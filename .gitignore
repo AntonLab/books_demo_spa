@@ -24,3 +24,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# agent skills — materialized from skills-lock.json via `npx skills`
+# (.claude/skills holds machine-specific absolute symlinks into .agents/)
+/.agents
+/.claude/skills
