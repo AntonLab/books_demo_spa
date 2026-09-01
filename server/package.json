@@ -10,7 +10,7 @@
     "start": "node ./src/index.ts",
     "start:dev": "nodemon ./src/index.ts",
     "build": "tsc -p tsconfig.build.json",
-    "test": "node --test \"src/**/*.spec.ts\"",
+    "test": "node --env-file-if-exists=.env.local --test \"src/**/*.spec.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
