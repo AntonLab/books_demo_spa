@@ -11,7 +11,14 @@ implemented end to end, associated by `User.hasMany(Series)`,
 Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
 `src/index.ts` ensures the schema exists, authenticates, and mounts the
 Express app under `/api`. Routes, controllers, repositories, models, and
-middleware are all wired. `node:test` is the test runner (`npm test`).
+middleware are all wired for those four. `node:test` is the test runner
+(`npm test`).
+
+`Comment` is a model only. `User.hasMany(Comment)`, `Book.hasMany(Comment)`
+and the self-referential `Comment.hasMany(Comment, { as: 'replies' })` are
+wired and covered by `models/Comment.spec.ts`, but it has no repository,
+controller or route yet, and `types/comment.ts` holds only `PublicComment` —
+no zod schemas.
 
 ## Development Commands
 
@@ -49,14 +56,14 @@ added.
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
   Sequelize-backed; `likePattern.ts` holds the LIKE escaping they share)
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `Book.ts`, `Chapter.ts`, `index.ts`; `tagArray.ts` holds the JSON tag-column
-  normalisation `Series` and `Book` share)
+  `Book.ts`, `Chapter.ts`, `Comment.ts`, `index.ts`; `tagArray.ts` holds the
+  JSON tag-column normalisation `Series` and `Book` share)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
 - `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
   `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `errors.ts`, `express.d.ts`)
+  `chapter.ts`, `comment.ts`, `errors.ts`, `express.d.ts`)
 
 ## Runtime notes
 
@@ -172,6 +179,27 @@ snippets — still get wrong. Verified against the 5.x router and request source
   worth representing, and `SET NULL` would be illegal on the column anyway.
   Between them the two associations cover both shapes — consult which one an
   optional link deserves before copying either.
+- **`comments.parentId` is a third shape, and InnoDB's cascade depth is what
+  chooses it**: the column is a self-reference (a reply points at the comment
+  it answers), nullable because a top-level comment answers nothing. It looks
+  like a candidate for `ON DELETE CASCADE` — delete a comment, lose its
+  subtree — but a self-referential cascade recurses, and InnoDB caps a cascade
+  chain at 15. Measured on MySQL 8.0.46: with `CASCADE`, deleting a thread
+  nested deeper than 15 fails with `ER_FK_DEPTH_EXCEEDED` (errno 3008), and so
+  does deleting the _book_ that owns it, because `books` → `comments` then
+  recurses through the replies; a bulk `DELETE FROM comments` fails the same
+  way, which would take the test teardown with it. `RESTRICT` fares no better
+  — that book delete then fails with errno 1451. `SET NULL` leaves every one
+  of those working, at the cost of promoting a deleted comment's direct replies
+  to top level, so that is what `Comment.hasMany(Comment)` declares. Deleting a
+  whole subtree belongs in application code: walk it, then delete in one
+  statement inside a transaction.
+- **A self-referential `ON UPDATE CASCADE` is a lie**: MySQL will not recurse
+  an update through the table it is already updating, so it silently behaves
+  like `RESTRICT` (verified — the update fails with errno 1451). The replies
+  association therefore declares `onUpdate: 'RESTRICT'`, unlike every other
+  association here, which says what actually happens. Nothing is lost: `id` is
+  a surrogate key that is never rewritten.
 - **`chapters.text` is `MEDIUMTEXT`, not `TEXT`**: `TEXT` holds 65,535
   _bytes_, which under utf8mb4 is as few as ~16k characters — a chapter of a
   novel passes that easily, and MySQL then truncates (or, in strict mode,
@@ -211,7 +239,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `books_demo_spa_test_books`, `books_demo_spa_test_chapters`) — `node:test`
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
-  Clear children before parents: `Chapter` → `Book` → `Series` → `User`.
+  Clear children before parents: `Chapter` → `Book` → `Series` → `User`, and
+  `Comment` ahead of `Book` once a suite needs it.
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
