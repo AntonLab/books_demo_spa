@@ -5,13 +5,13 @@ for persistence.
 
 ## Status
 
-The `User`, `Series` and `Book` models and their CRUD APIs are implemented end
-to end, associated by `User.hasMany(Series)`, `User.hasMany(Book)` and
-`Series.hasMany(Book)`. Sequelize (via `mysql2`) connects to the
-`books_demo_spa` MySQL database; `src/index.ts` ensures the schema exists,
-authenticates, and mounts the Express app under `/api`. Routes, controllers,
-repositories, models, and middleware are all wired. `node:test` is the test
-runner (`npm test`).
+The `User`, `Series`, `Book` and `Chapter` models and their CRUD APIs are
+implemented end to end, associated by `User.hasMany(Series)`,
+`User.hasMany(Book)`, `Series.hasMany(Book)` and `Book.hasMany(Chapter)`.
+Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
+`src/index.ts` ensures the schema exists, authenticates, and mounts the
+Express app under `/api`. Routes, controllers, repositories, models, and
+middleware are all wired. `node:test` is the test runner (`npm test`).
 
 ## Development Commands
 
@@ -42,21 +42,21 @@ added.
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
 - `src/routes/` — Express route definitions (`userRoutes.ts`,
-  `seriesRoutes.ts`, `bookRoutes.ts`, mounted under `/api`)
+  `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, mounted under `/api`)
 - `src/controllers/` — request handlers / HTTP mapping (`userController.ts`,
-  `seriesController.ts`, `bookController.ts`)
+  `seriesController.ts`, `bookController.ts`, `chapterController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
-  `seriesRepository.ts`, `bookRepository.ts`, Sequelize-backed;
-  `likePattern.ts` holds the LIKE escaping they share)
+  `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
+  Sequelize-backed; `likePattern.ts` holds the LIKE escaping they share)
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `Book.ts`, `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation
-  `Series` and `Book` share)
+  `Book.ts`, `Chapter.ts`, `index.ts`; `tagArray.ts` holds the JSON tag-column
+  normalisation `Series` and `Book` share)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
 - `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
   `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `errors.ts`, `express.d.ts`)
+  `chapter.ts`, `errors.ts`, `express.d.ts`)
 
 ## Runtime notes
 
@@ -167,6 +167,25 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `NOT NULL` column, so the association passes `allowNull: true` in its
   `foreignKey` object rather than letting Sequelize infer NOT NULL.
   `books.userId` stays `CASCADE`, like `series.userId`.
+- **`chapters.bookId` is the mirror image**: required, so it is `NOT NULL` and
+  `Book.hasMany(Chapter)` cascades. A chapter outside a book is not a state
+  worth representing, and `SET NULL` would be illegal on the column anyway.
+  Between them the two associations cover both shapes — consult which one an
+  optional link deserves before copying either.
+- **`chapters.text` is `MEDIUMTEXT`, not `TEXT`**: `TEXT` holds 65,535
+  _bytes_, which under utf8mb4 is as few as ~16k characters — a chapter of a
+  novel passes that easily, and MySQL then truncates (or, in strict mode,
+  rejects the write). `DataTypes.TEXT('medium')` is how Sequelize spells it.
+  `CHAPTER_TEXT_MAX_LENGTH` caps input at 1,000,000 characters, which stays
+  inside the 16 MB column even at 4 bytes per character. The descriptions on
+  `series` and `books` are short by nature and stay `TEXT`.
+- **A large column belongs out of the list SELECT**: `chapterRepository.list`
+  passes an explicit `attributes` array that omits `text`, and returns
+  `ChapterSummary` (`Omit<PublicChapter, 'text'>`) rather than the full record,
+  so `GET /api/chapters` cannot drag twenty MEDIUMTEXT bodies off disk to
+  serve a table of contents. The body is reachable through `GET /:id`. Keeping
+  the omission in the _type_ is what stops a future call site from quietly
+  putting it back.
 - **Two foreign keys need two error messages**: `bookRepository` cannot map
   every `ForeignKeyConstraintError` to one resource the way `seriesRepository`
   does — blaming the user for a bad `seriesId` sends the caller hunting for a
@@ -189,10 +208,10 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `destroy({ where: {} })` and let `ON DELETE CASCADE` take the children.
   Each MySQL-backed suite also syncs its own schema
   (`books_demo_spa_test`, `books_demo_spa_test_series`,
-  `books_demo_spa_test_books`) — `node:test` runs spec files in parallel
-  processes, and two suites calling `sync({ force: true })` on one database
-  drop each other's tables mid-run. Clear children before parents:
-  `Book` → `Series` → `User`.
+  `books_demo_spa_test_books`, `books_demo_spa_test_chapters`) — `node:test`
+  runs spec files in parallel processes, and two suites calling
+  `sync({ force: true })` on one database drop each other's tables mid-run.
+  Clear children before parents: `Chapter` → `Book` → `Series` → `User`.
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember

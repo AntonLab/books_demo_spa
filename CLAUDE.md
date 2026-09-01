@@ -28,10 +28,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   and `npm run build` (hashed output into `client/build/`). There is still no
   `test` script. See `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
-  `books_demo_spa`, and `User`, `Series` and `Book` models — associated by
-  `User.hasMany(Series)`, `User.hasMany(Book)` and `Series.hasMany(Book)` —
-  each have a full CRUD API. `npm run build` (`tsc -p tsconfig.build.json`)
-  emits to `dist/`.
+  `books_demo_spa`, and `User`, `Series`, `Book` and `Chapter` models —
+  associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
+  `Series.hasMany(Book)` and `Book.hasMany(Chapter)` — each have a full CRUD
+  API. `npm run build` (`tsc -p tsconfig.build.json`) emits to `dist/`.
 - `server` has a test suite using `node:test` (`npm test`). `client` still has
   no test script.
 

@@ -10,6 +10,7 @@ import type {
 } from '../repositories/seriesRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
+import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import type { PublicSeries } from '../types/series.ts';
 
 const KNOWN_USER_ID = 1;
@@ -97,6 +98,7 @@ async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
     userRepository: createUnusedRepository<UserRepository>('user'),
     seriesRepository: createFakeRepository(),
     bookRepository: createUnusedRepository<BookRepository>('book'),
+    chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
   });
   const server = app.listen(0);
   await once(server, 'listening');

@@ -1,5 +1,6 @@
 import type { Sequelize } from 'sequelize';
 import { initBookModel, Book } from './Book.ts';
+import { initChapterModel, Chapter } from './Chapter.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initUserModel, User } from './User.ts';
 
@@ -7,12 +8,14 @@ export interface Models {
   User: typeof User;
   Series: typeof Series;
   Book: typeof Book;
+  Chapter: typeof Chapter;
 }
 
 export function initModels(sequelize: Sequelize): Models {
   initUserModel(sequelize);
   initSeriesModel(sequelize);
   initBookModel(sequelize);
+  initChapterModel(sequelize);
 
   // Associations are declared after every model is initialised, so the target
   // is always a registered model no matter what order the files load in.
@@ -48,9 +51,21 @@ export function initModels(sequelize: Sequelize): Models {
   });
   Book.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
 
-  return { User, Series, Book };
+  Book.hasMany(Chapter, {
+    as: 'chapters',
+    foreignKey: 'bookId',
+    // CASCADE rather than the SET NULL used for books.seriesId: bookId is NOT
+    // NULL, because a chapter belonging to no book is not a state worth
+    // representing — and MySQL forbids SET NULL on a NOT NULL column anyway.
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Chapter.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  return { User, Series, Book, Chapter };
 }
 
 export { User, toPublicUser } from './User.ts';
 export { Series, toPublicSeries } from './Series.ts';
 export { Book, toPublicBook } from './Book.ts';
+export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
