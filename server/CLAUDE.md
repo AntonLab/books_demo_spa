@@ -5,34 +5,49 @@ for persistence.
 
 ## Status
 
-Early scaffold. `src/index.ts` only creates an Express app and calls
-`app.listen(4000)` — no routes, middleware, or database connection are wired yet.
-`sequelize` and `mysql2` are installed but unused so far. The feature directories
-below exist but are empty.
+The `User` model and its CRUD API are implemented end to end. Sequelize (via
+`mysql2`) connects to the `books_demo_spa` MySQL database; `src/index.ts`
+ensures the schema exists, authenticates, and mounts the Express app under
+`/api`. Routes, controllers, repositories, models, and middleware are all
+wired. `node:test` is the test runner (`npm test`).
 
 ## Development Commands
 
 - `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.5)
 - `npm run start:dev` — run under nodemon (see `nodemon.json`), which execs
   `node ./src/index.ts` and restarts on changes to `src/**/*.{ts,json}`
-- `npm run build` — compile with `tsc` to `dist/`
+- `npm run build` — compile with `tsc -p tsconfig.build.json` to `dist/`; that
+  config extends `tsconfig.json` but excludes `src/**/*.spec.ts`, so test files
+  are never emitted
+- `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
+  (loads `.env.local` when present, then runs every `node:test` spec, including
+  the MySQL-backed integration suite — omitting `--env-file-if-exists` would
+  silently skip that suite instead of failing loudly)
 - `npm run typecheck` — `tsc --noEmit` (type-check only)
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`)
 - `npm run format` / `npm run format:check` — Prettier (root `.prettierrc.json`)
 
-There is no `test` script or `sequelize-cli` dependency yet — do not reference
-them until they are added.
+There is no `sequelize-cli` dependency yet — do not reference it until it is
+added.
 
 ## Layout
 
-- `src/index.ts` — Express entry point (listens on port 4000)
-- `src/routes/` — Express route definitions _(empty — to be created)_
-- `src/controllers/` — request handlers / HTTP mapping _(empty)_
-- `src/repositories/` — data-access layer _(empty)_
-- `src/models/` — Sequelize models & associations _(empty)_
-- `src/db/` — database connection / config _(empty)_
-- `src/middleware/` — auth, validation, error handling _(empty)_
-- `src/types/` — shared TypeScript types _(empty)_
+- `src/index.ts` — process entry point: loads `.env.local`, ensures the schema,
+  connects Sequelize, authenticates, and starts listening
+- `src/app.ts` — builds the Express app (`createApp`), wiring routes and the
+  error-handling middleware
+- `src/logger.ts` — the sanctioned console boundary; every other module logs
+  through this instead of calling `console.*` directly
+- `src/password.ts` — argon2id password hashing and verification
+- `src/routes/` — Express route definitions (`userRoutes.ts`, mounted under `/api`)
+- `src/controllers/` — request handlers / HTTP mapping (`userController.ts`)
+- `src/repositories/` — data-access layer (`userRepository.ts`, Sequelize-backed)
+- `src/models/` — Sequelize models & associations (`User.ts`, `index.ts`)
+- `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
+  `sequelize.ts`)
+- `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
+  `notFound.ts`, `validate.ts`)
+- `src/types/` — shared TypeScript types (`user.ts`, `errors.ts`, `express.d.ts`)
 
 ## Runtime notes
 
@@ -40,6 +55,12 @@ them until they are added.
   `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `start:dev` run the `.ts` entry directly via Node (native TS
   type-stripping); nodemon only adds watch/restart on top.
+- Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
+  because Node's native TS mode resolves modules exactly as written — it does
+  no extension rewriting itself. `tsconfig.json` sets
+  `rewriteRelativeImportExtensions: true`, so `npm run build` rewrites those
+  same imports to `.js` when compiling to `dist/`, and the same source runs
+  unmodified in both modes.
 
 ## Express 5 notes
 
@@ -95,6 +116,14 @@ snippets — still get wrong. Verified against the 5.x router and request source
   }
   ```
 
+- **Case-sensitive login**: `login` overrides the table's default collation
+  with an explicit `utf8mb4_0900_as_cs` column type (Sequelize 6 has no
+  per-column collation option, so it is given as a raw type string), which is
+  what lets `Bob` and `bob` coexist as distinct users. `email` carries no
+  column collation and inherits the case-insensitive table default instead.
+  Because of that split, any query that searches or filters `login` alongside
+  case-insensitive fields needs an explicit `COLLATE` clause (see `buildWhere`
+  in `userRepository.ts`) or the comparison silently stays case-sensitive.
 - **The dialect is `mysql`** (through `mysql2`), not Postgres. `DataTypes.JSONB`
   and `DataTypes.ARRAY` are Postgres-only and will not work here.
 - **Charset**: create schemas and tables as `utf8mb4` / `utf8mb4_0900_ai_ci` —

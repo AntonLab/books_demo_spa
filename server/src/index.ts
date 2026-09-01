@@ -1,5 +1,44 @@
-import express from 'express';
+import { createApp } from './app.ts';
+import { loadConfig } from './db/config.ts';
+import { ensureDatabase } from './db/ensureDatabase.ts';
+import { createSequelize } from './db/sequelize.ts';
+import { logger } from './logger.ts';
+import { initModels } from './models/index.ts';
+import { createSequelizeUserRepository } from './repositories/userRepository.ts';
 
-const app = express();
+function loadLocalEnv(): void {
+  try {
+    process.loadEnvFile('.env.local');
+  } catch {
+    logger.warn('.env.local not found; relying on the ambient environment');
+  }
+}
 
-app.listen(4000);
+async function main(): Promise<void> {
+  loadLocalEnv();
+  const config = loadConfig();
+
+  // Sequelize cannot create its own schema, and creating one is not the
+  // application's business in production.
+  if (config.env !== 'production') {
+    await ensureDatabase(config.db);
+  }
+
+  const sequelize = createSequelize(config.db);
+  initModels(sequelize);
+
+  // A rejection here stops the process: never continue into a server with no
+  // database.
+  await sequelize.authenticate();
+
+  if (config.env !== 'production') {
+    await sequelize.sync();
+  }
+
+  const app = createApp({ userRepository: createSequelizeUserRepository() });
+  app.listen(config.port, () => {
+    logger.info(`server listening on http://127.0.0.1:${config.port}`);
+  });
+}
+
+await main();

@@ -27,9 +27,11 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   `npm run dev` (dev server on port 3000, Fast Refresh, `/api` proxied to :4000)
   and `npm run build` (hashed output into `client/build/`). There is still no
   `test` script. See `client/CLAUDE.md`.
-- `server` has `sequelize` and `mysql2` installed but not wired; `src/index.ts`
-  only starts Express on port 4000. `npm run build` (`tsc`) emits to `dist/`.
-- No test tooling is configured in either package.
+- `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
+  `books_demo_spa`, and a `User` model with a full CRUD API is implemented.
+  `npm run build` (`tsc -p tsconfig.build.json`) emits to `dist/`.
+- `server` has a test suite using `node:test` (`npm test`). `client` still has
+  no test script.
 
 ## Quality Gates
 
@@ -38,9 +40,11 @@ Run these from within the relevant package (`client/` or `server/`) before commi
 - `npm run typecheck` — TypeScript, no emit
 - `npm run lint` — ESLint 9 flat config (`eslint.config.mjs`)
 - `npm run format:check` — Prettier (shared `.prettierrc.json` at the repo root)
+- `npm test` (server only) — `node:test`, including a MySQL-backed integration
+  suite; see `server/CLAUDE.md` for the exact script
 
-`npm run lint:fix` and `npm run format` apply fixes. No test runner is configured
-yet; document one here and in the package CLAUDE.md when it is added.
+`npm run lint:fix` and `npm run format` apply fixes. `client` has no test runner
+configured yet; document one here and in `client/CLAUDE.md` when it is added.
 
 ## Anti-Patterns
 
