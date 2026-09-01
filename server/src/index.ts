@@ -41,4 +41,10 @@ async function main(): Promise<void> {
   });
 }
 
-await main();
+await main().catch((error: unknown) => {
+  logger.error(
+    'Fatal error during startup',
+    error instanceof Error ? error.message : String(error)
+  );
+  process.exitCode = 1;
+});

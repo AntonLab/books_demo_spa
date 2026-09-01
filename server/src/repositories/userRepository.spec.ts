@@ -179,6 +179,23 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(found.total, 1);
   });
 
+  test('a literal % in q is escaped rather than matching every row', async () => {
+    await User.destroy({ truncate: true });
+    await repository.create({
+      ...base,
+      login: 'alice',
+      email: 'a@example.com',
+    });
+    await repository.create({
+      ...base,
+      login: 'carol',
+      email: 'c@example.com',
+    });
+
+    const found = await repository.list({ limit: 20, offset: 0, q: '%' });
+    assert.equal(found.total, 0);
+  });
+
   test('updates a single field and leaves the rest alone', async () => {
     await User.destroy({ truncate: true });
     const created = await repository.create({ ...base });
