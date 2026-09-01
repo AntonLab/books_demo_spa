@@ -107,10 +107,16 @@ const post = (base: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
+// undici's Body.json() returns Promise<unknown>; this is the single place the
+// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
+async function json<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
 test('POST creates a user and never echoes the password', async () => {
   await withServer(async (base) => {
     const response = await post(base, valid);
-    const body = await response.json();
+    const body = await json<{ login: string; status: string }>(response);
 
     assert.equal(response.status, 201);
     assert.equal(body.login, 'Bob');
@@ -124,7 +130,10 @@ test('POST rejects an invalid email with 400', async () => {
     const response = await post(base, { ...valid, email: 'nope' });
 
     assert.equal(response.status, 400);
-    assert.match((await response.json()).error, /validation/i);
+    assert.match(
+      (await json<{ error: string }>(response)).error,
+      /validation/i
+    );
   });
 });
 
@@ -134,7 +143,9 @@ test('POST rejects a duplicate login with 409 naming the field', async () => {
     const response = await post(base, { ...valid, email: 'other@example.com' });
 
     assert.equal(response.status, 409);
-    assert.deepEqual((await response.json()).details, { field: 'login' });
+    assert.deepEqual((await json<{ details: unknown }>(response)).details, {
+      field: 'login',
+    });
   });
 });
 
@@ -142,7 +153,12 @@ test('GET list returns items with the paging envelope', async () => {
   await withServer(async (base) => {
     await post(base, valid);
     const response = await fetch(`${base}/api/users`);
-    const body = await response.json();
+    const body = await json<{
+      total: number;
+      limit: number;
+      offset: number;
+      items: unknown[];
+    }>(response);
 
     assert.equal(response.status, 200);
     assert.equal(body.total, 1);
@@ -170,13 +186,13 @@ test('GET by id rejects a non-numeric id with 400', async () => {
 
 test('PATCH updates one field', async () => {
   await withServer(async (base) => {
-    const created = await (await post(base, valid)).json();
+    const created = await json<{ id: number }>(await post(base, valid));
     const response = await fetch(`${base}/api/users/${created.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ firstName: 'Robert' }),
     });
-    const body = await response.json();
+    const body = await json<{ firstName: string; lastName: string }>(response);
 
     assert.equal(response.status, 200);
     assert.equal(body.firstName, 'Robert');
@@ -186,7 +202,7 @@ test('PATCH updates one field', async () => {
 
 test('PATCH rejects an empty body with 400', async () => {
   await withServer(async (base) => {
-    const created = await (await post(base, valid)).json();
+    const created = await json<{ id: number }>(await post(base, valid));
     const response = await fetch(`${base}/api/users/${created.id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -199,7 +215,7 @@ test('PATCH rejects an empty body with 400', async () => {
 
 test('DELETE returns 204 once and 404 afterwards', async () => {
   await withServer(async (base) => {
-    const created = await (await post(base, valid)).json();
+    const created = await json<{ id: number }>(await post(base, valid));
 
     assert.equal(
       (await fetch(`${base}/api/users/${created.id}`, { method: 'DELETE' }))
@@ -219,6 +235,6 @@ test('an unknown route returns a JSON 404', async () => {
     const response = await fetch(`${base}/api/nothing-here`);
 
     assert.equal(response.status, 404);
-    assert.ok((await response.json()).error);
+    assert.ok((await json<{ error: string }>(response)).error);
   });
 });
