@@ -1,4 +1,4 @@
-/* eslint-disable no-console -- this module is the single sanctioned console boundary */
+// The single sanctioned console boundary: every other module logs through this one.
 
 export interface LogSink {
   info(...args: unknown[]): void;
