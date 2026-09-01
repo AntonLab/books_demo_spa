@@ -41,6 +41,24 @@ them until they are added.
 - Both `start` and `start:dev` run the `.ts` entry directly via Node (native TS
   type-stripping); nodemon only adds watch/restart on top.
 
+## Express 5 notes
+
+Express 5 differs from Express 4 in ways most tutorials — and most generated
+snippets — still get wrong. Verified against the 5.x router and request sources:
+
+- **Async errors forward themselves.** The router inspects a handler's return
+  value and calls `next(err)` when the returned promise rejects, so an `async`
+  handler needs no `try/catch` whose only job is to funnel the error into
+  `next`. Catch only to add context, then rethrow.
+- **Handler arity is significant.** An error handler must take exactly four
+  params `(err, req, res, next)`; with three it is treated as ordinary
+  middleware, with five it is skipped by both the normal and the error path.
+  Keep the unused `next` rather than deleting it to satisfy a lint rule.
+- **`req.query` is a getter with no setter.** Assigning to it fails silently
+  (or throws in strict mode) — put validated or coerced values on your own
+  request property instead. Every read re-parses the query string, so read it
+  once into a local in hot paths.
+
 ## Code Guidelines (apply as the API is built out)
 
 - **Strict types**: strict mode is on. Avoid `any`; type models with
@@ -57,3 +75,42 @@ them until they are added.
 - No synchronous filesystem calls in request handlers; no `console.log` for logging
   in production code — use a logger. ESLint flags `console` (`no-console`) and
   `any` (`@typescript-eslint/no-explicit-any`).
+
+## Sequelize & MySQL conventions
+
+- **Model typing**: derive attributes from `InferAttributes`, mark
+  server-generated columns `CreationOptional`, and prefix every field with
+  `declare` so they stay type-only and never emit class properties that shadow
+  Sequelize's accessors:
+
+  ```ts
+  class Book extends Model<
+    InferAttributes<Book>,
+    InferCreationAttributes<Book>
+  > {
+    declare id: CreationOptional<number>;
+    declare title: string;
+    declare authorId: number;
+    declare createdAt: CreationOptional<Date>;
+  }
+  ```
+
+- **The dialect is `mysql`** (through `mysql2`), not Postgres. `DataTypes.JSONB`
+  and `DataTypes.ARRAY` are Postgres-only and will not work here.
+- **Charset**: create schemas and tables as `utf8mb4` / `utf8mb4_0900_ai_ci` —
+  MySQL's `utf8` is 3-byte `utf8mb3` and drops emoji and much CJK. Under utf8mb4
+  a `VARCHAR(255)` index entry reaches 1020 bytes, which fits InnoDB's 3072-byte
+  key limit on the default DYNAMIC row format but overflows the 767-byte limit of
+  REDUNDANT/COMPACT — use a prefix index for longer strings.
+- **Uniqueness belongs in the schema**: enforce it with a unique index, never a
+  custom validator that runs `findOne` first — that is a check-then-write race
+  and an extra query on every save.
+- **Hooks**: pass `options.transaction` to every query a hook issues, or the
+  hook's writes land outside the caller's transaction. Keep external side effects
+  (email, queue publishes) out of hooks entirely — `afterCreate` fires before the
+  surrounding transaction commits, and a rollback cannot unsend them.
+- **Fail fast on startup**: let a failed `sequelize.authenticate()` reject and
+  stop the process; never log-and-continue into a server with no database.
+- **Migrations**: `sequelize-cli` is not installed. When it is added, remember
+  this is an ESM package — `.js` migrations are parsed as ESM, so the CLI's
+  `module.exports` template will throw. Name them `.cjs` or author them as ESM.
