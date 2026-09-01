@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repository and in the working tree.
+# Without this, core.autocrlf=true checks files out with CRLF on Windows and
+# `npm run format:check` fails on a fresh clone, because Prettier expects LF.
+* text=auto eol=lf
