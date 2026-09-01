@@ -29,3 +29,6 @@ yarn-error.log*
 # (.claude/skills holds machine-specific absolute symlinks into .agents/)
 /.agents
 /.claude/skills
+
+# agent working notes — plans and specs generated per task, not project docs
+/docs

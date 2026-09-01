@@ -10,6 +10,7 @@ import type {
 } from '../repositories/userRepository.ts';
 import type { PublicUser } from '../types/user.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
+import type { BookRepository } from '../repositories/bookRepository.ts';
 
 function createFakeRepository(): UserRepository {
   const rows = new Map<number, PublicUser>();
@@ -80,11 +81,11 @@ function createFakeRepository(): UserRepository {
   };
 }
 
-// createApp requires both repositories, but no request in this file reaches
-// /api/series — a stub that throws keeps that assumption honest.
-function createUnusedSeriesRepository(): SeriesRepository {
+// createApp requires every repository, but no request in this file reaches
+// /api/series or /api/books — stubs that throw keep that assumption honest.
+function createUnusedRepository<T>(name: string): T {
   const unreachable = (): never => {
-    throw new Error('the series repository must not be used by these tests');
+    throw new Error(`the ${name} repository must not be used by these tests`);
   };
 
   return {
@@ -93,13 +94,14 @@ function createUnusedSeriesRepository(): SeriesRepository {
     findById: unreachable,
     update: unreachable,
     remove: unreachable,
-  };
+  } as T;
 }
 
 async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
   const app = createApp({
     userRepository: createFakeRepository(),
-    seriesRepository: createUnusedSeriesRepository(),
+    seriesRepository: createUnusedRepository<SeriesRepository>('series'),
+    bookRepository: createUnusedRepository<BookRepository>('book'),
   });
   const server = app.listen(0);
   await once(server, 'listening');

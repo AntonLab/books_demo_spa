@@ -4,6 +4,7 @@ import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
+import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
 import { createSequelizeUserRepository } from './repositories/userRepository.ts';
 
@@ -39,6 +40,7 @@ async function main(): Promise<void> {
   const app = createApp({
     userRepository: createSequelizeUserRepository(),
     seriesRepository: createSequelizeSeriesRepository(),
+    bookRepository: createSequelizeBookRepository(),
   });
   app.listen(config.port, () => {
     logger.info(`server listening on http://127.0.0.1:${config.port}`);

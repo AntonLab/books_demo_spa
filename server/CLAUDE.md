@@ -5,8 +5,9 @@ for persistence.
 
 ## Status
 
-The `User` and `Series` models and their CRUD APIs are implemented end to
-end, with `User.hasMany(Series)`. Sequelize (via `mysql2`) connects to the
+The `User`, `Series` and `Book` models and their CRUD APIs are implemented end
+to end, associated by `User.hasMany(Series)`, `User.hasMany(Book)` and
+`Series.hasMany(Book)`. Sequelize (via `mysql2`) connects to the
 `books_demo_spa` MySQL database; `src/index.ts` ensures the schema exists,
 authenticates, and mounts the Express app under `/api`. Routes, controllers,
 repositories, models, and middleware are all wired. `node:test` is the test
@@ -41,20 +42,21 @@ added.
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
 - `src/routes/` — Express route definitions (`userRoutes.ts`,
-  `seriesRoutes.ts`, mounted under `/api`)
+  `seriesRoutes.ts`, `bookRoutes.ts`, mounted under `/api`)
 - `src/controllers/` — request handlers / HTTP mapping (`userController.ts`,
-  `seriesController.ts`)
+  `seriesController.ts`, `bookController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
-  `seriesRepository.ts`, Sequelize-backed; `likePattern.ts` holds the LIKE
-  escaping both share)
+  `seriesRepository.ts`, `bookRepository.ts`, Sequelize-backed;
+  `likePattern.ts` holds the LIKE escaping they share)
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `index.ts`)
+  `Book.ts`, `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation
+  `Series` and `Book` share)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
 - `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
   `notFound.ts`, `validate.ts`)
-- `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `errors.ts`,
-  `express.d.ts`)
+- `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
+  `errors.ts`, `express.d.ts`)
 
 ## Runtime notes
 
@@ -147,27 +149,50 @@ snippets — still get wrong. Verified against the 5.x router and request source
   surrounding transaction commits, and a rollback cannot unsend them.
 - **Fail fast on startup**: let a failed `sequelize.authenticate()` reject and
   stop the process; never log-and-continue into a server with no database.
-- **Lists in MySQL**: `series.tags` is a `JSON` column, because MySQL has no
-  array type. Two consequences worth remembering. A JSON column cannot carry a
-  literal `DEFAULT`, so the empty-array default lives in `createSeriesSchema`
-  rather than the DDL. And membership needs `JSON_CONTAINS`, not `LIKE` — a
-  substring match would let `?tag=epic` also return rows tagged
-  `epic-fantasy`. Pass the tag as an argument to `fn()` so Sequelize escapes
-  it instead of concatenating it into the SQL.
-- **Foreign key column types must match exactly**: `series.userId` is
-  `INTEGER UNSIGNED` because `users.id` is; a plain `INTEGER` makes MySQL
-  reject the constraint with errno 3780.
+- **Lists in MySQL**: `series.tags` and `books.tags` are `JSON` columns,
+  because MySQL has no array type. Two consequences worth remembering. A JSON
+  column cannot carry a literal `DEFAULT`, so the empty-array default lives in
+  `createSeriesSchema` / `createBookSchema` rather than the DDL. And membership
+  needs `JSON_CONTAINS`, not `LIKE` — a substring match would let `?tag=epic`
+  also return rows tagged `epic-fantasy`. Pass the tag as an argument to `fn()`
+  so Sequelize escapes it instead of concatenating it into the SQL.
+- **Foreign key column types must match exactly**: `series.userId` and
+  `books.userId` / `books.seriesId` are `INTEGER UNSIGNED` because `users.id`
+  and `series.id` are; a plain `INTEGER` makes MySQL reject the constraint with
+  errno 3780.
+- **`books.seriesId` is optional, and that drives its `ON DELETE`**: a book can
+  stand alone, so the column is nullable and `Series.hasMany(Book)` uses
+  `ON DELETE SET NULL` — dropping a series unlinks its books instead of
+  deleting records nobody asked to delete. MySQL rejects `SET NULL` on a
+  `NOT NULL` column, so the association passes `allowNull: true` in its
+  `foreignKey` object rather than letting Sequelize infer NOT NULL.
+  `books.userId` stays `CASCADE`, like `series.userId`.
+- **Two foreign keys need two error messages**: `bookRepository` cannot map
+  every `ForeignKeyConstraintError` to one resource the way `seriesRepository`
+  does — blaming the user for a bad `seriesId` sends the caller hunting for a
+  user that exists. The columns are only distinguishable through MySQL's
+  constraint text, so `asMissingReference` matches the column name in it and
+  falls back to `userId`, which is the only candidate when no `seriesId` was
+  supplied. Both branches are covered by the MySQL-backed suite.
 - **Zod `.partial()` does not undo `.default()`**: a PATCH schema built from
   a create schema that defaults `tags` to `[]` will parse a body with no
   `tags` key as `tags: []` and silently wipe the stored value. `update*`
-  schemas are therefore spelled out rather than derived (see `types/series.ts`).
+  schemas are therefore spelled out rather than derived (see `types/series.ts`
+  and `types/book.ts`). `createBookSchema` defaults `seriesId` to `null` for
+  the same reason, which makes this sharper still: a derived PATCH schema would
+  unlink a book from its series on every body that omitted the key. Note the
+  split in what is editable — `userId` is absent from both `update*` schemas
+  (re-parenting is not a field edit), but `seriesId` is present in
+  `updateBookSchema`, where an explicit `null` is how a book leaves a series.
 - **Foreign keys constrain the test teardown**: MySQL refuses to `TRUNCATE` a
   table referenced by a foreign key, so the suites clear users with
   `destroy({ where: {} })` and let `ON DELETE CASCADE` take the children.
   Each MySQL-backed suite also syncs its own schema
-  (`books_demo_spa_test`, `books_demo_spa_test_series`) — `node:test` runs
-  spec files in parallel processes, and two suites calling
-  `sync({ force: true })` on one database drop each other's tables mid-run.
+  (`books_demo_spa_test`, `books_demo_spa_test_series`,
+  `books_demo_spa_test_books`) — `node:test` runs spec files in parallel
+  processes, and two suites calling `sync({ force: true })` on one database
+  drop each other's tables mid-run. Clear children before parents:
+  `Book` → `Series` → `User`.
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
