@@ -1,11 +1,11 @@
 # Claude Code — books_demo_spa
 
-Two-package repo: a Create React App (TypeScript) frontend and an Express +
+Two-package repo: a webpack-bundled React (TypeScript) frontend and an Express +
 Sequelize backend. Early scaffold — most feature directories exist but are empty.
 
 ## Layout
 
-- `client/` — React 19 + TypeScript SPA (Create React App layout). See `client/CLAUDE.md`.
+- `client/` — React 19 + TypeScript SPA bundled with webpack 5. See `client/CLAUDE.md`.
 - `server/` — Express 5 + Sequelize/MySQL API. See `server/CLAUDE.md`.
 
 There is no root `package.json`; install and run each package from its own directory.
@@ -23,9 +23,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 - Both packages now have TypeScript, ESLint (flat config), and Prettier wired up,
   exposing `typecheck`, `lint`, `lint:fix`, `format`, and `format:check` scripts.
   See each package's CLAUDE.md.
-- `client` has no bundler, dev server, or build yet (the CRA `react-scripts` setup
-  and `public/` were removed); `typecheck`/`lint`/`format` run, but there is no
-  `dev`/`build`/`test`.
+- `client` is bundled with webpack 5 (swc-loader + fork-ts-checker), exposing
+  `npm run dev` (dev server on port 3000, Fast Refresh, `/api` proxied to :4000)
+  and `npm run build` (hashed output into `client/build/`). There is still no
+  `test` script. See `client/CLAUDE.md`.
 - `server` has `sequelize` and `mysql2` installed but not wired; `src/index.ts`
   only starts Express on port 4000. `npm run build` (`tsc`) emits to `dist/`.
 - No test tooling is configured in either package.

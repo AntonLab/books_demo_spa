@@ -35,6 +35,17 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
     },
   },
+  // Webpack config files are CommonJS and run in Node, not the browser.
+  {
+    files: ['config/webpack.*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
   // Disable stylistic rules that conflict with Prettier. Must stay last.
   prettier
 );
