@@ -18,6 +18,14 @@ export default tseslint.config(
       // Enforce the repo anti-patterns from CLAUDE.md.
       'no-console': 'warn',
       '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
     },
   },
   // Disable stylistic rules that conflict with Prettier. Must stay last.
