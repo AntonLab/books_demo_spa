@@ -6,6 +6,7 @@ import {
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { toPublicUser, User } from '../models/User.ts';
+import { containsPattern } from './likePattern.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
   CreateUserInput,
@@ -46,15 +47,6 @@ function asConflict(error: unknown): never {
   throw error;
 }
 
-// Escapes MySQL's LIKE metacharacters (and the escape character itself) so a
-// user-supplied search term is matched literally rather than as a pattern —
-// otherwise `?q=%` matches every row and `?q=_` matches any single character.
-// The value still reaches the query as a bound parameter, so this is about
-// search semantics, not SQL injection.
-function escapeLikePattern(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 function buildWhere(query: ListUsersQuery): WhereOptions {
   const clauses: WhereOptions[] = [];
 
@@ -63,7 +55,7 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
   }
 
   if (query.q) {
-    const pattern = `%${escapeLikePattern(query.q)}%`;
+    const pattern = containsPattern(query.q);
     clauses.push({
       [Op.or]: [
         // `login` carries a case-sensitive collation, so a plain LIKE there

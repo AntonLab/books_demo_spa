@@ -5,11 +5,12 @@ for persistence.
 
 ## Status
 
-The `User` model and its CRUD API are implemented end to end. Sequelize (via
-`mysql2`) connects to the `books_demo_spa` MySQL database; `src/index.ts`
-ensures the schema exists, authenticates, and mounts the Express app under
-`/api`. Routes, controllers, repositories, models, and middleware are all
-wired. `node:test` is the test runner (`npm test`).
+The `User` and `Series` models and their CRUD APIs are implemented end to
+end, with `User.hasMany(Series)`. Sequelize (via `mysql2`) connects to the
+`books_demo_spa` MySQL database; `src/index.ts` ensures the schema exists,
+authenticates, and mounts the Express app under `/api`. Routes, controllers,
+repositories, models, and middleware are all wired. `node:test` is the test
+runner (`npm test`).
 
 ## Development Commands
 
@@ -39,15 +40,21 @@ added.
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
-- `src/routes/` — Express route definitions (`userRoutes.ts`, mounted under `/api`)
-- `src/controllers/` — request handlers / HTTP mapping (`userController.ts`)
-- `src/repositories/` — data-access layer (`userRepository.ts`, Sequelize-backed)
-- `src/models/` — Sequelize models & associations (`User.ts`, `index.ts`)
+- `src/routes/` — Express route definitions (`userRoutes.ts`,
+  `seriesRoutes.ts`, mounted under `/api`)
+- `src/controllers/` — request handlers / HTTP mapping (`userController.ts`,
+  `seriesController.ts`)
+- `src/repositories/` — data-access layer (`userRepository.ts`,
+  `seriesRepository.ts`, Sequelize-backed; `likePattern.ts` holds the LIKE
+  escaping both share)
+- `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
+  `index.ts`)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
 - `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
   `notFound.ts`, `validate.ts`)
-- `src/types/` — shared TypeScript types (`user.ts`, `errors.ts`, `express.d.ts`)
+- `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `errors.ts`,
+  `express.d.ts`)
 
 ## Runtime notes
 
@@ -140,6 +147,29 @@ snippets — still get wrong. Verified against the 5.x router and request source
   surrounding transaction commits, and a rollback cannot unsend them.
 - **Fail fast on startup**: let a failed `sequelize.authenticate()` reject and
   stop the process; never log-and-continue into a server with no database.
+- **Lists in MySQL**: `series.tags` is a `JSON` column, because MySQL has no
+  array type. Two consequences worth remembering. A JSON column cannot carry a
+  literal `DEFAULT`, so the empty-array default lives in `createSeriesSchema`
+  rather than the DDL. And membership needs `JSON_CONTAINS`, not `LIKE` — a
+  substring match would let `?tag=epic` also return rows tagged
+  `epic-fantasy`. Pass the tag as an argument to `fn()` so Sequelize escapes
+  it instead of concatenating it into the SQL.
+- **Foreign key column types must match exactly**: `series.userId` is
+  `INTEGER UNSIGNED` because `users.id` is; a plain `INTEGER` makes MySQL
+  reject the constraint with errno 3780.
+- **Zod `.partial()` does not undo `.default()`**: a PATCH schema built from
+  a create schema that defaults `tags` to `[]` will parse a body with no
+  `tags` key as `tags: []` and silently wipe the stored value. `update*`
+  schemas are therefore spelled out rather than derived (see `types/series.ts`).
+- **Foreign keys constrain the test teardown**: MySQL refuses to `TRUNCATE` a
+  table referenced by a foreign key, so the suites clear users with
+  `destroy({ where: {} })` and let `ON DELETE CASCADE` take the children.
+  Each MySQL-backed suite also syncs its own schema
+  (`books_demo_spa_test`, `books_demo_spa_test_series`) — `node:test` runs
+  spec files in parallel processes, and two suites calling
+  `sync({ force: true })` on one database drop each other's tables mid-run.
+  A suite that syncs must call `initModels`, not a single `init*Model`, or
+  `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
   this is an ESM package — `.js` migrations are parsed as ESM, so the CLI's
   `module.exports` template will throw. Name them `.cjs` or author them as ESM.
