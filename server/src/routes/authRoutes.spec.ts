@@ -9,6 +9,7 @@ import type {
   SessionRepository,
   SessionRecord,
 } from '../repositories/sessionRepository.ts';
+import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import type { CreateUserInput, PublicUser, UserStatus } from '../types/user.ts';
 
@@ -81,7 +82,15 @@ function createFakeUsers(seed: { status?: UserStatus } = {}) {
     },
   } as unknown as UserRepository;
 
-  return repository;
+  async function setPassword(id: number, plaintext: string): Promise<void> {
+    const row = rows.get(id);
+    if (!row) return;
+    // 'test' pins the deliberately weak argon2 parameters from password.ts, so
+    // the suite does not spend seconds inside the KDF.
+    row.password = await hashPassword(plaintext, 'test');
+  }
+
+  return { repository, setPassword };
 }
 
 function createFakeSessions() {
@@ -117,14 +126,67 @@ function createFakeSessions() {
   return { repository, rows };
 }
 
+// Takes the two collaborators explicitly rather than deriving them, so the
+// fake's reach matches the real repository's: password, token, sessions.
+function createFakeResets(
+  users: ReturnType<typeof createFakeUsers>,
+  sessions: ReturnType<typeof createFakeSessions>
+) {
+  const rows = new Map<
+    string,
+    { userId: number; usedAt: Date | null; expiresAt: Date }
+  >();
+
+  const repository: PasswordResetRepository = {
+    async create(userId, tokenHash, expiresAt) {
+      rows.set(tokenHash, { userId, usedAt: null, expiresAt });
+    },
+    async invalidateAllForUser(userId) {
+      let affected = 0;
+      for (const row of rows.values()) {
+        if (row.userId === userId && row.usedAt === null) {
+          row.usedAt = new Date();
+          affected += 1;
+        }
+      }
+      return affected;
+    },
+    // Mirrors the real repository's single-use + expiry filter; the real one
+    // does it in SQL inside a transaction, this one in memory.
+    async redeem(tokenHash, newPassword) {
+      const row = rows.get(tokenHash);
+      if (!row || row.usedAt !== null || row.expiresAt <= new Date())
+        return false;
+      row.usedAt = new Date();
+      await users.setPassword(row.userId, newPassword);
+      await sessions.repository.deleteAllForUser(row.userId);
+      return true;
+    },
+  };
+
+  return { repository, rows };
+}
+
 function authDeps(seed: { status?: UserStatus } = {}) {
   const sessions = createFakeSessions();
+  const users = createFakeUsers(seed);
+  const resets = createFakeResets(users, sessions);
+  const delivered: { email: string; token: string }[] = [];
+
   return {
     deps: {
-      userRepository: createFakeUsers(seed),
+      userRepository: users.repository,
       sessionRepository: sessions.repository,
+      passwordResetRepository: resets.repository,
+      resetDelivery: {
+        async send(email: string, token: string) {
+          delivered.push({ email, token });
+        },
+      },
     },
     sessions,
+    resets,
+    delivered,
   };
 }
 
@@ -316,5 +378,168 @@ test('POST /logout without a session is still 204: logging out twice is not an e
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
     assert.equal((await post(base, 'logout', {})).status, 204);
+  });
+});
+
+test('a reset request for a known address is accepted and delivers a link', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    const response = await post(base, 'password-reset/request', {
+      email: 'bob@example.com',
+    });
+
+    assert.equal(response.status, 202);
+    assert.equal(delivered.length, 1);
+  });
+});
+
+test('a reset request for an unknown address is accepted identically', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    const known = await post(base, 'password-reset/request', {
+      email: 'bob@example.com',
+    });
+    const unknown = await post(base, 'password-reset/request', {
+      email: 'nobody@example.com',
+    });
+
+    assert.equal(known.status, unknown.status);
+    assert.equal(await known.text(), await unknown.text());
+    // The difference is invisible to the caller but real on the server.
+    assert.equal(delivered.length, 1);
+  });
+});
+
+test('the delivered token is not the value stored', async () => {
+  const { deps, delivered, resets } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+
+    const token = delivered[0]?.token;
+    assert.ok(token);
+    assert.equal(resets.rows.has(token), false);
+    assert.ok(resets.rows.has(hashToken(token)));
+  });
+});
+
+test('confirming a reset lets the new password log in', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+
+    const confirm = await post(base, 'password-reset/confirm', {
+      token: delivered[0]?.token,
+      password: 'brandnewpassword',
+    });
+
+    assert.equal(confirm.status, 204);
+    assert.equal(
+      (
+        await post(base, 'login', {
+          login: 'Bob',
+          password: 'brandnewpassword',
+        })
+      ).status,
+      200
+    );
+  });
+});
+
+test('confirming a reset kills sessions opened before it', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    const token = sessionCookie(await post(base, 'register', registration));
+    const cookie = `${SESSION_COOKIE_NAME}=${token}`;
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+
+    await post(base, 'password-reset/confirm', {
+      token: delivered[0]?.token,
+      password: 'brandnewpassword',
+    });
+
+    assert.equal(
+      (await fetch(`${base}/api/auth/me`, { headers: { cookie } })).status,
+      401
+    );
+  });
+});
+
+test('a reset token cannot be used twice', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    const token = delivered[0]?.token;
+
+    await post(base, 'password-reset/confirm', {
+      token,
+      password: 'brandnewpassword',
+    });
+    const second = await post(base, 'password-reset/confirm', {
+      token,
+      password: 'yetanotherpassword',
+    });
+
+    assert.equal(second.status, 400);
+  });
+});
+
+test('an unknown token and a used token fail identically', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    const token = delivered[0]?.token;
+    await post(base, 'password-reset/confirm', {
+      token,
+      password: 'brandnewpassword',
+    });
+
+    const used = await post(base, 'password-reset/confirm', {
+      token,
+      password: 'anotherpassword1',
+    });
+    const unknown = await post(base, 'password-reset/confirm', {
+      token: 'never-issued',
+      password: 'anotherpassword1',
+    });
+
+    assert.deepEqual(await json(used), await json(unknown));
+  });
+});
+
+test('a second reset request supersedes the first token', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+
+    const response = await post(base, 'password-reset/confirm', {
+      token: delivered[0]?.token,
+      password: 'brandnewpassword',
+    });
+
+    assert.equal(response.status, 400);
+  });
+});
+
+test('a reset password under 8 characters is rejected', async () => {
+  const { deps, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'password-reset/request', { email: 'bob@example.com' });
+
+    const response = await post(base, 'password-reset/confirm', {
+      token: delivered[0]?.token,
+      password: 'short',
+    });
+
+    assert.equal(response.status, 400);
   });
 });

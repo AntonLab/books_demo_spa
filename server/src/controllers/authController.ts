@@ -1,7 +1,9 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
+import type { ResetDelivery } from '../delivery/resetDelivery.ts';
 import { validatedBody } from '../middleware/validate.ts';
 import { hashPassword, verifyPassword } from '../password.ts';
+import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import {
@@ -11,12 +13,23 @@ import {
   SESSION_TTL_MS,
 } from '../sessionCookie.ts';
 import { createToken, hashToken } from '../tokens.ts';
-import type { LoginInput, RegisterInput } from '../types/auth.ts';
-import { ForbiddenError, UnauthorizedError } from '../types/errors.ts';
+import type {
+  LoginInput,
+  RegisterInput,
+  ResetConfirmInput,
+  ResetRequestInput,
+} from '../types/auth.ts';
+import {
+  AppError,
+  ForbiddenError,
+  UnauthorizedError,
+} from '../types/errors.ts';
 
 export interface AuthControllerDeps {
   userRepository: UserRepository;
   sessionRepository: SessionRepository;
+  passwordResetRepository: PasswordResetRepository;
+  resetDelivery: ResetDelivery;
   // Injectable purely so a test can prove the unknown-login path still spends
   // an argon2 verify. A wall-clock assertion would be flaky under load, and an
   // ESM import binding cannot be spied on from outside; this makes the timing
@@ -29,7 +42,13 @@ export interface AuthController {
   login: RequestHandler;
   logout: RequestHandler;
   me: RequestHandler;
+  requestReset: RequestHandler;
+  confirmReset: RequestHandler;
 }
+
+// One hour, far shorter than a session's seven days: a reset link sits in a
+// mailbox, which is a much likelier place to leak from than a cookie jar.
+const RESET_TTL_MS = 60 * 60 * 1000;
 
 // Computed lazily and cached, not hardcoded: hashPassword reads the argon2
 // parameters from NODE_ENV, so tests get the deliberately weak settings and
@@ -118,6 +137,52 @@ export function createAuthController(deps: AuthControllerDeps): AuthController {
       // requireAuth guarantees this; the check narrows the optional type.
       if (!req.user) throw new UnauthorizedError();
       res.json(req.user);
+    },
+
+    requestReset: async (req, res) => {
+      const { email } = validatedBody<ResetRequestInput>(req);
+      const user = await deps.userRepository.findByEmail(email);
+
+      if (user) {
+        // Supersede any outstanding token: two live links for one account
+        // widens the window a stolen one is useful in.
+        await deps.passwordResetRepository.invalidateAllForUser(user.id);
+
+        const token = createToken();
+        await deps.passwordResetRepository.create(
+          user.id,
+          hashToken(token),
+          new Date(Date.now() + RESET_TTL_MS)
+        );
+        await deps.resetDelivery.send(user.email, token);
+      }
+
+      // 202 whether or not the address exists. Branching the response here
+      // would turn this endpoint into an account-enumeration oracle.
+      res.status(202).end();
+    },
+
+    confirmReset: async (req, res) => {
+      const { token, password } = validatedBody<ResetConfirmInput>(req);
+
+      // One call, one transaction: the repository updates the password, stamps
+      // the token used, and revokes every session together.
+      const redeemed = await deps.passwordResetRepository.redeem(
+        hashToken(token),
+        password
+      );
+      if (!redeemed) {
+        // Unknown, expired and already-used all land here with one message, so
+        // the response never says which.
+        //
+        // AppError rather than ValidationError: ValidationError's constructor
+        // takes `details`, not a message, so passing a string there would
+        // produce {error: 'Request validation failed', details: '...'} — the
+        // wrong shape for a failure that is not a schema violation.
+        throw new AppError('Reset token is invalid or has expired', 400);
+      }
+
+      res.status(204).end();
     },
   };
 }
