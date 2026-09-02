@@ -11,6 +11,7 @@ import { MainPage } from './pages/MainPage';
 import { MyBooksPage } from './pages/MyBooksPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ResetPasswordRoute } from './pages/ResetPasswordRoute';
 import { SeriesPage } from './pages/SeriesPage';
 
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
@@ -31,6 +32,7 @@ export function AppShell() {
       <Layout.Content style={{ padding: 24 }}>
         <Routes>
           <Route path="/" element={<MainPage />} />
+          <Route path="/reset-password" element={<ResetPasswordRoute />} />
           <Route path="/series" element={<SeriesPage />} />
           <Route path="/my-books" element={<MyBooksPage />} />
           <Route path="/profile" element={<ProfilePage />} />
