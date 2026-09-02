@@ -31,12 +31,22 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
   — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
   `Series.hasMany(Book)`, `Book.hasMany(Chapter)` and `hasMany(Like)` from
-  each of `User`, `Book` and `Comment` — have a full CRUD API. A like points
-  at exactly one of a book or a comment; that XOR is enforced in zod and in a
-  model validator, never by the database (see `server/CLAUDE.md`).
+  each of `User`, `Book` and `Comment` — have a full CRUD API, though every
+  write on them now requires a session (see the auth bullet below). A like
+  points at exactly one of a book or a comment; that XOR is enforced in zod
+  and in a model validator, never by the database (see `server/CLAUDE.md`).
   `Comment` (owned by a user and a book, with self-referential replies) is so
   far a model only, with no CRUD API. `npm run build`
   (`tsc -p tsconfig.build.json`) emits to `dist/`.
+- `server` has session-based auth at `/api/auth` — register, login, logout,
+  me, and a two-step password reset — backed by `Session` and
+  `PasswordResetToken` models and an opaque token in an httpOnly `sid` cookie.
+  A `requireAuth` middleware guards every `POST`/`PATCH`/`DELETE` on the five
+  resources above, plus both reads on `/api/users`; all other `GET`s stay
+  public. Ownership is deliberately not checked — a signed-in user may write
+  another user's rows, which is out of scope by design. See `server/CLAUDE.md`
+  for the cookie flags, the SHA-256-not-argon2 choice for tokens, and the
+  login timing defence.
 - `server` has a test suite using `node:test` (`npm test`). `client` still has
   no test script.
 
