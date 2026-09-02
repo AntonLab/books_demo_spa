@@ -16,6 +16,16 @@ export function createUnusedRepository<T>(name: string): T {
     findById: unreachable,
     update: unreachable,
     remove: unreachable,
+    // The auth-era methods. The stub is built from a fixed key list and cast,
+    // so a method missing here is a runtime "not a function" rather than a
+    // compile error — every repository method any route can reach must appear.
+    findValidByTokenHash: unreachable,
+    deleteByTokenHash: unreachable,
+    deleteAllForUser: unreachable,
+    invalidateAllForUser: unreachable,
+    redeem: unreachable,
+    findByLoginWithPassword: unreachable,
+    findByEmail: unreachable,
   } as T;
 }
 
@@ -26,6 +36,13 @@ function defaultDeps(): AppDeps {
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),
     likeRepository: createUnusedRepository('like'),
+    sessionRepository: createUnusedRepository('session'),
+    passwordResetRepository: createUnusedRepository('passwordReset'),
+    resetDelivery: {
+      send: () => {
+        throw new Error('reset delivery must not be used by these tests');
+      },
+    },
   };
 }
 
