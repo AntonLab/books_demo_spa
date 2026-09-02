@@ -27,11 +27,14 @@ export interface RouteDeps {
 
 export function createApiRouter(deps: RouteDeps): Router {
   const router = Router();
+  // Every factory takes the whole RouteDeps rather than its own repository:
+  // each one builds a requireAuth, which needs the session and user
+  // repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
-  router.use('/users', createUserRoutes(deps.userRepository));
-  router.use('/series', createSeriesRoutes(deps.seriesRepository));
-  router.use('/books', createBookRoutes(deps.bookRepository));
-  router.use('/chapters', createChapterRoutes(deps.chapterRepository));
-  router.use('/likes', createLikeRoutes(deps.likeRepository));
+  router.use('/users', createUserRoutes(deps));
+  router.use('/series', createSeriesRoutes(deps));
+  router.use('/books', createBookRoutes(deps));
+  router.use('/chapters', createChapterRoutes(deps));
+  router.use('/likes', createLikeRoutes(deps));
   return router;
 }
