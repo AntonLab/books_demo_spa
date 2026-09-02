@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logoutUser, openModal } from '../../store/authSlice';
+import { SearchBar } from './SearchBar';
 
 export function AppHeader() {
   const dispatch = useAppDispatch();
@@ -43,6 +44,8 @@ export function AppHeader() {
         onClick={({ key }) => void navigate(key)}
         style={{ flex: 1, minWidth: 0 }}
       />
+
+      <SearchBar />
 
       {status !== 'ready' ? (
         // Not "Log in": showing it here would flash a logged-out header at a
