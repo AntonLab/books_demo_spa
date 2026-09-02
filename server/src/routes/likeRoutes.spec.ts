@@ -1,18 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
 import { ConflictError, NotFoundError } from '../types/errors.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
-import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import type {
   LikeListResult,
   LikeRepository,
 } from '../repositories/likeRepository.ts';
-import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import type { UserRepository } from '../repositories/userRepository.ts';
 import type { PublicLike } from '../types/like.ts';
+import { json, withApp } from './routeTestKit.testkit.ts';
 
 const KNOWN_USER_ID = 1;
 const KNOWN_BOOK_ID = 1;
@@ -94,41 +88,6 @@ function createFakeRepository(): LikeRepository {
   };
 }
 
-// No request in this file reaches the other four resources, but createApp
-// requires the dependencies — stubs that throw keep that assumption honest.
-function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-  } as T;
-}
-
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
-  const app = createApp({
-    userRepository: createUnusedRepository<UserRepository>('user'),
-    seriesRepository: createUnusedRepository<SeriesRepository>('series'),
-    bookRepository: createUnusedRepository<BookRepository>('book'),
-    chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
-    likeRepository: createFakeRepository(),
-  });
-  const server = app.listen(0);
-  await once(server, 'listening');
-  const { port } = server.address() as AddressInfo;
-
-  try {
-    await fn(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
-
 const onBook = {
   userId: KNOWN_USER_ID,
   bookId: KNOWN_BOOK_ID,
@@ -152,14 +111,8 @@ const patch = (base: string, id: number, body: unknown) =>
 const remove = (base: string, id: number) =>
   fetch(`${base}/api/likes/${id}`, { method: 'DELETE' });
 
-// undici's Body.json() returns Promise<unknown>; this is the single place the
-// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
-async function json<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
-}
-
 test('POST creates a like on a book and leaves commentId null', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, onBook);
     const body = await json<PublicLike>(response);
 
@@ -171,7 +124,7 @@ test('POST creates a like on a book and leaves commentId null', async () => {
 });
 
 test('POST creates a dislike on a comment and leaves bookId null', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       userId: KNOWN_USER_ID,
       commentId: KNOWN_COMMENT_ID,
@@ -187,7 +140,7 @@ test('POST creates a dislike on a comment and leaves bookId null', async () => {
 });
 
 test('POST naming both a book and a comment is a 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       ...onBook,
       commentId: KNOWN_COMMENT_ID,
@@ -202,7 +155,7 @@ test('POST naming both a book and a comment is a 400', async () => {
 });
 
 test('POST naming neither a book nor a comment is a 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       userId: KNOWN_USER_ID,
       isLike: true,
@@ -213,7 +166,7 @@ test('POST naming neither a book nor a comment is a 400', async () => {
 });
 
 test('POST without isLike is a 400 — a like and a dislike differ', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       userId: KNOWN_USER_ID,
       bookId: KNOWN_BOOK_ID,
@@ -225,7 +178,7 @@ test('POST without isLike is a 400 — a like and a dislike differ', async () =>
 
 // Changing one's mind is a PATCH; a second POST is a conflict, not an upsert.
 test('POST twice on the same target is a 409', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     await post(base, onBook);
     const response = await post(base, { ...onBook, isLike: false });
 
@@ -234,7 +187,7 @@ test('POST twice on the same target is a 409', async () => {
 });
 
 test('POST against an unknown book is a 404, not a 500', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { ...onBook, bookId: 999 });
 
     assert.equal(response.status, 404);
@@ -246,7 +199,7 @@ test('POST against an unknown book is a 404, not a 500', async () => {
 });
 
 test('POST against an unknown comment names the comment, not the user', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       userId: KNOWN_USER_ID,
       commentId: 999,
@@ -262,7 +215,7 @@ test('POST against an unknown comment names the comment, not the user', async ()
 });
 
 test('GET lists likes with the paging envelope', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     await post(base, onBook);
 
     const response = await fetch(`${base}/api/likes`);
@@ -281,7 +234,7 @@ test('GET lists likes with the paging envelope', async () => {
 // z.coerce.boolean() this returns the like as well, because Boolean("false")
 // is true.
 test('GET ?isLike=false returns dislikes, not everything', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     await post(base, onBook);
     await post(base, {
       userId: KNOWN_USER_ID,
@@ -298,7 +251,7 @@ test('GET ?isLike=false returns dislikes, not everything', async () => {
 });
 
 test('GET ?bookId= filters to one target', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     await post(base, onBook);
     await post(base, {
       userId: KNOWN_USER_ID,
@@ -316,7 +269,7 @@ test('GET ?bookId= filters to one target', async () => {
 });
 
 test('GET /:id returns one like, and 404 when it is not there', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicLike>(await post(base, onBook));
 
     const found = await fetch(`${base}/api/likes/${created.id}`);
@@ -329,13 +282,13 @@ test('GET /:id returns one like, and 404 when it is not there', async () => {
 });
 
 test('GET /:id rejects a non-numeric id with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/likes/abc`)).status, 400);
   });
 });
 
 test('PATCH flips a like into a dislike', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicLike>(await post(base, onBook));
 
     const response = await patch(base, created.id, { isLike: false });
@@ -346,7 +299,7 @@ test('PATCH flips a like into a dislike', async () => {
 });
 
 test('PATCH with an empty body is a 400 — isLike is the only field', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicLike>(await post(base, onBook));
 
     assert.equal((await patch(base, created.id, {})).status, 400);
@@ -356,7 +309,7 @@ test('PATCH with an empty body is a 400 — isLike is the only field', async () 
 // Re-targeting is a re-parenting operation, not a field edit: the extra key is
 // stripped by the schema rather than applied.
 test('PATCH cannot move a like to another target', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicLike>(await post(base, onBook));
 
     const response = await patch(base, created.id, {
@@ -373,13 +326,13 @@ test('PATCH cannot move a like to another target', async () => {
 });
 
 test('PATCH on a like that is not there is a 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     assert.equal((await patch(base, 999, { isLike: false })).status, 404);
   });
 });
 
 test('DELETE removes a like, and repeating it is a 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicLike>(await post(base, onBook));
 
     assert.equal((await remove(base, created.id)).status, 204);

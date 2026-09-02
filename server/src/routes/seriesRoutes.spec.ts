@@ -1,18 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type {
   SeriesListResult,
   SeriesRepository,
 } from '../repositories/seriesRepository.ts';
-import type { UserRepository } from '../repositories/userRepository.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
-import type { ChapterRepository } from '../repositories/chapterRepository.ts';
-import type { LikeRepository } from '../repositories/likeRepository.ts';
 import type { PublicSeries } from '../types/series.ts';
+import { json, withApp } from './routeTestKit.testkit.ts';
 
 const KNOWN_USER_ID = 1;
 
@@ -78,41 +72,6 @@ function createFakeRepository(): SeriesRepository {
   };
 }
 
-// No request in this file reaches /api/users or /api/books, but createApp
-// requires the dependencies — stubs that throw keep that assumption honest.
-function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-  } as T;
-}
-
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
-  const app = createApp({
-    userRepository: createUnusedRepository<UserRepository>('user'),
-    seriesRepository: createFakeRepository(),
-    bookRepository: createUnusedRepository<BookRepository>('book'),
-    chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
-    likeRepository: createUnusedRepository<LikeRepository>('like'),
-  });
-  const server = app.listen(0);
-  await once(server, 'listening');
-  const { port } = server.address() as AddressInfo;
-
-  try {
-    await fn(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
-
 const valid = {
   userId: KNOWN_USER_ID,
   description: 'A space opera in three parts',
@@ -133,14 +92,8 @@ const patch = (base: string, id: number, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// undici's Body.json() returns Promise<unknown>; this is the single place the
-// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
-async function json<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
-}
-
 test('POST creates a series and echoes its tags', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, valid);
     const body = await json<PublicSeries>(response);
 
@@ -151,7 +104,7 @@ test('POST creates a series and echoes its tags', async () => {
 });
 
 test('POST defaults tags to an empty array when omitted', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       userId: KNOWN_USER_ID,
       description: 'No tags yet',
@@ -163,7 +116,7 @@ test('POST defaults tags to an empty array when omitted', async () => {
 });
 
 test('POST collapses duplicate tags before storing them', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       ...valid,
       tags: ['epic', 'epic', 'sci-fi'],
@@ -177,7 +130,7 @@ test('POST collapses duplicate tags before storing them', async () => {
 });
 
 test('POST rejects a missing description with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { userId: KNOWN_USER_ID });
 
     assert.equal(response.status, 400);
@@ -189,7 +142,7 @@ test('POST rejects a missing description with 400', async () => {
 });
 
 test('POST against an unknown user is a 404, not a 500', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { ...valid, userId: 999 });
 
     assert.equal(response.status, 404);
@@ -201,7 +154,7 @@ test('POST against an unknown user is a 404, not a 500', async () => {
 });
 
 test('GET list returns items with the paging envelope', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     await post(base, valid);
     const response = await fetch(`${base}/api/series`);
     const body = await json<{
@@ -221,7 +174,7 @@ test('GET list returns items with the paging envelope', async () => {
 });
 
 test('GET list filters by tag and by owner', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     await post(base, valid);
     await post(base, { ...valid, description: 'Standalone', tags: ['drama'] });
 
@@ -242,19 +195,19 @@ test('GET list filters by tag and by owner', async () => {
 });
 
 test('GET by id returns 404 for a missing record', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/series/999`)).status, 404);
   });
 });
 
 test('GET by id rejects a non-numeric id with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/series/abc`)).status, 400);
   });
 });
 
 test('PATCH replaces tags but leaves them alone when omitted', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicSeries>(await post(base, valid));
 
     const retagged = await json<PublicSeries>(
@@ -271,7 +224,7 @@ test('PATCH replaces tags but leaves them alone when omitted', async () => {
 });
 
 test('PATCH ignores userId rather than re-parenting the series', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicSeries>(await post(base, valid));
     const response = await patch(base, created.id, {
       userId: 2,
@@ -284,7 +237,7 @@ test('PATCH ignores userId rather than re-parenting the series', async () => {
 });
 
 test('PATCH with an empty body is rejected with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicSeries>(await post(base, valid));
 
     assert.equal((await patch(base, created.id, {})).status, 400);
@@ -292,7 +245,7 @@ test('PATCH with an empty body is rejected with 400', async () => {
 });
 
 test('DELETE removes the series, then reports 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicSeries>(await post(base, valid));
 
     const first = await fetch(`${base}/api/series/${created.id}`, {

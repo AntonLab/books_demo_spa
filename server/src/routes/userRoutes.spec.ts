@@ -1,18 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
   UserRepository,
   UserListResult,
 } from '../repositories/userRepository.ts';
 import type { PublicUser } from '../types/user.ts';
-import type { ChapterRepository } from '../repositories/chapterRepository.ts';
-import type { LikeRepository } from '../repositories/likeRepository.ts';
-import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
+import { json, withApp } from './routeTestKit.testkit.ts';
 
 function createFakeRepository(): UserRepository {
   const rows = new Map<number, PublicUser>();
@@ -83,41 +77,6 @@ function createFakeRepository(): UserRepository {
   };
 }
 
-// createApp requires every repository, but no request in this file reaches
-// /api/series or /api/books — stubs that throw keep that assumption honest.
-function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-  } as T;
-}
-
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
-  const app = createApp({
-    userRepository: createFakeRepository(),
-    seriesRepository: createUnusedRepository<SeriesRepository>('series'),
-    bookRepository: createUnusedRepository<BookRepository>('book'),
-    chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
-    likeRepository: createUnusedRepository<LikeRepository>('like'),
-  });
-  const server = app.listen(0);
-  await once(server, 'listening');
-  const { port } = server.address() as AddressInfo;
-
-  try {
-    await fn(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
-
 const valid = {
   login: 'Bob',
   email: 'bob@example.com',
@@ -133,14 +92,8 @@ const post = (base: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// undici's Body.json() returns Promise<unknown>; this is the single place the
-// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
-async function json<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
-}
-
 test('POST creates a user and never echoes the password', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, valid);
     const body = await json<{ login: string; status: string }>(response);
 
@@ -152,7 +105,7 @@ test('POST creates a user and never echoes the password', async () => {
 });
 
 test('POST rejects an invalid email with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { ...valid, email: 'nope' });
 
     assert.equal(response.status, 400);
@@ -164,7 +117,7 @@ test('POST rejects an invalid email with 400', async () => {
 });
 
 test('POST rejects a duplicate login with 409 naming the field', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     await post(base, valid);
     const response = await post(base, { ...valid, email: 'other@example.com' });
 
@@ -176,7 +129,7 @@ test('POST rejects a duplicate login with 409 naming the field', async () => {
 });
 
 test('GET list returns items with the paging envelope', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     await post(base, valid);
     const response = await fetch(`${base}/api/users`);
     const body = await json<{
@@ -195,7 +148,7 @@ test('GET list returns items with the paging envelope', async () => {
 });
 
 test('GET by id returns 404 for a missing record', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const response = await fetch(`${base}/api/users/999`);
 
     assert.equal(response.status, 404);
@@ -203,7 +156,7 @@ test('GET by id returns 404 for a missing record', async () => {
 });
 
 test('GET by id rejects a non-numeric id with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const response = await fetch(`${base}/api/users/abc`);
 
     assert.equal(response.status, 400);
@@ -211,7 +164,7 @@ test('GET by id rejects a non-numeric id with 400', async () => {
 });
 
 test('PATCH updates one field', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const created = await json<{ id: number }>(await post(base, valid));
     const response = await fetch(`${base}/api/users/${created.id}`, {
       method: 'PATCH',
@@ -227,7 +180,7 @@ test('PATCH updates one field', async () => {
 });
 
 test('PATCH rejects an empty body with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const created = await json<{ id: number }>(await post(base, valid));
     const response = await fetch(`${base}/api/users/${created.id}`, {
       method: 'PATCH',
@@ -240,7 +193,7 @@ test('PATCH rejects an empty body with 400', async () => {
 });
 
 test('DELETE returns 204 once and 404 afterwards', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const created = await json<{ id: number }>(await post(base, valid));
 
     assert.equal(
@@ -257,7 +210,7 @@ test('DELETE returns 204 once and 404 afterwards', async () => {
 });
 
 test('an unknown route returns a JSON 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
     const response = await fetch(`${base}/api/nothing-here`);
 
     assert.equal(response.status, 404);

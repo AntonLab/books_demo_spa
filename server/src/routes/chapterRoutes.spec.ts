@@ -1,18 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
 import type {
   ChapterListResult,
   ChapterRepository,
 } from '../repositories/chapterRepository.ts';
-import type { LikeRepository } from '../repositories/likeRepository.ts';
-import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import type { UserRepository } from '../repositories/userRepository.ts';
 import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
+import { json, withApp } from './routeTestKit.testkit.ts';
 
 const KNOWN_BOOK_ID = 1;
 
@@ -85,41 +79,6 @@ function createFakeRepository(): ChapterRepository {
   };
 }
 
-// No request in this file reaches the other three resources, but createApp
-// requires the dependencies — stubs that throw keep that assumption honest.
-function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-  } as T;
-}
-
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
-  const app = createApp({
-    userRepository: createUnusedRepository<UserRepository>('user'),
-    seriesRepository: createUnusedRepository<SeriesRepository>('series'),
-    bookRepository: createUnusedRepository<BookRepository>('book'),
-    chapterRepository: createFakeRepository(),
-    likeRepository: createUnusedRepository<LikeRepository>('like'),
-  });
-  const server = app.listen(0);
-  await once(server, 'listening');
-  const { port } = server.address() as AddressInfo;
-
-  try {
-    await fn(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-}
-
 const valid = {
   bookId: KNOWN_BOOK_ID,
   title: 'Chapter One',
@@ -143,14 +102,8 @@ const patch = (base: string, id: number, body: unknown) =>
 const remove = (base: string, id: number) =>
   fetch(`${base}/api/chapters/${id}`, { method: 'DELETE' });
 
-// undici's Body.json() returns Promise<unknown>; this is the single place the
-// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
-async function json<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
-}
-
 test('POST creates a chapter and echoes its title and body', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, valid);
     const body = await json<PublicChapter>(response);
 
@@ -162,7 +115,7 @@ test('POST creates a chapter and echoes its title and body', async () => {
 });
 
 test('POST trims the title before storing it', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { ...valid, title: '  Prologue  ' });
 
     assert.equal((await json<PublicChapter>(response)).title, 'Prologue');
@@ -170,7 +123,7 @@ test('POST trims the title before storing it', async () => {
 });
 
 test('POST rejects a missing title with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, {
       bookId: KNOWN_BOOK_ID,
       text: 'No title',
@@ -185,7 +138,7 @@ test('POST rejects a missing title with 400', async () => {
 });
 
 test('POST rejects a missing bookId with 400 — a chapter needs a book', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { title: 'Orphan', text: 'No book' });
 
     assert.equal(response.status, 400);
@@ -193,7 +146,7 @@ test('POST rejects a missing bookId with 400 — a chapter needs a book', async 
 });
 
 test('POST against an unknown book is a 404, not a 500', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await post(base, { ...valid, bookId: 999 });
 
     assert.equal(response.status, 404);
@@ -205,7 +158,7 @@ test('POST against an unknown book is a 404, not a 500', async () => {
 });
 
 test('GET / lists chapters without their bodies', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     await post(base, valid);
 
     const response = await fetch(`${base}/api/chapters?bookId=1`);
@@ -221,7 +174,7 @@ test('GET / lists chapters without their bodies', async () => {
 });
 
 test('GET /:id returns the body the list withheld', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicChapter>(await post(base, valid));
 
     const response = await fetch(`${base}/api/chapters/${created.id}`);
@@ -235,7 +188,7 @@ test('GET /:id returns the body the list withheld', async () => {
 });
 
 test('GET /:id for an unknown chapter is a 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const response = await fetch(`${base}/api/chapters/999`);
 
     assert.equal(response.status, 404);
@@ -247,7 +200,7 @@ test('GET /:id for an unknown chapter is a 404', async () => {
 });
 
 test('PATCH renames a chapter without touching its body', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicChapter>(await post(base, valid));
 
     const response = await patch(base, created.id, { title: 'Renamed' });
@@ -260,7 +213,7 @@ test('PATCH renames a chapter without touching its body', async () => {
 });
 
 test('PATCH rejects an empty body with 400', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicChapter>(await post(base, valid));
 
     assert.equal((await patch(base, created.id, {})).status, 400);
@@ -268,7 +221,7 @@ test('PATCH rejects an empty body with 400', async () => {
 });
 
 test('PATCH ignores bookId — a chapter cannot be moved between books', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicChapter>(await post(base, valid));
 
     const body = await json<PublicChapter>(
@@ -280,7 +233,7 @@ test('PATCH ignores bookId — a chapter cannot be moved between books', async (
 });
 
 test('DELETE removes a chapter, and a second attempt is a 404', async () => {
-  await withServer(async (base) => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     const created = await json<PublicChapter>(await post(base, valid));
 
     assert.equal((await remove(base, created.id)).status, 204);
