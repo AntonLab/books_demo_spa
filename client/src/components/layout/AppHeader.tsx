@@ -53,12 +53,20 @@ export function AppHeader() {
           menu={{ items: accountItems, onClick: handleAccountClick }}
           trigger={['click']}
         >
-          <Space style={{ color: '#fff', cursor: 'pointer' }}>
-            {/* An initial rather than an icon, so `@ant-design/icons` stays
-                out of the dependency list. */}
-            <Avatar size="small">{user.login.charAt(0).toUpperCase()}</Avatar>
-            {user.login}
-          </Space>
+          {/* A native <button> (via antd's `type="text"`) rather than a
+              bare <Space>/<div>: antd's Dropdown only grafts mouse/focus
+              handlers onto its trigger child, never tabIndex or a role, so
+              a non-interactive element here is invisible to keyboard
+              navigation. A <Button> is focusable and Enter/Space-activated
+              for free. */}
+          <Button type="text" style={{ color: '#fff' }}>
+            <Space>
+              {/* An initial rather than an icon, so `@ant-design/icons`
+                  stays out of the dependency list. */}
+              <Avatar size="small">{user.login.charAt(0).toUpperCase()}</Avatar>
+              {user.login}
+            </Space>
+          </Button>
         </Dropdown>
       ) : (
         <Space>
