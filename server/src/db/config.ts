@@ -15,6 +15,10 @@ const envSchema = z.object({
   // surface later as confusing data instead of immediately as a config error.
   DB_USER: z.string().min(1),
   DB_PASSWORD: z.string(),
+  // Validated as a URL rather than a bare string: a malformed origin here would
+  // not surface until a reset link was built from it, in an email nobody can
+  // fix. The default is the webpack dev server the client runs on.
+  APP_BASE_URL: z.url().default('http://localhost:3000'),
 });
 
 export interface DbConfig {
@@ -28,6 +32,7 @@ export interface DbConfig {
 export interface AppConfig {
   env: 'development' | 'test' | 'production';
   port: number;
+  appBaseUrl: string;
   db: DbConfig;
 }
 
@@ -45,6 +50,7 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
   return {
     env: env.NODE_ENV,
     port: env.PORT,
+    appBaseUrl: env.APP_BASE_URL,
     db: {
       host: env.DB_HOST,
       port: env.DB_PORT,

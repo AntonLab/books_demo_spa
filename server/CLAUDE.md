@@ -15,6 +15,15 @@ Express app under `/api`. Routes, controllers, repositories, models, and
 middleware are all wired for those five. `node:test` is the test runner
 (`npm test`).
 
+`Session` and `PasswordResetToken` back a full session-based auth API at
+`/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
+`POST /password-reset/request` and `POST /password-reset/confirm`. Both models
+hang off `User.hasMany(...)` with `ON DELETE CASCADE`. **Every write on the
+five resources above — `POST`, `PATCH`, `DELETE` — now requires a session**,
+and so do both reads on `/api/users`, because `PublicUser` carries an email
+address and an open list would be a scrapeable account directory. Every other
+`GET` stays public. See **Auth** below.
+
 `Comment` is the one model without an API. `User.hasMany(Comment)`,
 `Book.hasMany(Comment)`, `Comment.hasMany(Like)` and the self-referential
 `Comment.hasMany(Comment, { as: 'replies' })` are wired and covered by
@@ -51,27 +60,98 @@ added.
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
-- `src/routes/` — Express route definitions (`userRoutes.ts`,
+- `src/tokens.ts` — `createToken()` (32 random bytes, base64url) and
+  `hashToken()` (SHA-256) for session and reset tokens
+- `src/sessionCookie.ts` — the `sid` cookie's name, TTL, and the shared
+  set/clear helpers
+- `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
+  and the logger-backed implementation that is the only sink so far
+- `src/routes/` — Express route definitions (`authRoutes.ts`, `userRoutes.ts`,
   `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `likeRoutes.ts`,
-  mounted under `/api`)
-- `src/controllers/` — request handlers / HTTP mapping (`userController.ts`,
-  `seriesController.ts`, `bookController.ts`, `chapterController.ts`,
-  `likeController.ts`)
+  mounted under `/api`). `routeTestKit.testkit.ts` holds the harness the six
+  route specs share (`withApp`, `withAuthenticatedApp`, `AUTH_COOKIE`,
+  `json`); `tsconfig.build.json` excludes `*.testkit.ts` alongside `*.spec.ts`,
+  so neither is emitted to `dist/`.
+- `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
+  `userController.ts`, `seriesController.ts`, `bookController.ts`,
+  `chapterController.ts`, `likeController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  `likeRepository.ts`, Sequelize-backed; `likePattern.ts` holds the LIKE
+  `likeRepository.ts`, `sessionRepository.ts`, `passwordResetRepository.ts`,
+  Sequelize-backed; `likePattern.ts` holds the LIKE
   escaping they share). Note the collision: `likePattern.ts` is about the SQL
   `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `Book.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `index.ts`; `tagArray.ts`
+  `Book.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `Session.ts`,
+  `PasswordResetToken.ts`, `index.ts`; `tagArray.ts`
   holds the JSON tag-column normalisation `Series` and `Book` share)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
-- `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
-  `notFound.ts`, `validate.ts`)
+- `src/middleware/` — auth, validation, error handling (`requireAuth.ts`,
+  `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `comment.ts`, `like.ts`, `errors.ts`, `express.d.ts`)
+  `chapter.ts`, `comment.ts`, `like.ts`, `auth.ts`, `errors.ts`,
+  `express.d.ts`)
+
+## Environment
+
+`.env.local` (git-ignored) supplies these; `src/db/config.ts` validates them
+with zod and throws on anything malformed rather than starting with a broken
+value.
+
+| Variable                  | Default                 | Notes                                                                                                                                                            |
+| ------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.           |
+| `PORT`                    | `4000`                  | The API's own port.                                                                                                                                              |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                                                                                                  |
+| `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                  |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not. |
+| `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
+
+## Auth
+
+- **The `sid` cookie** carries an opaque 32-byte base64url token: `httpOnly`,
+  `sameSite: 'lax'`, `path: '/'`, `secure` only under
+  `NODE_ENV=production`, seven-day `maxAge`. `lax` rather than `strict` so
+  following a reset link from a mail client does not arrive session-less. Set
+  and cleared through one shared options object in `sessionCookie.ts`, because
+  a `clearCookie` whose options differ from the `cookie` that set it leaves the
+  original in place.
+- **Tokens are hashed with SHA-256, not argon2.** argon2 is slow by design to
+  make low-entropy passwords expensive to guess; a 256-bit random token cannot
+  be guessed at any speed, so that cost buys nothing — and a session token is
+  verified on _every_ authenticated request, where argon2's ~19 MiB working set
+  would be a self-inflicted denial of service. Hashing at rest still matters: a
+  leaked dump must not hand over usable sessions. Only the hash is stored; the
+  plaintext exists in the cookie and the reset link and nowhere else.
+- **`requireAuth` runs before `validate`** on every guarded route, so an
+  unauthenticated request is refused without its body being parsed or echoed
+  back in a 400. The visible consequence: an unauthenticated request with a
+  malformed body or id is a 401, not a 400.
+- **Login gives one answer to two questions.** An unknown login and a wrong
+  password both return 401 with an identical body, and the unknown-login path
+  deliberately spends an argon2 verify against a cached dummy hash so the two
+  cannot be told apart by response time either. That dummy hash is computed
+  lazily and reused, and `authController.spec.ts` drives the `verify` seam
+  directly to prove both properties — a wall-clock assertion would be flaky
+  under load, and an ESM import binding cannot be spied on from outside.
+- **A blocked account is checked after the password, not before**, or the 403
+  would tell an attacker without the password that the account exists.
+- **Login always opens a new session** rather than reusing an existing row,
+  which is what rules out session fixation.
+- **Reset requests always answer 202**, whether or not the address exists —
+  branching would make the endpoint an account-enumeration oracle. A new
+  request invalidates any outstanding token first, so two live links never
+  coexist. Tokens last one hour, far less than a session's seven days, because
+  a link sits in a mailbox.
+- **Reset confirmation revokes every session** for that user, in the same
+  transaction that stores the new password and stamps the token used — a
+  partial apply would leave a redeemed token beside a live pre-reset session,
+  the exact state the flow exists to prevent. Unknown, expired and
+  already-used tokens all fail with one 400 and one message.
+- **Ownership is deliberately not checked.** A signed-in user may write another
+  user's rows; that is out of scope by design and needs its own spec.
 
 ## Runtime notes
 

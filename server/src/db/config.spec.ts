@@ -45,3 +45,23 @@ test('rejects an unknown NODE_ENV', () => {
     /NODE_ENV/
   );
 });
+
+test('APP_BASE_URL defaults to the webpack dev server origin', () => {
+  const config = parseConfig({ DB_USER: 'u', DB_PASSWORD: 'p' });
+  assert.equal(config.appBaseUrl, 'http://localhost:3000');
+});
+
+test('APP_BASE_URL is taken from the environment when set', () => {
+  const config = parseConfig({
+    DB_USER: 'u',
+    DB_PASSWORD: 'p',
+    APP_BASE_URL: 'https://books.example.com',
+  });
+  assert.equal(config.appBaseUrl, 'https://books.example.com');
+});
+
+test('a malformed APP_BASE_URL is a config error, not a broken link later', () => {
+  assert.throws(() =>
+    parseConfig({ DB_USER: 'u', DB_PASSWORD: 'p', APP_BASE_URL: 'not-a-url' })
+  );
+});
