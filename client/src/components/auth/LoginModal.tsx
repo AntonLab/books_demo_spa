@@ -37,12 +37,7 @@ export function LoginModal() {
       footer={null}
     >
       {formError !== null && (
-        <Alert
-          type="error"
-          role="alert"
-          message={formError}
-          style={{ marginBottom: 16 }}
-        />
+        <Alert type="error" title={formError} style={{ marginBottom: 16 }} />
       )}
 
       <Form form={form} layout="vertical" onFinish={handleFinish}>
