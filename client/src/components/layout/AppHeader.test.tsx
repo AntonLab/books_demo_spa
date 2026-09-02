@@ -116,4 +116,22 @@ describe('AppHeader when logged in', () => {
     });
     expect(mockedAuth.logout).toHaveBeenCalledTimes(1);
   });
+
+  it('is reachable by keyboard and opens the dropdown on Enter', async () => {
+    renderWithProviders(<AppHeader />, { preloadedState: authState({ user }) });
+
+    // A bare <Space>/<div> trigger would never receive focus via Tab, so
+    // this pins the account trigger being a real focusable control rather
+    // than only clickable.
+    const trigger = screen.getByRole('button', { name: /bob/i });
+
+    for (let i = 0; i < 20 && document.activeElement !== trigger; i++) {
+      await userEvent.tab();
+    }
+    expect(document.activeElement).toBe(trigger);
+
+    await userEvent.keyboard('{Enter}');
+
+    expect(await screen.findByText('Log out')).toBeInTheDocument();
+  });
 });
