@@ -1,5 +1,5 @@
-import { screen } from '@testing-library/react';
-import { AppShell } from './App';
+import { render, screen } from '@testing-library/react';
+import App, { AppShell } from './App';
 import { renderWithProviders } from './test/renderWithProviders';
 import * as authApi from './api/auth';
 import * as booksApi from './api/books';
@@ -84,5 +84,25 @@ describe('AppShell session bootstrap', () => {
     expect(auth.status).toBe('ready');
     expect(auth.user).toBeNull();
     expect(auth.error).toBeNull();
+  });
+});
+
+describe('App', () => {
+  // The composition root: Provider > ConfigProvider > AntdApp > BrowserRouter
+  // > AppShell, mounted for real rather than swapped for MemoryRouter and a
+  // fresh store the way every other suite in this file does. BrowserRouter
+  // reads the jsdom URL, which defaults to http://localhost/, so this
+  // exercises MainPage the same way the "renders MainPage at /" case above
+  // does — just through the real tree instead of AppShell in isolation.
+  it('renders the real composition root at /', async () => {
+    render(<App />);
+
+    expect(
+      await screen.findByRole('heading', { name: /books/i })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Log in' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Search books')).toBeInTheDocument();
   });
 });

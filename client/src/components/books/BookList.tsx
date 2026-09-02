@@ -20,13 +20,7 @@ export function BookList({
   emptyText = 'No books yet.',
 }: BookListProps) {
   if (status === 'error') {
-    return (
-      <Alert
-        type="error"
-        role="alert"
-        message={error ?? 'Could not load books'}
-      />
-    );
+    return <Alert type="error" title={error ?? 'Could not load books'} />;
   }
 
   if (status === 'idle' || status === 'loading') {

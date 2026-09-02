@@ -143,6 +143,7 @@ const authSlice = createSlice({
     openModal(state, action: PayloadAction<ModalName>) {
       state.activeModal = action.payload;
       state.error = null;
+      state.resetToken = null;
     },
     openResetConfirm(state, action: PayloadAction<string>) {
       state.activeModal = 'resetConfirm';
@@ -186,6 +187,13 @@ const authSlice = createSlice({
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
         state.status = 'ready';
+      })
+      .addCase(confirmPasswordReset.fulfilled, (state) => {
+        // The server destroys every session for the user on a successful
+        // reset — this one included — so the client must not keep showing a
+        // signed-in header. `status` stays 'ready': we still know the
+        // answer to "who is signed in?", and it is "nobody".
+        state.user = null;
       });
   },
 });
