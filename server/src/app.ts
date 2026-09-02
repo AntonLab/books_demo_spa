@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
@@ -21,6 +22,8 @@ export function createApp(deps: AppDeps): Express {
   const app = express();
 
   app.use(express.json());
+  // Express 5 can set cookies but not read them; requireAuth needs req.cookies.
+  app.use(cookieParser());
   app.use('/api', createApiRouter(deps));
   app.use(notFound);
   // Must stay last, after every route and middleware.
