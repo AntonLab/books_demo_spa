@@ -74,6 +74,16 @@ function createFakeRepository(): UserRepository {
     async remove(id) {
       return rows.delete(id);
     },
+
+    // No request in this file reaches auth lookups; the fake only needs to
+    // satisfy the interface.
+    async findByLoginWithPassword() {
+      return null;
+    },
+
+    async findByEmail() {
+      return null;
+    },
   };
 }
 

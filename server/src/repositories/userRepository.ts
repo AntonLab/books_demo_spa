@@ -13,6 +13,7 @@ import type {
   ListUsersQuery,
   PublicUser,
   UpdateUserInput,
+  UserStatus,
 } from '../types/user.ts';
 
 export interface UserListResult {
@@ -26,6 +27,10 @@ export interface UserRepository {
   findById(id: number): Promise<PublicUser | null>;
   update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
+  findByLoginWithPassword(
+    login: string
+  ): Promise<{ id: number; password: string; status: UserStatus } | null>;
+  findByEmail(email: string): Promise<PublicUser | null>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -118,6 +123,23 @@ export function createSequelizeUserRepository(): UserRepository {
     async remove(id) {
       const deleted = await User.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    // The one place the password column is read. unscoped() bypasses the
+    // defaultScope that excludes it; the return type is deliberately narrow so
+    // the hash cannot travel further than the caller that verifies it.
+    async findByLoginWithPassword(login) {
+      const user = await User.unscoped().findOne({ where: { login } });
+      return user
+        ? { id: user.id, password: user.password, status: user.status }
+        : null;
+    },
+
+    // No unscoped(): the defaultScope keeps the hash out, which is what the
+    // reset flow wants — it needs the id, not the credential.
+    async findByEmail(email) {
+      const user = await User.findOne({ where: { email } });
+      return user ? toPublicUser(user) : null;
     },
   };
 }

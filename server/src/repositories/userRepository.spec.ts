@@ -247,4 +247,66 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.remove(created.id), false);
   });
+
+  test('findByLoginWithPassword returns the stored hash for a known login', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth1',
+      email: 'auth1@example.com',
+    });
+
+    const found = await repository.findByLoginWithPassword('Auth1');
+    assert.ok(found);
+    assert.equal(await verifyPassword(found.password, base.password), true);
+  });
+
+  test('findByLoginWithPassword is case-sensitive, matching the login collation', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth2',
+      email: 'auth2@example.com',
+    });
+
+    assert.equal(await repository.findByLoginWithPassword('auth2'), null);
+  });
+
+  test('findByLoginWithPassword returns null for an unknown login', async () => {
+    assert.equal(await repository.findByLoginWithPassword('NoSuchUser'), null);
+  });
+
+  test('findByLoginWithPassword carries status, so a blocked user can be refused', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth3',
+      email: 'auth3@example.com',
+      status: 'blocked',
+    });
+
+    assert.equal(
+      (await repository.findByLoginWithPassword('Auth3'))?.status,
+      'blocked'
+    );
+  });
+
+  test('findByEmail is case-insensitive, matching the email collation', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth4',
+      email: 'auth4@example.com',
+    });
+
+    assert.ok(await repository.findByEmail('AUTH4@EXAMPLE.COM'));
+  });
+
+  test('findByEmail never exposes the password hash', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth5',
+      email: 'auth5@example.com',
+    });
+
+    const found = await repository.findByEmail('auth5@example.com');
+    assert.ok(found);
+    assert.equal('password' in found, false);
+  });
 });
