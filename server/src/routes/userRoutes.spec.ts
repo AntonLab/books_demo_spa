@@ -1,18 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import type { AddressInfo } from 'node:net';
-import { createApp } from '../app.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
   UserRepository,
   UserListResult,
 } from '../repositories/userRepository.ts';
 import type { PublicUser } from '../types/user.ts';
-import type { ChapterRepository } from '../repositories/chapterRepository.ts';
-import type { LikeRepository } from '../repositories/likeRepository.ts';
-import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
+import {
+  AUTH_COOKIE,
+  json,
+  withApp,
+  withAuthenticatedApp,
+} from './routeTestKit.testkit.ts';
 
 function createFakeRepository(): UserRepository {
   const rows = new Map<number, PublicUser>();
@@ -80,42 +79,17 @@ function createFakeRepository(): UserRepository {
     async remove(id) {
       return rows.delete(id);
     },
+
+    // No request in this file reaches auth lookups; the fake only needs to
+    // satisfy the interface.
+    async findByLoginWithPassword() {
+      return null;
+    },
+
+    async findByEmail() {
+      return null;
+    },
   };
-}
-
-// createApp requires every repository, but no request in this file reaches
-// /api/series or /api/books — stubs that throw keep that assumption honest.
-function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-  } as T;
-}
-
-async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
-  const app = createApp({
-    userRepository: createFakeRepository(),
-    seriesRepository: createUnusedRepository<SeriesRepository>('series'),
-    bookRepository: createUnusedRepository<BookRepository>('book'),
-    chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
-    likeRepository: createUnusedRepository<LikeRepository>('like'),
-  });
-  const server = app.listen(0);
-  await once(server, 'listening');
-  const { port } = server.address() as AddressInfo;
-
-  try {
-    await fn(`http://127.0.0.1:${port}`);
-  } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
 }
 
 const valid = {
@@ -126,141 +100,235 @@ const valid = {
   lastName: 'Bobsson',
 };
 
-const post = (base: string, body: unknown) =>
+const post = (
+  base: string,
+  body: unknown,
+  cookie: string | null = AUTH_COOKIE
+) =>
   fetch(`${base}/api/users`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
     body: JSON.stringify(body),
   });
 
-// undici's Body.json() returns Promise<unknown>; this is the single place the
-// test narrows it, mirroring the validatedBody/Query/Params pattern in validate.ts.
-async function json<T>(response: Response): Promise<T> {
-  return (await response.json()) as T;
-}
-
 test('POST creates a user and never echoes the password', async () => {
-  await withServer(async (base) => {
-    const response = await post(base, valid);
-    const body = await json<{ login: string; status: string }>(response);
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, valid);
+      const body = await json<{ login: string; status: string }>(response);
 
-    assert.equal(response.status, 201);
-    assert.equal(body.login, 'Bob');
-    assert.equal(body.status, 'pending');
-    assert.equal('password' in body, false);
-  });
+      assert.equal(response.status, 201);
+      assert.equal(body.login, 'Bob');
+      assert.equal(body.status, 'pending');
+      assert.equal('password' in body, false);
+    }
+  );
 });
 
 test('POST rejects an invalid email with 400', async () => {
-  await withServer(async (base) => {
-    const response = await post(base, { ...valid, email: 'nope' });
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, { ...valid, email: 'nope' });
 
-    assert.equal(response.status, 400);
-    assert.match(
-      (await json<{ error: string }>(response)).error,
-      /validation/i
-    );
-  });
+      assert.equal(response.status, 400);
+      assert.match(
+        (await json<{ error: string }>(response)).error,
+        /validation/i
+      );
+    }
+  );
 });
 
 test('POST rejects a duplicate login with 409 naming the field', async () => {
-  await withServer(async (base) => {
-    await post(base, valid);
-    const response = await post(base, { ...valid, email: 'other@example.com' });
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+      const response = await post(base, {
+        ...valid,
+        email: 'other@example.com',
+      });
 
-    assert.equal(response.status, 409);
-    assert.deepEqual((await json<{ details: unknown }>(response)).details, {
-      field: 'login',
-    });
-  });
+      assert.equal(response.status, 409);
+      assert.deepEqual((await json<{ details: unknown }>(response)).details, {
+        field: 'login',
+      });
+    }
+  );
 });
 
 test('GET list returns items with the paging envelope', async () => {
-  await withServer(async (base) => {
-    await post(base, valid);
-    const response = await fetch(`${base}/api/users`);
-    const body = await json<{
-      total: number;
-      limit: number;
-      offset: number;
-      items: unknown[];
-    }>(response);
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+      const response = await fetch(`${base}/api/users`, {
+        headers: { cookie: AUTH_COOKIE },
+      });
+      const body = await json<{
+        total: number;
+        limit: number;
+        offset: number;
+        items: unknown[];
+      }>(response);
 
-    assert.equal(response.status, 200);
-    assert.equal(body.total, 1);
-    assert.equal(body.limit, 20);
-    assert.equal(body.offset, 0);
-    assert.equal(body.items.length, 1);
-  });
+      assert.equal(response.status, 200);
+      assert.equal(body.total, 1);
+      assert.equal(body.limit, 20);
+      assert.equal(body.offset, 0);
+      assert.equal(body.items.length, 1);
+    }
+  );
 });
 
 test('GET by id returns 404 for a missing record', async () => {
-  await withServer(async (base) => {
-    const response = await fetch(`${base}/api/users/999`);
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(`${base}/api/users/999`, {
+        headers: { cookie: AUTH_COOKIE },
+      });
 
-    assert.equal(response.status, 404);
-  });
+      assert.equal(response.status, 404);
+    }
+  );
 });
 
 test('GET by id rejects a non-numeric id with 400', async () => {
-  await withServer(async (base) => {
-    const response = await fetch(`${base}/api/users/abc`);
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(`${base}/api/users/abc`, {
+        headers: { cookie: AUTH_COOKIE },
+      });
 
-    assert.equal(response.status, 400);
-  });
+      assert.equal(response.status, 400);
+    }
+  );
 });
 
 test('PATCH updates one field', async () => {
-  await withServer(async (base) => {
-    const created = await json<{ id: number }>(await post(base, valid));
-    const response = await fetch(`${base}/api/users/${created.id}`, {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const response = await fetch(`${base}/api/users/${created.id}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: AUTH_COOKIE,
+        },
+        body: JSON.stringify({ firstName: 'Robert' }),
+      });
+      const body = await json<{ firstName: string; lastName: string }>(
+        response
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(body.firstName, 'Robert');
+      assert.equal(body.lastName, 'Bobsson');
+    }
+  );
+});
+
+test('PATCH rejects an empty body with 400', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const response = await fetch(`${base}/api/users/${created.id}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: AUTH_COOKIE,
+        },
+        body: JSON.stringify({}),
+      });
+
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('DELETE returns 204 once and 404 afterwards', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+
+      assert.equal(
+        (
+          await fetch(`${base}/api/users/${created.id}`, {
+            method: 'DELETE',
+            headers: { cookie: AUTH_COOKIE },
+          })
+        ).status,
+        204
+      );
+      assert.equal(
+        (
+          await fetch(`${base}/api/users/${created.id}`, {
+            method: 'DELETE',
+            headers: { cookie: AUTH_COOKIE },
+          })
+        ).status,
+        404
+      );
+    }
+  );
+});
+
+test('an unknown route returns a JSON 404', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(`${base}/api/nothing-here`);
+
+      assert.equal(response.status, 404);
+      assert.ok((await json<{ error: string }>(response)).error);
+    }
+  );
+});
+
+test('POST without a session is 401', async () => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await post(base, valid, null)).status, 401);
+  });
+});
+
+test('PATCH without a session is 401', async () => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
+    const response = await fetch(`${base}/api/users/1`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ firstName: 'Robert' }),
     });
-    const body = await json<{ firstName: string; lastName: string }>(response);
 
-    assert.equal(response.status, 200);
-    assert.equal(body.firstName, 'Robert');
-    assert.equal(body.lastName, 'Bobsson');
+    assert.equal(response.status, 401);
   });
 });
 
-test('PATCH rejects an empty body with 400', async () => {
-  await withServer(async (base) => {
-    const created = await json<{ id: number }>(await post(base, valid));
-    const response = await fetch(`${base}/api/users/${created.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    });
+test('DELETE without a session is 401', async () => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
+    const response = await fetch(`${base}/api/users/1`, { method: 'DELETE' });
 
-    assert.equal(response.status, 400);
+    assert.equal(response.status, 401);
   });
 });
 
-test('DELETE returns 204 once and 404 afterwards', async () => {
-  await withServer(async (base) => {
-    const created = await json<{ id: number }>(await post(base, valid));
-
-    assert.equal(
-      (await fetch(`${base}/api/users/${created.id}`, { method: 'DELETE' }))
-        .status,
-      204
-    );
-    assert.equal(
-      (await fetch(`${base}/api/users/${created.id}`, { method: 'DELETE' }))
-        .status,
-      404
-    );
+test('GET /api/users requires a session, since PublicUser carries email addresses', async () => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await fetch(`${base}/api/users`)).status, 401);
   });
 });
 
-test('an unknown route returns a JSON 404', async () => {
-  await withServer(async (base) => {
-    const response = await fetch(`${base}/api/nothing-here`);
-
-    assert.equal(response.status, 404);
-    assert.ok((await json<{ error: string }>(response)).error);
+test('GET /api/users/:id requires a session for the same reason', async () => {
+  await withApp({ userRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await fetch(`${base}/api/users/1`)).status, 401);
   });
 });
