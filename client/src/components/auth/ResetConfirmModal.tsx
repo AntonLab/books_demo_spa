@@ -58,7 +58,7 @@ export function ResetConfirmModal() {
         <Result
           status="success"
           title="Your password has been reset."
-          subTitle="Every other session has been signed out. Log in with the new password."
+          subTitle="You have been signed out everywhere. Log in with your new password."
           extra={
             <Button type="primary" onClick={dismiss}>
               Continue
