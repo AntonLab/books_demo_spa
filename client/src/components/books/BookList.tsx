@@ -31,7 +31,7 @@ export function BookList({
 
   if (status === 'idle' || status === 'loading') {
     return (
-      <div aria-label="Loading books" aria-busy="true">
+      <div role="status" aria-label="Loading books" aria-busy="true">
         <Skeleton active paragraph={{ rows: 3 }} />
       </div>
     );
