@@ -25,8 +25,14 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   See each package's CLAUDE.md.
 - `client` is bundled with webpack 5 (swc-loader + fork-ts-checker), exposing
   `npm run dev` (dev server on port 3000, Fast Refresh, `/api` proxied to :4000)
-  and `npm run build` (hashed output into `client/build/`). There is still no
-  `test` script. See `client/CLAUDE.md`.
+  and `npm run build` (hashed output into `client/build/`). It also has a
+  Jest test runner (`npm test`, jsdom + `@swc/jest`; see `client/CLAUDE.md`
+  for why the script is not plain `jest`). See `client/CLAUDE.md`.
+- `client` now has a working UI on top of that toolchain: a `MainPage`
+  listing books, a header with nav, search and auth state, four auth modals
+  against `/api/auth` (login, register, forgot/reset password), and a
+  `/search` page — built on antd 6, react-router and Redux Toolkit. See
+  `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
   `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
   — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
@@ -47,8 +53,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   another user's rows, which is out of scope by design. See `server/CLAUDE.md`
   for the cookie flags, the SHA-256-not-argon2 choice for tokens, and the
   login timing defence.
-- `server` has a test suite using `node:test` (`npm test`). `client` still has
-  no test script.
+- `server` has a test suite using `node:test` (`npm test`). `client` has a
+  Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 
 ## Quality Gates
 
@@ -57,15 +63,17 @@ Run these from within the relevant package (`client/` or `server/`) before commi
 - `npm run typecheck` — TypeScript, no emit
 - `npm run lint` — ESLint 9 flat config (`eslint.config.mjs`)
 - `npm run format:check` — Prettier (shared `.prettierrc.json` at the repo root)
-- `npm test` (server only) — `node:test`, including a MySQL-backed integration
-  suite; see `server/CLAUDE.md` for the exact script
+- `npm test` — applies to **both** packages now. `server` uses `node:test`,
+  including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
+  exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
+  why its script is not plain `jest`).
 
-`npm run lint:fix` and `npm run format` apply fixes. `client` has no test runner
-configured yet; document one here and in `client/CLAUDE.md` when it is added.
+`npm run lint:fix` and `npm run format` apply fixes.
 
 ## Anti-Patterns
 
 Do not:
+
 - Do not write absolute local paths in governance files (e.g. `D:/project/src/`) —
   use relative paths only (e.g. `src/`). These files are checked in and must stay
   portable across machines.
