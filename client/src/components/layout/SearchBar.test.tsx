@@ -54,7 +54,10 @@ describe('SearchBar', () => {
 
     await userEvent.type(screen.getByLabelText('Search books'), '{Enter}');
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/');
+    // Exact match, not toHaveTextContent: '/search?q=' contains '/' as a
+    // substring, so a substring assertion here would pass even with the
+    // empty-term guard deleted entirely.
+    expect(screen.getByTestId('location').textContent).toBe('/');
   });
 
   it('does nothing when the term is only whitespace', async () => {
@@ -62,7 +65,7 @@ describe('SearchBar', () => {
 
     await userEvent.type(screen.getByLabelText('Search books'), '   {Enter}');
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/');
+    expect(screen.getByTestId('location').textContent).toBe('/');
   });
 
   it('caps the input at the 200 characters the server accepts', () => {
@@ -87,5 +90,21 @@ describe('SearchBar', () => {
       'placeholder',
       'Search books by description'
     );
+  });
+
+  it('does not navigate when the clear (x) icon is clicked', async () => {
+    // antd 6's Input.Search fires onSearch for its clear icon too, with
+    // info.source === 'clear' — confirmed by inspecting the rendered DOM,
+    // which is a <button class="ant-input-clear-icon"> inside the input's
+    // suffix. Without the source==='clear' guard in SearchBar, clicking it
+    // would navigate to a search for the term the user just erased.
+    const { container } = renderBar('/search?q=dragon');
+
+    const clearIcon = container.querySelector('.ant-input-clear-icon');
+    expect(clearIcon).not.toBeNull();
+
+    await userEvent.click(clearIcon as HTMLElement);
+
+    expect(screen.getByTestId('location').textContent).toBe('/search?q=dragon');
   });
 });
