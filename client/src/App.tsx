@@ -6,6 +6,7 @@ import { store } from './store';
 import { useAppDispatch } from './store/hooks';
 import { bootstrapSession } from './store/authSlice';
 import { AppHeader } from './components/layout/AppHeader';
+import { AuthModals } from './components/auth/AuthModals';
 import { MainPage } from './pages/MainPage';
 import { MyBooksPage } from './pages/MyBooksPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -36,6 +37,7 @@ export function AppShell() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Layout.Content>
+      <AuthModals />
     </Layout>
   );
 }
