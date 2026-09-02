@@ -144,11 +144,14 @@ package root re-exports server-runtime code (cookie signing, etc.) that uses
 
 - Functional components with hooks only — no class components.
 - Do not mutate state directly — use setter functions or immutable updates.
-- **Named exports everywhere, except `src/index.tsx` and `src/App.tsx`.**
-  Those two are entry points consumed positionally — `index.tsx` mounts
-  `App`'s default export and is never itself imported — so a default export
-  costs nothing there and matches the common convention for an app root.
-  Every component, hook, slice and type elsewhere is a named export.
+- **Named exports everywhere, except `src/index.tsx`, `src/App.tsx` and
+  `src/test/styleMock.ts`.** The first two are entry points consumed
+  positionally — `index.tsx` mounts `App`'s default export and is never
+  itself imported — so a default export costs nothing there and matches the
+  common convention for an app root. `styleMock.ts` defaults for a different
+  reason: Jest's `moduleNameMapper` contract requires the module it maps
+  `\.css$` imports to resolve to a default export. Every component, hook,
+  slice and type elsewhere is a named export.
 - The client talks to the API only through `src/api/client.ts`. Its
   `request<T>()` prefixes every path with `/api` and sends
   `credentials: 'include'` — without that, the browser withholds the

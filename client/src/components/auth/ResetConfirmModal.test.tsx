@@ -5,15 +5,30 @@ import { renderWithProviders } from '../../test/renderWithProviders';
 import * as authApi from '../../api/auth';
 import { ApiError } from '../../api/client';
 import type { RootState } from '../../store';
+import type { PublicUser } from '../../types/user';
 
 jest.mock('../../api/auth');
 
 const mockedAuth = jest.mocked(authApi);
 
-function withToken(token: string | null): Partial<RootState> {
+const signedInUser: PublicUser = {
+  id: 1,
+  login: 'bob',
+  email: 'bob@example.com',
+  firstName: 'Bob',
+  lastName: 'Bobson',
+  status: 'active',
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z',
+};
+
+function withToken(
+  token: string | null,
+  user: PublicUser | null = null
+): Partial<RootState> {
   return {
     auth: {
-      user: null,
+      user,
       status: 'ready',
       error: null,
       activeModal: 'resetConfirm',
@@ -118,5 +133,28 @@ describe('ResetConfirmModal', () => {
       await screen.findByText('This reset link is missing its token.')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('New password')).toBeNull();
+  });
+
+  it('signs the client out on a successful reset, since the server kills every session including this one', async () => {
+    mockedAuth.confirmReset.mockResolvedValue(undefined);
+    const { store } = renderWithProviders(<ResetConfirmModal />, {
+      preloadedState: withToken('tok-123', signedInUser),
+    });
+
+    expect(store.getState().auth.user).toEqual(signedInUser);
+
+    await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
+    await userEvent.type(
+      screen.getByLabelText('Confirm password'),
+      'newsecret1'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Set new password' })
+    );
+
+    expect(
+      await screen.findByText('Your password has been reset.')
+    ).toBeInTheDocument();
+    expect(store.getState().auth.user).toBeNull();
   });
 });
