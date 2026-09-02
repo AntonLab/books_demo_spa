@@ -30,7 +30,9 @@ export function SearchPage() {
       <Typography.Title level={2}>
         {status === 'ready'
           ? `${total} ${total === 1 ? 'result' : 'results'} for "${q}"`
-          : `Searching for "${q}"`}
+          : status === 'error'
+            ? `Search failed for "${q}"`
+            : `Searching for "${q}"`}
       </Typography.Title>
 
       <BookList
