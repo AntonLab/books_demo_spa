@@ -35,3 +35,6 @@ yarn-error.log*
 
 # git worktrees created for isolated task execution
 /.claude/worktrees
+
+# subagent-driven-development scratch (ledger, briefs, review packages)
+/.superpowers
