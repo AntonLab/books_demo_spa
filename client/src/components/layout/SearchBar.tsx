@@ -32,6 +32,21 @@ export function SearchBar() {
     // antd fires onSearch for the clear icon as well as for Enter and the
     // button. Navigating on a clear would run a search for the term the user
     // just erased.
+    //
+    // On antd 6.6.2, clearing actually forces `term` to `''` before this
+    // handler ever sees it (@rc-component/input's resolveOnChange clones the
+    // event with the target value hard-coded to '' for a click-type change),
+    // so the empty-term guard below currently blocks this path too — the two
+    // guards are redundant today, and no test isolates this one alone: the
+    // isolated case (source === 'clear' with a non-empty term) can't be
+    // reached through the real component, only synthesized, and a test built
+    // on that synthetic input would be pinning our handler against a case
+    // antd itself never produces. Kept anyway, deliberately, because that
+    // redundancy rides on resolveOnChange's internals, not on onSearch's
+    // documented contract — the contract only promises the callback fires on
+    // clear, not that the value comes through empty. If a future antd ever
+    // passes the erased text through instead, this guard is what stops it
+    // from being navigated to.
     if (info?.source === 'clear') {
       return;
     }
