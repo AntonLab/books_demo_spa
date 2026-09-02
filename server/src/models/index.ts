@@ -3,6 +3,10 @@ import { initBookModel, Book } from './Book.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initLikeModel, Like } from './Like.ts';
+import {
+  initPasswordResetTokenModel,
+  PasswordResetToken,
+} from './PasswordResetToken.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
@@ -15,6 +19,7 @@ export interface Models {
   Comment: typeof Comment;
   Like: typeof Like;
   Session: typeof Session;
+  PasswordResetToken: typeof PasswordResetToken;
 }
 
 export function initModels(sequelize: Sequelize): Models {
@@ -25,6 +30,7 @@ export function initModels(sequelize: Sequelize): Models {
   initCommentModel(sequelize);
   initLikeModel(sequelize);
   initSessionModel(sequelize);
+  initPasswordResetTokenModel(sequelize);
 
   // Associations are declared after every model is initialised, so the target
   // is always a registered model no matter what order the files load in.
@@ -172,7 +178,26 @@ export function initModels(sequelize: Sequelize): Models {
   });
   Session.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
-  return { User, Series, Book, Chapter, Comment, Like, Session };
+  // CASCADE, for the same reason as sessions: a reset token belonging to a
+  // deleted user answers to nobody.
+  User.hasMany(PasswordResetToken, {
+    as: 'passwordResetTokens',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  PasswordResetToken.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  return {
+    User,
+    Series,
+    Book,
+    Chapter,
+    Comment,
+    Like,
+    Session,
+    PasswordResetToken,
+  };
 }
 
 export { User, toPublicUser } from './User.ts';
@@ -182,3 +207,4 @@ export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';
 export { Session } from './Session.ts';
+export { PasswordResetToken } from './PasswordResetToken.ts';
