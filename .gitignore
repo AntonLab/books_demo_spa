@@ -32,3 +32,6 @@ yarn-error.log*
 
 # agent working notes — plans and specs generated per task, not project docs
 /docs
+
+# git worktrees created for isolated task execution
+/.claude/worktrees
