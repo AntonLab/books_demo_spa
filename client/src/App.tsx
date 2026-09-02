@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import { store } from './store';
 import { useAppDispatch } from './store/hooks';
 import { bootstrapSession } from './store/authSlice';
+import { AppHeader } from './components/layout/AppHeader';
 import { MainPage } from './pages/MainPage';
 import { MyBooksPage } from './pages/MyBooksPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -25,6 +26,7 @@ export function AppShell() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      <AppHeader />
       <Layout.Content style={{ padding: 24 }}>
         <Routes>
           <Route path="/" element={<MainPage />} />
