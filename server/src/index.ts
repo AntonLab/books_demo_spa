@@ -6,6 +6,7 @@ import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
+import { createSequelizeLikeRepository } from './repositories/likeRepository.ts';
 import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
 import { createSequelizeUserRepository } from './repositories/userRepository.ts';
 
@@ -43,6 +44,7 @@ async function main(): Promise<void> {
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),
+    likeRepository: createSequelizeLikeRepository(),
   });
   app.listen(config.port, () => {
     logger.info(`server listening on http://127.0.0.1:${config.port}`);

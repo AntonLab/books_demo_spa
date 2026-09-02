@@ -10,6 +10,7 @@ import type {
 } from '../repositories/userRepository.ts';
 import type { PublicUser } from '../types/user.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
+import type { LikeRepository } from '../repositories/likeRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 
@@ -104,6 +105,7 @@ async function withServer(fn: (base: string) => Promise<void>): Promise<void> {
     seriesRepository: createUnusedRepository<SeriesRepository>('series'),
     bookRepository: createUnusedRepository<BookRepository>('book'),
     chapterRepository: createUnusedRepository<ChapterRepository>('chapter'),
+    likeRepository: createUnusedRepository<LikeRepository>('like'),
   });
   const server = app.listen(0);
   await once(server, 'listening');

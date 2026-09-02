@@ -5,20 +5,23 @@ for persistence.
 
 ## Status
 
-The `User`, `Series`, `Book` and `Chapter` models and their CRUD APIs are
-implemented end to end, associated by `User.hasMany(Series)`,
-`User.hasMany(Book)`, `Series.hasMany(Book)` and `Book.hasMany(Chapter)`.
+The `User`, `Series`, `Book`, `Chapter` and `Like` models and their CRUD APIs
+are implemented end to end, associated by `User.hasMany(Series)`,
+`User.hasMany(Book)`, `Series.hasMany(Book)`, `Book.hasMany(Chapter)`, and
+`hasMany(Like)` from each of `User`, `Book` and `Comment`.
 Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
 `src/index.ts` ensures the schema exists, authenticates, and mounts the
 Express app under `/api`. Routes, controllers, repositories, models, and
-middleware are all wired for those four. `node:test` is the test runner
+middleware are all wired for those five. `node:test` is the test runner
 (`npm test`).
 
-`Comment` is a model only. `User.hasMany(Comment)`, `Book.hasMany(Comment)`
-and the self-referential `Comment.hasMany(Comment, { as: 'replies' })` are
-wired and covered by `models/Comment.spec.ts`, but it has no repository,
-controller or route yet, and `types/comment.ts` holds only `PublicComment` —
-no zod schemas.
+`Comment` is the one model without an API. `User.hasMany(Comment)`,
+`Book.hasMany(Comment)`, `Comment.hasMany(Like)` and the self-referential
+`Comment.hasMany(Comment, { as: 'replies' })` are wired and covered by
+`models/Comment.spec.ts`, but it has no repository, controller or route yet,
+and `types/comment.ts` holds only `PublicComment` — no zod schemas. Likes on
+comments are reachable through `/api/likes` regardless, since a like
+references a comment by id.
 
 ## Development Commands
 
@@ -49,21 +52,26 @@ added.
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
 - `src/routes/` — Express route definitions (`userRoutes.ts`,
-  `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, mounted under `/api`)
+  `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `likeRoutes.ts`,
+  mounted under `/api`)
 - `src/controllers/` — request handlers / HTTP mapping (`userController.ts`,
-  `seriesController.ts`, `bookController.ts`, `chapterController.ts`)
+  `seriesController.ts`, `bookController.ts`, `chapterController.ts`,
+  `likeController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  Sequelize-backed; `likePattern.ts` holds the LIKE escaping they share)
+  `likeRepository.ts`, Sequelize-backed; `likePattern.ts` holds the LIKE
+  escaping they share). Note the collision: `likePattern.ts` is about the SQL
+  `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
+  sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `Book.ts`, `Chapter.ts`, `Comment.ts`, `index.ts`; `tagArray.ts` holds the
-  JSON tag-column normalisation `Series` and `Book` share)
+  `Book.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `index.ts`; `tagArray.ts`
+  holds the JSON tag-column normalisation `Series` and `Book` share)
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
 - `src/middleware/` — auth, validation, error handling (`errorHandler.ts`,
   `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `comment.ts`, `errors.ts`, `express.d.ts`)
+  `chapter.ts`, `comment.ts`, `like.ts`, `errors.ts`, `express.d.ts`)
 
 ## Runtime notes
 
@@ -221,6 +229,37 @@ snippets — still get wrong. Verified against the 5.x router and request source
   constraint text, so `asMissingReference` matches the column name in it and
   falls back to `userId`, which is the only candidate when no `seriesId` was
   supplied. Both branches are covered by the MySQL-backed suite.
+- **`likes` is the one table with an invariant the database cannot hold**: a
+  like points at exactly one of a book or a comment, so `bookId` and
+  `commentId` are both nullable and exactly one is filled. MySQL 8 would
+  express that as a `CHECK` constraint, but Sequelize 6 cannot declare one in
+  `Model.init` and there is no migration tool here to add it out of band — so
+  the XOR is enforced twice in application code instead: a `.refine()` on
+  `createLikeSchema` (400 at the API edge) and a model-level `validate` in
+  `Like.init` (the last line for callers reaching Sequelize directly). A raw
+  SQL write can still break it. Add the `CHECK` when migrations arrive.
+- **Both of a like's targets cascade, unlike every other optional FK here**:
+  `books.seriesId` and `comments.parentId` are nullable and `SET NULL`, but a
+  like whose target was nulled out would have neither column set — precisely
+  the state the XOR forbids — so deleting a book or a comment deletes its
+  likes. There is no cascade-depth problem: the longest chain is
+  `books` → `comments` → `likes`, and nothing recurses. `users` reaches
+  `likes` by two paths (directly, and via its books and comments), which MySQL
+  permits.
+- **NULLs are what make one unique index into two**: `likes` carries unique
+  indexes on `(userId, bookId)` and `(userId, commentId)` to give a user one
+  vote per target. MySQL treats NULLs in a unique index as distinct, so every
+  like on a comment (`bookId IS NULL`) sits outside the first and every like
+  on a book sits outside the second — the two constraints do not interfere.
+  A duplicate surfaces as a `ConflictError` (409); flipping a like to a
+  dislike is a `PATCH`, not a second `POST`. Both indexes also cover `userId`,
+  which is why there is no separate `(userId, id)`: `?userId=` takes a
+  filesort over one user's own rows, and `likes` is the most write-heavy table
+  here, where a fifth index is paid on every insert.
+- **`z.coerce.boolean()` is a trap for a boolean query filter**: coercion runs
+  `Boolean("false")`, which is `true`, so `?isLike=false` would silently
+  return likes. `listLikesQuerySchema` uses `z.stringbool()` instead. The same
+  care is not needed in a JSON body, where `z.boolean()` sees a real boolean.
 - **Zod `.partial()` does not undo `.default()`**: a PATCH schema built from
   a create schema that defaults `tags` to `[]` will parse a body with no
   `tags` key as `tags: []` and silently wipe the stored value. `update*`
@@ -236,11 +275,13 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `destroy({ where: {} })` and let `ON DELETE CASCADE` take the children.
   Each MySQL-backed suite also syncs its own schema
   (`books_demo_spa_test`, `books_demo_spa_test_series`,
-  `books_demo_spa_test_books`, `books_demo_spa_test_chapters`) — `node:test`
+  `books_demo_spa_test_books`, `books_demo_spa_test_chapters`,
+  `books_demo_spa_test_likes`) — `node:test`
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
-  Clear children before parents: `Chapter` → `Book` → `Series` → `User`, and
-  `Comment` ahead of `Book` once a suite needs it.
+  Clear children before parents:
+  `Like` → `Comment` → `Chapter` → `Book` → `Series` → `User`; `Like` is the
+  leaf of every chain, and `Comment` must precede `Book`.
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember

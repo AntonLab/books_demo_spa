@@ -2,6 +2,7 @@ import type { Sequelize } from 'sequelize';
 import { initBookModel, Book } from './Book.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
+import { initLikeModel, Like } from './Like.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initUserModel, User } from './User.ts';
 
@@ -11,6 +12,7 @@ export interface Models {
   Book: typeof Book;
   Chapter: typeof Chapter;
   Comment: typeof Comment;
+  Like: typeof Like;
 }
 
 export function initModels(sequelize: Sequelize): Models {
@@ -19,6 +21,7 @@ export function initModels(sequelize: Sequelize): Models {
   initBookModel(sequelize);
   initChapterModel(sequelize);
   initCommentModel(sequelize);
+  initLikeModel(sequelize);
 
   // Associations are declared after every model is initialised, so the target
   // is always a registered model no matter what order the files load in.
@@ -119,7 +122,43 @@ export function initModels(sequelize: Sequelize): Models {
   });
   Comment.belongsTo(Comment, { as: 'parent', foreignKey: 'parentId' });
 
-  return { User, Series, Book, Chapter, Comment };
+  // A like points at exactly one of a book or a comment, so both foreign keys
+  // are nullable — and both cascade, unlike the SET NULL that books.seriesId
+  // and comments.parentId use. SET NULL would leave a like with neither target
+  // set, which is the one state models/Like.ts exists to forbid; deleting the
+  // thing that was liked should take the likes with it.
+  //
+  // There is no recursion to worry about here, unlike the comment replies: the
+  // deepest chain is books -> comments -> likes, well inside InnoDB's cascade
+  // limit of 15. Users reach likes by two paths (directly, and through their
+  // books and comments), which MySQL allows.
+  User.hasMany(Like, {
+    as: 'likes',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Like.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  Book.hasMany(Like, {
+    as: 'likes',
+    // allowNull is restated here so Sequelize does not infer NOT NULL from the
+    // association: a like on a comment leaves this column empty.
+    foreignKey: { name: 'bookId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Like.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  Comment.hasMany(Like, {
+    as: 'likes',
+    foreignKey: { name: 'commentId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Like.belongsTo(Comment, { as: 'comment', foreignKey: 'commentId' });
+
+  return { User, Series, Book, Chapter, Comment, Like };
 }
 
 export { User, toPublicUser } from './User.ts';
@@ -127,3 +166,4 @@ export { Series, toPublicSeries } from './Series.ts';
 export { Book, toPublicBook } from './Book.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 export { Comment, toPublicComment } from './Comment.ts';
+export { Like, toPublicLike } from './Like.ts';

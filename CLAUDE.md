@@ -28,11 +28,14 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   and `npm run build` (hashed output into `client/build/`). There is still no
   `test` script. See `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
-  `books_demo_spa`, and `User`, `Series`, `Book` and `Chapter` models —
-  associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
-  `Series.hasMany(Book)` and `Book.hasMany(Chapter)` — each have a full CRUD
-  API. `Comment` (owned by a user and a book, with self-referential replies)
-  is so far a model only, with no CRUD API. `npm run build`
+  `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
+  — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
+  `Series.hasMany(Book)`, `Book.hasMany(Chapter)` and `hasMany(Like)` from
+  each of `User`, `Book` and `Comment` — have a full CRUD API. A like points
+  at exactly one of a book or a comment; that XOR is enforced in zod and in a
+  model validator, never by the database (see `server/CLAUDE.md`).
+  `Comment` (owned by a user and a book, with self-referential replies) is so
+  far a model only, with no CRUD API. `npm run build`
   (`tsc -p tsconfig.build.json`) emits to `dist/`.
 - `server` has a test suite using `node:test` (`npm test`). `client` still has
   no test script.

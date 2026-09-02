@@ -3,6 +3,7 @@ import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
 import type { BookRepository } from './repositories/bookRepository.ts';
 import type { ChapterRepository } from './repositories/chapterRepository.ts';
+import type { LikeRepository } from './repositories/likeRepository.ts';
 import type { SeriesRepository } from './repositories/seriesRepository.ts';
 import type { UserRepository } from './repositories/userRepository.ts';
 import { createApiRouter } from './routes/index.ts';
@@ -12,6 +13,7 @@ export interface AppDeps {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  likeRepository: LikeRepository;
 }
 
 // No listen() here: tests bind an ephemeral port themselves.
