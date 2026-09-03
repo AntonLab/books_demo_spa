@@ -12,8 +12,25 @@ module.exports = merge(common(true), {
   },
   module: {
     rules: [
+      // `*.module.css` is scoped per component (see CLAUDE.md, Component
+      // folders); every other stylesheet stays global, which is what
+      // `antd/dist/reset.css` in src/index.tsx relies on. The plain rule
+      // excludes `.module.css` explicitly, so the two can never both match.
+      {
+        test: /\.module\.css$/i,
+        use: [
+          'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              modules: { localIdentName: '[name]__[local]--[hash:base64:5]' },
+            },
+          },
+        ],
+      },
       {
         test: /\.css$/i,
+        exclude: /\.module\.css$/i,
         use: ['style-loader', 'css-loader'],
       },
     ],

@@ -25,13 +25,13 @@ export function renderWithProviders(
     ...renderOptions
   } = options;
 
-  function Wrapper({ children }: { children: ReactNode }) {
+  const Wrapper = ({ children }: { children: ReactNode }) => {
     return (
       <Provider store={store}>
         <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
       </Provider>
     );
-  }
+  };
 
   return { store, ...render(ui, { wrapper: Wrapper, ...renderOptions }) };
 }

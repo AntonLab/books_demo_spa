@@ -1,0 +1,1 @@
+export { ResetPasswordRoute } from './ResetPasswordRoute';
