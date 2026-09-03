@@ -4,9 +4,12 @@ import {
   type CreationOptional,
   type InferAttributes,
   type InferCreationAttributes,
+  type NonAttribute,
   type Sequelize,
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
+import type { Book } from './Book.ts';
+import type { Series } from './Series.ts';
 import {
   USER_STATUSES,
   type PublicUser,
@@ -26,6 +29,13 @@ export class User extends Model<
   declare status: CreationOptional<UserStatus>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
+
+  // Set by User.hasMany(Series) / User.hasMany(Book) and populated only by an
+  // eager `include`. NonAttribute keeps them out of the inferred attribute set
+  // so they are never mistaken for columns; the imports above are type-only, so
+  // the cycles with Series.ts and Book.ts are erased at runtime.
+  declare series?: NonAttribute<Series[]>;
+  declare books?: NonAttribute<Book[]>;
 }
 
 export function initUserModel(sequelize: Sequelize): typeof User {

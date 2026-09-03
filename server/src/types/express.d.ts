@@ -12,6 +12,11 @@ declare global {
         query?: unknown;
         params?: unknown;
       };
+
+      // Optional, unlike `validated`: most requests legitimately have no user.
+      // Handlers mounted behind requireAuth can rely on it being set, and
+      // narrow it rather than asserting.
+      user?: import('./user.ts').PublicUser;
     }
   }
 }
