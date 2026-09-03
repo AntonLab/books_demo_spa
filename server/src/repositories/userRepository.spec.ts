@@ -7,7 +7,7 @@ import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
-import { initUserModel, User } from '../models/User.ts';
+import { initModels, User } from '../models/index.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
@@ -59,7 +59,10 @@ describe('userRepository against real MySQL', { skip }, () => {
     const db = testDbConfig();
     await ensureDatabase(db);
     sequelize = createSequelize(db);
-    initUserModel(sequelize);
+    // The whole model graph, not just User: series holds a foreign key into
+    // users, and sync({ force: true }) can only drop users if it knows to drop
+    // the referencing table first.
+    initModels(sequelize);
     await sequelize.sync({ force: true });
   });
 
@@ -67,8 +70,13 @@ describe('userRepository against real MySQL', { skip }, () => {
     await sequelize.close();
   });
 
+  // A DELETE rather than TRUNCATE: MySQL refuses to truncate a table referenced
+  // by a foreign key, and series now points at users. ON DELETE CASCADE clears
+  // any children along with it.
+  const clearUsers = () => User.destroy({ where: {} });
+
   test('stores a hash rather than the plaintext, and it verifies', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     const created = await repository.create({ ...base });
 
     const row = await User.unscoped().findByPk(created.id);
@@ -78,14 +86,14 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('never returns the password field', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal('password' in created, false);
   });
 
   test('Bob and bob are different logins', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
     const lower = await repository.create({
       ...base,
@@ -98,7 +106,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a repeated login is rejected', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
 
     await assert.rejects(
@@ -110,7 +118,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('email stays case-insensitive, so Bob@ collides with bob@', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({
       ...base,
       login: 'first',
@@ -129,7 +137,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('paginates and reports the total', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     for (let i = 0; i < 5; i += 1) {
       await repository.create({
         ...base,
@@ -144,7 +152,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('filters by status', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({
       ...base,
       login: 'a',
@@ -168,7 +176,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('search stays case-insensitive even though login is not', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({
       ...base,
       login: 'Bob',
@@ -180,7 +188,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a literal % in q is escaped rather than matching every row', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     await repository.create({
       ...base,
       login: 'alice',
@@ -197,7 +205,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('updates a single field and leaves the rest alone', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     const created = await repository.create({ ...base });
 
     const updated = await repository.update(created.id, {
@@ -209,7 +217,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('re-hashes when the password changes', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     const created = await repository.create({ ...base });
     const before = await User.unscoped().findByPk(created.id);
 
@@ -225,7 +233,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('returns null for a missing record and false for a missing delete', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
 
     assert.equal(await repository.findById(9999), null);
     assert.equal(await repository.update(9999, { firstName: 'X' }), null);
@@ -233,10 +241,72 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('removes an existing record once', async () => {
-    await User.destroy({ truncate: true });
+    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.remove(created.id), false);
+  });
+
+  test('findByLoginWithPassword returns the stored hash for a known login', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth1',
+      email: 'auth1@example.com',
+    });
+
+    const found = await repository.findByLoginWithPassword('Auth1');
+    assert.ok(found);
+    assert.equal(await verifyPassword(found.password, base.password), true);
+  });
+
+  test('findByLoginWithPassword is case-sensitive, matching the login collation', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth2',
+      email: 'auth2@example.com',
+    });
+
+    assert.equal(await repository.findByLoginWithPassword('auth2'), null);
+  });
+
+  test('findByLoginWithPassword returns null for an unknown login', async () => {
+    assert.equal(await repository.findByLoginWithPassword('NoSuchUser'), null);
+  });
+
+  test('findByLoginWithPassword carries status, so a blocked user can be refused', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth3',
+      email: 'auth3@example.com',
+      status: 'blocked',
+    });
+
+    assert.equal(
+      (await repository.findByLoginWithPassword('Auth3'))?.status,
+      'blocked'
+    );
+  });
+
+  test('findByEmail is case-insensitive, matching the email collation', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth4',
+      email: 'auth4@example.com',
+    });
+
+    assert.ok(await repository.findByEmail('AUTH4@EXAMPLE.COM'));
+  });
+
+  test('findByEmail never exposes the password hash', async () => {
+    await repository.create({
+      ...base,
+      login: 'Auth5',
+      email: 'auth5@example.com',
+    });
+
+    const found = await repository.findByEmail('auth5@example.com');
+    assert.ok(found);
+    assert.equal('password' in found, false);
   });
 });
