@@ -9,6 +9,7 @@ import { bootstrapSession } from '@/store/authSlice';
 import { AppHeader } from '@/components/organisms/AppHeader';
 import { AuthModals } from '@/components/organisms/AuthModals';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary';
+import { appTheme } from '@/theme/tokens';
 
 // Pages are the only code-split modules: AppHeader, AuthModals and the store
 // render on every route, so splitting them would buy nothing. Each page is a
@@ -90,8 +91,9 @@ export const App: FC = () => {
   return (
     <Provider store={store}>
       {/* antd's App must sit inside ConfigProvider to pick up its tokens and
-          style reset. */}
-      <ConfigProvider>
+          style reset. `appTheme` merges our quarks into antd's token set —
+          see CLAUDE.md, Atomic Design, Quarks. */}
+      <ConfigProvider theme={appTheme}>
         <AntdApp>
           <BrowserRouter>
             <AppShell />
