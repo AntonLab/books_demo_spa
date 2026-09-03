@@ -1,18 +1,16 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Input } from 'antd';
+import { Input, theme } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router';
 
 // The server caps `q` at 200 characters (`z.string().min(1).max(200)`), so the
 // input prevents an over-long term rather than letting it become a 400.
 const MAX_QUERY_LENGTH = 200;
 
-// A layout constraint, not a design value: antd has no token for the width
-// of a search field, and the header's other widths come from flex. Keeping
-// it named and local is the honest version of Atomic Design rule 4.
-const MAX_WIDTH = 400;
-
 export const SearchBar: FC = () => {
+  // The max width is a quark, not a literal — see CLAUDE.md, Atomic Design
+  // rule 4, and `appSearchBarMaxWidth` in `src/theme/tokens.ts`.
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryFromUrl = searchParams.get('q') ?? '';
@@ -77,7 +75,7 @@ export const SearchBar: FC = () => {
       onSearch={handleSearch}
       allowClear
       enterButton
-      style={{ maxWidth: MAX_WIDTH }}
+      style={{ maxWidth: token.appSearchBarMaxWidth }}
     />
   );
 };

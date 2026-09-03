@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { SearchBar } from './SearchBar';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { appTheme } from '@/theme/tokens';
 
 // Renders the current URL so a test can assert where the bar navigated to.
 const LocationProbe = () => {
@@ -81,6 +82,17 @@ describe('SearchBar', () => {
     renderBar('/search?q=dragon');
 
     expect(screen.getByLabelText('Search books')).toHaveValue('dragon');
+  });
+
+  it('caps its width from the quark rather than a literal', () => {
+    const { container } = renderBar();
+
+    // antd puts the `style` prop on the search wrapper, not the <input>.
+    // Asserted against the token itself, not a hardcoded 400, so the test
+    // follows the quark if its value ever changes.
+    expect(container.querySelector('.ant-input-search')).toHaveStyle({
+      maxWidth: `${appTheme.token?.appSearchBarMaxWidth}px`,
+    });
   });
 
   it('says it searches descriptions, which is all the server matches', () => {

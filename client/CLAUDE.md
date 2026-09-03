@@ -12,14 +12,14 @@ UI components follow Brad Frost's Atomic Design levels, extended with
 `organisms/`. A level with nothing in it has no directory — create one when
 the first component needs it rather than leaving empty folders around.
 
-| Level     | Lives in                        | What it is                                        | Today                                                                                              |
-| --------- | ------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Quarks    | `<ConfigProvider>` in `App.tsx` | Colors, spacing, typography, radii, shadows       | None defined — `ConfigProvider` is passed no `theme`, so antd 6's defaults are the whole token set |
-| Atoms     | antd 6                          | Button, Input, Typography, Icon                   | Use antd directly; write an atom only where antd has no equivalent                                 |
-| Molecules | `src/components/molecules/`     | A few atoms doing one job                         | `SearchBar`                                                                                        |
-| Organisms | `src/components/organisms/`     | A standalone section; may hold state and dispatch | `AppHeader`, `BookList`, `BookCard`, `ErrorBoundary`, `AuthModals` + 4 modals                      |
-| Templates | `src/components/templates/`     | Page skeleton, placeholder content                | `App` — the composition root and the antd `Layout` shell around every route                        |
-| Pages     | `src/pages/`                    | A template filled with real data and routed       | The seven routed pages                                                                             |
+| Level     | Lives in                    | What it is                                          | Today                                                                                                                                            |
+| --------- | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx` |
+| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                               |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`                                                                                                                                      |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `ErrorBoundary`, `AuthModals` + 4 modals                                                                    |
+| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                      |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The seven routed pages                                                                                                                           |
 
 ### Rules
 
@@ -37,7 +37,15 @@ the first component needs it rather than leaving empty folders around.
    organisms and pages.
 4. **Tokens, not hardcoded values.** No arbitrary hex colours or pixel values
    in components — read antd's tokens (`theme.useToken()`), or add the value to
-   the `ConfigProvider` theme so it becomes a real quark.
+   the `ConfigProvider` theme so it becomes a real quark. antd's set has gaps
+   — it sizes controls by height and has no width token at all — so sometimes
+   the quark has to be invented. Declare it in `src/theme/tokens.ts`: give it
+   an `app` prefix, since antd flattens every token into one object and an
+   unprefixed name could collide with one a later antd version adds, and
+   augment antd's `AliasToken` in the same file so `theme.useToken()` types it
+   at every call site. `src/theme/tokens.test.tsx` pins the pipeline that makes
+   this work: antd derives its own tokens over ours, and nothing in its docs
+   promises an unknown key survives that.
 5. **Do not wrap antd for its own sake.** A passthrough around `<Button>` is
    over-atomization; wrap only to fix an awkward API or to fix a variant used
    in three or more places.
@@ -80,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 17 (10 components, 7 pages) follow this layout, and the `@/` alias is
+All 18 (11 components, 7 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -186,13 +194,17 @@ Available scripts:
   `RootState`/`AppStore`/`AppDispatch`), `hooks.ts` (pre-typed
   `useAppDispatch`/`useAppSelector`), and `authSlice.ts` / `booksSlice.ts` /
   `searchSlice.ts`.
+- `src/theme/` — `tokens.ts`, the quark layer: the `appTheme` `ThemeConfig`
+  handed to `ConfigProvider` in `App.tsx`, and the `AliasToken` augmentation
+  that makes our custom tokens typed everywhere `theme.useToken()` is called.
 - `src/types/` — `user.ts`, `book.ts`, `api.ts` (the shared `ListResponse<T>`
   and `ApiErrorBody` shapes) and `css.d.ts`. Dates cross the wire as ISO
   strings, not `Date`, throughout — the server types them as `Date` in
   process but they arrive as JSON strings.
 - `src/test/` — `setup.ts` (jsdom polyfills, see Testing below),
-  `renderWithProviders.tsx` (wraps a component in the Redux `Provider` and a
-  `MemoryRouter`, returns the store), `httpFixtures.ts` (minimal
+  `renderWithProviders.tsx` (wraps a component in the Redux `Provider`, antd's
+  `ConfigProvider` and a `MemoryRouter`, returns the store), `httpFixtures.ts`
+  (minimal
   `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`) and
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
@@ -279,8 +291,11 @@ package root re-exports server-runtime code (cookie signing, etc.) that uses
     the four auth modals included — can mount in a test without it.
 - **`fetch` is stubbed per test** (`window.fetch = jest.fn()`); there is no
   MSW. `src/test/renderWithProviders.tsx` wraps a component in the Redux
-  `Provider` and a `MemoryRouter` and returns the store so a test can assert
-  on dispatched state directly.
+  `Provider`, antd's `ConfigProvider` and a `MemoryRouter`, and returns the
+  store so a test can assert on dispatched state directly. `ConfigProvider` is
+  in that wrapper because `App.tsx` mounts one in production: without it a
+  component reading a custom quark would read `undefined` in tests only, and
+  nothing would fail to make that visible.
 
 ### What a component test must cover
 
@@ -333,14 +348,19 @@ contract, not a shortcut.
   half is convention, checked in review.
 
 - Do not mutate state directly — use setter functions or immutable updates.
-- **Named exports everywhere, except `src/index.tsx` and
-  `src/test/styleMock.ts`.** `index.tsx` is the webpack entry: it is never
+- **Named exports everywhere, except `src/index.tsx`,
+  `src/test/styleMock.ts` and the ambient declaration in
+  `src/types/css.d.ts`.** `index.tsx` is the webpack entry: it is never
   imported by anything, so what it exports is moot. `App` used to default-export
   too, as the app root; once it moved into a component folder behind a barrel
-  it became an ordinary named export like the rest. `styleMock.ts` defaults for
-  a different reason: Jest's `moduleNameMapper` contract requires the module it maps
-  `\.css$` imports to resolve to a default export. Every component, hook,
-  slice and type elsewhere is a named export.
+  it became an ordinary named export like the rest. The other two are not
+  choices at all — each matches a tool's contract. Jest's `moduleNameMapper`
+  requires the module it maps `\.css$` imports to resolve to a default export,
+  so `styleMock.ts` provides one. `css-loader` with `modules` on emits a CSS
+  Module's class-name map as that module's default export, so
+  `declare module '*.module.css'` has to describe it as one — and that file
+  types other people's modules rather than exporting anything of its own.
+  Every component, hook, slice and type elsewhere is a named export.
 - The client talks to the API only through `src/api/client.ts`. Its
   `request<T>()` prefixes every path with `/api` and sends
   `credentials: 'include'` — without that, the browser withholds the
