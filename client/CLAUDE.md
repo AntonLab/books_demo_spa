@@ -2,6 +2,137 @@
 
 React 19 + TypeScript single-page app, bundled with webpack 5.
 
+## Atomic Design
+
+UI components follow Brad Frost's Atomic Design levels, extended with
+**quarks** (design tokens) below atoms.
+
+`src/components/` is grouped by level, not by feature: the former `auth/`,
+`books/` and `layout/` directories are gone, replaced by `molecules/` and
+`organisms/`. A level with nothing in it has no directory — create one when
+the first component needs it rather than leaving empty folders around.
+
+| Level     | Lives in                        | What it is                                        | Today                                                                                              |
+| --------- | ------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Quarks    | `<ConfigProvider>` in `App.tsx` | Colors, spacing, typography, radii, shadows       | None defined — `ConfigProvider` is passed no `theme`, so antd 6's defaults are the whole token set |
+| Atoms     | antd 6                          | Button, Input, Typography, Icon                   | Use antd directly; write an atom only where antd has no equivalent                                 |
+| Molecules | `src/components/molecules/`     | A few atoms doing one job                         | `SearchBar`                                                                                        |
+| Organisms | `src/components/organisms/`     | A standalone section; may hold state and dispatch | `AppHeader`, `BookList`, `BookCard`, `ErrorBoundary`, `AuthModals` + 4 modals                      |
+| Templates | `src/components/templates/`     | Page skeleton, placeholder content                | `App` — the composition root and the antd `Layout` shell around every route                        |
+| Pages     | `src/pages/`                    | A template filled with real data and routed       | The seven routed pages                                                                             |
+
+### Rules
+
+1. **Imports flow downward only** — quarks → atoms → molecules → organisms →
+   templates → pages. A molecule never imports an organism. **One exemption:
+   a page may import another page**, because composing a route out of an
+   existing one is cheaper than extracting a shared organism for a single
+   caller — `ResetPasswordRoute` renders `MainPage` under the reset-confirm
+   modal. Nothing below the page level may import a page. Enforced at review
+   time only: no lint rule checks this.
+2. **Check before creating.** Search `src/components/` first. Never add a
+   second component that does what an existing one already does.
+3. **No business logic below organisms.** Atoms and molecules take props and
+   render. `useAppSelector`, `useAppDispatch` and `src/api` calls belong in
+   organisms and pages.
+4. **Tokens, not hardcoded values.** No arbitrary hex colours or pixel values
+   in components — read antd's tokens (`theme.useToken()`), or add the value to
+   the `ConfigProvider` theme so it becomes a real quark.
+5. **Do not wrap antd for its own sake.** A passthrough around `<Button>` is
+   over-atomization; wrap only to fix an awkward API or to fix a variant used
+   in three or more places.
+6. **Prototype complex work on a throwaway page** before wiring it into a
+   template or a routed page.
+7. **One folder per component**, PascalCase, tests beside the code — see
+   Component folders below.
+
+### Component folders
+
+Every component is a self-contained directory — under `src/components/`
+and under `src/pages/` alike, since a page is a component too. Tests,
+styles and types sit beside the component, never in a mirrored global
+folder. A component folder lives inside its Atomic Design level, a page
+folder directly under `src/pages/`:
+
+```text
+src/components/organisms/BookCard/
+├── BookCard.tsx        # logic and implementation
+├── BookCard.test.tsx   # Jest + React Testing Library
+├── BookCard.types.ts   # interfaces, when they are complex enough to move
+├── BookCard.css        # scoped styles (or .module.css)
+└── index.ts            # barrel: the folder's public API
+
+src/pages/MainPage/
+├── MainPage.tsx
+├── MainPage.test.tsx
+└── index.ts
+```
+
+- **PascalCase** for the folder, every file inside it, and the types.
+- **Named exports in the component file.** `index.ts` exists only to
+  re-export the public API and holds no logic of its own.
+- **The rest of the app imports the folder, never a file inside it** —
+  `import { BookCard } from '@/components/organisms/BookCard'`, not
+  `.../BookCard/BookCard`. The barrel is what makes the internals private.
+- `.types.ts` and `.css` are optional. Add them when there is something to
+  put in them; do not create empty scaffolding.
+- A page becoming a folder does not change what the `lazy()` calls in
+  `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
+  re-exports the same named `MainPage`, so the `default` remap is untouched.
+
+All 17 (10 components, 7 pages) follow this layout, and the `@/` alias is
+wired into the three tools that must agree on it: `paths` in
+`tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
+`moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
+
+Two caveats:
+
+- **`tsconfig.json` sets `paths` with no `baseUrl`.** `baseUrl` is
+  deprecated in TypeScript 6 and errors as `TS5101`; without it,
+  `moduleResolution: Bundler` resolves `paths` against the tsconfig
+  directory, so the mapping value needs a leading `./` (`["./src/*"]`).
+- **`.css` and `.module.css` both work, but nothing uses them yet.** Plain
+  stylesheets always did — that is how `src/index.tsx` pulls in
+  `antd/dist/reset.css`. CSS Modules were added alongside the folder rule:
+  both webpack overlays carry a `/.module.css$/` rule with
+  `css-loader`'s `modules` on (hashed class names in prod, readable ones in
+  dev), the plain `.css` rule now excludes them, and `src/types/css.d.ts`
+  declares `*.module.css` as a class-name map. Jest still maps every `.css`
+  to `styleMock.ts`, so a module's classes come back `undefined` in tests —
+  assert on roles and text, not class names. Atomic Design rule 4 still
+  applies: reach for antd tokens before adding a stylesheet.
+
+### Page loading and errors
+
+Every routed page is code-split and guarded against a render error. The
+rules, all of them live in `App.tsx`:
+
+1. **Lazy-load every page**, and only pages. Nothing under `src/pages/` gets a
+   static `import` in `App.tsx`; `AppHeader`, `AuthModals` and the store stay
+   static, since they render on every route and splitting them buys nothing.
+2. **Remap the named export.** `React.lazy` resolves a module's `default`, but
+   pages are named exports (see Conventions), so each one needs
+   `lazy(() => import('@/pages/MainPage').then((m) => ({ default: m.MainPage })))`.
+   Do not add default exports to pages to make `lazy` shorter — the named-export
+   rule is the load-bearing one.
+3. **One `<Suspense>` and one `<ErrorBoundary>` around `<Routes>`**, both inside
+   `Layout.Content`. That wraps all pages at once and keeps the header and auth
+   modals mounted when a chunk is in flight or a page throws. Per-route
+   boundaries are the fallback if a page ever needs its own recovery UI — do
+   not add them pre-emptively.
+4. **Key the boundary by route** (`<ErrorBoundary key={useLocation().pathname}>`)
+   or a caught error persists across every later navigation.
+5. **The error boundary is the one permitted class component.** React exposes
+   no hook for `getDerivedStateFromError`, so `ErrorBoundary` is the documented
+   exception to the functional-components-only rule in the root `CLAUDE.md`.
+   It lives in `src/components/organisms/ErrorBoundary/` and is hand-written
+   rather than pulled from a dependency. It defines `getDerivedStateFromError`
+   only — no `componentDidCatch`, because React already logs an uncaught render
+   error itself and the client has no logger to forward one to.
+
+The route tests in `App.test.tsx` needed no changes for this: they
+already `await screen.findByRole(...)`, which waits out the lazy chunk.
+
 ## Status
 
 No longer a scaffold: the client has a working main page, header (nav, search,
@@ -23,21 +154,29 @@ Available scripts:
 
 - `public/index.html` — HTML template consumed by `html-webpack-plugin`
 - `src/index.tsx` — app entry, mounts `<App />` into `#root`
-- `src/App.tsx` — root component (default export)
+- `src/components/templates/App/` — `App`, the composition root (Redux
+  `Provider`, antd `ConfigProvider`, `BrowserRouter`), and `AppShell`, the
+  `Layout` around every route. Holds the `lazy()` call for each page plus the
+  single `<Suspense>`/`<ErrorBoundary>` pair (see Page loading and errors).
+  `AppShell` is exported separately because `App` mounts `BrowserRouter`,
+  which a route test cannot point at an arbitrary path.
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
   responses into a typed `ApiError`), plus `auth.ts` and `books.ts`, the
   per-resource typed calls built on it.
-- `src/components/`
-  - `auth/` — `AuthModals` (reads `activeModal` from `authSlice` and renders
-    only that one, so only one modal is ever mounted at a time), plus
-    `LoginModal`, `RegisterModal`, `ResetRequestModal`, `ResetConfirmModal`.
-  - `books/` — `BookCard` and the presentational `BookList` (takes
-    `items`/`status`/`error` as props so both `MainPage` and `SearchPage` can
-    feed it from their own slice).
-  - `layout/` — `AppHeader` (nav menu, `SearchBar`, and the three auth
-    states — signed out / loading / signed in) and `SearchBar`.
-- `src/pages/` — `MainPage`, `SearchPage`, `MyBooksPage`, `ProfilePage`,
+- `src/components/` — grouped by Atomic Design level (see above), not by
+  feature. Each component becomes its own folder (see Component folders).
+  - `molecules/` — `SearchBar`.
+  - `organisms/` — `AppHeader` (nav menu, `SearchBar`, and the three auth
+    states — signed out / loading / signed in); `AuthModals` (reads
+    `activeModal` from `authSlice` and renders only that one, so only one
+    modal is ever mounted at a time) plus `LoginModal`, `RegisterModal`,
+    `ResetRequestModal` and `ResetConfirmModal`; `BookCard` and the
+    presentational `BookList` (takes `items`/`status`/`error` as props so both
+    `MainPage` and `SearchPage` can feed it from their own slice); and
+    `ErrorBoundary`, the client's only class component.
+- `src/pages/` — one folder per page (see Component folders): `MainPage`,
+  `SearchPage`, `MyBooksPage`, `ProfilePage`,
   `SeriesPage`, `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
@@ -59,8 +198,11 @@ Available scripts:
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
 - `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays, merged via `webpack-merge`
 - `tsconfig.json` — strict, `noEmit`, `jsx: react-jsx`,
-  `moduleResolution: Bundler`, target `ES2020`
-- `eslint.config.mjs` — ESLint flat config (TypeScript + React + hooks + jsx-a11y)
+  `moduleResolution: Bundler`, target `ES2020`, and the `@/*` → `./src/*`
+  path mapping
+- `eslint.config.mjs` — ESLint flat config (TypeScript + React + hooks +
+  jsx-a11y), plus `react/function-component-definition` set to
+  `arrow-function`
 
 ## Webpack
 
@@ -140,16 +282,63 @@ package root re-exports server-runtime code (cookie signing, etc.) that uses
   `Provider` and a `MemoryRouter` and returns the store so a test can assert
   on dispatched state directly.
 
+### What a component test must cover
+
+Every component has a `ComponentName.test.tsx` next to it, asserting:
+
+1. It renders with its default and required props.
+2. It behaves correctly across prop variants — `disabled`, `loading`, empty,
+   error, and whatever else changes the output.
+3. User interaction, driven by `userEvent` (preferred) or `fireEvent`.
+
+Test the inputs and the outputs: props in, rendered DOM and fired callbacks
+out. Do not assert on internal state — a test that knows how a component
+stores something breaks on every refactor that changes nothing a user sees.
+
+Every component and page has a test file. The stub pages (`MyBooksPage`,
+`ProfilePage`, `SeriesPage`) take no props and have nothing to click, so
+their tests cover only the heading and the placeholder — that is the whole
+contract, not a shortcut.
+
 ## Conventions
 
-- Functional components with hooks only — no class components.
+- Functional components with hooks only — no class components, with the single
+  `ErrorBoundary` exception noted under Page loading and errors above.
+- **Components are arrow functions assigned to a `const` and typed with `FC`**,
+  never `function` declarations:
+
+  ```tsx
+  import type { FC } from 'react';
+
+  type Props = { book: PublicBook };
+
+  export const BookCard: FC<Props> = ({ book }) => { ... };
+  ```
+
+  Write `FC`, imported as a named type — not `React.FC`. They are the same
+  type, but the automatic JSX runtime (`jsx: react-jsx`) means no file in
+  `src/` imports the `React` namespace, and pulling one in for the prefix adds
+  an import for nothing. A component with no props is
+  `export const AppHeader: FC = () => { ... }`.
+
+  `@types/react` 19 gives `FC` **no implicit `children`** (that was dropped in
+  v18), so a component accepting children must declare
+  `children: ReactNode` in its own `Props`.
+
+  This covers components only; plain helpers, custom hooks and thunks keep
+  whichever form reads best. The arrow half is **enforced**:
+  `react/function-component-definition` is set to `arrow-function` in
+  `eslint.config.mjs`, so `lint` fails on a `function` component and
+  `lint:fix` rewrites it. That rule does not add the `FC` annotation — that
+  half is convention, checked in review.
+
 - Do not mutate state directly — use setter functions or immutable updates.
-- **Named exports everywhere, except `src/index.tsx`, `src/App.tsx` and
-  `src/test/styleMock.ts`.** The first two are entry points consumed
-  positionally — `index.tsx` mounts `App`'s default export and is never
-  itself imported — so a default export costs nothing there and matches the
-  common convention for an app root. `styleMock.ts` defaults for a different
-  reason: Jest's `moduleNameMapper` contract requires the module it maps
+- **Named exports everywhere, except `src/index.tsx` and
+  `src/test/styleMock.ts`.** `index.tsx` is the webpack entry: it is never
+  imported by anything, so what it exports is moot. `App` used to default-export
+  too, as the app root; once it moved into a component folder behind a barrel
+  it became an ordinary named export like the rest. `styleMock.ts` defaults for
+  a different reason: Jest's `moduleNameMapper` contract requires the module it maps
   `\.css$` imports to resolve to a default export. Every component, hook,
   slice and type elsewhere is a named export.
 - The client talks to the API only through `src/api/client.ts`. Its
