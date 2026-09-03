@@ -81,7 +81,11 @@ Do not:
   `package.json` — verify before writing them down.
 - Do not leave `console.log` in production code — use a proper logger.
 - Do not use synchronous filesystem APIs in request handlers.
-- Do not use class components — use functional components with hooks.
+- Do not use class components — use functional components with hooks. One
+  exception exists: the client's `ErrorBoundary`, because React exposes no
+  hook for `getDerivedStateFromError`. Do not add a second without the same
+  justification, and do not add a dependency to dodge it. See
+  `client/CLAUDE.md`.
 - Do not mutate state directly — use setter functions or immutable updates.
 - Do not use the `any` type — use `unknown` or a proper type instead.
 - Do not use `@ts-ignore` — fix the type error or use `@ts-expect-error` with a reason.
