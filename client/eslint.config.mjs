@@ -33,6 +33,15 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
       '@typescript-eslint/no-explicit-any': 'error',
+      // Components are arrow functions typed with `FC` (see CLAUDE.md). The
+      // autofix converts the declaration form; the `FC` annotation is manual.
+      'react/function-component-definition': [
+        'error',
+        {
+          namedComponents: 'arrow-function',
+          unnamedComponents: 'arrow-function',
+        },
+      ],
     },
   },
   // Webpack config files are CommonJS and run in Node, not the browser.

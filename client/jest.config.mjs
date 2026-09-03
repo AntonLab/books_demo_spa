@@ -23,6 +23,10 @@ export default {
   // node_modules. antd needs no exception — it still ships CJS at lib/index.js.
   transformIgnorePatterns: ['/node_modules/(?!react-router/)'],
   moduleNameMapper: {
+    // Order matters: a `@/…/x.css` import must hit the style mock, not the
+    // alias. Both entries stay in step with tsconfig `paths` and webpack
+    // `resolve.alias`.
     '\\.css$': '<rootDir>/src/test/styleMock.ts',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
 };
