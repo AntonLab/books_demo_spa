@@ -1,12 +1,11 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { authReducer } from './authSlice';
-import { booksReducer } from './booksSlice';
-import { searchReducer } from './searchSlice';
 
+// One slice, and it holds no server state: which auth modal is open and the
+// reset token the URL carried into it. Everything fetched lives in the
+// TanStack Query cache — see src/queries/.
 const rootReducer = combineReducers({
   auth: authReducer,
-  books: booksReducer,
-  search: searchReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
