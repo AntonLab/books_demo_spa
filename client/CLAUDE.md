@@ -163,8 +163,9 @@ Available scripts:
 
 - `public/index.html` — HTML template consumed by `html-webpack-plugin`
 - `src/index.tsx` — app entry, mounts `<App />` into `#root`
-- `src/components/templates/App/` — `App`, the composition root (Redux
-  `Provider`, antd `ConfigProvider`, `BrowserRouter`), and `AppShell`, the
+- `src/components/templates/App/` — `App`, the composition root
+  (`QueryClientProvider` outermost, then the Redux `Provider`, antd's
+  `ConfigProvider`, `AntdApp` and `BrowserRouter`), and `AppShell`, the
   `Layout` around every route. Holds the `lazy()` call for each page plus the
   single `<Suspense>`/`<ErrorBoundary>` pair (see Page loading and errors).
   `AppShell` is exported separately because `App` mounts `BrowserRouter`,
@@ -204,8 +205,10 @@ Available scripts:
     `activeModal` from `authSlice` and renders only that one, so only one
     modal is ever mounted at a time) plus `LoginModal`, `RegisterModal`,
     `ResetRequestModal` and `ResetConfirmModal`; `BookCard` and the
-    presentational `BookList` (takes `items`/`status`/`error` as props so both
-    `MainPage` and `SearchPage` can feed it from their own slice); and
+    presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
+    `emptyText` as props so both `MainPage` (from `useBooks()`) and
+    `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
+    `src/queries/books.ts` hook); and
     `ErrorBoundary`, the client's only class component.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
   `SearchPage`, `MyBooksPage`, `ProfilePage`,
@@ -228,9 +231,11 @@ Available scripts:
   strings, not `Date`, throughout — the server types them as `Date` in
   process but they arrive as JSON strings.
 - `src/test/` — `setup.ts` (jsdom polyfills, see Testing below),
-  `renderWithProviders.tsx` (wraps a component in the Redux `Provider`, antd's
-  `ConfigProvider` and a `MemoryRouter`, returns the store), `httpFixtures.ts`
-  (minimal
+  `renderWithProviders.tsx` (wraps a component in a `QueryClientProvider`
+  — the outermost provider — then the Redux `Provider`, antd's
+  `ConfigProvider` and a `MemoryRouter`, and returns `{ store, queryClient
+}`), `queryClient.ts` (`createTestQueryClient`, the fresh-per-render
+  client `renderWithProviders` defaults to), `httpFixtures.ts` (minimal
   `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`) and
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
@@ -372,8 +377,8 @@ contract, not a shortcut.
   v18), so a component accepting children must declare
   `children: ReactNode` in its own `Props`.
 
-  This covers components only; plain helpers, custom hooks and thunks keep
-  whichever form reads best. The arrow half is **enforced**:
+  This covers components only; plain helpers and custom hooks keep whichever
+  form reads best. The arrow half is **enforced**:
   `react/function-component-definition` is set to `arrow-function` in
   `eslint.config.mjs`, so `lint` fails on a `function` component and
   `lint:fix` rewrites it. That rule does not add the `FC` annotation — that
