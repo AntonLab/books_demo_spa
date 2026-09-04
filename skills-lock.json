@@ -31,6 +31,12 @@
       "skillPath": "packages/toolkit/skills/build-modern-redux-apps/modern-redux/SKILL.md",
       "computedHash": "f98b3f17f95c6483373cce4bd47095b704e5255d56ee40ef846960d6e1754de0"
     },
+    "clerk-tanstack-patterns": {
+      "source": "clerk/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frameworks/clerk-tanstack-patterns/SKILL.md",
+      "computedHash": "70566866acbf48b4a982c2ee700c2b94d7c6aa4b47a4f6870fccc3b2e80cfd59"
+    },
     "database-migration": {
       "source": "wshobson/agents",
       "sourceType": "github",

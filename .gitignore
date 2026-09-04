@@ -30,8 +30,12 @@ yarn-error.log*
 /.agents
 /.claude/skills
 
-# agent working notes — plans and specs generated per task, not project docs
-/docs
+# agent working notes — plans and specs generated per task, not project docs.
+# docs/agents/ is the exception: it configures the engineering skills, so it is
+# checked in. `/docs/*` matches direct children only, so un-ignoring the
+# directory is enough to let the files inside it through.
+/docs/*
+!/docs/agents/
 
 # git worktrees created for isolated task execution
 /.claude/worktrees
