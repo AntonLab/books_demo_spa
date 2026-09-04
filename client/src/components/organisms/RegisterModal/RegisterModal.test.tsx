@@ -4,6 +4,9 @@ import { RegisterModal } from './RegisterModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
+import { createAppStore } from '@/store';
+import { openModal } from '@/store/authSlice';
+import { queryKeys } from '@/queries/keys';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
@@ -97,15 +100,17 @@ describe('RegisterModal submission', () => {
     expect(sent).not.toHaveProperty('confirm');
   });
 
-  it('stores the user and closes the modal on success', async () => {
+  it('caches the user and closes the modal on success', async () => {
     mockedAuth.register.mockResolvedValue(user);
-    const { store } = renderWithProviders(<RegisterModal />);
+    const store = createAppStore();
+    store.dispatch(openModal('register'));
+    const { queryClient } = renderWithProviders(<RegisterModal />, { store });
 
     await fillValidForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     await waitFor(() => {
-      expect(store.getState().auth.user).toEqual(user);
+      expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
     });
     expect(store.getState().auth.activeModal).toBeNull();
   });

@@ -4,7 +4,10 @@ import { ResetConfirmModal } from './ResetConfirmModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
-import type { RootState } from '@/store';
+import { createAppStore } from '@/store';
+import { openModal, openResetConfirm } from '@/store/authSlice';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
@@ -22,19 +25,20 @@ const signedInUser: PublicUser = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-function withToken(
-  token: string | null,
-  user: PublicUser | null = null
-): Partial<RootState> {
-  return {
-    auth: {
-      user,
-      status: 'ready',
-      error: null,
-      activeModal: 'resetConfirm',
-      resetToken: token,
-    },
-  };
+// Seeds both stores through their public entry points rather than building
+// state literals, so this survives AuthState losing its server-state fields.
+function withToken(token: string | null, user: PublicUser | null = null) {
+  const store = createAppStore();
+  if (token !== null) {
+    store.dispatch(openResetConfirm(token));
+  } else {
+    store.dispatch(openModal('resetConfirm'));
+  }
+
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, user);
+
+  return { store, queryClient };
 }
 
 beforeEach(() => {
@@ -43,9 +47,7 @@ beforeEach(() => {
 
 describe('ResetConfirmModal', () => {
   it('rejects a password shorter than 8 characters', async () => {
-    renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken('tok-123'),
-    });
+    renderWithProviders(<ResetConfirmModal />, withToken('tok-123'));
 
     await userEvent.type(screen.getByLabelText('New password'), 'short');
     await userEvent.click(
@@ -59,9 +61,7 @@ describe('ResetConfirmModal', () => {
   });
 
   it('rejects a mismatched confirmation', async () => {
-    renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken('tok-123'),
-    });
+    renderWithProviders(<ResetConfirmModal />, withToken('tok-123'));
 
     await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
     await userEvent.type(
@@ -79,9 +79,7 @@ describe('ResetConfirmModal', () => {
 
   it('sends the token from the store with the new password', async () => {
     mockedAuth.confirmReset.mockResolvedValue(undefined);
-    renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken('tok-123'),
-    });
+    renderWithProviders(<ResetConfirmModal />, withToken('tok-123'));
 
     await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
     await userEvent.type(
@@ -106,9 +104,7 @@ describe('ResetConfirmModal', () => {
     mockedAuth.confirmReset.mockRejectedValue(
       new ApiError(400, 'Reset token is invalid or has expired')
     );
-    renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken('stale'),
-    });
+    renderWithProviders(<ResetConfirmModal />, withToken('stale'));
 
     await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
     await userEvent.type(
@@ -125,9 +121,7 @@ describe('ResetConfirmModal', () => {
   });
 
   it('explains rather than submitting when the link carried no token', async () => {
-    renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken(null),
-    });
+    renderWithProviders(<ResetConfirmModal />, withToken(null));
 
     expect(
       await screen.findByText('This reset link is missing its token.')
@@ -137,11 +131,12 @@ describe('ResetConfirmModal', () => {
 
   it('signs the client out on a successful reset, since the server kills every session including this one', async () => {
     mockedAuth.confirmReset.mockResolvedValue(undefined);
-    const { store } = renderWithProviders(<ResetConfirmModal />, {
-      preloadedState: withToken('tok-123', signedInUser),
-    });
+    const { queryClient } = renderWithProviders(
+      <ResetConfirmModal />,
+      withToken('tok-123', signedInUser)
+    );
 
-    expect(store.getState().auth.user).toEqual(signedInUser);
+    expect(queryClient.getQueryData(queryKeys.session)).toEqual(signedInUser);
 
     await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
     await userEvent.type(
@@ -155,6 +150,6 @@ describe('ResetConfirmModal', () => {
     expect(
       await screen.findByText('Your password has been reset.')
     ).toBeInTheDocument();
-    expect(store.getState().auth.user).toBeNull();
+    expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
   });
 });

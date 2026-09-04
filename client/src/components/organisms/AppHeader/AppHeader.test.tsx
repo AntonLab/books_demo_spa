@@ -2,9 +2,10 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import type { PublicUser } from '@/types/user';
-import type { RootState } from '@/store';
 
 jest.mock('@/api/auth');
 
@@ -21,17 +22,12 @@ const user: PublicUser = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-function authState(overrides: Partial<RootState['auth']>): Partial<RootState> {
-  return {
-    auth: {
-      user: null,
-      status: 'ready',
-      error: null,
-      activeModal: null,
-      resetToken: null,
-      ...overrides,
-    },
-  };
+// Seeds the session cache so the header renders a settled state without
+// waiting on a request.
+function withSession(session: PublicUser | null) {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, session);
+  return { queryClient };
 }
 
 beforeEach(() => {
@@ -40,9 +36,10 @@ beforeEach(() => {
 
 describe('AppHeader while the session is loading', () => {
   it('shows neither Log in nor an avatar', () => {
-    renderWithProviders(<AppHeader />, {
-      preloadedState: authState({ status: 'loading' }),
-    });
+    // Never resolves, so the query stays pending for the assertion.
+    mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
+
+    renderWithProviders(<AppHeader />);
 
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
     expect(screen.queryByText('bob')).toBeNull();
@@ -51,7 +48,7 @@ describe('AppHeader while the session is loading', () => {
 
 describe('AppHeader when logged out', () => {
   it('offers Log in and Register', () => {
-    renderWithProviders(<AppHeader />, { preloadedState: authState({}) });
+    renderWithProviders(<AppHeader />, withSession(null));
 
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(
@@ -60,15 +57,13 @@ describe('AppHeader when logged out', () => {
   });
 
   it('hides My Books', () => {
-    renderWithProviders(<AppHeader />, { preloadedState: authState({}) });
+    renderWithProviders(<AppHeader />, withSession(null));
 
     expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
   it('opens the login modal in the store when Log in is clicked', async () => {
-    const { store } = renderWithProviders(<AppHeader />, {
-      preloadedState: authState({}),
-    });
+    const { store } = renderWithProviders(<AppHeader />, withSession(null));
 
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
@@ -76,9 +71,7 @@ describe('AppHeader when logged out', () => {
   });
 
   it('opens the register modal when Register is clicked', async () => {
-    const { store } = renderWithProviders(<AppHeader />, {
-      preloadedState: authState({}),
-    });
+    const { store } = renderWithProviders(<AppHeader />, withSession(null));
 
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
@@ -88,14 +81,14 @@ describe('AppHeader when logged out', () => {
 
 describe('AppHeader when logged in', () => {
   it('shows the login name instead of the auth buttons', () => {
-    renderWithProviders(<AppHeader />, { preloadedState: authState({ user }) });
+    renderWithProviders(<AppHeader />, withSession(user));
 
     expect(screen.getByText('bob')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
   });
 
   it('shows My Books', () => {
-    renderWithProviders(<AppHeader />, { preloadedState: authState({ user }) });
+    renderWithProviders(<AppHeader />, withSession(user));
 
     expect(
       screen.getByRole('menuitem', { name: 'My Books' })
@@ -104,21 +97,25 @@ describe('AppHeader when logged in', () => {
 
   it('logs out through the dropdown', async () => {
     mockedAuth.logout.mockResolvedValue(undefined);
-    const { store } = renderWithProviders(<AppHeader />, {
-      preloadedState: authState({ user }),
-    });
+    const { queryClient } = renderWithProviders(
+      <AppHeader />,
+      withSession(user)
+    );
 
     await userEvent.click(screen.getByText('bob'));
     await userEvent.click(await screen.findByText('Log out'));
 
     await waitFor(() => {
-      expect(store.getState().auth.user).toBeNull();
+      expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
     });
     expect(mockedAuth.logout).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('button', { name: 'Log in' })
+    ).toBeInTheDocument();
   });
 
   it('is reachable by keyboard and opens the dropdown on Enter', async () => {
-    renderWithProviders(<AppHeader />, { preloadedState: authState({ user }) });
+    renderWithProviders(<AppHeader />, withSession(user));
 
     // A bare <Space>/<div> trigger would never receive focus via Tab, so
     // this pins the account trigger being a real focusable control rather
