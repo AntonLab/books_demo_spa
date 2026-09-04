@@ -72,18 +72,17 @@ describe('AppShell session bootstrap', () => {
     renderWithProviders(<AppShell />);
 
     await screen.findByRole('heading', { name: /books/i });
+    // AppHeader reading useSession() is what fires this; there is no longer
+    // an explicit dispatch on mount.
     expect(mockedAuth.me).toHaveBeenCalledTimes(1);
   });
 
-  it('settles to ready with no user when the visitor is anonymous', async () => {
-    const { store } = renderWithProviders(<AppShell />);
+  it('settles to a signed-out header when the visitor is anonymous', async () => {
+    renderWithProviders(<AppShell />);
 
-    await screen.findByRole('heading', { name: /books/i });
-
-    const { auth } = store.getState();
-    expect(auth.status).toBe('ready');
-    expect(auth.user).toBeNull();
-    expect(auth.error).toBeNull();
+    expect(
+      await screen.findByRole('button', { name: 'Log in' })
+    ).toBeInTheDocument();
   });
 });
 

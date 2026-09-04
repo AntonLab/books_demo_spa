@@ -2,7 +2,9 @@ import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, theme } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
-import { closeModal, openModal, registerUser } from '@/store/authSlice';
+import { closeModal, openModal } from '@/store/authSlice';
+import { useRegister } from '@/queries/auth';
+import { ApiError } from '@/api/client';
 
 interface RegisterValues {
   login: string;
@@ -29,37 +31,37 @@ export const RegisterModal: FC = () => {
   const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const [form] = Form.useForm<RegisterValues>();
-  const [submitting, setSubmitting] = useState(false);
+  const register = useRegister();
   const [formError, setFormError] = useState<string | null>(null);
 
   async function handleFinish(values: RegisterValues) {
-    setSubmitting(true);
     setFormError(null);
 
-    const result = await dispatch(
-      registerUser({
+    try {
+      await register.mutateAsync({
         login: values.login,
         email: values.email,
         password: values.password,
         firstName: values.firstName,
         lastName: values.lastName,
-      })
-    );
+      });
+      // The reducer no longer sees the API result, so the modal closes itself.
+      dispatch(closeModal());
+    } catch (error) {
+      // The ApiError arrives intact, so `details` can be narrowed straight off
+      // it — no AuthFailure in between.
+      if (error instanceof ApiError) {
+        const field = conflictField(error.details);
+        if (error.status === 409 && field) {
+          form.setFields([{ name: field, errors: [error.message] }]);
+          return;
+        }
+      }
 
-    setSubmitting(false);
-    if (!registerUser.rejected.match(result)) {
-      return;
+      setFormError(
+        error instanceof Error ? error.message : 'Could not register'
+      );
     }
-
-    const failure = result.payload;
-    const field = failure ? conflictField(failure.details) : null;
-
-    if (failure?.status === 409 && field) {
-      form.setFields([{ name: field, errors: [failure.message] }]);
-      return;
-    }
-
-    setFormError(failure?.message ?? 'Could not register');
   }
 
   return (
@@ -160,7 +162,12 @@ export const RegisterModal: FC = () => {
         </Form.Item>
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={submitting} block>
+          <Button
+            type="primary"
+            htmlType="submit"
+            loading={register.isPending}
+            block
+          >
             Register
           </Button>
         </Form.Item>
