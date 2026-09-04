@@ -148,7 +148,10 @@ three auth states), four auth modals, and a search page, backed by TanStack
 Query for server state and Redux Toolkit for UI state, talking to the real
 `/api`. The build toolchain and test runner
 are both real: webpack 5 (dev server with React Fast Refresh, hashed
-production build), TypeScript, ESLint, Prettier and Jest are all wired up.
+production build), TypeScript, ESLint and Jest are all wired up.
+
+This package is an npm workspace. Install from the repo root, not here; the
+scripts below still run from this directory, or from the root with `-w client`.
 
 Available scripts:
 
@@ -157,7 +160,9 @@ Available scripts:
 - `npm test` / `npm run test:watch` — Jest + React Testing Library (jsdom), transformed by `@swc/jest`
 - `npm run typecheck` — `tsc --noEmit`
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`)
-- `npm run format` / `npm run format:check` — Prettier (root `.prettierrc.json`)
+
+Prettier has no script here: it is root-only, because `.prettierrc.json` and
+`.prettierignore` are repo-wide. Run `npm run format` from the repo root.
 
 ## Layout
 
@@ -240,12 +245,16 @@ Available scripts:
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
 - `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays, merged via `webpack-merge`
-- `tsconfig.json` — strict, `noEmit`, `jsx: react-jsx`,
-  `moduleResolution: Bundler`, target `ES2020`, and the `@/*` → `./src/*`
-  path mapping
-- `eslint.config.mjs` — ESLint flat config (TypeScript + React + hooks +
-  jsx-a11y), plus `react/function-component-definition` set to
-  `arrow-function`
+- `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
+  `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
+  `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,
+  and the `@/*` → `./src/*` path mapping
+- `eslint.config.mjs` — calls `createConfig` from the repo-root
+  `eslint.config.base.mjs`, which supplies the recommended sets, the repo-wide
+  rules and the Prettier tail. This file adds only the
+  React + hooks + jsx-a11y block (including
+  `react/function-component-definition` set to `arrow-function`) and the
+  webpack-config override
 
 ## Webpack
 
@@ -284,6 +293,8 @@ off `@typescript-eslint/no-require-imports`.
   proper type, and add a comment if `any` is truly unavoidable.
   `@typescript-eslint/no-explicit-any` is enforced as an error.
 - `tsconfig` is `noEmit` — webpack produces the build; `tsc` only checks types.
+- `no-console` is a warning here, inherited from `eslint.config.base.mjs`. Client
+  code has none today; use a proper logger rather than silencing it.
 
 ## Testing
 
@@ -294,14 +305,23 @@ Babel config exists. Tests are co-located (`Button.tsx` → `Button.test.tsx`).
 The `test` script is not plain `jest`:
 
 ```
-node --experimental-vm-modules node_modules/jest/bin/jest.js
+cross-env NODE_OPTIONS=--experimental-vm-modules jest
 ```
 
-This is load-bearing, not incidental. `react-router` 8 is ESM-only — its
+The flag is load-bearing, not incidental. `react-router` 8 is ESM-only — its
 `package.json` is `"type": "module"` with no `require` condition — and its
 package root re-exports server-runtime code (cookie signing, etc.) that uses
 `import.meta`, which Jest's default CJS loader cannot parse.
-`--experimental-vm-modules` is what lets Jest load that code at all.
+`--experimental-vm-modules` is what lets Jest load that code at all; without it
+12 of the 25 suites fail.
+
+Two details of the wrapping matter. `jest` is invoked by name rather than
+through `node_modules/jest/bin/jest.js`, because npm workspaces hoist Jest to
+the repo-root `node_modules` and no such path exists under `client/`; the bare
+name resolves through `node_modules/.bin` on `PATH` whether or not npm hoists.
+And `cross-env` sets the variable portably — npm runs scripts through
+`cmd.exe` on Windows, where a bare `NODE_OPTIONS=... jest` prefix is a syntax
+error.
 
 - **`jest.config.mjs` carries
   `transformIgnorePatterns: ['/node_modules/(?!react-router/)']`.** Jest

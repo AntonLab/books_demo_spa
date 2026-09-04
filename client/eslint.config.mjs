@@ -1,15 +1,14 @@
-import js from '@eslint/js';
-import tseslint from 'typescript-eslint';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import { createConfig } from '../eslint.config.base.mjs';
 
-export default tseslint.config(
-  { ignores: ['build', 'dist', 'coverage', 'node_modules'] },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
+// The shared ignores, recommended sets, repo-wide rules and the Prettier tail
+// live in the root eslint.config.base.mjs. Only the React and browser
+// specifics are below.
+export default createConfig(
+  ['build'],
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -32,7 +31,6 @@ export default tseslint.config(
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
-      '@typescript-eslint/no-explicit-any': 'error',
       // Components are arrow functions typed with `FC` (see CLAUDE.md). The
       // autofix converts the declaration form; the `FC` annotation is manual.
       'react/function-component-definition': [
@@ -54,7 +52,5 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },
-  },
-  // Disable stylistic rules that conflict with Prettier. Must stay last.
-  prettier
+  }
 );
