@@ -31,8 +31,12 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 - `client` now has a working UI on top of that toolchain: a `MainPage`
   listing books, a header with nav, search and auth state, four auth modals
   against `/api/auth` (login, register, forgot/reset password), and a
-  `/search` page — built on antd 6, react-router and Redux Toolkit. See
-  `client/CLAUDE.md`.
+  `/search` page — built on antd 6, react-router, TanStack Query and Redux
+  Toolkit. The split between the last two is deliberate: **TanStack Query
+  owns everything fetched** (the session, the book list, each search term,
+  and the five auth mutations, all in `src/queries/`), while **Redux holds
+  UI state only** — `authSlice` is down to `activeModal` and `resetToken`.
+  See `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
   `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
   — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
