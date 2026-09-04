@@ -2,7 +2,8 @@ import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result, theme } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
-import { closeModal, openModal, requestPasswordReset } from '@/store/authSlice';
+import { closeModal, openModal } from '@/store/authSlice';
+import { useRequestReset } from '@/queries/auth';
 
 interface ResetRequestValues {
   email: string;
@@ -18,24 +19,22 @@ export const ResetRequestModal: FC = () => {
   const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const [form] = Form.useForm<ResetRequestValues>();
-  const [submitting, setSubmitting] = useState(false);
+  const requestReset = useRequestReset();
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   async function handleFinish(values: ResetRequestValues) {
-    setSubmitting(true);
     setFormError(null);
 
-    const result = await dispatch(requestPasswordReset(values.email));
-
-    setSubmitting(false);
-    if (requestPasswordReset.rejected.match(result)) {
+    try {
+      await requestReset.mutateAsync(values.email);
+      setSent(true);
+    } catch (error) {
       // Only a malformed request or a dead server reaches here.
-      setFormError(result.payload?.message ?? 'Could not send the reset link');
-      return;
+      setFormError(
+        error instanceof Error ? error.message : 'Could not send the reset link'
+      );
     }
-
-    setSent(true);
   }
 
   return (
@@ -74,7 +73,7 @@ export const ResetRequestModal: FC = () => {
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={submitting}
+                loading={requestReset.isPending}
                 block
               >
                 Send reset link

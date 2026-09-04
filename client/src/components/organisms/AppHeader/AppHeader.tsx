@@ -11,8 +11,9 @@ import {
 } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { logoutUser, openModal } from '@/store/authSlice';
+import { useAppDispatch } from '@/store/hooks';
+import { openModal } from '@/store/authSlice';
+import { useLogout, useSession } from '@/queries/auth';
 import { SearchBar } from '@/components/molecules/SearchBar';
 
 export const AppHeader: FC = () => {
@@ -20,8 +21,9 @@ export const AppHeader: FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const user = useAppSelector((state) => state.auth.user);
-  const status = useAppSelector((state) => state.auth.status);
+  const session = useSession();
+  const logout = useLogout();
+  const user = session.data;
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
@@ -39,7 +41,7 @@ export const AppHeader: FC = () => {
 
   function handleAccountClick({ key }: { key: string }) {
     if (key === 'logout') {
-      void dispatch(logoutUser());
+      logout.mutate();
       return;
     }
     void navigate(key);
@@ -60,7 +62,7 @@ export const AppHeader: FC = () => {
 
       <SearchBar />
 
-      {status !== 'ready' ? (
+      {session.isPending ? (
         // Not "Log in": showing it here would flash a logged-out header at a
         // logged-in user on every reload while GET /me is in flight.
         <Skeleton.Button active />
