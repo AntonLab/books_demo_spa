@@ -13,9 +13,9 @@ export interface ListBooksParams {
 // (`z.string().min(1)`), so a blank term is omitted rather than sent —
 // `useSearchBooks` also disables itself on one, which stops the request
 // happening at all rather than merely shaping the URL.
-export function listBooks(
+export const listBooks = (
   params: ListBooksParams = {}
-): Promise<ListResponse<PublicBook>> {
+): Promise<ListResponse<PublicBook>> => {
   const search = new URLSearchParams();
   if (params.q) search.set('q', params.q);
   if (params.limit !== undefined) search.set('limit', String(params.limit));
@@ -25,4 +25,4 @@ export function listBooks(
   return request<ListResponse<PublicBook>>(
     query ? `/books?${query}` : '/books'
   );
-}
+};

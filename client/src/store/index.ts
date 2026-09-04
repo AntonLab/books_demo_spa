@@ -12,9 +12,9 @@ export type RootState = ReturnType<typeof rootReducer>;
 
 // A factory as well as a singleton: every test needs a fresh store, and
 // preloadedState is how a component test starts from a given auth state.
-export function createAppStore(preloadedState?: Partial<RootState>) {
+export const createAppStore = (preloadedState?: Partial<RootState>) => {
   return configureStore({ reducer: rootReducer, preloadedState });
-}
+};
 
 export const store = createAppStore();
 

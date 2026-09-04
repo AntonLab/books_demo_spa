@@ -16,11 +16,11 @@ export interface ConfirmResetInput {
   password: string;
 }
 
-function setSession(client: QueryClient, session: Session): void {
+const setSession = (client: QueryClient, session: Session): void => {
   client.setQueryData<Session>(queryKeys.session, session);
-}
+};
 
-export function useSession() {
+export const useSession = () => {
   return useQuery({
     queryKey: queryKeys.session,
     queryFn: async (): Promise<Session> => {
@@ -37,7 +37,7 @@ export function useSession() {
       }
     },
   });
-}
+};
 
 // Every mutation below writes the session with `setQueryData` rather than
 // `invalidateQueries`: the response body *is* the new session, so refetching
@@ -49,37 +49,37 @@ export function useSession() {
 // would forward that second, internal context object straight to the api
 // layer. The wrapper is the same shape `useConfirmReset` already needs for
 // its two-positional-argument call — it just also applies here.
-export function useLogin() {
+export const useLogin = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: LoginInput) => authApi.login(input),
     onSuccess: (user) => setSession(client, user),
   });
-}
+};
 
-export function useRegister() {
+export const useRegister = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: RegisterInput) => authApi.register(input),
     onSuccess: (user) => setSession(client, user),
   });
-}
+};
 
-export function useLogout() {
+export const useLogout = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => setSession(client, null),
   });
-}
+};
 
-export function useRequestReset() {
+export const useRequestReset = () => {
   return useMutation({
     mutationFn: (email: string) => authApi.requestReset(email),
   });
-}
+};
 
-export function useConfirmReset() {
+export const useConfirmReset = () => {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ token, password }: ConfirmResetInput) =>
@@ -89,4 +89,4 @@ export function useConfirmReset() {
     // header.
     onSuccess: () => setSession(client, null),
   });
-}
+};

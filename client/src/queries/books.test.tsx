@@ -20,13 +20,13 @@ const book: PublicBook = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-function wrapper(client = createTestQueryClient()) {
+const wrapper = (client = createTestQueryClient()) => {
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   Wrapper.displayName = 'QueryClientWrapper';
   return Wrapper;
-}
+};
 
 beforeEach(() => {
   jest.resetAllMocks();

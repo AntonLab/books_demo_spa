@@ -24,11 +24,11 @@ const user: PublicUser = {
 
 // Seeds the session cache so the header renders a settled state without
 // waiting on a request.
-function withSession(session: PublicUser | null) {
+const withSession = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
   return { queryClient };
-}
+};
 
 beforeEach(() => {
   jest.resetAllMocks();

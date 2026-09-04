@@ -8,7 +8,7 @@ import {
 } from './auth';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
-function mockFetch(status = 200, body: unknown = {}): jest.Mock {
+const mockFetch = (status = 200, body: unknown = {}): jest.Mock => {
   const response =
     status === 204 || status === 202
       ? emptyResponse(status)
@@ -16,11 +16,11 @@ function mockFetch(status = 200, body: unknown = {}): jest.Mock {
   const fn = jest.fn().mockResolvedValue(response);
   window.fetch = fn as unknown as typeof fetch;
   return fn;
-}
+};
 
-function callOf(fetchMock: jest.Mock): [string, RequestInit] {
+const callOf = (fetchMock: jest.Mock): [string, RequestInit] => {
   return fetchMock.mock.calls[0] as [string, RequestInit];
-}
+};
 
 describe('auth api', () => {
   it('posts a registration to /api/auth/register', async () => {
