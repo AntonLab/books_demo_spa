@@ -7,10 +7,8 @@
     "lib": ["ES2022"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-
     "rootDir": "src",
     "outDir": "dist",
-
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "sourceMap": true,

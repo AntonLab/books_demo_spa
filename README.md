@@ -6,11 +6,11 @@ independent npm packages.
 
 ## Stack
 
-| Layer    | Technology                                                                  |
-| -------- | --------------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5       |
-| Backend  | Node.js >= 22.5, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2    |
-| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)        |
+| Layer    | Technology                                                                |
+| -------- | ------------------------------------------------------------------------- |
+| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5    |
+| Backend  | Node.js >= 22.5, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
+| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)     |
 
 ## Layout
 
@@ -60,27 +60,27 @@ ever talks to one origin in development.
 with zod at start-up, so a malformed value fails loudly instead of booting a
 broken server.
 
-| Variable                  | Default                 | Notes                                                     |
-| ------------------------- | ----------------------- | --------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`                   |
-| `PORT`                    | `4000`                  | The API's port                                            |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                           |
-| `DB_NAME`                 | `books_demo_spa`        |                                                           |
+| Variable                  | Default                 | Notes                                                                                   |
+| ------------------------- | ----------------------- | --------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`                                                 |
+| `PORT`                    | `4000`                  | The API's port                                                                          |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                         |
+| `DB_NAME`                 | `books_demo_spa`        |                                                                                         |
 | `DB_USER` / `DB_PASSWORD` | _(none)_                | Required — no default, on purpose. An empty password is accepted, a missing one is not. |
-| `APP_BASE_URL`            | `http://localhost:3000` | Client origin used to build password-reset links          |
+| `APP_BASE_URL`            | `http://localhost:3000` | Client origin used to build password-reset links                                        |
 
 ## API
 
 Everything is mounted under `/api`:
 
-| Prefix          | Resource                                                       |
-| --------------- | -------------------------------------------------------------- |
+| Prefix          | Resource                                                                                |
+| --------------- | --------------------------------------------------------------------------------------- |
 | `/api/auth`     | `register`, `login`, `logout`, `me`, `password-reset/request`, `password-reset/confirm` |
-| `/api/users`    | CRUD (both reads require a session)                            |
-| `/api/series`   | CRUD                                                           |
-| `/api/books`    | CRUD                                                           |
-| `/api/chapters` | CRUD                                                           |
-| `/api/likes`    | CRUD (a like points at exactly one of a book or a comment)      |
+| `/api/users`    | CRUD (both reads require a session)                                                     |
+| `/api/series`   | CRUD                                                                                    |
+| `/api/books`    | CRUD                                                                                    |
+| `/api/chapters` | CRUD                                                                                    |
+| `/api/likes`    | CRUD (a like points at exactly one of a book or a comment)                              |
 
 Authentication is session-based: an opaque token in an httpOnly `sid` cookie,
 stored hashed. `GET`s are public except on `/api/users`; every `POST`, `PATCH`
@@ -97,16 +97,16 @@ A `Comment` model exists (with self-referential replies) but has no HTTP API yet
 
 Run from within `client/` or `server/`.
 
-| Script                 | client                              | server                             |
-| ---------------------- | ----------------------------------- | ---------------------------------- |
-| `npm run dev`          | webpack dev server on :3000         | —                                  |
-| `npm start`            | —                                   | run the API                        |
-| `npm run start:dev`    | —                                   | run the API under nodemon          |
-| `npm run build`        | production bundle into `build/`     | `tsc` output into `dist/`          |
-| `npm test`             | Jest + React Testing Library (jsdom)| `node:test` (includes MySQL-backed integration specs) |
-| `npm run typecheck`    | `tsc --noEmit`                      | `tsc --noEmit`                     |
-| `npm run lint`         | ESLint                              | ESLint                             |
-| `npm run format:check` | Prettier                            | Prettier                           |
+| Script                 | client                               | server                                                |
+| ---------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `npm run dev`          | webpack dev server on :3000          | —                                                     |
+| `npm start`            | —                                    | run the API                                           |
+| `npm run start:dev`    | —                                    | run the API under nodemon                             |
+| `npm run build`        | production bundle into `build/`      | `tsc` output into `dist/`                             |
+| `npm test`             | Jest + React Testing Library (jsdom) | `node:test` (includes MySQL-backed integration specs) |
+| `npm run typecheck`    | `tsc --noEmit`                       | `tsc --noEmit`                                        |
+| `npm run lint`         | ESLint                               | ESLint                                                |
+| `npm run format:check` | Prettier                             | Prettier                                              |
 
 `npm run lint:fix` and `npm run format` apply fixes. `client` also has
 `npm run test:watch`.
@@ -120,3 +120,17 @@ Before committing, run `npm run typecheck`, `npm run lint`,
 `npm run format:check` and `npm test` in each package you touched. Commit
 messages follow the conventional-commit prefixes (`feat:`, `fix:`, `chore:`,
 `docs:`, `test:`).
+
+### Pre-commit hook
+
+`.githooks/pre-commit` lints and formats the staged files on every commit:
+ESLint `--fix` and Prettier `--write`, re-staged automatically, with the commit
+blocked if an ESLint error survives the fix. Running `npm install` in either
+package turns it on via the `prepare` script; to enable it by hand:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Skip it for a single commit with `git commit --no-verify`. It does not run
+`typecheck` or the tests, so the gates above still apply.
