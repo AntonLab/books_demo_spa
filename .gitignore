@@ -1,34 +1,30 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# There is no root package.json: `client/` and `server/` are installed and built
+# separately, so the rules below are written to match at any depth rather than
+# being repeated per package.
 
 # dependencies
-*/node_modules
-/.pnp
-.pnp.js
+node_modules/
 
 # testing
-/coverage
-*/coverage
+coverage/
 
-# production / build output
-/build
-*/build
-*/dist
+# build output — `client` emits build/, `server` emits dist/
+build/
+dist/
 
 # misc
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# local environment / secrets (server reads .env.local; .env.example is checked in)
+.env*.local
 
 # agent skills — materialized from skills-lock.json via `npx skills`
-# (.claude/skills holds machine-specific absolute symlinks into .agents/)
+# (.claude holds machine-specific absolute symlinks into .agents/, plus the
+# git worktrees created for isolated task execution)
 /.agents
-/.claude/skills
+/.claude
 
 # agent working notes — plans and specs generated per task, not project docs.
 # docs/agents/ is the exception: it configures the engineering skills, so it is
@@ -36,9 +32,6 @@ yarn-error.log*
 # directory is enough to let the files inside it through.
 /docs/*
 !/docs/agents/
-
-# git worktrees created for isolated task execution
-/.claude/worktrees
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 /.superpowers
