@@ -4,13 +4,17 @@
 # staged files, re-stage whatever they rewrote, and block the commit if any
 # ESLint error survives the autofix.
 #
-# Enabled per clone by `git config core.hooksPath .githooks`. The `prepare`
-# script in client/package.json and server/package.json runs that on every
-# `npm install`, so a fresh clone picks the hook up as soon as either package
-# is installed. Bypass a single commit with `git commit --no-verify`.
+# Enabled per clone by `git config core.hooksPath .githooks`. The root
+# package.json's `prepare` script runs that on every `npm install`, so a fresh
+# clone picks the hook up as soon as the repo is installed. Bypass a single
+# commit with `git commit --no-verify`.
 #
-# POSIX sh on purpose: Git for Windows runs hooks through its own sh, and there
-# is no root package.json to hang husky or lint-staged off (see CLAUDE.md).
+# POSIX sh on purpose: Git for Windows runs hooks through its own sh. The repo
+# is an npm workspace, so one root `node_modules/.bin` holds both tools.
+#
+# ESLint runs once per package because flat config does not cascade — each
+# package's eslint.config.mjs must be the working directory's config. Prettier
+# runs once from the repo root, because its config is repo-wide (see CLAUDE.md).
 
 set -u
 
@@ -21,6 +25,7 @@ work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT INT TERM
 
 status=0
+bin="$repo_root/node_modules/.bin"
 
 # Deletions are excluded (--diff-filter=ACMR): there is nothing left on disk to
 # lint or format. core.quotepath=false keeps non-ASCII paths unescaped so they
@@ -42,9 +47,16 @@ if [ -s "$work/partial" ]; then
   exit 1
 fi
 
+# One root install covers both workspaces, so one probe covers both tools.
+if [ ! -x "$bin/prettier" ]; then
+  echo "pre-commit: node_modules is missing, so the staged files went"
+  echo "            unchecked. Run \`npm install\` at the repo root."
+  exit 0
+fi
+
 # Runs one tool over one file list, from inside one directory.
 #   $1 directory to run in, relative to the repo root
-#   $2 executable, relative to that directory
+#   $2 executable (absolute, so the cd cannot strand it)
 #   $3 list file holding paths relative to that directory
 #   $4.. extra flags for the tool
 run_tool() {
@@ -64,61 +76,38 @@ run_tool() {
   ( cd "$rt_dir" && "$rt_bin" "$@" )
 }
 
-# ESLint understands the script extensions only. Prettier takes everything
-# else in the bucket as well, and --ignore-unknown skips what it cannot parse.
+# ESLint understands the script extensions only.
 lintable() {
   grep -Ei '\.(ts|tsx|js|jsx|mjs|cjs)$' "$1" >"$2"
   return 0
 }
 
-# Lints and formats one package's staged files.
+# Lints one package's staged files from inside that package, so ESLint picks up
+# that package's flat config.
 #   $1 package directory, $2 list file with paths relative to that directory
-check_package() {
-  cp_dir=$1
-  cp_list=$2
+lint_package() {
+  lp_dir=$1
+  lp_list=$2
 
-  [ -s "$cp_list" ] || return 0
-
-  if [ ! -x "$cp_dir/node_modules/.bin/prettier" ]; then
-    echo "pre-commit: $cp_dir/node_modules is missing, so its staged files went"
-    echo "            unchecked. Run \`npm install\` in $cp_dir/."
-    return 0
-  fi
-
-  lintable "$cp_list" "$work/lintable"
+  lintable "$lp_list" "$work/lintable"
   # --no-warn-ignored: a staged file the package's config ignores is not an
   # error, it just has nothing to say about it.
-  run_tool "$cp_dir" ./node_modules/.bin/eslint "$work/lintable" \
+  run_tool "$lp_dir" "$bin/eslint" "$work/lintable" \
     --fix --no-warn-ignored || status=1
-
-  run_tool "$cp_dir" ./node_modules/.bin/prettier "$cp_list" \
-    --write --ignore-unknown --log-level warn || status=1
 }
 
-grep    '^client/'          "$work/staged" | sed 's|^client/||' >"$work/client"
-grep    '^server/'          "$work/staged" | sed 's|^server/||' >"$work/server"
-grep -Ev '^(client|server)/' "$work/staged"                     >"$work/root"
+grep '^client/' "$work/staged" | sed 's|^client/||' >"$work/client"
+grep '^server/' "$work/staged" | sed 's|^server/||' >"$work/server"
 
-check_package client "$work/client"
-check_package server "$work/server"
+lint_package client "$work/client"
+lint_package server "$work/server"
 
-# Root-level files (the shared configs, the markdown, skills-lock.json) are
-# covered by no package's ESLint config, so they get Prettier only. There is no
-# root node_modules either, hence borrowing a package's binary; running from the
-# repo root still picks up the root .prettierrc.json and .prettierignore.
-if [ -s "$work/root" ]; then
-  root_prettier=''
-  for candidate in client/node_modules/.bin/prettier server/node_modules/.bin/prettier; do
-    [ -x "$candidate" ] && { root_prettier="./$candidate"; break; }
-  done
-  if [ -n "$root_prettier" ]; then
-    run_tool . "$root_prettier" "$work/root" \
-      --write --ignore-unknown --log-level warn || status=1
-  else
-    echo "pre-commit: no node_modules in either package, so the root-level"
-    echo "            staged files went unformatted."
-  fi
-fi
+# Prettier runs once over every staged file, from the repo root: one
+# .prettierrc.json and one .prettierignore cover the whole repo, including the
+# root-level configs and markdown that no package's ESLint config reaches.
+# --ignore-unknown skips what it cannot parse.
+run_tool . "$bin/prettier" "$work/staged" \
+  --write --ignore-unknown --log-level warn || status=1
 
 # Re-stage unconditionally: when the commit is about to be blocked the fixes
 # are still worth keeping, so they land in the next attempt instead of being

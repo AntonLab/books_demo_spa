@@ -1,6 +1,0 @@
-# Prettier ignore files do not cascade, so this repeats what the root .gitignore
-# says: `npm run format` runs from this directory and never reads it.
-# node_modules needs no entry — Prettier skips it by default.
-build
-coverage
-package-lock.json

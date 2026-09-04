@@ -1,5 +1,6 @@
 # Prettier 3 reads .gitignore as well as this file, and only from the directory
-# it runs in — so the root .gitignore already covers node_modules, build, dist
-# and coverage here. Lockfiles are the exception: they are tracked, so .gitignore
-# does not list them, but they are generated and must not be reformatted.
+# it runs in. Prettier is root-only here (see CLAUDE.md), so this pair is the
+# whole story: the root .gitignore already covers node_modules, build, dist and
+# coverage. The lockfile is the exception — it is tracked, so .gitignore does
+# not list it, but it is generated and must not be reformatted.
 package-lock.json
