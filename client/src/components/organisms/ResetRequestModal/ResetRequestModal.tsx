@@ -23,7 +23,7 @@ export const ResetRequestModal: FC = () => {
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  async function handleFinish(values: ResetRequestValues) {
+  const handleFinish = async (values: ResetRequestValues) => {
     setFormError(null);
 
     try {
@@ -35,7 +35,7 @@ export const ResetRequestModal: FC = () => {
         error instanceof Error ? error.message : 'Could not send the reset link'
       );
     }
-  }
+  };
 
   return (
     <Modal

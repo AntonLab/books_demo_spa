@@ -13,7 +13,7 @@ const LocationProbe = () => {
   );
 };
 
-function renderBar(route = '/') {
+const renderBar = (route = '/') => {
   return renderWithProviders(
     <>
       <SearchBar />
@@ -23,7 +23,7 @@ function renderBar(route = '/') {
     </>,
     { route }
   );
-}
+};
 
 describe('SearchBar', () => {
   it('navigates to /search with the encoded term on submit', async () => {

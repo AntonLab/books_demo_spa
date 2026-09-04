@@ -27,7 +27,7 @@ const signedInUser: PublicUser = {
 
 // Seeds both stores through their public entry points rather than building
 // state literals, so this survives AuthState losing its server-state fields.
-function withToken(token: string | null, user: PublicUser | null = null) {
+const withToken = (token: string | null, user: PublicUser | null = null) => {
   const store = createAppStore();
   if (token !== null) {
     store.dispatch(openResetConfirm(token));
@@ -39,7 +39,7 @@ function withToken(token: string | null, user: PublicUser | null = null) {
   queryClient.setQueryData(queryKeys.session, user);
 
   return { store, queryClient };
-}
+};
 
 beforeEach(() => {
   jest.resetAllMocks();

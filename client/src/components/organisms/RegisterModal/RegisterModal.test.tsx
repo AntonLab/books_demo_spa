@@ -24,14 +24,14 @@ const user: PublicUser = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-async function fillValidForm(): Promise<void> {
+const fillValidForm = async (): Promise<void> => {
   await userEvent.type(screen.getByLabelText('Login'), 'bob');
   await userEvent.type(screen.getByLabelText('Email'), 'bob@example.com');
   await userEvent.type(screen.getByLabelText('First name'), 'Bob');
   await userEvent.type(screen.getByLabelText('Last name'), 'Bobson');
   await userEvent.type(screen.getByLabelText('Password'), 'secret123');
   await userEvent.type(screen.getByLabelText('Confirm password'), 'secret123');
-}
+};
 
 beforeEach(() => {
   jest.resetAllMocks();
