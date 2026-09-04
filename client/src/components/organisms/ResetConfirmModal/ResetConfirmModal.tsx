@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result, theme } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { closeModal, confirmPasswordReset } from '@/store/authSlice';
+import { closeModal } from '@/store/authSlice';
+import { useConfirmReset } from '@/queries/auth';
 
 interface ResetConfirmValues {
   password: string;
@@ -18,7 +19,7 @@ export const ResetConfirmModal: FC = () => {
   const navigate = useNavigate();
   const token = useAppSelector((state) => state.auth.resetToken);
   const [form] = Form.useForm<ResetConfirmValues>();
-  const [submitting, setSubmitting] = useState(false);
+  const confirmReset = useConfirmReset();
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
@@ -31,22 +32,18 @@ export const ResetConfirmModal: FC = () => {
   async function handleFinish(values: ResetConfirmValues) {
     if (!token) return;
 
-    setSubmitting(true);
     setFormError(null);
 
-    const result = await dispatch(
-      confirmPasswordReset({ token, password: values.password })
-    );
-
-    setSubmitting(false);
-    if (confirmPasswordReset.rejected.match(result)) {
+    try {
+      await confirmReset.mutateAsync({ token, password: values.password });
+      setDone(true);
+    } catch (error) {
       // Unknown, expired and already-used tokens all arrive as one 400 with
       // one message; the UI says no more than the server does.
-      setFormError(result.payload?.message ?? 'Could not reset the password');
-      return;
+      setFormError(
+        error instanceof Error ? error.message : 'Could not reset the password'
+      );
     }
-
-    setDone(true);
   }
 
   return (
@@ -119,7 +116,7 @@ export const ResetConfirmModal: FC = () => {
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={submitting}
+                loading={confirmReset.isPending}
                 block
               >
                 Set new password

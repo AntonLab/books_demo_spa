@@ -4,6 +4,9 @@ import { LoginModal } from './LoginModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
+import { createAppStore } from '@/store';
+import { openModal } from '@/store/authSlice';
+import { queryKeys } from '@/queries/keys';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
@@ -36,21 +39,26 @@ describe('LoginModal', () => {
     expect(mockedAuth.login).not.toHaveBeenCalled();
   });
 
-  it('submits the credentials and stores the user', async () => {
+  it('submits the credentials, caches the user and closes the modal', async () => {
     mockedAuth.login.mockResolvedValue(user);
-    const { store } = renderWithProviders(<LoginModal />);
+    const store = createAppStore();
+    store.dispatch(openModal('login'));
+    const { queryClient } = renderWithProviders(<LoginModal />, { store });
 
     await userEvent.type(screen.getByLabelText('Login'), 'bob');
     await userEvent.type(screen.getByLabelText('Password'), 'secret123');
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     await waitFor(() => {
-      expect(store.getState().auth.user).toEqual(user);
+      expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
     });
     expect(mockedAuth.login).toHaveBeenCalledWith({
       login: 'bob',
       password: 'secret123',
     });
+    // The reducer used to do this; the component does it now, so it is worth
+    // its own assertion.
+    expect(store.getState().auth.activeModal).toBeNull();
   });
 
   it('shows the server message at form level on a 401', async () => {

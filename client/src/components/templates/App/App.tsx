@@ -1,11 +1,11 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense } from 'react';
 import type { FC } from 'react';
 import { App as AntdApp, ConfigProvider, Layout, Spin, theme } from 'antd';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
 import { store } from '@/store';
-import { useAppDispatch } from '@/store/hooks';
-import { bootstrapSession } from '@/store/authSlice';
+import { queryClient } from '@/queries/queryClient';
 import { AppHeader } from '@/components/organisms/AppHeader';
 import { AuthModals } from '@/components/organisms/AuthModals';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary';
@@ -44,14 +44,7 @@ const SeriesPage = lazy(() =>
 // MemoryRouter instead.
 export const AppShell: FC = () => {
   const { token } = theme.useToken();
-  const dispatch = useAppDispatch();
   const { pathname } = useLocation();
-
-  useEffect(() => {
-    // Asks "who am I?" once on mount. A 401 resolves to "anonymous" inside the
-    // thunk, so no error surfaces for a first-time visitor.
-    void dispatch(bootstrapSession());
-  }, [dispatch]);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -89,17 +82,22 @@ export const AppShell: FC = () => {
 
 export const App: FC = () => {
   return (
-    <Provider store={store}>
-      {/* antd's App must sit inside ConfigProvider to pick up its tokens and
-          style reset. `appTheme` merges our quarks into antd's token set —
-          see CLAUDE.md, Atomic Design, Quarks. */}
-      <ConfigProvider theme={appTheme}>
-        <AntdApp>
-          <BrowserRouter>
-            <AppShell />
-          </BrowserRouter>
-        </AntdApp>
-      </ConfigProvider>
-    </Provider>
+    // Outermost, though the order is not forced: nothing in the Redux tree
+    // reads the query client through context and nothing in a query reads the
+    // store. It matches renderWithProviders, where the nesting has to agree.
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        {/* antd's App must sit inside ConfigProvider to pick up its tokens and
+            style reset. `appTheme` merges our quarks into antd's token set —
+            see CLAUDE.md, Atomic Design, Quarks. */}
+        <ConfigProvider theme={appTheme}>
+          <AntdApp>
+            <BrowserRouter>
+              <AppShell />
+            </BrowserRouter>
+          </AntdApp>
+        </ConfigProvider>
+      </Provider>
+    </QueryClientProvider>
   );
 };

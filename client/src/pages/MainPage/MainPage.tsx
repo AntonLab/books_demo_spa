@@ -1,22 +1,21 @@
-import { useEffect } from 'react';
 import type { FC } from 'react';
 import { Typography } from 'antd';
 import { BookList } from '@/components/organisms/BookList';
-import { fetchBooks } from '@/store/booksSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useBooks } from '@/queries/books';
 
 export const MainPage: FC = () => {
-  const dispatch = useAppDispatch();
-  const { items, status, error } = useAppSelector((state) => state.books);
-
-  useEffect(() => {
-    void dispatch(fetchBooks());
-  }, [dispatch]);
+  // No effect and no dispatch: a query runs because something reads it.
+  const { data, isPending, isError, error } = useBooks();
 
   return (
     <>
       <Typography.Title level={2}>Books</Typography.Title>
-      <BookList items={items} status={status} error={error} />
+      <BookList
+        items={data?.items ?? []}
+        isPending={isPending}
+        isError={isError}
+        error={error}
+      />
     </>
   );
 };

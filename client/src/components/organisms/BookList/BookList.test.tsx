@@ -14,19 +14,38 @@ const book: PublicBook = {
 
 describe('BookList', () => {
   it('shows a loading state while the request is in flight', () => {
-    render(<BookList items={[]} status="loading" error={null} />);
+    render(
+      <BookList items={[]} isPending={true} isError={false} error={null} />
+    );
 
     expect(screen.getByLabelText('Loading books')).toBeInTheDocument();
   });
 
   it('shows the error message when loading failed', () => {
-    render(<BookList items={[]} status="error" error="Network down" />);
+    render(
+      <BookList
+        items={[]}
+        isPending={false}
+        isError={true}
+        error={new Error('Network down')}
+      />
+    );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Network down');
   });
 
+  it('falls back to a generic message when the error carries none', () => {
+    render(
+      <BookList items={[]} isPending={false} isError={true} error={null} />
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load books');
+  });
+
   it('shows the default empty message when there are no books', () => {
-    render(<BookList items={[]} status="ready" error={null} />);
+    render(
+      <BookList items={[]} isPending={false} isError={false} error={null} />
+    );
 
     expect(screen.getByText('No books yet.')).toBeInTheDocument();
   });
@@ -35,7 +54,8 @@ describe('BookList', () => {
     render(
       <BookList
         items={[]}
-        status="ready"
+        isPending={false}
+        isError={false}
         error={null}
         emptyText='No books match "dragon"'
       />
@@ -45,7 +65,9 @@ describe('BookList', () => {
   });
 
   it('renders a card per book, with its description and tags', () => {
-    render(<BookList items={[book]} status="ready" error={null} />);
+    render(
+      <BookList items={[book]} isPending={false} isError={false} error={null} />
+    );
 
     expect(
       screen.getByText('A tale of dragons and the people who ride them')
@@ -55,7 +77,9 @@ describe('BookList', () => {
   });
 
   it('does not claim an author it was not given', () => {
-    render(<BookList items={[book]} status="ready" error={null} />);
+    render(
+      <BookList items={[book]} isPending={false} isError={false} error={null} />
+    );
 
     expect(screen.queryByText(/user\s*3/i)).toBeNull();
   });
