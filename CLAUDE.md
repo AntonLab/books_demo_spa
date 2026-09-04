@@ -7,8 +7,20 @@ Sequelize backend. Early scaffold — most feature directories exist but are emp
 
 - `client/` — React 19 + TypeScript SPA bundled with webpack 5. See `client/CLAUDE.md`.
 - `server/` — Express 5 + Sequelize/MySQL API. See `server/CLAUDE.md`.
+- `tsconfig.base.json` — compiler options shared by both packages; each
+  `tsconfig.json` extends it with a relative path. Keep `include`, `exclude` and
+  `paths` out of it: TypeScript resolves those against the file that declares
+  them, so they would point at the repo root instead of the package.
+- `eslint.config.base.mjs` — the shared flat-config core, exported as
+  `createConfig({ js, tseslint, prettier, ignores }, ...packageConfigs)`. ESLint
+  does not search parent directories, so each package keeps its own
+  `eslint.config.mjs` that calls this. The plugins are passed in rather than
+  imported there: with no root `package.json`, a bare import from the repo root
+  cannot resolve.
 
-There is no root `package.json`; install and run each package from its own directory.
+There is no root `package.json`; install and run each package from its own
+directory. The two shared config files above need none — `extends` is a path
+lookup, and the ESLint base imports nothing.
 
 ## Stack
 
