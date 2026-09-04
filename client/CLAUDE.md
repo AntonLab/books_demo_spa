@@ -240,12 +240,16 @@ Available scripts:
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
 - `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays, merged via `webpack-merge`
-- `tsconfig.json` — strict, `noEmit`, `jsx: react-jsx`,
-  `moduleResolution: Bundler`, target `ES2020`, and the `@/*` → `./src/*`
-  path mapping
-- `eslint.config.mjs` — ESLint flat config (TypeScript + React + hooks +
-  jsx-a11y), plus `react/function-component-definition` set to
-  `arrow-function`
+- `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
+  `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
+  `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,
+  and the `@/*` → `./src/*` path mapping
+- `eslint.config.mjs` — imports the plugins and passes them to `createConfig`
+  from the repo-root `eslint.config.base.mjs`, which supplies the recommended
+  sets, the repo-wide rules and the Prettier tail. This file adds only the
+  React + hooks + jsx-a11y block (including
+  `react/function-component-definition` set to `arrow-function`) and the
+  webpack-config override
 
 ## Webpack
 
@@ -284,6 +288,8 @@ off `@typescript-eslint/no-require-imports`.
   proper type, and add a comment if `any` is truly unavoidable.
   `@typescript-eslint/no-explicit-any` is enforced as an error.
 - `tsconfig` is `noEmit` — webpack produces the build; `tsc` only checks types.
+- `no-console` is a warning here, inherited from `eslint.config.base.mjs`. Client
+  code has none today; use a proper logger rather than silencing it.
 
 ## Testing
 
