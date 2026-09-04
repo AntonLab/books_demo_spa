@@ -86,6 +86,30 @@ Run these from within the relevant package (`client/` or `server/`) before commi
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
+### Pre-commit hook
+
+`.githooks/pre-commit` runs ESLint (`--fix`) and Prettier (`--write`) over the
+staged files only, re-stages whatever they rewrote, and blocks the commit if an
+ESLint **error** survives the autofix. Warnings (`no-console`) print but pass.
+Files route by prefix: `client/` through client's toolchain, `server/` through
+server's, and root-level files through Prettier alone — no package's ESLint
+config reaches them, and there is no root `node_modules`, so the hook borrows a
+package's Prettier binary. A package whose dependencies are not installed is
+skipped with a warning rather than failing the commit.
+
+`core.hooksPath` lives in `.git/config` and is therefore per-clone. The
+`prepare` script in both `package.json`s sets it, so `npm install` in either
+package enables the hook; by hand it is
+`git config core.hooksPath .githooks`. Bypass one commit with
+`git commit --no-verify`.
+
+The hook refuses to run on a partially staged file — one that is staged _and_
+dirty in the working tree. It rewrites the working-tree copy, so re-staging
+would pull the unstaged hunks into the commit as well.
+
+It is not a substitute for the gates above: it never runs `typecheck` or the
+test suites.
+
 ## Anti-Patterns
 
 Do not:
