@@ -33,8 +33,8 @@ the first component needs it rather than leaving empty folders around.
 2. **Check before creating.** Search `src/components/` first. Never add a
    second component that does what an existing one already does.
 3. **No business logic below organisms.** Atoms and molecules take props and
-   render. `useAppSelector`, `useAppDispatch` and `src/api` calls belong in
-   organisms and pages.
+   render. `useAppSelector`, `useAppDispatch`, `src/api` calls and `src/queries`
+   hooks belong in organisms and pages.
 4. **Tokens, not hardcoded values.** No arbitrary hex colours or pixel values
    in components — read antd's tokens (`theme.useToken()`), or add the value to
    the `ConfigProvider` theme so it becomes a real quark. antd's set has gaps
@@ -144,8 +144,9 @@ already `await screen.findByRole(...)`, which waits out the lazy chunk.
 ## Status
 
 No longer a scaffold: the client has a working main page, header (nav, search,
-three auth states), four auth modals, and a search page, backed by Redux
-Toolkit and talking to the real `/api`. The build toolchain and test runner
+three auth states), four auth modals, and a search page, backed by TanStack
+Query for server state and Redux Toolkit for UI state, talking to the real
+`/api`. The build toolchain and test runner
 are both real: webpack 5 (dev server with React Fast Refresh, hashed
 production build), TypeScript, ESLint, Prettier and Jest are all wired up.
 
@@ -171,7 +172,30 @@ Available scripts:
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
   responses into a typed `ApiError`), plus `auth.ts` and `books.ts`, the
-  per-resource typed calls built on it.
+  per-resource typed calls built on it. Since the TanStack Query migration
+  these are the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`,
+  not called directly from components.
+- `src/queries/` — the TanStack Query layer, and the only thing that calls
+  `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
+  `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`
+  (every cache key in one registry), `auth.ts` (`useSession` plus the five
+  auth mutations) and `books.ts` (`useBooks`, `useSearchBooks`,
+  `BOOKS_PAGE_SIZE`). Flat files, like `src/api/` and `src/store/`, and
+  outside the Atomic Design levels for the same reason.
+
+  Three things worth knowing before editing it:
+
+  - **`retry` is off** and `staleTime` is 30s. Every error this API
+    surfaces is a 4xx to show at once — a 401 from `/auth/me` is the
+    _normal_ answer for an anonymous visitor, not a failure to retry.
+  - **The session is `PublicUser | null`**, never `undefined`: `null` means
+    "asked, nobody is signed in". `useSession` maps the 401 to it inside
+    the `queryFn`. TanStack rejects an `undefined` return outright, which
+    is what keeps the two apart.
+  - **`useSearchBooks` is disabled on a blank term**, and a disabled query
+    reports `isPending: true` with `fetchStatus: 'idle'` indefinitely. That
+    is why `SearchPage` returns `<Empty>` before rendering `BookList`.
+
 - `src/components/` — grouped by Atomic Design level (see above), not by
   feature. Each component becomes its own folder (see Component folders).
   - `molecules/` — `SearchBar`.
@@ -190,10 +214,12 @@ Available scripts:
   the original spec's file list, added because the spec routed
   `/reset-password` to the confirm modal without naming the component that
   reads the token).
-- `src/store/` — `index.ts` (`createAppStore`, the `store` singleton,
-  `RootState`/`AppStore`/`AppDispatch`), `hooks.ts` (pre-typed
-  `useAppDispatch`/`useAppSelector`), and `authSlice.ts` / `booksSlice.ts` /
-  `searchSlice.ts`.
+- `src/store/` — UI state only: `index.ts` (`createAppStore`, the `store`
+  singleton, `RootState`/`AppStore`/`AppDispatch`), `hooks.ts` (pre-typed
+  `useAppDispatch`/`useAppSelector`) and `authSlice.ts`, which holds
+  `activeModal` and `resetToken` and nothing else. `booksSlice` and
+  `searchSlice` are gone; the server state they cached by hand lives in
+  `src/queries/`.
 - `src/theme/` — `tokens.ts`, the quark layer: the `appTheme` `ThemeConfig`
   handed to `ConfigProvider` in `App.tsx`, and the `AliasToken` augmentation
   that makes our custom tokens typed everywhere `theme.useToken()` is called.
@@ -289,13 +315,19 @@ package root re-exports server-runtime code (cookie signing, etc.) that uses
     registration/watch mechanism) constructs one unconditionally on every
     `Form.Item` mount to schedule a macrotask, so no antd `Form` — none of
     the four auth modals included — can mount in a test without it.
-- **`fetch` is stubbed per test** (`window.fetch = jest.fn()`); there is no
-  MSW. `src/test/renderWithProviders.tsx` wraps a component in the Redux
-  `Provider`, antd's `ConfigProvider` and a `MemoryRouter`, and returns the
-  store so a test can assert on dispatched state directly. `ConfigProvider` is
-  in that wrapper because `App.tsx` mounts one in production: without it a
-  component reading a custom quark would read `undefined` in tests only, and
-  nothing would fail to make that visible.
+- **The API is mocked per test, not the network.** Component and query
+  tests `jest.mock('@/api/auth')` or `'@/api/books')` and drive the mock;
+  only `src/api/*.test.ts` stubs `window.fetch` directly, against the
+  `Response`-shaped fixtures in `httpFixtures.ts`. There is no MSW.
+  `src/test/renderWithProviders.tsx` wraps a component in a
+  `QueryClientProvider`, the Redux `Provider`, antd's `ConfigProvider` and
+  a `MemoryRouter`, and returns both the store and the query client so a
+  test can seed a session (`queryClient.setQueryData(queryKeys.session,
+user)`) or a UI action (`store.dispatch(openResetConfirm(token))`).
+  Its client comes from `src/test/queryClient.ts` and is **fresh per
+  render** — a shared one leaks cached data between tests — with
+  `staleTime: Infinity` so seeded data is never refetched behind a test's
+  back, and `gcTime: Infinity` so no timer outlives the test.
 
 ### What a component test must cover
 
@@ -365,3 +397,6 @@ contract, not a shortcut.
   `request<T>()` prefixes every path with `/api` and sends
   `credentials: 'include'` — without that, the browser withholds the
   httpOnly `sid` cookie and every authenticated call fails as a 401.
+  Components reach it through `src/queries/`, never directly; a `queryFn`
+  calling `fetch` itself would drop `credentials: 'include'` and turn every
+  authenticated call into a 401.
