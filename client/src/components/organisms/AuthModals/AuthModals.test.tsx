@@ -4,14 +4,16 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import type { RootState } from '@/store';
 import type { AuthState } from '@/store/authSlice';
 
-function withModal(activeModal: AuthState['activeModal']): Partial<RootState> {
+const withModal = (
+  activeModal: AuthState['activeModal']
+): Partial<RootState> => {
   return {
     auth: {
       activeModal,
       resetToken: activeModal === 'resetConfirm' ? 'tok-123' : null,
     },
   };
-}
+};
 
 describe('AuthModals', () => {
   it('renders nothing when no modal is active', () => {

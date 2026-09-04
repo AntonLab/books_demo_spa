@@ -21,19 +21,19 @@ export interface RequestOptions {
 // A 204, and the 202 the reset-request endpoint answers with, carry no body at
 // all. Parsing is attempted and its failure swallowed, so one code path covers
 // "empty by design" and "error page that is not JSON".
-async function readJson(response: Response): Promise<unknown> {
+const readJson = async (response: Response): Promise<unknown> => {
   try {
     return (await response.json()) as unknown;
   } catch {
     return undefined;
   }
-}
+};
 
-function errorFrom(
+const errorFrom = (
   status: number,
   parsed: unknown,
   fallback: string
-): ApiError {
+): ApiError => {
   if (typeof parsed === 'object' && parsed !== null) {
     const body = parsed as Partial<ApiErrorBody>;
     if (typeof body.error === 'string') {
@@ -41,12 +41,12 @@ function errorFrom(
     }
   }
   return new ApiError(status, fallback);
-}
+};
 
-export async function request<T>(
+export const request = async <T>(
   path: string,
   options: RequestOptions = {}
-): Promise<T> {
+): Promise<T> => {
   const { method = 'GET', body, signal } = options;
 
   const response = await fetch(`/api${path}`, {
@@ -73,4 +73,4 @@ export async function request<T>(
   }
 
   return (await readJson(response)) as T;
-}
+};

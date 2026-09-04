@@ -12,11 +12,11 @@ import { QueryClient } from '@tanstack/react-query';
 //   which TanStack rejects outright.
 // - `gcTime: Infinity` so no garbage-collection timer outlives the test and
 //   keeps a Jest worker handle open.
-export function createTestQueryClient(): QueryClient {
+export const createTestQueryClient = (): QueryClient => {
   return new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity, gcTime: Infinity },
       mutations: { retry: false },
     },
   });
-}
+};

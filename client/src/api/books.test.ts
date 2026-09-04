@@ -1,11 +1,11 @@
 import { listBooks } from './books';
 import { jsonResponse } from '../test/httpFixtures';
 
-function mockFetch(body: unknown): jest.Mock {
+const mockFetch = (body: unknown): jest.Mock => {
   const fn = jest.fn().mockResolvedValue(jsonResponse(body));
   window.fetch = fn as unknown as typeof fetch;
   return fn;
-}
+};
 
 const envelope = { items: [], total: 0, limit: 20, offset: 0 };
 

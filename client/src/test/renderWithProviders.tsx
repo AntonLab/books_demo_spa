@@ -28,10 +28,10 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
 // suite turns order-dependent. Both it and the store are returned so a test
 // can seed a session (`queryClient.setQueryData`) or dispatch a UI action
 // (`store.dispatch`) without reaching for a second helper.
-export function renderWithProviders(
+export const renderWithProviders = (
   ui: ReactElement,
   options: ProviderOptions = {}
-): RenderResult & { store: AppStore; queryClient: QueryClient } {
+): RenderResult & { store: AppStore; queryClient: QueryClient } => {
   const {
     preloadedState,
     store = createAppStore(preloadedState),
@@ -57,4 +57,4 @@ export function renderWithProviders(
     queryClient,
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
   };
-}
+};

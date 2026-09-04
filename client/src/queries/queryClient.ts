@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 // A factory as well as a singleton, mirroring `createAppStore`/`store` in
 // src/store/index.ts — and safe for the same reason that one is: there is no
 // SSR here, so one client per process is one client per user.
-export function createQueryClient(): QueryClient {
+export const createQueryClient = (): QueryClient => {
   return new QueryClient({
     defaultOptions: {
       queries: {
@@ -26,6 +26,6 @@ export function createQueryClient(): QueryClient {
       },
     },
   });
-}
+};
 
 export const queryClient = createQueryClient();

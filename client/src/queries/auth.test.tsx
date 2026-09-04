@@ -31,13 +31,13 @@ const user: PublicUser = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-function wrapper(client: QueryClient) {
+const wrapper = (client: QueryClient) => {
   const Wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
   Wrapper.displayName = 'QueryClientWrapper';
   return Wrapper;
-}
+};
 
 beforeEach(() => {
   jest.resetAllMocks();

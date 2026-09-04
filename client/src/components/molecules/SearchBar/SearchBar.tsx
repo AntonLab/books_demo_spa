@@ -28,11 +28,11 @@ export const SearchBar: FC = () => {
     setValue(queryFromUrl);
   }
 
-  function handleSearch(
+  const handleSearch = (
     term: string,
     _event?: unknown,
     info?: { source?: 'input' | 'clear' }
-  ) {
+  ) => {
     // antd fires onSearch for the clear icon as well as for Enter and the
     // button. Navigating on a clear would run a search for the term the user
     // just erased.
@@ -61,7 +61,7 @@ export const SearchBar: FC = () => {
     }
 
     void navigate(`/search?q=${encodeURIComponent(trimmed)}`);
-  }
+  };
 
   return (
     <Input.Search

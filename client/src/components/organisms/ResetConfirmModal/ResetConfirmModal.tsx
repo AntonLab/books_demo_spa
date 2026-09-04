@@ -23,13 +23,13 @@ export const ResetConfirmModal: FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  function dismiss() {
+  const dismiss = () => {
     dispatch(closeModal());
     // replace, so the token is not left sitting in browser history.
     void navigate('/', { replace: true });
-  }
+  };
 
-  async function handleFinish(values: ResetConfirmValues) {
+  const handleFinish = async (values: ResetConfirmValues) => {
     if (!token) return;
 
     setFormError(null);
@@ -44,7 +44,7 @@ export const ResetConfirmModal: FC = () => {
         error instanceof Error ? error.message : 'Could not reset the password'
       );
     }
-  }
+  };
 
   return (
     <Modal open title="Choose a new password" onCancel={dismiss} footer={null}>
@@ -98,7 +98,7 @@ export const ResetConfirmModal: FC = () => {
               rules={[
                 { required: true, message: 'Repeat the password' },
                 ({ getFieldValue }) => ({
-                  validator(_rule, value: string) {
+                  validator: (_rule, value: string) => {
                     if (!value || getFieldValue('password') === value) {
                       return Promise.resolve();
                     }
