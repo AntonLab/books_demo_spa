@@ -1,30 +1,42 @@
 import type { FC } from 'react';
 import { Alert, Col, Empty, Row, Skeleton } from 'antd';
 import { BookCard } from '@/components/organisms/BookCard';
-import type { LoadStatus } from '@/store/booksSlice';
 import type { PublicBook } from '@/types/book';
 
 export interface BookListProps {
   items: PublicBook[];
-  status: LoadStatus;
-  error: string | null;
+  isPending: boolean;
+  isError: boolean;
+  error: Error | null;
   emptyText?: string;
 }
 
-// Presentational on purpose: MainPage feeds it from booksSlice and SearchPage
-// from searchSlice. A component that selected from booksSlice itself could not
-// serve both.
+// Presentational on purpose: MainPage feeds it from `useBooks` and SearchPage
+// from `useSearchBooks`. A component that ran the query itself could not serve
+// both.
+//
+// It takes TanStack's own flags rather than a `LoadStatus` string so there is
+// one vocabulary for a load rather than two, and no page has to translate
+// between them. Callers pass `data?.items ?? []`, so `items` is always an
+// array and the empty branch never sees `undefined`.
 export const BookList: FC<BookListProps> = ({
   items,
-  status,
+  isPending,
+  isError,
   error,
   emptyText = 'No books yet.',
 }) => {
-  if (status === 'error') {
-    return <Alert type="error" title={error ?? 'Could not load books'} />;
+  if (isError) {
+    return (
+      <Alert type="error" title={error?.message ?? 'Could not load books'} />
+    );
   }
 
-  if (status === 'idle' || status === 'loading') {
+  // `isPending`, not `isLoading`: the two differ for a query disabled by
+  // `enabled: false`, which sits at `isPending: true` with `isLoading: false`.
+  // "There is no data to render" is what the skeleton means, and that is
+  // `isPending`.
+  if (isPending) {
     return (
       <div role="status" aria-label="Loading books" aria-busy="true">
         <Skeleton active paragraph={{ rows: 3 }} />
