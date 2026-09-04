@@ -105,3 +105,20 @@ Do not:
 1. Work within the relevant package (`client/` or `server/`) and read its CLAUDE.md.
 2. Verify any command in these docs actually exists before relying on it.
 3. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues on `AntonLab/books_demo_spa`, driven by the `gh` CLI.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See
+`docs/agents/domain.md`.
