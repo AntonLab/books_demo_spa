@@ -7,9 +7,6 @@ import type { AuthState } from '@/store/authSlice';
 function withModal(activeModal: AuthState['activeModal']): Partial<RootState> {
   return {
     auth: {
-      user: null,
-      status: 'ready',
-      error: null,
       activeModal,
       resetToken: activeModal === 'resetConfirm' ? 'tok-123' : null,
     },
