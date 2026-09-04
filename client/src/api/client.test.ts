@@ -1,11 +1,11 @@
 import { ApiError, request } from './client';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
-function mockFetch(response: Response): jest.Mock {
+const mockFetch = (response: Response): jest.Mock => {
   const fn = jest.fn().mockResolvedValue(response);
   window.fetch = fn as unknown as typeof fetch;
   return fn;
-}
+};
 
 describe('request', () => {
   it('prefixes /api and sends credentials so the sid cookie travels', async () => {

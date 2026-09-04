@@ -9,7 +9,7 @@ interface ResponseLike {
   json: () => Promise<unknown>;
 }
 
-function build(status: number, json: () => Promise<unknown>): Response {
+const build = (status: number, json: () => Promise<unknown>): Response => {
   const response: ResponseLike = {
     ok: status >= 200 && status < 300,
     status,
@@ -17,16 +17,16 @@ function build(status: number, json: () => Promise<unknown>): Response {
     json,
   };
   return response as unknown as Response;
-}
+};
 
-export function jsonResponse(body: unknown, status = 200): Response {
+export const jsonResponse = (body: unknown, status = 200): Response => {
   return build(status, () => Promise.resolve(body));
-}
+};
 
 // A 204, an empty 202, and a non-JSON error page all behave the same way to a
 // caller: `json()` rejects. One fixture covers all three.
-export function emptyResponse(status: number): Response {
+export const emptyResponse = (status: number): Response => {
   return build(status, () =>
     Promise.reject(new SyntaxError('Unexpected end of JSON input'))
   );
-}
+};

@@ -39,13 +39,13 @@ export const AppHeader: FC = () => {
     { key: 'logout', label: 'Log out' },
   ];
 
-  function handleAccountClick({ key }: { key: string }) {
+  const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
       logout.mutate();
       return;
     }
     void navigate(key);
-  }
+  };
 
   return (
     <Layout.Header

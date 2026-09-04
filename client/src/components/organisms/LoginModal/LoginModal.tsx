@@ -18,7 +18,7 @@ export const LoginModal: FC = () => {
   // `submitting` is gone — the mutation tracks it.
   const [formError, setFormError] = useState<string | null>(null);
 
-  async function handleFinish(values: LoginValues) {
+  const handleFinish = async (values: LoginValues) => {
     setFormError(null);
 
     try {
@@ -31,7 +31,7 @@ export const LoginModal: FC = () => {
       // wrong here would undo that anti-enumeration guarantee.
       setFormError(error instanceof Error ? error.message : 'Could not log in');
     }
-  }
+  };
 
   return (
     <Modal

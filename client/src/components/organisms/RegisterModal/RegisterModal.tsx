@@ -19,13 +19,13 @@ interface RegisterValues {
 
 // The server already worked out which column collided and returns it as
 // `details.field`; this narrows that `unknown` back to a form field name.
-function conflictField(details: unknown): 'login' | 'email' | null {
+const conflictField = (details: unknown): 'login' | 'email' | null => {
   if (typeof details !== 'object' || details === null) {
     return null;
   }
   const { field } = details as { field?: unknown };
   return field === 'login' || field === 'email' ? field : null;
-}
+};
 
 export const RegisterModal: FC = () => {
   const { token } = theme.useToken();
@@ -34,7 +34,7 @@ export const RegisterModal: FC = () => {
   const register = useRegister();
   const [formError, setFormError] = useState<string | null>(null);
 
-  async function handleFinish(values: RegisterValues) {
+  const handleFinish = async (values: RegisterValues) => {
     setFormError(null);
 
     try {
@@ -62,7 +62,7 @@ export const RegisterModal: FC = () => {
         error instanceof Error ? error.message : 'Could not register'
       );
     }
-  }
+  };
 
   return (
     <Modal
@@ -147,7 +147,7 @@ export const RegisterModal: FC = () => {
           rules={[
             { required: true, message: 'Repeat the password' },
             ({ getFieldValue }) => ({
-              validator(_rule, value: string) {
+              validator: (_rule, value: string) => {
                 if (!value || getFieldValue('password') === value) {
                   return Promise.resolve();
                 }

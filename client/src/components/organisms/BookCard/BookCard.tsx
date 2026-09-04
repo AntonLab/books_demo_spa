@@ -4,9 +4,9 @@ import type { PublicBook } from '@/types/book';
 
 // `createdAt` is an ISO string on the wire, so it is parsed here rather than
 // assumed to be a Date.
-function formatDate(iso: string): string {
+const formatDate = (iso: string): string => {
   return new Date(iso).toLocaleDateString();
-}
+};
 
 interface BookCardProps {
   book: PublicBook;
