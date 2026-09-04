@@ -1,7 +1,8 @@
 # Claude Code — books_demo_spa
 
-Two-package repo: a webpack-bundled React (TypeScript) frontend and an Express +
-Sequelize backend. Early scaffold — most feature directories exist but are empty.
+Two npm workspaces under one root `package.json`: a webpack-bundled React
+(TypeScript) frontend and an Express + Sequelize backend. Early scaffold — most
+feature directories exist but are empty.
 
 ## Layout
 
@@ -12,15 +13,19 @@ Sequelize backend. Early scaffold — most feature directories exist but are emp
   `paths` out of it: TypeScript resolves those against the file that declares
   them, so they would point at the repo root instead of the package.
 - `eslint.config.base.mjs` — the shared flat-config core, exported as
-  `createConfig({ js, tseslint, prettier, ignores }, ...packageConfigs)`. ESLint
-  does not search parent directories, so each package keeps its own
-  `eslint.config.mjs` that calls this. The plugins are passed in rather than
-  imported there: with no root `package.json`, a bare import from the repo root
-  cannot resolve.
+  `createConfig(ignores, ...packageConfigs)`. ESLint does not search parent
+  directories, so each package keeps its own `eslint.config.mjs` that calls
+  this. It imports its own plugins: the root `package.json` declares them and
+  npm hoists them into the root `node_modules`, so bare specifiers resolve.
+- `package.json` — the workspace root. It declares `client` and `server` as
+  workspaces, owns the seven devDependencies both packages need (eslint,
+  @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
+  typescript) plus `concurrently`, and holds `engines.node`.
 
-There is no root `package.json`; install and run each package from its own
-directory. The two shared config files above need none — `extends` is a path
-lookup, and the ESLint base imports nothing.
+One `npm install` at the repo root installs both workspaces into a single
+hoisted `node_modules` with one lockfile. Package-specific dependencies stay
+declared in the package that uses them — webpack and jest in `client`, nodemon
+in `server` — so each `package.json` still says what that package needs.
 
 ## Stack
 
@@ -32,9 +37,15 @@ lookup, and the ESLint base imports nothing.
 
 The scaffold is incomplete — keep the docs honest as you fill it in:
 
-- Both packages now have TypeScript, ESLint (flat config), and Prettier wired up,
-  exposing `typecheck`, `lint`, `lint:fix`, `format`, and `format:check` scripts.
-  See each package's CLAUDE.md.
+- Both packages now have TypeScript and ESLint (flat config) wired up, exposing
+  `typecheck`, `lint` and `lint:fix`. Prettier is root-only — its config is
+  repo-wide, so `format` and `format:check` live only in the root
+  `package.json` and no package defines them. See each package's CLAUDE.md.
+- The root `package.json` fans `typecheck`, `lint`, `lint:fix`, `test` and
+  `build` out over both workspaces, and `npm run dev` starts the client dev
+  server and the API together under `concurrently`. It defines no per-package
+  aliases: one workspace is targeted with npm's own `-w` flag
+  (`npm run dev -w client`, `npm test -w server`), uniformly for every script.
 - `client` is bundled with webpack 5 (swc-loader + fork-ts-checker), exposing
   `npm run dev` (dev server on port 3000, Fast Refresh, `/api` proxied to :4000)
   and `npm run build` (hashed output into `client/build/`). It also has a
@@ -74,11 +85,13 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 
 ## Quality Gates
 
-Run these from within the relevant package (`client/` or `server/`) before commit:
+Run these from the repo root before commit; each fans out over both workspaces.
+Target one with npm's `-w` flag (`npm test -w client`):
 
 - `npm run typecheck` — TypeScript, no emit
 - `npm run lint` — ESLint 9 flat config (`eslint.config.mjs`)
-- `npm run format:check` — Prettier (shared `.prettierrc.json` at the repo root)
+- `npm run format:check` — Prettier, root-only (`.prettierrc.json` and
+  `.prettierignore` at the repo root are the only copies)
 - `npm test` — applies to **both** packages now. `server` uses `node:test`,
   including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
   exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
@@ -91,15 +104,16 @@ Run these from within the relevant package (`client/` or `server/`) before commi
 `.githooks/pre-commit` runs ESLint (`--fix`) and Prettier (`--write`) over the
 staged files only, re-stages whatever they rewrote, and blocks the commit if an
 ESLint **error** survives the autofix. Warnings (`no-console`) print but pass.
-Files route by prefix: `client/` through client's toolchain, `server/` through
-server's, and root-level files through Prettier alone — no package's ESLint
-config reaches them, and there is no root `node_modules`, so the hook borrows a
-package's Prettier binary. A package whose dependencies are not installed is
-skipped with a warning rather than failing the commit.
+ESLint runs once per package, from inside it, because flat config does not
+cascade — a staged path is routed by its `client/` or `server/` prefix. Prettier
+runs once from the repo root over every staged file, including the root-level
+configs and markdown no package's ESLint config reaches. Both binaries come from
+the single hoisted `node_modules/.bin`; if it is missing the hook warns and lets
+the commit through rather than failing it.
 
-`core.hooksPath` lives in `.git/config` and is therefore per-clone. The
-`prepare` script in both `package.json`s sets it, so `npm install` in either
-package enables the hook; by hand it is
+`core.hooksPath` lives in `.git/config` and is therefore per-clone. The root
+`package.json`'s `prepare` script sets it, so `npm install` enables the hook;
+by hand it is
 `git config core.hooksPath .githooks`. Bypass one commit with
 `git commit --no-verify`.
 

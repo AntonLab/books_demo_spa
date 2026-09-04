@@ -1,7 +1,7 @@
 {
-  // Shared compiler options for both packages. `client/` and `server/` extend
-  // this with a relative path; there is no root package.json and none is needed,
-  // because `extends` is a file lookup rather than a module resolution.
+  // Shared compiler options for both workspaces. `client/` and `server/` extend
+  // this with a relative path, which is a file lookup rather than a module
+  // resolution, so it needs nothing installed.
   //
   // Only options with the same value in both packages belong here. Note that
   // `include`, `exclude` and `paths` must NOT: TypeScript resolves those

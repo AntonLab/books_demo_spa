@@ -34,9 +34,14 @@ references a comment by id.
 
 ## Development Commands
 
+This package is an npm workspace. Install from the repo root, not here; the
+scripts below still run from this directory, or from the root with `-w server`.
+
 - `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.5)
-- `npm run start:dev` — run under nodemon (see `nodemon.json`), which execs
-  `node ./src/index.ts` and restarts on changes to `src/**/*.{ts,json}`
+- `npm run dev` — run under nodemon, which restarts on changes to
+  `src/**/*.{ts,json}`. The script is bare `nodemon`: `nodemon.json` supplies
+  both the watch settings and `exec: node ./src/index.ts`, so the entry point
+  is named once rather than in both places
 - `npm run build` — compile with `tsc -p tsconfig.build.json` to `dist/`; that
   config extends `tsconfig.json` (which in turn extends the repo-root
   `tsconfig.base.json`) but excludes `src/**/*.spec.ts`, so test files
@@ -47,9 +52,11 @@ references a comment by id.
   silently skip that suite instead of failing loudly)
 - `npm run typecheck` — `tsc --noEmit` (type-check only)
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`,
-  which passes its plugins to `createConfig` in the repo-root
-  `eslint.config.base.mjs`; the Node globals block is all that is local)
-- `npm run format` / `npm run format:check` — Prettier (root `.prettierrc.json`)
+  which calls `createConfig` in the repo-root `eslint.config.base.mjs`; the
+  Node globals block is all that is local)
+
+Prettier has no script here: it is root-only, because `.prettierrc.json` and
+`.prettierignore` are repo-wide. Run `npm run format` from the repo root.
 
 There is no `sequelize-cli` dependency yet — do not reference it until it is
 added.
@@ -160,7 +167,7 @@ value.
 
 - ESM package (`"type": "module"`), Node >= 22.5. `tsconfig.json` uses
   `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
-- Both `start` and `start:dev` run the `.ts` entry directly via Node (native TS
+- Both `start` and `dev` run the `.ts` entry directly via Node (native TS
   type-stripping); nodemon only adds watch/restart on top.
 - Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
   because Node's native TS mode resolves modules exactly as written — it does
