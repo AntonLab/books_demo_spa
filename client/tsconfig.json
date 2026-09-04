@@ -14,7 +14,6 @@
     // it is deprecated in TS 6, and `moduleResolution: Bundler` resolves
     // `paths` against this file's directory without it.
     "paths": { "@/*": ["./src/*"] },
-
     "noEmit": true,
     "isolatedModules": true
   },
