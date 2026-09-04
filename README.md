@@ -2,7 +2,7 @@
 
 A demo single-page application for browsing books: a React 19 + TypeScript
 frontend and an Express 5 + Sequelize/MySQL API, kept in one repository as two
-independent npm packages.
+npm workspaces.
 
 ## Stack
 
@@ -19,8 +19,8 @@ client/   React SPA bundled with webpack 5   — see client/CLAUDE.md
 server/   Express API on Sequelize/MySQL     — see server/CLAUDE.md
 ```
 
-There is no root `package.json`: install and run each package from its own
-directory.
+One root `package.json` declares both as npm workspaces, so a single
+`npm install` at the repo root covers the whole repo and writes one lockfile.
 
 ## Prerequisites
 
@@ -30,29 +30,22 @@ directory.
 
 ## Getting started
 
-### 1. Server
-
 ```bash
-cd server
-npm install
-cp .env.example .env.local   # then fill in DB_USER / DB_PASSWORD
-npm run start:dev            # http://localhost:4000
+npm install                            # once, from the repo root
+cp server/.env.example server/.env.local   # then fill in DB_USER / DB_PASSWORD
+npm run dev                            # both, on :3000 and :4000
 ```
+
+`npm run dev` runs the webpack dev server and the API side by side under
+`concurrently`, with each process's output prefixed by name; Ctrl-C stops both.
+To run just one, use `npm run dev -w client` or `npm run dev -w server`.
+
+The client dev server proxies `/api` to `http://localhost:4000`, so the browser
+only ever talks to one origin in development.
 
 On start-up (outside `NODE_ENV=production`) the server creates the
 `books_demo_spa` schema if it is missing and syncs the Sequelize models, so a
 clean MySQL install needs no manual migration step.
-
-### 2. Client
-
-```bash
-cd client
-npm install
-npm run dev                  # http://localhost:3000
-```
-
-The dev server proxies `/api` to `http://localhost:4000`, so the browser only
-ever talks to one origin in development.
 
 ## Environment
 
@@ -95,20 +88,26 @@ A `Comment` model exists (with self-referential replies) but has no HTTP API yet
 
 ## Scripts
 
-Run from within `client/` or `server/`.
+Run these from the repo root.
 
-| Script                 | client                               | server                                                |
-| ---------------------- | ------------------------------------ | ----------------------------------------------------- |
-| `npm run dev`          | webpack dev server on :3000          | —                                                     |
-| `npm start`            | —                                    | run the API                                           |
-| `npm run start:dev`    | —                                    | run the API under nodemon                             |
-| `npm run build`        | production bundle into `build/`      | `tsc` output into `dist/`                             |
-| `npm test`             | Jest + React Testing Library (jsdom) | `node:test` (includes MySQL-backed integration specs) |
-| `npm run typecheck`    | `tsc --noEmit`                       | `tsc --noEmit`                                        |
-| `npm run lint`         | ESLint                               | ESLint                                                |
-| `npm run format:check` | Prettier                             | Prettier                                              |
+| Script                 | Does                                                                |
+| ---------------------- | ------------------------------------------------------------------- |
+| `npm run dev`          | client on :3000 and server on :4000 together, under `concurrently`  |
+| `npm run build`        | both: client bundle into `client/build/`, `tsc` into `server/dist/` |
+| `npm test`             | both: Jest (client) and `node:test` (server)                        |
+| `npm run typecheck`    | both: `tsc --noEmit`                                                |
+| `npm run lint`         | both: ESLint                                                        |
+| `npm run format:check` | Prettier over the whole repo                                        |
 
-`npm run lint:fix` and `npm run format` apply fixes. `client` also has
+`npm run lint:fix` and `npm run format` apply fixes.
+
+Every script except the Prettier pair fans out over both workspaces; target one
+with npm's `-w` flag (`npm run dev -w client`, `npm run build -w server`). The
+root deliberately defines no single-package aliases, so `-w` is the one way to
+narrow any script. Prettier is root-only because its config is repo-wide — the
+packages define no `format` script.
+
+The API alone, without nodemon, is `npm run start -w server`. `client` also has
 `npm run test:watch`.
 
 The server's test suite talks to a real MySQL database, so `.env.local` must be
@@ -117,16 +116,16 @@ configured before `npm test` there.
 ## Quality gates
 
 Before committing, run `npm run typecheck`, `npm run lint`,
-`npm run format:check` and `npm test` in each package you touched. Commit
-messages follow the conventional-commit prefixes (`feat:`, `fix:`, `chore:`,
-`docs:`, `test:`).
+`npm run format:check` and `npm test` from the repo root; each covers both
+workspaces. Commit messages follow the conventional-commit prefixes (`feat:`,
+`fix:`, `chore:`, `docs:`, `test:`).
 
 ### Pre-commit hook
 
 `.githooks/pre-commit` lints and formats the staged files on every commit:
 ESLint `--fix` and Prettier `--write`, re-staged automatically, with the commit
-blocked if an ESLint error survives the fix. Running `npm install` in either
-package turns it on via the `prepare` script; to enable it by hand:
+blocked if an ESLint error survives the fix. `npm install` turns it on via the
+root `prepare` script; to enable it by hand:
 
 ```bash
 git config core.hooksPath .githooks
