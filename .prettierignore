@@ -1,8 +1,5 @@
-# Build output and dependencies
-node_modules
-build
-dist
-coverage
-
-# Lockfiles are managed by npm
+# Prettier 3 reads .gitignore as well as this file, and only from the directory
+# it runs in — so the root .gitignore already covers node_modules, build, dist
+# and coverage here. Lockfiles are the exception: they are tracked, so .gitignore
+# does not list them, but they are generated and must not be reformatted.
 package-lock.json
