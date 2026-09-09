@@ -20,7 +20,10 @@ feature directories exist but are empty.
 - `package.json` — the workspace root. It declares `client` and `server` as
   workspaces, owns the seven devDependencies both packages need (eslint,
   @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
-  typescript) plus `concurrently`, and holds `engines.node`.
+  typescript) plus `concurrently` and `skills`, and holds `engines.node`.
+  `skills` is the CLI that materializes `skills-lock.json` into `.agents/`;
+  it is pinned here rather than run through `npx` so a fresh clone rebuilds
+  the same skill set. Run it with `npm run skills`.
 
 One `npm install` at the repo root installs both workspaces into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
@@ -140,6 +143,9 @@ Do not:
   hook for `getDerivedStateFromError`. Do not add a second without the same
   justification, and do not add a dependency to dodge it. See
   `client/CLAUDE.md`.
+- Do not run the `setup-pre-commit` skill or install Husky/lint-staged. This
+  repo's hook is `.githooks/pre-commit`, enabled via `core.hooksPath` by the
+  root `prepare` script. The skill would install a competing hook.
 - Do not mutate state directly — use setter functions or immutable updates.
 - Do not use the `any` type — use `unknown` or a proper type instead.
 - Do not use `@ts-ignore` — fix the type error or use `@ts-expect-error` with a reason.

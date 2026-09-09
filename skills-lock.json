@@ -35,7 +35,7 @@
       "source": "reduxjs/redux-toolkit",
       "sourceType": "github",
       "skillPath": "packages/toolkit/skills/build-modern-redux-apps/modern-redux/SKILL.md",
-      "computedHash": "f98b3f17f95c6483373cce4bd47095b704e5255d56ee40ef846960d6e1754de0"
+      "computedHash": "1f3bac7413e62b9315f19c60c9e73bf03ac6c9f9fb330977294980534a9c9957"
     },
     "claude-handoff": {
       "source": "mattpocock/skills",
@@ -149,7 +149,7 @@
       "source": "reduxjs/redux-toolkit",
       "sourceType": "github",
       "skillPath": "packages/toolkit/skills/model-redux-state/build-slices-and-selectors/SKILL.md",
-      "computedHash": "61c8adf595e03835e5c7266bca6db8b8507f6b346c36a3442e6f9844af2b55ba"
+      "computedHash": "95084920357bcff68b049b2227d18cd04e1f1c1da70af498119abb83e6e9716c"
     },
     "mysql": {
       "source": "planetscale/database-skills",
@@ -168,12 +168,6 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/prototype/SKILL.md",
       "computedHash": "62979fe039ef64407b258f8824db41b9185f788638747df803032df4153c2aae"
-    },
-    "react-state-management": {
-      "source": "wshobson/agents",
-      "sourceType": "github",
-      "skillPath": "plugins/frontend-mobile-development/skills/react-state-management/SKILL.md",
-      "computedHash": "ad235563b998dde651611d5b733f12c3cdcc61f6e9368551230a1dbfeec2313e"
     },
     "research": {
       "source": "mattpocock/skills",
