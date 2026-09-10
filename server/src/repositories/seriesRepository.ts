@@ -22,11 +22,17 @@ export interface SeriesListResult {
 }
 
 export interface SeriesRepository {
-  create(input: CreateSeriesInput): Promise<PublicSeries>;
+  // userId is not part of CreateSeriesInput: it comes from the session, never
+  // the request body, so it is supplied as a separate argument rather than a
+  // schema field a caller could set.
+  create(input: CreateSeriesInput & { userId: number }): Promise<PublicSeries>;
   list(query: ListSeriesQuery): Promise<SeriesListResult>;
   findById(id: number): Promise<PublicSeries | null>;
   update(id: number, input: UpdateSeriesInput): Promise<PublicSeries | null>;
   remove(id: number): Promise<boolean>;
+  // The cheapest question the ownership check can ask: one indexed column, no
+  // eager loads, no serialisation.
+  findOwnerId(id: number): Promise<number | null>;
 }
 
 // A rejected FK on `series.userId` means the referenced user does not exist.
@@ -114,6 +120,11 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     async remove(id) {
       const deleted = await Series.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    async findOwnerId(id) {
+      const series = await Series.findByPk(id, { attributes: ['userId'] });
+      return series?.userId ?? null;
     },
   };
 }
