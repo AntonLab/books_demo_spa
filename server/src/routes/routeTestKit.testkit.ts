@@ -41,6 +41,7 @@ function defaultDeps(): AppDeps {
     seriesRepository: createUnusedRepository('series'),
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),
+    commentRepository: createUnusedRepository('comment'),
     likeRepository: createUnusedRepository('like'),
     sessionRepository: createUnusedRepository('session'),
     passwordResetRepository: createUnusedRepository('passwordReset'),

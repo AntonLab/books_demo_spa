@@ -5,6 +5,7 @@ import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
 import type { BookRepository } from './repositories/bookRepository.ts';
 import type { ChapterRepository } from './repositories/chapterRepository.ts';
+import type { CommentRepository } from './repositories/commentRepository.ts';
 import type { LikeRepository } from './repositories/likeRepository.ts';
 import type { PasswordResetRepository } from './repositories/passwordResetRepository.ts';
 import type { SeriesRepository } from './repositories/seriesRepository.ts';
@@ -17,6 +18,7 @@ export interface AppDeps {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  commentRepository: CommentRepository;
   likeRepository: LikeRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
