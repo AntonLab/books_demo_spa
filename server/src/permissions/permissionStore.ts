@@ -11,16 +11,25 @@ import type {
 // The matrix is derived from code and never changes at runtime, so it is read
 // once rather than on every request. Changing permissions means editing the
 // definition and restarting — which recreating the table already requires.
-let matrix = new Map<string, PermissionScope>();
-
+//
+// It starts from the code rather than empty. The table is a mirror of the
+// definition, so the two agree by construction, and a process that never calls
+// syncPermissions — createApp under test, or any host mounting the API without
+// a database — still answers correctly instead of refusing everything. An empty
+// start would make that misconfiguration look exactly like a deliberate 403.
 const key = (role: Role, module: Module, action: Action): string =>
   `${role}/${module}/${action}`;
 
-// Exported for tests, which need a matrix without a database behind it.
-export function loadMatrix(rows: PublicPermission[]): void {
-  matrix = new Map(
+const toMatrix = (rows: PublicPermission[]): Map<string, PermissionScope> =>
+  new Map(
     rows.map((row) => [key(row.role, row.module, row.action), row.scope])
   );
+
+let matrix = toMatrix(buildMatrixRows());
+
+// Exported for tests, which need a matrix without a database behind it.
+export function loadMatrix(rows: PublicPermission[]): void {
+  matrix = toMatrix(rows);
 }
 
 // Replaces the table wholesale rather than upserting row by row: a partial
