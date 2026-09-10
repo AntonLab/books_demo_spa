@@ -75,3 +75,11 @@ test('an admin moderates but does not author', () => {
   assert.equal(scope('admin', 'series', 'create'), 'none');
   assert.equal(scope('admin', 'chapters', 'create'), 'none');
 });
+
+test('a user may flip their own like, which the API exposes as PATCH /likes/:id', () => {
+  // likeRoutes has always had a PATCH — it is how a like becomes a dislike.
+  // Without this grant the route is reachable by superadmin alone, which is a
+  // gap rather than a policy: nobody can change their own reaction.
+  assert.equal(scope('user', 'likes', 'update'), 'own');
+  assert.equal(scope('author', 'likes', 'update'), 'own');
+});
