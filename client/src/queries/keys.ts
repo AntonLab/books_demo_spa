@@ -11,4 +11,10 @@ import type { ListBooksParams } from '../api/books';
 export const queryKeys = {
   session: ['auth', 'me'] as const,
   books: (params: ListBooksParams) => ['books', params] as const,
+  // Keyed by a bare id, so it cannot collide with `books`, which is always
+  // keyed by a params object.
+  book: (id: number) => ['books', id] as const,
+  chapters: (bookId: number) => ['chapters', { bookId }] as const,
+  chapter: (id: number) => ['chapters', id] as const,
+  comments: (bookId: number) => ['comments', { bookId }] as const,
 };

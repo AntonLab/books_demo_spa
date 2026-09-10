@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { listBooks } from '../api/books';
+import { getBook, listBooks } from '../api/books';
 import { queryKeys } from './keys';
 
 // The first page only. Paging is a documented non-goal; `total` is kept so the
@@ -26,5 +26,12 @@ export const useSearchBooks = (q: string) => {
     queryKey: queryKeys.books({ q, limit: BOOKS_PAGE_SIZE }),
     queryFn: () => listBooks({ q, limit: BOOKS_PAGE_SIZE }),
     enabled: q.length > 0,
+  });
+};
+
+export const useBook = (id: number) => {
+  return useQuery({
+    queryKey: queryKeys.book(id),
+    queryFn: () => getBook(id),
   });
 };
