@@ -42,6 +42,7 @@ function createFakeUsers(seed: { status?: UserStatus } = {}) {
         firstName: input.firstName,
         lastName: input.lastName,
         status: input.status ?? 'pending',
+        role: 'user' as const,
         password: await hashPassword(input.password, 'test'),
         createdAt: now,
         updatedAt: now,

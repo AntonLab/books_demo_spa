@@ -78,3 +78,25 @@ test('errors carry the right status codes', () => {
 test('conflict error names the offending field in its details', () => {
   assert.deepEqual(new ConflictError('email').details, { field: 'email' });
 });
+
+test('a role in a create body is dropped — it is never caller-supplied', () => {
+  const parsed = createUserSchema.parse({
+    login: 'someone',
+    email: 'someone@example.com',
+    password: 'hunter2hunter2',
+    firstName: 'Some',
+    lastName: 'One',
+    role: 'admin',
+  });
+
+  assert.equal('role' in parsed, false);
+});
+
+test('a role in an update body is dropped too', () => {
+  // updateUserSchema is createUserSchema.partial(), so this follows from the
+  // test above — asserted separately because that derivation is exactly what
+  // would silently reintroduce the field.
+  const parsed = updateUserSchema.parse({ role: 'superadmin', login: 'x123' });
+
+  assert.equal('role' in parsed, false);
+});

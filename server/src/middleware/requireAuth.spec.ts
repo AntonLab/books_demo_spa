@@ -19,6 +19,7 @@ const USER: PublicUser = {
   firstName: 'Bob',
   lastName: 'Bobsson',
   status: 'active',
+  role: 'user',
   createdAt: new Date(),
   updatedAt: new Date(),
 };

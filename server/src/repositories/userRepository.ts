@@ -15,6 +15,7 @@ import type {
   UpdateUserInput,
   UserStatus,
 } from '../types/user.ts';
+import type { UserRole } from '../types/permission.ts';
 
 export interface UserListResult {
   items: PublicUser[];
@@ -22,7 +23,10 @@ export interface UserListResult {
 }
 
 export interface UserRepository {
-  create(input: CreateUserInput): Promise<PublicUser>;
+  // The role is a separate argument rather than part of CreateUserInput, so
+  // the type itself says it is not caller-supplied body data — the same shape
+  // as `actorId` on the comment and like repositories.
+  create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
   findById(id: number): Promise<PublicUser | null>;
   update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
@@ -80,9 +84,9 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
 
 export function createSequelizeUserRepository(): UserRepository {
   return {
-    async create(input) {
+    async create(input, role = 'user') {
       try {
-        const user = await User.create(input);
+        const user = await User.create({ ...input, role });
         return toPublicUser(user);
       } catch (error) {
         asConflict(error);

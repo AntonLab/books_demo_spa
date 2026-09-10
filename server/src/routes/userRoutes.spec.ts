@@ -37,6 +37,7 @@ function createFakeRepository(): UserRepository {
         firstName: input.firstName,
         lastName: input.lastName,
         status: input.status ?? 'pending',
+        role: 'user',
         createdAt: now,
         updatedAt: now,
       };
