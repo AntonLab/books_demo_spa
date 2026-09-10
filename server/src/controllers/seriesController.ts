@@ -1,11 +1,15 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import {
   validatedBody,
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import { NotFoundError } from '../types/errors.ts';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../types/errors.ts';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -25,11 +29,33 @@ export interface SeriesController {
 export function createSeriesController(
   repository: SeriesRepository
 ): SeriesController {
+  // The other half of enforcement. requirePermission already refused `none`;
+  // `any` needs nothing more, and `own` is the only case that has to look at
+  // the row — which is why this cannot live in the middleware, where the row
+  // is not loaded yet.
+  //
+  // 404 before 403, so a refusal cannot be used to probe which ids exist.
+  const assertMayTouch = async (req: Request, id: number): Promise<void> => {
+    if (req.permissionScope !== 'own') return;
+
+    const ownerId = await repository.findOwnerId(id);
+    if (ownerId === null) throw new NotFoundError('Series', id);
+    if (ownerId !== req.user?.id) {
+      throw new ForbiddenError('You may only change your own series');
+    }
+  };
+
   return {
     create: async (req, res) => {
-      const series = await repository.create(
-        validatedBody<CreateSeriesInput>(req)
-      );
+      if (!req.user) throw new UnauthorizedError();
+
+      // The owner comes from the session, never the body — otherwise an
+      // author could create a series owned by someone else and the ownership
+      // rule above would mean nothing.
+      const series = await repository.create({
+        ...validatedBody<CreateSeriesInput>(req),
+        userId: req.user.id,
+      });
       res.status(201).json(series);
     },
 
@@ -48,6 +74,8 @@ export function createSeriesController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
       const series = await repository.update(
         id,
         validatedBody<UpdateSeriesInput>(req)
@@ -58,6 +86,8 @@ export function createSeriesController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('Series', id);
       res.status(204).end();

@@ -20,8 +20,10 @@ const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
 // whitespace-only title fails min(1) rather than landing as an empty string.
 const titleSchema = z.string().trim().min(1).max(SERIES_TITLE_MAX_LENGTH);
 
+// No userId: the owner comes from the session, never the body. Without that,
+// an author could create a series owned by someone else, and "you may only
+// edit your own series" would mean nothing.
 export const createSeriesSchema = z.object({
-  userId: userIdSchema,
   title: titleSchema,
   description: descriptionSchema,
   // Defaulted here rather than in the column: MySQL forbids a literal DEFAULT
