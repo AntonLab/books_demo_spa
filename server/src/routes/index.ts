@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { ResetDelivery } from '../delivery/resetDelivery.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
+import type { CommentRepository } from '../repositories/commentRepository.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
@@ -10,6 +11,7 @@ import type { UserRepository } from '../repositories/userRepository.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
+import { createCommentRoutes } from './commentRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
@@ -19,6 +21,7 @@ export interface RouteDeps {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  commentRepository: CommentRepository;
   likeRepository: LikeRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
@@ -35,6 +38,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/series', createSeriesRoutes(deps));
   router.use('/books', createBookRoutes(deps));
   router.use('/chapters', createChapterRoutes(deps));
+  router.use('/comments', createCommentRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
   return router;
 }
