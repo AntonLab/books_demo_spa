@@ -7,6 +7,7 @@ import {
   initPasswordResetTokenModel,
   PasswordResetToken,
 } from './PasswordResetToken.ts';
+import { initPermissionModel, Permission } from './Permission.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
@@ -20,10 +21,13 @@ export interface Models {
   Like: typeof Like;
   Session: typeof Session;
   PasswordResetToken: typeof PasswordResetToken;
+  Permission: typeof Permission;
 }
 
 export function initModels(sequelize: Sequelize): Models {
   initUserModel(sequelize);
+  // Reference data, unrelated to any row — no association block follows it.
+  initPermissionModel(sequelize);
   initSeriesModel(sequelize);
   initBookModel(sequelize);
   initChapterModel(sequelize);
@@ -197,6 +201,7 @@ export function initModels(sequelize: Sequelize): Models {
     Like,
     Session,
     PasswordResetToken,
+    Permission,
   };
 }
 
@@ -208,3 +213,4 @@ export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';
 export { Session } from './Session.ts';
 export { PasswordResetToken } from './PasswordResetToken.ts';
+export { Permission, toPublicPermission } from './Permission.ts';
