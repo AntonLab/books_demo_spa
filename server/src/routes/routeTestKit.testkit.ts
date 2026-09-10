@@ -19,6 +19,7 @@ export function createUnusedRepository<T>(name: string): T {
     create: unreachable,
     list: unreachable,
     findById: unreachable,
+    findDetailById: unreachable,
     update: unreachable,
     remove: unreachable,
     // The auth-era methods. The stub is built from a fixed key list and cast,

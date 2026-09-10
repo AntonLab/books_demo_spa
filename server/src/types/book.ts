@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AuthorSummary } from './user.ts';
 
 export const BOOK_TAG_MAX_LENGTH = 32;
 export const BOOK_MAX_TAGS = 20;
@@ -83,4 +84,20 @@ export interface PublicBook {
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// What GET /api/books/:id returns: the record plus the two names a book page
+// has to show and the like state it renders. Additive over PublicBook, so the
+// endpoint's existing readers are unaffected.
+//
+// The author is embedded rather than looked up by the client because
+// /api/users is guarded — an anonymous visitor could not resolve a name at all.
+export interface BookDetail extends PublicBook {
+  author: AuthorSummary;
+  series: { id: number; title: string } | null;
+  likeCount: number;
+  // null both for an anonymous visitor and for a signed-in one who has not
+  // liked this book. The client needs no third state: with no session it hides
+  // the button outright.
+  viewerLikeId: number | null;
 }
