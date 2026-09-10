@@ -5,6 +5,7 @@ import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
+import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
 import { createSequelizeCommentRepository } from './repositories/commentRepository.ts';
@@ -42,6 +43,11 @@ async function main(): Promise<void> {
   if (config.env !== 'production') {
     await sequelize.sync();
   }
+
+  // The matrix is reference data derived from code, so it is written on every
+  // boot and read into memory once. Without this the store is empty and every
+  // scope reads `none` — the server would refuse everything.
+  await syncPermissions();
 
   const app = createApp({
     userRepository: createSequelizeUserRepository(),
