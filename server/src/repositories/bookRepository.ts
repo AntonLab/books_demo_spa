@@ -7,8 +7,12 @@ import {
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
+import { Like } from '../models/Like.ts';
+import { Series } from '../models/Series.ts';
+import { User, toAuthorSummary } from '../models/User.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type {
+  BookDetail,
   CreateBookInput,
   ListBooksQuery,
   PublicBook,
@@ -25,6 +29,13 @@ export interface BookRepository {
   create(input: CreateBookInput): Promise<PublicBook>;
   list(query: ListBooksQuery): Promise<BookListResult>;
   findById(id: number): Promise<PublicBook | null>;
+  // Separate from findById rather than replacing it: the detail read costs an
+  // author join, a series join and two like queries, and the write paths that
+  // only need to know a row exists should not pay for them.
+  findDetailById(
+    id: number,
+    viewerId: number | null
+  ): Promise<BookDetail | null>;
   update(id: number, input: UpdateBookInput): Promise<PublicBook | null>;
   remove(id: number): Promise<boolean>;
 }
@@ -127,6 +138,42 @@ export function createSequelizeBookRepository(): BookRepository {
     async findById(id) {
       const book = await Book.findByPk(id);
       return book ? toPublicBook(book) : null;
+    },
+
+    async findDetailById(id, viewerId) {
+      const book = await Book.findByPk(id, {
+        include: [
+          { model: User, as: 'user' },
+          { model: Series, as: 'series' },
+        ],
+      });
+      // `user` is guaranteed by the NOT NULL foreign key, so a book without one
+      // means the row itself is missing rather than the author.
+      if (!book?.user) return null;
+
+      // Two follow-up queries rather than a correlated subquery in the SELECT
+      // above: each is a single indexed lookup on likes, and keeping them apart
+      // leaves the include readable.
+      const likeCount = await Like.count({
+        where: { bookId: id, isLike: true },
+      });
+      const viewerLike =
+        viewerId === null
+          ? null
+          : await Like.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['id'],
+            });
+
+      return {
+        ...toPublicBook(book),
+        author: toAuthorSummary(book.user),
+        series: book.series
+          ? { id: book.series.id, title: book.series.title }
+          : null,
+        likeCount,
+        viewerLikeId: viewerLike?.id ?? null,
+      };
     },
 
     async update(id, input) {
