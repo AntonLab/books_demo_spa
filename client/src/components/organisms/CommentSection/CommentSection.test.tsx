@@ -33,6 +33,7 @@ const root: CommentWithAuthor = {
   userId: 3,
   bookId: 1,
   text: 'A fine book',
+  isDeleted: false,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
@@ -199,6 +200,59 @@ describe('CommentSection', () => {
 
     // The server refuses a self-like with 403, so it is never offered.
     expect(screen.getAllByRole('button', { name: 'Like' })).toHaveLength(1);
+  });
+
+  it('drops a deleted comment that holds no replies', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        root,
+        {
+          ...reply,
+          id: 8,
+          parentId: null,
+          text: '',
+          isDeleted: true,
+          author: null,
+        },
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(await screen.findByText('A fine book')).toBeInTheDocument();
+    expect(screen.queryByText('[deleted]')).toBeNull();
+  });
+
+  it('keeps a deleted comment that still holds a reply', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [{ ...root, text: '', isDeleted: true, author: null }, reply],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    // The tombstone stays so the reply below it keeps its place in the thread.
+    expect(await screen.findByText('[deleted]')).toBeInTheDocument();
+    expect(screen.getByText('Agreed')).toBeInTheDocument();
+  });
+
+  it('drops a deleted reply', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [root, { ...reply, text: '', isDeleted: true, author: null }],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(await screen.findByText('A fine book')).toBeInTheDocument();
+    expect(screen.queryByText('[deleted]')).toBeNull();
   });
 
   it('likes another user comment', async () => {

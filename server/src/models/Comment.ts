@@ -25,6 +25,9 @@ export class Comment extends Model<
   declare userId: ForeignKey<User['id']>;
   declare bookId: ForeignKey<Book['id']>;
   declare text: string;
+  // A soft delete. The row survives so its replies keep a parent to hang off,
+  // which is the whole reason deletion is a flag rather than a DELETE.
+  declare isDeleted: CreationOptional<boolean>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -69,6 +72,14 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
         type: DataTypes.TEXT,
         allowNull: false,
       },
+      // Unlike the JSON columns elsewhere, a BOOLEAN takes a literal DEFAULT
+      // happily, so this one lives in the DDL rather than in a zod schema — and
+      // no create schema accepts it, since a comment is never born deleted.
+      isDeleted: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
       createdAt: { type: DataTypes.DATE, allowNull: false },
@@ -97,6 +108,10 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
   return Comment;
 }
 
+// The one place a deleted comment's text is withheld. Blanking here rather
+// than at each call site is what stops a future endpoint from serving it by
+// omission — the row still carries it, so anything reading the model directly
+// would.
 export function toPublicComment(comment: Comment): PublicComment {
   return {
     id: comment.id,
@@ -106,7 +121,8 @@ export function toPublicComment(comment: Comment): PublicComment {
     parentId: comment.parentId ?? null,
     userId: comment.userId,
     bookId: comment.bookId,
-    text: comment.text,
+    text: comment.isDeleted ? '' : comment.text,
+    isDeleted: comment.isDeleted,
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
   };
@@ -122,5 +138,12 @@ export function toCommentWithAuthor(
   likeCount: number,
   viewerLikeId: number | null
 ): CommentWithAuthor {
-  return { ...toPublicComment(comment), author, likeCount, viewerLikeId };
+  return {
+    ...toPublicComment(comment),
+    // Withheld alongside the text: a tombstone naming the person who deleted
+    // their own comment defeats the point of deleting it.
+    author: comment.isDeleted ? null : author,
+    likeCount,
+    viewerLikeId,
+  };
 }
