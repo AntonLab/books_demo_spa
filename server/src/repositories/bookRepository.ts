@@ -26,7 +26,10 @@ export interface BookListResult {
 }
 
 export interface BookRepository {
-  create(input: CreateBookInput): Promise<PublicBook>;
+  // userId is not part of CreateBookInput: it comes from the session, never
+  // the request body, so it is supplied as a separate argument rather than a
+  // schema field a caller could set.
+  create(input: CreateBookInput & { userId: number }): Promise<PublicBook>;
   list(query: ListBooksQuery): Promise<BookListResult>;
   findById(id: number): Promise<PublicBook | null>;
   // Separate from findById rather than replacing it: the detail read costs an
@@ -38,6 +41,9 @@ export interface BookRepository {
   ): Promise<BookDetail | null>;
   update(id: number, input: UpdateBookInput): Promise<PublicBook | null>;
   remove(id: number): Promise<boolean>;
+  // The cheapest question the ownership check can ask: one indexed column, no
+  // eager loads, no serialisation.
+  findOwnerId(id: number): Promise<number | null>;
 }
 
 // A rejected FK on `books` means the referenced row does not exist. Reporting
@@ -193,6 +199,11 @@ export function createSequelizeBookRepository(): BookRepository {
     async remove(id) {
       const deleted = await Book.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    async findOwnerId(id) {
+      const book = await Book.findByPk(id, { attributes: ['userId'] });
+      return book?.userId ?? null;
     },
   };
 }
