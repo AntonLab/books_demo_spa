@@ -87,3 +87,26 @@ test('resetConfirmSchema requires a token and a password of full strength', () =
     false
   );
 });
+
+test('registration defaults the role to user', () => {
+  assert.equal(registerSchema.parse(validRegistration).role, 'user');
+});
+
+test('registration accepts author — the "I am author" checkbox', () => {
+  const parsed = registerSchema.parse({ ...validRegistration, role: 'author' });
+
+  assert.equal(parsed.role, 'author');
+});
+
+test('registration refuses admin and superadmin outright', () => {
+  // Unreachable by construction rather than by a check downstream.
+  assert.equal(
+    registerSchema.safeParse({ ...validRegistration, role: 'admin' }).success,
+    false
+  );
+  assert.equal(
+    registerSchema.safeParse({ ...validRegistration, role: 'superadmin' })
+      .success,
+    false
+  );
+});
