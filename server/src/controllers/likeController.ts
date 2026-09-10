@@ -5,7 +5,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { NotFoundError, UnauthorizedError } from '../types/errors.ts';
 import type {
   CreateLikeInput,
   ListLikesQuery,
@@ -27,7 +27,14 @@ export function createLikeController(
 ): LikeController {
   return {
     create: async (req, res) => {
-      const like = await repository.create(validatedBody<CreateLikeInput>(req));
+      // requireAuth guarantees req.user here; the type is optional because
+      // most requests legitimately have none, so narrow rather than assert.
+      if (!req.user) throw new UnauthorizedError();
+
+      const like = await repository.create(
+        validatedBody<CreateLikeInput>(req),
+        req.user.id
+      );
       res.status(201).json(like);
     },
 
