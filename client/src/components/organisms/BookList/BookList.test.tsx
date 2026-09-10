@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { BookList } from './BookList';
+import { renderWithProviders } from '@/test/renderWithProviders';
 import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
@@ -15,7 +16,7 @@ const book: PublicBook = {
 
 describe('BookList', () => {
   it('shows a loading state while the request is in flight', () => {
-    render(
+    renderWithProviders(
       <BookList items={[]} isPending={true} isError={false} error={null} />
     );
 
@@ -23,7 +24,7 @@ describe('BookList', () => {
   });
 
   it('shows the error message when loading failed', () => {
-    render(
+    renderWithProviders(
       <BookList
         items={[]}
         isPending={false}
@@ -36,7 +37,7 @@ describe('BookList', () => {
   });
 
   it('falls back to a generic message when the error carries none', () => {
-    render(
+    renderWithProviders(
       <BookList items={[]} isPending={false} isError={true} error={null} />
     );
 
@@ -44,7 +45,7 @@ describe('BookList', () => {
   });
 
   it('shows the default empty message when there are no books', () => {
-    render(
+    renderWithProviders(
       <BookList items={[]} isPending={false} isError={false} error={null} />
     );
 
@@ -52,7 +53,7 @@ describe('BookList', () => {
   });
 
   it('shows a caller-supplied empty message', () => {
-    render(
+    renderWithProviders(
       <BookList
         items={[]}
         isPending={false}
@@ -66,7 +67,7 @@ describe('BookList', () => {
   });
 
   it('renders a card per book, with its description and tags', () => {
-    render(
+    renderWithProviders(
       <BookList items={[book]} isPending={false} isError={false} error={null} />
     );
 
@@ -78,7 +79,7 @@ describe('BookList', () => {
   });
 
   it('does not claim an author it was not given', () => {
-    render(
+    renderWithProviders(
       <BookList items={[book]} isPending={false} isError={false} error={null} />
     );
 

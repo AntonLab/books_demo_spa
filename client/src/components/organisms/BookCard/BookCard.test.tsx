@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { BookCard } from './BookCard';
+import { renderWithProviders } from '@/test/renderWithProviders';
 import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
@@ -14,8 +15,16 @@ const book: PublicBook = {
 };
 
 describe('BookCard', () => {
+  it('links the title to the book page', () => {
+    renderWithProviders(<BookCard book={book} />);
+
+    expect(
+      screen.getByRole('link', { name: 'A Tale of Dragons' })
+    ).toHaveAttribute('href', '/books/1');
+  });
+
   it('renders the description and every tag', () => {
-    render(<BookCard book={book} />);
+    renderWithProviders(<BookCard book={book} />);
 
     expect(screen.getByText(book.description)).toBeInTheDocument();
     expect(screen.getByText('epic')).toBeInTheDocument();
@@ -23,14 +32,14 @@ describe('BookCard', () => {
   });
 
   it('renders no tags when the book has none', () => {
-    render(<BookCard book={{ ...book, tags: [] }} />);
+    renderWithProviders(<BookCard book={{ ...book, tags: [] }} />);
 
     expect(screen.getByText(book.description)).toBeInTheDocument();
     expect(screen.queryByText('epic')).not.toBeInTheDocument();
   });
 
   it('formats createdAt as a local date, not the raw ISO string', () => {
-    render(<BookCard book={book} />);
+    renderWithProviders(<BookCard book={book} />);
 
     // The exact string is locale-dependent, so assert on what must be true:
     // the ISO timestamp is gone, and a rendered date took its place.
