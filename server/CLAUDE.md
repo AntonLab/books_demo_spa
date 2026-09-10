@@ -42,9 +42,9 @@ apart from the other five, both covered under **Auth**: the author comes from
 the session rather than the body, and `PATCH`/`DELETE` check ownership. Its
 list endpoint returns a flat page — each row carrying `parentId`, an embedded
 `author`, a `likeCount` and the caller's `viewerLikeId` — and leaves tree
-assembly to the client, which keeps paging meaningful. Deleting a comment takes
-its whole reply subtree with it; see **Sequelize & MySQL conventions** for why
-that cascade is not a foreign key.
+assembly to the client, which keeps paging meaningful. Deletion is soft: the
+row survives with `isDeleted` set so its replies keep a parent, and its text
+and author are withheld on the way out. See **Auth**.
 
 ## Development Commands
 
@@ -197,6 +197,24 @@ value.
     it is safe where the uniqueness check would not be: a row's owner never
     changes, so the answer cannot go stale before the insert. Uniqueness stays
     with the indexes for exactly that reason.
+- **Deleting a comment is a soft delete.** `DELETE /api/comments/:id` sets
+  `isDeleted` on that one row and touches nothing else; the replies stay, so
+  the thread reads around the gap rather than losing everything under a
+  withdrawn remark. Consequences worth knowing:
+  - **The text stays on the row and is withheld by the serialiser.**
+    `toPublicComment` returns `text: ''` when the flag is set and
+    `toCommentWithAuthor` returns `author: null`, which is what makes
+    `CommentWithAuthor.author` nullable. Blanking in one place rather than at
+    each call site is what stops a future endpoint serving the text by
+    omission.
+  - **A deleted comment is immutable**: `PATCH` on one is 403, since editing a
+    tombstone would put text back under a heading saying the author withdrew
+    it.
+  - **A second `DELETE` is a 404.** `remove` scopes its update to rows not
+    already marked, so it reports false the second time.
+  - **A thread cannot be removed wholesale.** Each reply belongs to its own
+    author and only they may delete it. That is the deliberate cost of keeping
+    replies alive.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
@@ -426,10 +444,11 @@ snippets — still get wrong. Verified against the 5.x router and request source
   then fails on the missing column. Drop it
   (`DROP DATABASE books_demo_spa`) and let `ensureDatabase` rebuild it on the
   next boot. The `title` columns on `books` and `series` landed this way.
-- **The comment reply cascade lives in the repository, not the foreign key.**
-  `comments.parentId` is `ON DELETE SET NULL`, and `commentRepository.remove`
-  walks the subtree and deletes it in one statement inside a transaction.
-  `ON DELETE CASCADE` on a self-reference fails with `ER_FK_DEPTH_EXCEEDED`
-  (errno 3008) past 15 levels — and takes the owning book's delete down with
-  it, because deleting a book cascades into comments and then recurses through
-  the replies. The measurement is recorded in `models/index.ts`.
+- **Deleting a comment does not delete anything.** `commentRepository.remove`
+  sets `isDeleted` and stops there — see **Comments** under Auth. The reply
+  cascade that used to live here is gone with it.
+  `comments.parentId` stays `ON DELETE SET NULL` regardless, because deleting a
+  _book_ still hard-cascades into its comments: `ON DELETE CASCADE` on the
+  self-reference fails with `ER_FK_DEPTH_EXCEEDED` (errno 3008) past 15 levels
+  and takes the book's delete down with it. The measurement is recorded in
+  `models/index.ts`, and `commentRepository.spec.ts` covers a 20-deep thread.

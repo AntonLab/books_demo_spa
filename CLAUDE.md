@@ -89,7 +89,9 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   like button can render its state without a 401 for anonymous visitors.
   Ownership is checked on **comments and likes only**: only a comment's author
   may edit or delete it, and nobody may like their own book or comment (403
-  either way). On books, series and chapters it is still deliberately unchecked
+  either way). Deleting a comment is a **soft delete** — `isDeleted` is set on
+  that row alone, its replies stay, and its text and author are withheld in
+  every response. On books, series and chapters it is still deliberately unchecked
   — a signed-in user may write another user's rows, which stays out of scope by
   design. Identity for a comment or a like comes from the session, never from
   the request body; without that the ownership rules would be trivially

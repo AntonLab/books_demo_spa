@@ -68,7 +68,10 @@ export interface PublicComment {
   parentId: number | null;
   userId: number;
   bookId: number;
+  // Empty string once `isDeleted` is set — the row keeps the original, the
+  // serialiser withholds it. See toPublicComment in models/Comment.ts.
   text: string;
+  isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -78,7 +81,10 @@ export interface PublicComment {
 // guarded. The like fields ride along for the reason the book detail carries
 // them — the alternative is one request per comment on screen.
 export interface CommentWithAuthor extends PublicComment {
-  author: AuthorSummary;
+  // null on a deleted comment, which is what makes the tombstone anonymous.
+  // Non-null everywhere else: userId is NOT NULL, so there is always an author
+  // to name.
+  author: AuthorSummary | null;
   likeCount: number;
   viewerLikeId: number | null;
 }

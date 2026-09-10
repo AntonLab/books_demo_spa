@@ -13,6 +13,7 @@ import {
 import type {
   CreateCommentInput,
   ListCommentsQuery,
+  PublicComment,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -45,12 +46,18 @@ export function createCommentController(
   //
   // 404 before 403 deliberately: reporting "forbidden" for a comment that does
   // not exist would leak which ids are real.
-  const assertOwned = async (id: number, userId: number): Promise<void> => {
+  // Returns the row it looked up, so a caller that also needs to inspect it —
+  // `update`, checking isDeleted — does not pay for a second query.
+  const assertOwned = async (
+    id: number,
+    userId: number
+  ): Promise<PublicComment> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
     if (existing.userId !== userId) {
       throw new ForbiddenError('You may only change your own comments');
     }
+    return existing;
   };
 
   return {
@@ -82,7 +89,13 @@ export function createCommentController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(id, actorId(req));
+      const existing = await assertOwned(id, actorId(req));
+
+      // A deleted comment is a tombstone, not a draft: editing one would put
+      // text back under a heading that says the author withdrew it.
+      if (existing.isDeleted) {
+        throw new ForbiddenError('A deleted comment cannot be edited');
+      }
 
       const comment = await repository.update(
         id,

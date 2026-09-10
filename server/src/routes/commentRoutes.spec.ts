@@ -41,6 +41,7 @@ function createFakeRepository(): CommentRepository {
     userId: OTHER_USER_ID,
     bookId: KNOWN_BOOK_ID,
     text: 'Not yours',
+    isDeleted: false,
     createdAt: now,
     updatedAt: now,
   });
@@ -60,6 +61,7 @@ function createFakeRepository(): CommentRepository {
         userId: actorId,
         bookId: input.bookId,
         text: input.text,
+        isDeleted: false,
         createdAt: created,
         updatedAt: created,
       };
@@ -81,7 +83,8 @@ function createFakeRepository(): CommentRepository {
           .slice(query.offset, query.offset + query.limit)
           .map((row): CommentWithAuthor => ({
             ...row,
-            author: AUTHOR,
+            // Mirrors the real serialiser: a tombstone is anonymous.
+            author: row.isDeleted ? null : AUTHOR,
             likeCount: 0,
             // Mirrors the real repository: only a signed-in caller can have a
             // like of their own to report.
@@ -108,8 +111,14 @@ function createFakeRepository(): CommentRepository {
       return updated;
     },
 
+    // A soft delete, like the real repository: the row stays, scoped to those
+    // not already marked, so a second call reports false.
     async remove(id) {
-      return rows.delete(id);
+      const current = rows.get(id);
+      if (!current || current.isDeleted) return false;
+
+      rows.set(id, { ...current, isDeleted: true, text: '' });
+      return true;
     },
   };
 }
@@ -236,7 +245,7 @@ test('GET list stays public and reports no viewer like for an anonymous reader',
       const body = await json<{ items: CommentWithAuthor[]; total: number }>(
         response
       );
-      assert.equal(body.items[0]?.author.login, TEST_USER.login);
+      assert.equal(body.items[0]?.author?.login, TEST_USER.login);
       assert.equal(body.items[0]?.viewerLikeId, null);
     }
   );
@@ -314,6 +323,40 @@ test('DELETE removes your own comment', async () => {
 
       assert.equal((await remove(base, created.id)).status, 204);
       assert.equal((await remove(base, created.id)).status, 404);
+    }
+  );
+});
+
+test('DELETE leaves the comment in the list as a tombstone', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      await remove(base, created.id);
+
+      const body = await json<{ items: CommentWithAuthor[] }>(
+        await fetch(`${base}/api/comments?bookId=${KNOWN_BOOK_ID}`)
+      );
+
+      // Still there, so any replies keep a parent to hang off.
+      const tombstone = body.items.find((item) => item.id === created.id);
+      assert.notEqual(tombstone, undefined);
+      assert.equal(tombstone?.isDeleted, true);
+      assert.equal(tombstone?.text, '');
+      assert.equal(tombstone?.author, null);
+    }
+  );
+});
+
+test('PATCH refuses a deleted comment with 403', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      await remove(base, created.id);
+
+      const response = await patch(base, created.id, { text: 'Back again' });
+      assert.equal(response.status, 403);
     }
   );
 });

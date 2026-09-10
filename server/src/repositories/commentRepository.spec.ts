@@ -130,40 +130,74 @@ describe('commentRepository against real MySQL', { skip }, () => {
     );
   });
 
-  test('remove deletes the whole reply subtree', async () => {
+  test('remove marks the comment rather than deleting the row', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'goodbye' },
+      readerId
+    );
+
+    assert.equal(await repository.remove(comment.id), true);
+
+    const reloaded = await repository.findById(comment.id);
+    assert.notEqual(reloaded, null);
+    assert.equal(reloaded?.isDeleted, true);
+    // The row keeps its author: the foreign key and the ownership check both
+    // hang off it.
+    assert.equal(reloaded?.userId, readerId);
+  });
+
+  test('remove keeps the replies, so the thread stays readable', async () => {
     const root = await repository.create(
       { bookId, parentId: null, text: 'root' },
       readerId
     );
     const child = await repository.create(
       { bookId, parentId: root.id, text: 'child' },
-      readerId
-    );
-    const grandchild = await repository.create(
-      { bookId, parentId: child.id, text: 'grandchild' },
-      readerId
+      ownerId
     );
 
-    assert.equal(await repository.remove(root.id), true);
+    await repository.remove(root.id);
 
-    assert.equal(await repository.findById(root.id), null);
-    assert.equal(await repository.findById(child.id), null);
-    assert.equal(await repository.findById(grandchild.id), null);
+    const reloaded = await repository.findById(child.id);
+    assert.notEqual(reloaded, null);
+    assert.equal(reloaded?.isDeleted, false);
+    assert.equal(reloaded?.parentId, root.id);
   });
 
-  test('remove leaves an unrelated thread alone', async () => {
-    const doomed = await repository.create(
-      { bookId, parentId: null, text: 'doomed' },
-      readerId
-    );
-    const survivor = await repository.create(
-      { bookId, parentId: null, text: 'survivor' },
+  test('remove reports false on a comment already deleted', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'goodbye' },
       readerId
     );
 
-    await repository.remove(doomed.id);
+    assert.equal(await repository.remove(comment.id), true);
+    // What makes a second DELETE a 404 rather than a silent 204.
+    assert.equal(await repository.remove(comment.id), false);
+  });
 
-    assert.notEqual(await repository.findById(survivor.id), null);
+  test('remove reports false on a comment that is not there', async () => {
+    assert.equal(await repository.remove(999_999), false);
+  });
+
+  test('the text survives in the database but not in the list', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'secret' },
+      readerId
+    );
+    await repository.remove(comment.id);
+
+    // Still on the row — the flag is the only thing remove() changes.
+    const row = await Comment.findByPk(comment.id);
+    assert.equal(row?.text, 'secret');
+
+    // Blanked on the way out, in one place: the serialiser.
+    const { items } = await repository.list(
+      { limit: 20, offset: 0, bookId },
+      null
+    );
+    assert.equal(items[0]?.text, '');
+    assert.equal(items[0]?.author, null);
+    assert.equal(items[0]?.isDeleted, true);
   });
 
   test('deleting a book with a nested thread still works', async () => {
@@ -196,8 +230,8 @@ describe('commentRepository against real MySQL', { skip }, () => {
     );
 
     assert.equal(total, 1);
-    assert.equal(items[0]?.author.id, readerId);
-    assert.equal(items[0]?.author.login, reader.login);
+    assert.equal(items[0]?.author?.id, readerId);
+    assert.equal(items[0]?.author?.login, reader.login);
     // The email is the whole reason /api/users is guarded; an embedded author
     // must not carry one.
     assert.equal('email' in (items[0]?.author ?? {}), false);
