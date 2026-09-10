@@ -20,9 +20,11 @@ function exactlyOneTarget(value: {
   return (value.bookId === null) !== (value.commentId === null);
 }
 
+// No userId. The liker comes from req.user.id, never from the body —
+// otherwise the self-like ban is defeated by naming someone else, and the
+// unique indexes would be enforcing "one like per *claimed* user".
 export const createLikeSchema = z
   .object({
-    userId: idSchema,
     bookId: targetIdSchema,
     commentId: targetIdSchema,
     // Required rather than defaulted to true: a like and a dislike are the

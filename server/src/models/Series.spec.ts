@@ -88,6 +88,7 @@ test('toPublicSeries copies the tag array rather than aliasing the model', () =>
   const series = Series.build({
     id: 1,
     userId: 2,
+    title: 'Test Series',
     description: 'A trilogy',
     tags: ['sci-fi'],
   });
@@ -102,6 +103,7 @@ test('toPublicSeries parses a JSON string, should a driver return one raw', () =
   const series = Series.build({
     id: 1,
     userId: 2,
+    title: 'Test Series',
     description: 'A trilogy',
     tags: ['sci-fi'],
   });

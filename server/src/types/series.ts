@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const SERIES_TAG_MAX_LENGTH = 32;
 export const SERIES_MAX_TAGS = 20;
 export const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
+export const SERIES_TITLE_MAX_LENGTH = 255;
 
 // Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
 // anyway — collapsing them here keeps what lands in the JSON column canonical.
@@ -13,9 +14,15 @@ const tagListSchema = z
 
 const userIdSchema = z.coerce.number().int().positive();
 const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
+// Trimmed, unlike descriptionSchema and for the reason recorded in
+// types/chapter.ts: a title is echoed in every summary list, where stray
+// whitespace is pure noise. Trimming runs before the length checks, so a
+// whitespace-only title fails min(1) rather than landing as an empty string.
+const titleSchema = z.string().trim().min(1).max(SERIES_TITLE_MAX_LENGTH);
 
 export const createSeriesSchema = z.object({
   userId: userIdSchema,
+  title: titleSchema,
   description: descriptionSchema,
   // Defaulted here rather than in the column: MySQL forbids a literal DEFAULT
   // on a JSON column, so the empty array has to come from the application.
@@ -30,6 +37,7 @@ export const createSeriesSchema = z.object({
 // and wipe the stored tags.
 export const updateSeriesSchema = z
   .object({
+    title: titleSchema,
     description: descriptionSchema,
     tags: tagListSchema,
   })
@@ -59,6 +67,7 @@ export type ListSeriesQuery = z.infer<typeof listSeriesQuerySchema>;
 export interface PublicSeries {
   id: number;
   userId: number;
+  title: string;
   description: string;
   tags: string[];
   createdAt: Date;

@@ -12,6 +12,7 @@ import type { Book } from './Book.ts';
 import type { Series } from './Series.ts';
 import {
   USER_STATUSES,
+  type AuthorSummary,
   type PublicUser,
   type UserStatus,
 } from '../types/user.ts';
@@ -106,5 +107,17 @@ export function toPublicUser(user: User): PublicUser {
     status: user.status,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+  };
+}
+
+// The shape public endpoints embed when they name an author. Deliberately not
+// derived from toPublicUser with a delete: an author summary that grew a field
+// because PublicUser did is exactly the leak this exists to prevent.
+export function toAuthorSummary(user: User): AuthorSummary {
+  return {
+    id: user.id,
+    login: user.login,
+    firstName: user.firstName,
+    lastName: user.lastName,
   };
 }

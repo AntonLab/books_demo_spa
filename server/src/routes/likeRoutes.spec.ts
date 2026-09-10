@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ConflictError, NotFoundError } from '../types/errors.ts';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../types/errors.ts';
 import type {
   LikeListResult,
   LikeRepository,
@@ -16,18 +20,31 @@ import {
 const KNOWN_USER_ID = 1;
 const KNOWN_BOOK_ID = 1;
 const KNOWN_COMMENT_ID = 1;
+// Rows the acting user owns. Liking either is refused, so the ids exist only
+// to be rejected.
+const OWN_BOOK_ID = 77;
+const OWN_COMMENT_ID = 88;
 
 function createFakeRepository(): LikeRepository {
   const rows = new Map<number, PublicLike>();
   let nextId = 1;
 
   return {
-    async create(input) {
+    async create(input, actorId) {
+      // Stands in for the real repository's ownership lookup: these two rows
+      // belong to the acting user, so liking them is refused.
+      if (input.bookId === OWN_BOOK_ID) {
+        throw new ForbiddenError('You cannot like your own book');
+      }
+      if (input.commentId === OWN_COMMENT_ID) {
+        throw new ForbiddenError('You cannot like your own comment');
+      }
+
       // Stands in for the three foreign keys: the real repository maps MySQL's
       // rejection to these same NotFoundErrors, reading the constraint text to
       // tell them apart.
-      if (input.userId !== KNOWN_USER_ID) {
-        throw new NotFoundError('User', input.userId);
+      if (actorId !== KNOWN_USER_ID) {
+        throw new NotFoundError('User', actorId);
       }
       if (input.bookId !== null && input.bookId !== KNOWN_BOOK_ID) {
         throw new NotFoundError('Book', input.bookId);
@@ -39,7 +56,7 @@ function createFakeRepository(): LikeRepository {
       // (userId, commentId).
       const taken = [...rows.values()].some(
         (row) =>
-          row.userId === input.userId &&
+          row.userId === actorId &&
           row.bookId === input.bookId &&
           row.commentId === input.commentId
       );
@@ -47,7 +64,7 @@ function createFakeRepository(): LikeRepository {
 
       const like: PublicLike = {
         id: nextId,
-        userId: input.userId,
+        userId: actorId,
         bookId: input.bookId,
         commentId: input.commentId,
         isLike: input.isLike,
@@ -94,7 +111,6 @@ function createFakeRepository(): LikeRepository {
 }
 
 const onBook = {
-  userId: KNOWN_USER_ID,
   bookId: KNOWN_BOOK_ID,
   isLike: true,
 };
@@ -158,7 +174,6 @@ test('POST creates a dislike on a comment and leaves bookId null', async () => {
     { likeRepository: createFakeRepository() },
     async (base) => {
       const response = await post(base, {
-        userId: KNOWN_USER_ID,
         commentId: KNOWN_COMMENT_ID,
         isLike: false,
       });
@@ -168,6 +183,48 @@ test('POST creates a dislike on a comment and leaves bookId null', async () => {
       assert.equal(body.bookId, null);
       assert.equal(body.commentId, KNOWN_COMMENT_ID);
       assert.equal(body.isLike, false);
+    }
+  );
+});
+
+test('POST takes the liker from the session and ignores a body userId', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, { ...onBook, userId: 999 });
+
+      assert.equal(response.status, 201);
+      // Without this, the self-like ban below is defeated by naming someone
+      // else in the body.
+      assert.equal((await json<PublicLike>(response)).userId, KNOWN_USER_ID);
+    }
+  );
+});
+
+test('POST refuses a like on your own book with 403', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, {
+        bookId: OWN_BOOK_ID,
+        isLike: true,
+      });
+
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('POST refuses a like on your own comment with 403', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, {
+        commentId: OWN_COMMENT_ID,
+        isLike: true,
+      });
+
+      assert.equal(response.status, 403);
     }
   );
 });
@@ -195,7 +252,6 @@ test('POST naming neither a book nor a comment is a 400', async () => {
     { likeRepository: createFakeRepository() },
     async (base) => {
       const response = await post(base, {
-        userId: KNOWN_USER_ID,
         isLike: true,
       });
 
@@ -209,7 +265,6 @@ test('POST without isLike is a 400 — a like and a dislike differ', async () =>
     { likeRepository: createFakeRepository() },
     async (base) => {
       const response = await post(base, {
-        userId: KNOWN_USER_ID,
         bookId: KNOWN_BOOK_ID,
       });
 
@@ -251,7 +306,6 @@ test('POST against an unknown comment names the comment, not the user', async ()
     { likeRepository: createFakeRepository() },
     async (base) => {
       const response = await post(base, {
-        userId: KNOWN_USER_ID,
         commentId: 999,
         isLike: true,
       });
@@ -293,7 +347,6 @@ test('GET ?isLike=false returns dislikes, not everything', async () => {
     async (base) => {
       await post(base, onBook);
       await post(base, {
-        userId: KNOWN_USER_ID,
         commentId: KNOWN_COMMENT_ID,
         isLike: false,
       });
@@ -313,7 +366,6 @@ test('GET ?bookId= filters to one target', async () => {
     async (base) => {
       await post(base, onBook);
       await post(base, {
-        userId: KNOWN_USER_ID,
         commentId: KNOWN_COMMENT_ID,
         isLike: true,
       });

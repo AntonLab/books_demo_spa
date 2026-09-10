@@ -14,3 +14,13 @@ export interface PublicUser {
   createdAt: string;
   updatedAt: string;
 }
+
+// The email-free author shape the public endpoints embed. The omission is what
+// makes it safe to return without a session — the email is the whole reason
+// /api/users is guarded, so the client can never look an author up itself.
+export interface AuthorSummary {
+  id: number;
+  login: string;
+  firstName: string;
+  lastName: string;
+}

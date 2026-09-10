@@ -45,3 +45,14 @@ export interface PublicUser {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// PublicUser minus the email address. That single omission is what makes an
+// author safe to embed in a public response: the email is the whole reason
+// /api/users is guarded, so a shape without one carries nothing that guard
+// exists to protect.
+export interface AuthorSummary {
+  id: number;
+  login: string;
+  firstName: string;
+  lastName: string;
+}

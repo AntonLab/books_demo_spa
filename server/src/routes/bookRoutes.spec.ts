@@ -5,7 +5,8 @@ import type {
   BookListResult,
   BookRepository,
 } from '../repositories/bookRepository.ts';
-import type { PublicBook } from '../types/book.ts';
+import type { BookDetail, PublicBook } from '../types/book.ts';
+import type { AuthorSummary } from '../types/user.ts';
 import {
   AUTH_COOKIE,
   json,
@@ -15,6 +16,17 @@ import {
 
 const KNOWN_USER_ID = 1;
 const KNOWN_SERIES_ID = 7;
+const VIEWER_LIKE_ID = 99;
+
+// Deliberately spelled out rather than derived from a PublicUser: the point of
+// the assertion below is that no email reaches the response, and a fixture
+// built by deleting a key would not prove that.
+const AUTHOR: AuthorSummary = {
+  id: KNOWN_USER_ID,
+  login: 'Author',
+  firstName: 'Ann',
+  lastName: 'Author',
+};
 
 function createFakeRepository(): BookRepository {
   const rows = new Map<number, PublicBook>();
@@ -36,6 +48,7 @@ function createFakeRepository(): BookRepository {
         id: nextId,
         userId: input.userId,
         seriesId: input.seriesId,
+        title: input.title,
         description: input.description,
         tags: input.tags,
         createdAt: now,
@@ -62,6 +75,21 @@ function createFakeRepository(): BookRepository {
 
     async findById(id) {
       return rows.get(id) ?? null;
+    },
+
+    async findDetailById(id, viewerId) {
+      const book = rows.get(id);
+      if (!book) return null;
+
+      return {
+        ...book,
+        author: AUTHOR,
+        series: { id: KNOWN_SERIES_ID, title: 'The Cycle' },
+        likeCount: 4,
+        // Stands in for the real repository's viewer lookup: only a signed-in
+        // caller can have a like of their own to report.
+        viewerLikeId: viewerId === null ? null : VIEWER_LIKE_ID,
+      };
     },
 
     async update(id, input) {
@@ -98,6 +126,7 @@ function createFakeRepository(): BookRepository {
 const valid = {
   userId: KNOWN_USER_ID,
   seriesId: KNOWN_SERIES_ID,
+  title: 'The First Book',
   description: 'The first book in the trilogy',
   tags: ['sci-fi', 'epic'],
 };
@@ -152,6 +181,7 @@ test('POST defaults seriesId to null when omitted — a book need not be in a se
     async (base) => {
       const response = await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'Standalone',
         description: 'Standalone',
       });
 
@@ -167,6 +197,7 @@ test('POST defaults tags to an empty array when omitted', async () => {
     async (base) => {
       const response = await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'No Tags Yet',
         description: 'No tags yet',
       });
 
@@ -279,6 +310,7 @@ test('GET list filters by tag, owner and series', async () => {
       await post(base, valid);
       await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'Standalone',
         description: 'Standalone',
         tags: ['drama'],
       });
@@ -301,6 +333,44 @@ test('GET list filters by tag, owner and series', async () => {
       // The standalone book has no series, so only one of the two matches.
       assert.equal(bySeries.total, 1);
       assert.equal(byOther.total, 0);
+    }
+  );
+});
+
+test('GET by id embeds the author and series, and never the email', async () => {
+  // Seeded through the authenticated harness because POST is guarded, then read
+  // back with no cookie at all: that is what proves the detail read stays
+  // public and that an anonymous visitor gets an empty viewerLikeId.
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const response = await fetch(`${base}/api/books/1`);
+      assert.equal(response.status, 200);
+
+      const body = await json<BookDetail>(response);
+      assert.equal(body.author.login, 'Author');
+      assert.equal('email' in body.author, false);
+      assert.equal(body.series?.title, 'The Cycle');
+      assert.equal(body.likeCount, 4);
+      assert.equal(body.viewerLikeId, null);
+    }
+  );
+});
+
+test('GET by id reports the viewer own like when signed in', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const response = await fetch(`${base}/api/books/1`, {
+        headers: { cookie: AUTH_COOKIE },
+      });
+
+      const body = await json<BookDetail>(response);
+      assert.equal(body.viewerLikeId, VIEWER_LIKE_ID);
     }
   );
 });

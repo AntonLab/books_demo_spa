@@ -83,6 +83,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     bookId = (
       await Book.create({
         userId: ownerId,
+        title: 'Test Book',
         description: 'A novel',
         tags: [],
       })
@@ -143,6 +144,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('the list filters by bookId and reports the unpaged total', async () => {
     const otherBook = await Book.create({
       userId: (await User.findOne())!.id,
+      title: 'Test Book',
       description: 'Another novel',
       tags: [],
     });

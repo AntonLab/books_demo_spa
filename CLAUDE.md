@@ -56,11 +56,14 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   for why the script is not plain `jest`). See `client/CLAUDE.md`.
 - `client` now has a working UI on top of that toolchain: a `MainPage`
   listing books, a header with nav, search and auth state, four auth modals
-  against `/api/auth` (login, register, forgot/reset password), and a
-  `/search` page — built on antd 6, react-router, TanStack Query and Redux
+  against `/api/auth` (login, register, forgot/reset password), a `/search`
+  page, a `/books/:id` book page (title, author, series, annotation, chapters,
+  comments) and a `/books/:bookId/chapters/:chapterId` reader — built on antd
+  6, react-router, TanStack Query and Redux
   Toolkit. The split between the last two is deliberate: **TanStack Query
   owns everything fetched** (the session, the book list, each search term,
-  and the five auth mutations, all in `src/queries/`), while **Redux holds
+  each book's detail, its chapters, its comment thread, and the auth, comment
+  and like mutations, all in `src/queries/`), while **Redux holds
   UI state only** — `authSlice` is down to `activeModal` and `resetToken`.
   See `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
@@ -71,18 +74,27 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   write on them now requires a session (see the auth bullet below). A like
   points at exactly one of a book or a comment; that XOR is enforced in zod
   and in a model validator, never by the database (see `server/CLAUDE.md`).
-  `Comment` (owned by a user and a book, with self-referential replies) is so
-  far a model only, with no CRUD API. `npm run build`
-  (`tsc -p tsconfig.build.json`) emits to `dist/`.
+  `Comment` (owned by a user and a book, with self-referential replies) now has
+  a full CRUD API too, at `/api/comments`. Books and series carry a `title`
+  column alongside their description, and `GET /api/books/:id` returns a
+  `BookDetail` embedding the author, the series name and the like state.
+  `npm run build` (`tsc -p tsconfig.build.json`) emits to `dist/`.
 - `server` has session-based auth at `/api/auth` — register, login, logout,
   me, and a two-step password reset — backed by `Session` and
   `PasswordResetToken` models and an opaque token in an httpOnly `sid` cookie.
-  A `requireAuth` middleware guards every `POST`/`PATCH`/`DELETE` on the five
+  A `requireAuth` middleware guards every `POST`/`PATCH`/`DELETE` on the six
   resources above, plus both reads on `/api/users`; all other `GET`s stay
-  public. Ownership is deliberately not checked — a signed-in user may write
-  another user's rows, which is out of scope by design. See `server/CLAUDE.md`
-  for the cookie flags, the SHA-256-not-argon2 choice for tokens, and the
-  login timing defence.
+  public. An `optionalAuth` middleware sits on the two public reads that need
+  to know who is asking — `GET /api/books/:id` and `GET /api/comments` — so a
+  like button can render its state without a 401 for anonymous visitors.
+  Ownership is checked on **comments and likes only**: only a comment's author
+  may edit or delete it, and nobody may like their own book or comment (403
+  either way). On books, series and chapters it is still deliberately unchecked
+  — a signed-in user may write another user's rows, which stays out of scope by
+  design. Identity for a comment or a like comes from the session, never from
+  the request body; without that the ownership rules would be trivially
+  defeated. See `server/CLAUDE.md` for the cookie flags, the
+  SHA-256-not-argon2 choice for tokens, and the login timing defence.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 
