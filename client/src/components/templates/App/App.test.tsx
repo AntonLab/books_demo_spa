@@ -3,13 +3,21 @@ import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
+import * as chaptersApi from '@/api/chapters';
+import * as commentsApi from '@/api/comments';
 import { ApiError } from '@/api/client';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
+jest.mock('@/api/chapters');
+jest.mock('@/api/comments');
 
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
+const mockedChapters = jest.mocked(chaptersApi);
+const mockedComments = jest.mocked(commentsApi);
+
+const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -23,6 +31,22 @@ beforeEach(() => {
     limit: 20,
     offset: 0,
   });
+  mockedBooks.getBook.mockResolvedValue({
+    id: 1,
+    userId: 3,
+    seriesId: null,
+    title: 'A Tale of Dragons',
+    description: 'Long ago, in a kingdom of scales.',
+    tags: [],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    author: { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
+    series: null,
+    likeCount: 0,
+    viewerLikeId: null,
+  });
+  mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);
+  mockedComments.listComments.mockResolvedValue(emptyEnvelope);
 });
 
 describe('AppShell routing', () => {
@@ -31,6 +55,14 @@ describe('AppShell routing', () => {
 
     expect(
       await screen.findByRole('heading', { name: /books/i })
+    ).toBeInTheDocument();
+  });
+
+  it('renders BookPage at /books/:id', async () => {
+    renderWithProviders(<AppShell />, { route: '/books/1' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
   });
 

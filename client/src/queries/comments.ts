@@ -24,7 +24,10 @@ const useCommentMutation = <TVariables>(
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn,
+    // Wrapped rather than passed straight through: TanStack calls a mutationFn
+    // with a second context argument, and forwarding that into an API function
+    // would hand it a stray parameter it never asked for.
+    mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: queryKeys.comments(bookId) }),
   });
