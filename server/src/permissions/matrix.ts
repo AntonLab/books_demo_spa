@@ -34,7 +34,9 @@ const USER_GRANTS: RoleGrants = {
   // directory, and may edit only their own row.
   users: { read: 'any', update: 'own', delete: 'own' },
   comments: { read: 'any', create: 'own', update: 'own', delete: 'own' },
-  likes: { read: 'any', create: 'own', delete: 'own' },
+  // update is what turns a like into a dislike; without it likeRoutes' PATCH
+  // would be reachable by superadmin alone.
+  likes: { read: 'any', create: 'own', update: 'own', delete: 'own' },
 };
 
 const AUTHOR_GRANTS: RoleGrants = {
