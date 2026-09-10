@@ -96,7 +96,13 @@ export function createCommentController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(req, id);
+      const existing = await assertOwned(req, id);
+
+      // A deleted comment is a tombstone, not a draft: editing one would put
+      // text back under a heading that says the author withdrew it.
+      if (existing.isDeleted) {
+        throw new ForbiddenError('A deleted comment cannot be edited');
+      }
 
       const comment = await repository.update(
         id,

@@ -71,32 +71,6 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
 }
 
-// Walks the reply tree breadth-first and returns every id at or below `rootId`.
-//
-// The foreign key stays ON DELETE SET NULL rather than CASCADE, because InnoDB
-// cannot recurse a self-referential cascade past 15 levels without
-// ER_FK_DEPTH_EXCEEDED — and that failure takes the owning book's delete down
-// with it, not just the thread's. Collecting the ids here and issuing one
-// DELETE has no depth limit at all. The measurement behind that choice is
-// recorded in models/index.ts.
-async function collectSubtreeIds(rootId: number): Promise<number[]> {
-  const ids = [rootId];
-  let frontier = [rootId];
-
-  while (frontier.length > 0) {
-    const children = await Comment.findAll({
-      attributes: ['id'],
-      where: { parentId: frontier },
-      raw: true,
-    });
-
-    frontier = children.map((child) => child.id);
-    ids.push(...frontier);
-  }
-
-  return ids;
-}
-
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
     async create(input, actorId) {
@@ -178,22 +152,17 @@ export function createSequelizeCommentRepository(): CommentRepository {
       return toPublicComment(comment);
     },
 
+    // A soft delete: the row survives so its replies keep a parent, and the
+    // thread stays readable around the gap. Only this comment is marked — a
+    // reply is somebody else's writing and is not theirs to remove.
     async remove(id) {
-      const sequelize = Comment.sequelize;
-      if (!sequelize) {
-        throw new Error('Comment model is not initialised');
-      }
-
-      // The walk and the delete share a transaction so a reply posted midway
-      // cannot be orphaned by a delete that has already collected its ids.
-      return sequelize.transaction(async (transaction) => {
-        const ids = await collectSubtreeIds(id);
-        const deleted = await Comment.destroy({
-          where: { id: ids },
-          transaction,
-        });
-        return deleted > 0;
-      });
+      // Scoped to rows not already deleted, so a second call reports false and
+      // the route answers 404 rather than a silent 204.
+      const [affected] = await Comment.update(
+        { isDeleted: true },
+        { where: { id, isDeleted: false } }
+      );
+      return affected > 0;
     },
   };
 }

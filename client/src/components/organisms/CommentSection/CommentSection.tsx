@@ -64,8 +64,16 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
 
   const all = data?.items ?? [];
   // The server returns a flat list; the two-level tree is assembled here.
-  const roots = all.filter((item) => item.parentId === null);
   const repliesOf = (id: number) => all.filter((item) => item.parentId === id);
+
+  // A tombstone earns its place only by holding replies together. One with
+  // nothing under it is pure noise, so it is dropped here rather than on the
+  // server — the tree is assembled in this component, so this is the only place
+  // that already knows whether a comment has children.
+  const visible = all.filter(
+    (item) => !item.isDeleted || repliesOf(item.id).length > 0
+  );
+  const roots = visible.filter((item) => item.parentId === null);
 
   const submit = () => {
     const text = draft.trim();
@@ -135,7 +143,11 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
         <div key={comment.id}>
           {renderComment(comment, true)}
           <div style={{ marginLeft: token.marginXL }}>
-            {repliesOf(comment.id).map((child) => renderComment(child, false))}
+            {/* `visible`, not `repliesOf`: a deleted reply holds nothing
+                together, so it is dropped like any other tombstone leaf. */}
+            {visible
+              .filter((item) => item.parentId === comment.id)
+              .map((child) => renderComment(child, false))}
           </div>
         </div>
       ))}

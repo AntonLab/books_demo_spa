@@ -95,15 +95,18 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   enforced on **books, series, chapters, comments and likes** — five
   resources, not four — with `admin` and `superadmin` bypassing it wherever
   the matrix grants them `any` rather than `own`; chapters resolve ownership
-  through their book, since `chapters` carries no `userId`. Identity for a
-  comment or a like still comes from the session, never the request body;
-  without that the ownership rules would be trivially defeated. Role changes
-  go through their own door, `PATCH /api/users/:id/role`: a row's owner may
-  switch between `user` and `author`, and only `superadmin` may set any other
-  role on any account. See `server/CLAUDE.md` for the full matrix, the
-  cookie flags, the SHA-256-not-argon2 choice for tokens, the login timing
-  defence, and — deliberately left unfixed pending a product decision — what
-  `admin`'s broad grant on `users` does and does not protect.
+  through their book, since `chapters` carries no `userId`. Deleting a
+  comment is a **soft delete** — `isDeleted` is set on that row alone, its
+  replies stay, and its text and author are withheld in every response.
+  Identity for a comment or a like still comes from the session, never the
+  request body; without that the ownership rules would be trivially
+  defeated. Role changes go through their own door,
+  `PATCH /api/users/:id/role`: a row's owner may switch between `user` and
+  `author`, and only `superadmin` may set any other role on any account. See
+  `server/CLAUDE.md` for the full matrix, the cookie flags, the
+  SHA-256-not-argon2 choice for tokens, the login timing defence, and —
+  deliberately left unfixed pending a product decision — what `admin`'s
+  broad grant on `users` does and does not protect.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 

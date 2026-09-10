@@ -31,11 +31,26 @@ export const Comment: FC<CommentProps> = ({
 }) => {
   const { token } = theme.useToken();
 
+  // A tombstone carries no author, no text and no controls — not even for the
+  // person who deleted it. It exists only so its replies keep a parent to hang
+  // off; anything more would put back what deleting was meant to remove.
+  if (comment.isDeleted) {
+    return (
+      <article style={{ marginBottom: token.marginSM }}>
+        <Typography.Text type="secondary" italic>
+          [deleted]
+        </Typography.Text>
+      </article>
+    );
+  }
+
   return (
     <article style={{ marginBottom: token.marginSM }}>
       <Space size={token.marginXS}>
         <Typography.Text strong>
-          {`${comment.author.firstName} ${comment.author.lastName}`}
+          {comment.author
+            ? `${comment.author.firstName} ${comment.author.lastName}`
+            : ''}
         </Typography.Text>
         <Typography.Text type="secondary">
           {new Date(comment.createdAt).toLocaleDateString()}

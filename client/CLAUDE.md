@@ -250,7 +250,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 
     `CommentSection` assembles the two-level tree itself: the server returns a
     flat page and the component groups it, so there is no recursive component
-    and a reply carries no Reply button. Edit, delete and like are rendered
+    and a reply carries no Reply button. It also **drops a deleted comment that
+    holds no replies** — a tombstone earns its place only by keeping a thread
+    together, and this component is the one place that already knows whether a
+    comment has children, so the server is not asked to. A deleted comment that
+    survives renders through the molecule as `[deleted]`, with no author and no
+    controls at all, not even for its own author. Edit, delete and like are rendered
     conditionally to mirror the server's rules — the server refuses each with
     a 403 regardless, so this only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,

@@ -132,9 +132,26 @@ test('toPublicComment carries the body — a comment is its text', () => {
     userId: 2,
     bookId: 3,
     text: 'Loved the ending.',
+    isDeleted: false,
     createdAt: undefined,
     updatedAt: undefined,
   });
+});
+
+test('toPublicComment withholds the body of a deleted comment', () => {
+  const comment = Comment.build({
+    id: 1,
+    parentId: null,
+    userId: 2,
+    bookId: 3,
+    text: 'Loved the ending.',
+    isDeleted: true,
+  });
+
+  // The row still carries the text; only the serialiser withholds it, which is
+  // what keeps every endpoint honest without each one remembering to.
+  assert.equal(comment.text, 'Loved the ending.');
+  assert.equal(toPublicComment(comment).text, '');
 });
 
 test('toPublicComment normalises a missing parentId to null, as books do for seriesId', () => {
