@@ -16,10 +16,10 @@ the first component needs it rather than leaving empty folders around.
 | --------- | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx` |
 | Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                               |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`                                                                                                                                      |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `ErrorBoundary`, `AuthModals` + 4 modals                                                                    |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                             |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `ChapterList`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals                                   |
 | Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                      |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The seven routed pages                                                                                                                           |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The nine routed pages                                                                                                                            |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 18 (11 components, 7 pages) follow this layout, and the `@/` alias is
+All 23 (14 components, 9 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -177,19 +177,27 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   which a route test cannot point at an arbitrary path.
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
-  responses into a typed `ApiError`), plus `auth.ts` and `books.ts`, the
+  responses into a typed `ApiError`), plus `auth.ts`, `books.ts`,
+  `chapters.ts`, `comments.ts` and `likes.ts`, the
   per-resource typed calls built on it. Since the TanStack Query migration
   these are the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`,
   not called directly from components.
+
+  One trap: `request()` takes `body` as an **object** and stringifies it
+  itself, setting `Content-Type` off whether it is `undefined`. Passing a
+  JSON string would double-encode it.
+
 - `src/queries/` — the TanStack Query layer, and the only thing that calls
   `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
   `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
-  auth mutations) and `books.ts` (`useBooks`, `useSearchBooks`,
-  `BOOKS_PAGE_SIZE`). Flat files, like `src/api/` and `src/store/`, and
-  outside the Atomic Design levels for the same reason.
+  auth mutations), `books.ts` (`useBooks`, `useSearchBooks`, `useBook`,
+  `BOOKS_PAGE_SIZE`), `chapters.ts` (`useChapters`, `useChapter`),
+  `comments.ts` (`useComments` plus the three comment mutations) and
+  `likes.ts` (`useToggleLike`). Flat files, like `src/api/` and `src/store/`,
+  and outside the Atomic Design levels for the same reason.
 
-  Three things worth knowing before editing it:
+  Five things worth knowing before editing it:
 
   - **`retry` is off** and `staleTime` is 30s. Every error this API
     surfaces is a 4xx to show at once — a 401 from `/auth/me` is the
@@ -201,10 +209,25 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   - **`useSearchBooks` is disabled on a blank term**, and a disabled query
     reports `isPending: true` with `fetchStatus: 'idle'` indefinitely. That
     is why `SearchPage` returns `<Empty>` before rendering `BookList`.
+  - **A `mutationFn` is wrapped, never passed straight through.** TanStack
+    calls it with a second context argument, which would arrive at an
+    `src/api/` function as a stray parameter it never declared — and shows
+    up in tests as a `toHaveBeenCalledWith` failure naming
+    `{ client, meta, mutationKey }`. `useCommentMutation` wraps for this
+    reason; do the same for any new mutation.
+  - **`useToggleLike` is one hook for both directions**, keyed off the
+    `viewerLikeId` the caller already holds: `null` means "like", a number
+    means "delete that row". It takes the key to invalidate as an argument,
+    because a book like refreshes the book and a comment like refreshes the
+    thread.
 
 - `src/components/` — grouped by Atomic Design level (see above), not by
   feature. Each component becomes its own folder (see Component folders).
-  - `molecules/` — `SearchBar`.
+  - `molecules/` — `SearchBar`; `LikeButton` (takes the viewer's own like id
+    rather than a boolean, so the caller can delete the right row on a second
+    click, and uses a text glyph because `@ant-design/icons` is not a
+    dependency here); `Comment` (presentational — the name is free because
+    antd removed its own `Comment` in v5).
   - `organisms/` — `AppHeader` (nav menu, `SearchBar`, and the three auth
     states — signed out / loading / signed in); `AuthModals` (reads
     `activeModal` from `authSlice` and renders only that one, so only one
@@ -213,10 +236,22 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
     `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
-    `src/queries/books.ts` hook); and
+    `src/queries/books.ts` hook); the presentational `ChapterList`;
+    `CommentSection` (owns the thread query, the three comment mutations, the
+    like toggle, and the "who am I replying to / what am I editing" state —
+    the two are mutually exclusive by construction, so only one composer is
+    ever on screen, and it renders its heading in every state so the section
+    keeps its place while loading); and
     `ErrorBoundary`, the client's only class component.
+
+    `CommentSection` assembles the two-level tree itself: the server returns a
+    flat page and the component groups it, so there is no recursive component
+    and a reply carries no Reply button. Edit, delete and like are rendered
+    conditionally to mirror the server's rules — the server refuses each with
+    a 403 regardless, so this only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
-  `SearchPage`, `MyBooksPage`, `ProfilePage`,
+  `SearchPage`, `BookPage` (`/books/:id`), `ChapterPage`
+  (`/books/:bookId/chapters/:chapterId`), `MyBooksPage`, `ProfilePage`,
   `SeriesPage`, `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
@@ -231,15 +266,19 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 - `src/theme/` — `tokens.ts`, the quark layer: the `appTheme` `ThemeConfig`
   handed to `ConfigProvider` in `App.tsx`, and the `AliasToken` augmentation
   that makes our custom tokens typed everywhere `theme.useToken()` is called.
-- `src/types/` — `user.ts`, `book.ts`, `api.ts` (the shared `ListResponse<T>`
-  and `ApiErrorBody` shapes) and `css.d.ts`. Dates cross the wire as ISO
-  strings, not `Date`, throughout — the server types them as `Date` in
-  process but they arrive as JSON strings.
+- `src/types/` — `user.ts` (`PublicUser` and `AuthorSummary`, the email-free
+  shape the public endpoints embed), `book.ts` (`PublicBook` and `BookDetail`),
+  `chapter.ts`, `comment.ts`, `like.ts`, `api.ts` (the shared
+  `ListResponse<T>` and `ApiErrorBody` shapes) and `css.d.ts`. Dates cross the
+  wire as ISO strings, not `Date`, throughout — the server types them as `Date`
+  in process but they arrive as JSON strings.
 - `src/test/` — `setup.ts` (jsdom polyfills, see Testing below),
   `renderWithProviders.tsx` (wraps a component in a `QueryClientProvider`
   — the outermost provider — then the Redux `Provider`, antd's
   `ConfigProvider` and a `MemoryRouter`, and returns `{ store, queryClient
-}`), `queryClient.ts` (`createTestQueryClient`, the fresh-per-render
+}`; pass `path` alongside `route` for a page that reads route params, or
+  `useParams()` returns an empty object and the page queries `NaN`),
+  `queryClient.ts` (`createTestQueryClient`, the fresh-per-render
   client `renderWithProviders` defaults to), `httpFixtures.ts` (minimal
   `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`) and
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
