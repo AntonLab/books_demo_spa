@@ -1,35 +1,17 @@
 import type { RequestHandler } from 'express';
-import type { SessionRepository } from '../repositories/sessionRepository.ts';
-import type { UserRepository } from '../repositories/userRepository.ts';
-import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
-import { hashToken } from '../tokens.ts';
+import { resolveSessionUser, type RequireAuthDeps } from './sessionUser.ts';
 import { UnauthorizedError } from '../types/errors.ts';
 
-export interface RequireAuthDeps {
-  sessionRepository: SessionRepository;
-  userRepository: UserRepository;
-}
+// Re-exported so the route factories keep importing it from here: every one of
+// them takes a RequireAuthDeps-shaped object and this is where they have always
+// found the type.
+export type { RequireAuthDeps };
 
 export function createRequireAuth(deps: RequireAuthDeps): RequestHandler {
   return async (req, _res, next) => {
-    const token: unknown = req.cookies?.[SESSION_COOKIE_NAME];
-    if (typeof token !== 'string' || token.length === 0) {
-      next(new UnauthorizedError());
-      return;
-    }
-
-    // Expiry is enforced by the repository's SQL, not re-checked here.
-    const session = await deps.sessionRepository.findValidByTokenHash(
-      hashToken(token)
-    );
-    if (!session) {
-      next(new UnauthorizedError());
-      return;
-    }
-
-    // A session can outlive its user only in the window before the CASCADE
-    // commits; treat it as unauthenticated rather than throwing.
-    const user = await deps.userRepository.findById(session.userId);
+    // The four ways this can fail are all one answer here: no user, so 401.
+    // optionalAuth shares the lookup and draws the opposite conclusion.
+    const user = await resolveSessionUser(deps, req);
     if (!user) {
       next(new UnauthorizedError());
       return;
