@@ -1,9 +1,16 @@
 import { z } from 'zod';
+import type { UserRole } from './permission.ts';
 
 // `as const` union rather than an enum, per the repository rules.
 export const USER_STATUSES = ['active', 'blocked', 'pending'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
+// No `role` here, and none in updateUserSchema below, which is derived from
+// this one with `.partial()` — a field added here appears there for free, and
+// PATCH /api/users/:id would then let any signed-in caller promote themselves.
+// The role travels as its own argument to the repository and through
+// PATCH /api/users/:id/role, never through a body that also carries other
+// fields.
 export const createUserSchema = z.object({
   login: z.string().min(3).max(64),
   email: z.email().max(255),
@@ -42,6 +49,7 @@ export interface PublicUser {
   firstName: string;
   lastName: string;
   status: UserStatus;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }

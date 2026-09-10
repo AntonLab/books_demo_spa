@@ -16,6 +16,7 @@ import {
   type PublicUser,
   type UserStatus,
 } from '../types/user.ts';
+import { USER_ROLES, type UserRole } from '../types/permission.ts';
 
 export class User extends Model<
   InferAttributes<User>,
@@ -28,6 +29,7 @@ export class User extends Model<
   declare firstName: string;
   declare lastName: string;
   declare status: CreationOptional<UserStatus>;
+  declare role: CreationOptional<UserRole>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -65,6 +67,11 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         type: DataTypes.ENUM(...USER_STATUSES),
         allowNull: false,
         defaultValue: 'pending',
+      },
+      role: {
+        type: DataTypes.ENUM(...USER_ROLES),
+        allowNull: false,
+        defaultValue: 'user',
       },
       // allowNull: false is required explicitly here — Sequelize only applies
       // its own NOT NULL default to createdAt/updatedAt when it auto-injects
@@ -105,6 +112,7 @@ export function toPublicUser(user: User): PublicUser {
     firstName: user.firstName,
     lastName: user.lastName,
     status: user.status,
+    role: user.role,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
