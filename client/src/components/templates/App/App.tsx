@@ -15,6 +15,9 @@ import { appTheme } from '@/theme/tokens';
 // render on every route, so splitting them would buy nothing. Each page is a
 // named export, so `lazy` has to remap it onto `default` — see CLAUDE.md,
 // "Page loading and errors".
+const BookPage = lazy(() =>
+  import('@/pages/BookPage').then((m) => ({ default: m.BookPage }))
+);
 const MainPage = lazy(() =>
   import('@/pages/MainPage').then((m) => ({ default: m.MainPage }))
 );
@@ -66,6 +69,7 @@ export const AppShell: FC = () => {
             <Routes>
               <Route path="/" element={<MainPage />} />
               <Route path="/reset-password" element={<ResetPasswordRoute />} />
+              <Route path="/books/:id" element={<BookPage />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/series" element={<SeriesPage />} />
               <Route path="/my-books" element={<MyBooksPage />} />
