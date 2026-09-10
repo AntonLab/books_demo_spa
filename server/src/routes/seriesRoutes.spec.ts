@@ -31,6 +31,7 @@ function createFakeRepository(): SeriesRepository {
       const series: PublicSeries = {
         id: nextId,
         userId: input.userId,
+        title: input.title,
         description: input.description,
         tags: input.tags,
         createdAt: now,
@@ -79,6 +80,7 @@ function createFakeRepository(): SeriesRepository {
 
 const valid = {
   userId: KNOWN_USER_ID,
+  title: 'A Space Opera',
   description: 'A space opera in three parts',
   tags: ['sci-fi', 'epic'],
 };
@@ -132,6 +134,7 @@ test('POST defaults tags to an empty array when omitted', async () => {
     async (base) => {
       const response = await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'No Tags Yet',
         description: 'No tags yet',
       });
 

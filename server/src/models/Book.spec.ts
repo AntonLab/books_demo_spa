@@ -104,6 +104,7 @@ test('toPublicBook copies the tag array rather than aliasing the model', () => {
     id: 1,
     userId: 2,
     seriesId: 3,
+    title: 'Test Book',
     description: 'A novel',
     tags: ['sci-fi'],
   });
@@ -118,6 +119,7 @@ test('toPublicBook parses a JSON string, should a driver return one raw', () => 
   const book = Book.build({
     id: 1,
     userId: 2,
+    title: 'Test Book',
     description: 'A novel',
     tags: ['sci-fi'],
   });
@@ -132,6 +134,7 @@ test('toPublicBook reports a standalone book as seriesId: null, never undefined'
   const book = Book.build({
     id: 1,
     userId: 2,
+    title: 'Test Book',
     description: 'Standalone',
     tags: [],
   });
