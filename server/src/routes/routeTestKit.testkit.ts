@@ -5,6 +5,7 @@ import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { hashToken } from '../tokens.ts';
+import type { UserRole } from '../types/permission.ts';
 import type { PublicUser } from '../types/user.ts';
 
 // The five route specs each drive one resource; createApp still requires the
@@ -88,21 +89,98 @@ export const TEST_USER: PublicUser = {
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 };
 
-const TEST_TOKEN = 'test-session-token';
+// A second identity for every role, plus one extra: `otherAuthor` is not a
+// role the matrix knows about, it is a second *author* with its own id, kept
+// distinct from `author` so a spec can prove one author cannot touch another
+// author's rows. Every persona below is reachable within one running app
+// instance, which is what lets a single test drive two identities — an
+// author creating a row, then a different persona acting on it.
+type TestPersona = UserRole | 'otherAuthor';
 
-// The cookie header every guarded request in the five resource specs sends.
-export const AUTH_COOKIE = `${SESSION_COOKIE_NAME}=${TEST_TOKEN}`;
+const PERSONA_TOKENS: Record<TestPersona, string> = {
+  user: 'token-user',
+  author: 'token-author',
+  admin: 'token-admin',
+  superadmin: 'token-superadmin',
+  otherAuthor: 'token-other-author',
+};
 
-// Minimal stand-ins for the two repositories requireAuth consults. They accept
-// exactly one token and know exactly one user, which is all these suites need.
+// One cookie per persona, so a spec can say who is calling without building a
+// session repository of its own.
+export const ROLE_COOKIES: Record<TestPersona, string> = {
+  user: `${SESSION_COOKIE_NAME}=${PERSONA_TOKENS.user}`,
+  author: `${SESSION_COOKIE_NAME}=${PERSONA_TOKENS.author}`,
+  admin: `${SESSION_COOKIE_NAME}=${PERSONA_TOKENS.admin}`,
+  superadmin: `${SESSION_COOKIE_NAME}=${PERSONA_TOKENS.superadmin}`,
+  otherAuthor: `${SESSION_COOKIE_NAME}=${PERSONA_TOKENS.otherAuthor}`,
+};
+
+// Distinct per persona, `user` and `author` included — userRepository.findById
+// is keyed by id, so two personas sharing one would make the session resolve
+// to whichever was registered last rather than to the caller who sent it.
+export const USER_IDS: Record<TestPersona, number> = {
+  user: TEST_USER.id,
+  author: 2,
+  admin: 3,
+  superadmin: 4,
+  otherAuthor: 5,
+};
+
+const PERSONA_ROLES: Record<TestPersona, UserRole> = {
+  user: 'user',
+  author: 'author',
+  admin: 'admin',
+  superadmin: 'superadmin',
+  // A second author, not a fifth role: the matrix has no idea `otherAuthor`
+  // exists.
+  otherAuthor: 'author',
+};
+
+// `user` resolves to TEST_USER itself rather than a look-alike: specs outside
+// this file assert response fields against TEST_USER directly (its login,
+// its id), and AUTH_COOKIE has to reach the very same object for those to
+// hold.
+function personaUser(persona: TestPersona): PublicUser {
+  if (persona === 'user') return TEST_USER;
+
+  return {
+    ...TEST_USER,
+    id: USER_IDS[persona],
+    login: persona,
+    role: PERSONA_ROLES[persona],
+  };
+}
+
+const PERSONAS = Object.keys(PERSONA_TOKENS) as TestPersona[];
+
+const USERS_BY_ID = new Map<number, PublicUser>(
+  PERSONAS.map((persona) => [USER_IDS[persona], personaUser(persona)])
+);
+
+const USERS_BY_TOKEN_HASH = new Map<string, PublicUser>(
+  PERSONAS.map((persona) => [
+    hashToken(PERSONA_TOKENS[persona]),
+    personaUser(persona),
+  ])
+);
+
+// Kept as an alias of ROLE_COOKIES.user, which resolves to TEST_USER, so the
+// specs that only know one identity keep compiling and passing unchanged.
+export const AUTH_COOKIE = ROLE_COOKIES.user;
+
+// Minimal stand-ins for the two repositories requireAuth/requirePermission
+// consult. Every persona's token and id are known at once, which is what lets
+// a spec drive two identities — an author creating a row, then otherAuthor or
+// admin acting on it — against a single running app instance.
 function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
   return {
     sessionRepository: {
       async findValidByTokenHash(tokenHash: string) {
-        return tokenHash === hashToken(TEST_TOKEN)
+        const user = USERS_BY_TOKEN_HASH.get(tokenHash);
+        return user
           ? {
-              id: 1,
-              userId: TEST_USER.id,
+              id: user.id,
+              userId: user.id,
               expiresAt: new Date(Date.now() + 60_000),
             }
           : null;
@@ -110,14 +188,15 @@ function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
     } as SessionRepository,
     userRepository: {
       async findById(id: number) {
-        return id === TEST_USER.id ? TEST_USER : null;
+        return USERS_BY_ID.get(id) ?? null;
       },
     } as UserRepository,
   };
 }
 
-// Use for guarded requests; pair with AUTH_COOKIE. `withApp` stays the
-// unauthenticated harness, so a spec's 401 tests keep working unchanged.
+// Use for guarded requests; pair with ROLE_COOKIES (or AUTH_COOKIE for the
+// plain-user persona). `withApp` stays the unauthenticated harness, so a
+// spec's 401 tests keep working unchanged.
 export async function withAuthenticatedApp(
   overrides: Partial<AppDeps>,
   fn: (base: string) => Promise<void>
@@ -131,17 +210,19 @@ export async function withAuthenticatedApp(
       ...overrides,
       // Only userRoutes.spec overrides userRepository, and requireAuth shares
       // it: resolving the session's user would otherwise go through that
-      // spec's own fake, which has never heard of TEST_USER and answers null
-      // — a 401 on every guarded request before the fake is even reached.
-      // The override answers first, so that spec's GET /:id keeps its own
-      // rows, and TEST_USER is the fallback that lets the session resolve.
+      // spec's own fake, which has never heard of these personas and answers
+      // null — a 401 on every guarded request before the fake is even
+      // reached. The override answers first, so that spec's GET /:id keeps
+      // its own rows, and the known personas are the fallback that lets the
+      // session resolve.
       userRepository: overrideUsers
         ? {
             ...overrideUsers,
             async findById(id: number) {
               return (
                 (await overrideUsers.findById(id)) ??
-                (id === TEST_USER.id ? TEST_USER : null)
+                USERS_BY_ID.get(id) ??
+                null
               );
             },
           }
