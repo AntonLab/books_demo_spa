@@ -66,6 +66,23 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders ChapterPage at /books/:bookId/chapters/:chapterId', async () => {
+    mockedChapters.getChapter.mockResolvedValue({
+      id: 9,
+      bookId: 1,
+      title: 'Chapter One',
+      text: 'It was a dark night.',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    });
+
+    renderWithProviders(<AppShell />, { route: '/books/1/chapters/9' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Chapter One' })
+    ).toBeInTheDocument();
+  });
+
   it('renders the series stub at /series', async () => {
     renderWithProviders(<AppShell />, { route: '/series' });
 

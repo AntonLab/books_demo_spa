@@ -18,6 +18,9 @@ import { appTheme } from '@/theme/tokens';
 const BookPage = lazy(() =>
   import('@/pages/BookPage').then((m) => ({ default: m.BookPage }))
 );
+const ChapterPage = lazy(() =>
+  import('@/pages/ChapterPage').then((m) => ({ default: m.ChapterPage }))
+);
 const MainPage = lazy(() =>
   import('@/pages/MainPage').then((m) => ({ default: m.MainPage }))
 );
@@ -70,6 +73,10 @@ export const AppShell: FC = () => {
               <Route path="/" element={<MainPage />} />
               <Route path="/reset-password" element={<ResetPasswordRoute />} />
               <Route path="/books/:id" element={<BookPage />} />
+              <Route
+                path="/books/:bookId/chapters/:chapterId"
+                element={<ChapterPage />}
+              />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/series" element={<SeriesPage />} />
               <Route path="/my-books" element={<MyBooksPage />} />
