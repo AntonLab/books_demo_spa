@@ -7,10 +7,9 @@ import {
 } from './like.ts';
 
 test('a like on a book parses, and the unused target defaults to null', () => {
-  const parsed = createLikeSchema.parse({ userId: 1, bookId: 2, isLike: true });
+  const parsed = createLikeSchema.parse({ bookId: 2, isLike: true });
 
   assert.deepEqual(parsed, {
-    userId: 1,
     bookId: 2,
     commentId: null,
     isLike: true,
@@ -19,27 +18,37 @@ test('a like on a book parses, and the unused target defaults to null', () => {
 
 test('a like on a comment parses, and the unused target defaults to null', () => {
   const parsed = createLikeSchema.parse({
-    userId: 1,
     commentId: 3,
     isLike: false,
   });
 
   assert.deepEqual(parsed, {
-    userId: 1,
     bookId: null,
     commentId: 3,
     isLike: false,
   });
 });
 
+test('a userId in the body is dropped — the liker comes from the session', () => {
+  // Without this, the self-like ban is defeated by naming someone else, and
+  // the unique indexes would enforce "one like per *claimed* user".
+  const parsed = createLikeSchema.parse({
+    userId: 999,
+    bookId: 2,
+    isLike: true,
+  });
+
+  assert.equal('userId' in parsed, false);
+});
+
 test('naming both targets is rejected — a like points at one thing', () => {
   assert.throws(() =>
-    createLikeSchema.parse({ userId: 1, bookId: 2, commentId: 3, isLike: true })
+    createLikeSchema.parse({ bookId: 2, commentId: 3, isLike: true })
   );
 });
 
 test('naming neither target is rejected', () => {
-  assert.throws(() => createLikeSchema.parse({ userId: 1, isLike: true }));
+  assert.throws(() => createLikeSchema.parse({ isLike: true }));
 });
 
 // The nullable default is what makes an omitted key null, so an explicitly
@@ -47,7 +56,6 @@ test('naming neither target is rejected', () => {
 test('spelling both targets out as null is rejected too', () => {
   assert.throws(() =>
     createLikeSchema.parse({
-      userId: 1,
       bookId: null,
       commentId: null,
       isLike: true,
@@ -56,7 +64,7 @@ test('spelling both targets out as null is rejected too', () => {
 });
 
 test('isLike is required — a like and a dislike are not the same row', () => {
-  assert.throws(() => createLikeSchema.parse({ userId: 1, bookId: 2 }));
+  assert.throws(() => createLikeSchema.parse({ bookId: 2 }));
 });
 
 test('updateLikeSchema requires isLike, so an empty body is rejected', () => {
