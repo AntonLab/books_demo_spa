@@ -48,6 +48,17 @@ async function probe(): Promise<true | string> {
 const reachable = await probe();
 const skip = reachable === true ? false : reachable;
 
+// Runs before the suite below, which is what makes it meaningful: it asserts
+// what the store answers when nothing has synced it yet.
+test('answers from the code-built matrix before any sync', () => {
+  // createApp does not sync — only src/index.ts does — so a store that started
+  // empty would deny every request in every route spec, and in any process
+  // that mounts the app without a database behind it.
+  assert.equal(scopeFor('guest', 'books', 'read'), 'any');
+  assert.equal(scopeFor('author', 'books', 'create'), 'own');
+  assert.equal(scopeFor('user', 'books', 'create'), 'none');
+});
+
 describe('permissionStore against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
 
