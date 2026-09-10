@@ -5,15 +5,25 @@ for persistence.
 
 ## Status
 
-The `User`, `Series`, `Book`, `Chapter` and `Like` models and their CRUD APIs
-are implemented end to end, associated by `User.hasMany(Series)`,
+The `User`, `Series`, `Book`, `Chapter`, `Comment` and `Like` models and their
+CRUD APIs are implemented end to end, associated by `User.hasMany(Series)`,
 `User.hasMany(Book)`, `Series.hasMany(Book)`, `Book.hasMany(Chapter)`, and
 `hasMany(Like)` from each of `User`, `Book` and `Comment`.
 Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
 `src/index.ts` ensures the schema exists, authenticates, and mounts the
 Express app under `/api`. Routes, controllers, repositories, models, and
-middleware are all wired for those five. `node:test` is the test runner
+middleware are all wired for those six. `node:test` is the test runner
 (`npm test`).
+
+`books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
+alongside their `description`, which now unambiguously means the annotation.
+The `?q=` filter on both matches either column.
+
+`GET /api/books/:id` returns a `BookDetail` rather than a `PublicBook`: the
+record plus an `author` (`AuthorSummary` — `PublicUser` minus the email, which
+is the omission that makes it safe in a public response), the series `id` and
+`title`, a `likeCount` and the caller's own `viewerLikeId`. The list endpoint
+is untouched and stays cheap.
 
 `Session` and `PasswordResetToken` back a full session-based auth API at
 `/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
@@ -24,13 +34,17 @@ and so do both reads on `/api/users`, because `PublicUser` carries an email
 address and an open list would be a scrapeable account directory. Every other
 `GET` stays public. See **Auth** below.
 
-`Comment` is the one model without an API. `User.hasMany(Comment)`,
+`Comment` has a full CRUD API at `/api/comments`, built to the same
+five-file pattern as the others. `User.hasMany(Comment)`,
 `Book.hasMany(Comment)`, `Comment.hasMany(Like)` and the self-referential
-`Comment.hasMany(Comment, { as: 'replies' })` are wired and covered by
-`models/Comment.spec.ts`, but it has no repository, controller or route yet,
-and `types/comment.ts` holds only `PublicComment` — no zod schemas. Likes on
-comments are reachable through `/api/likes` regardless, since a like
-references a comment by id.
+`Comment.hasMany(Comment, { as: 'replies' })` are all wired. Two things set it
+apart from the other five, both covered under **Auth**: the author comes from
+the session rather than the body, and `PATCH`/`DELETE` check ownership. Its
+list endpoint returns a flat page — each row carrying `parentId`, an embedded
+`author`, a `likeCount` and the caller's `viewerLikeId` — and leaves tree
+assembly to the client, which keeps paging meaningful. Deleting a comment takes
+its whole reply subtree with it; see **Sequelize & MySQL conventions** for why
+that cascade is not a foreign key.
 
 ## Development Commands
 
@@ -160,8 +174,36 @@ value.
   partial apply would leave a redeemed token beside a live pre-reset session,
   the exact state the flow exists to prevent. Unknown, expired and
   already-used tokens all fail with one 400 and one message.
-- **Ownership is deliberately not checked.** A signed-in user may write another
-  user's rows; that is out of scope by design and needs its own spec.
+- **`optionalAuth` is the counterpart to `requireAuth`** for a public read that
+  still wants to know who is asking. It performs the same cookie lookup and
+  calls `next()` with `req.user` left unset when there is no valid session,
+  where `requireAuth` would answer 401. Both are built on `resolveSessionUser`
+  in `middleware/sessionUser.ts`, which reports "nobody" for all four failure
+  modes — missing cookie, unknown token, expired session, deleted user —
+  because the two callers draw opposite conclusions from that one answer.
+  It sits on `GET /api/books/:id` and `GET /api/comments`, which is what lets
+  them report `viewerLikeId` without breaking for anonymous visitors. Nothing
+  behind it may rely on `req.user` being set.
+- **Ownership is checked on comments and likes, and nowhere else.** Only a
+  comment's author may `PATCH` or `DELETE` it, and nobody may like their own
+  book or their own comment; all four refusals are 403. On books, series and
+  chapters ownership is still deliberately unchecked — a signed-in user may
+  write another user's rows, which stays out of scope by design.
+  - The comment check lives in `commentController`, not a middleware, because
+    it needs the repository — and it reports 404 before 403, so a refusal
+    cannot be used to probe which ids exist.
+  - The self-like check lives in `likeRepository.create`, which loads the
+    target to compare owners. It is the one check-then-write in that file, and
+    it is safe where the uniqueness check would not be: a row's owner never
+    changes, so the answer cannot go stale before the insert. Uniqueness stays
+    with the indexes for exactly that reason.
+- **Identity comes from the session, never the body.** Neither
+  `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
+  controllers read `req.user.id`. This is load-bearing rather than tidy: if the
+  body could name a user, "you may only edit your own comment" and "you may not
+  like your own book" would both be defeated in one line, and the likes' unique
+  indexes would be enforcing one like per _claimed_ user. `createLikeSchema`
+  used to take one — that is a breaking change to `POST /api/likes`.
 
 ## Runtime notes
 
@@ -377,3 +419,17 @@ snippets — still get wrong. Verified against the 5.x router and request source
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
   this is an ESM package — `.js` migrations are parsed as ESM, so the CLI's
   `module.exports` template will throw. Name them `.cjs` or author them as ESM.
+- **Until then, changing a table's shape means recreating the dev database.**
+  `src/index.ts` calls `sequelize.sync()` with no `alter`, and `sync()` only
+  creates missing tables — it never touches an existing one. A new `NOT NULL`
+  column therefore never reaches a database created before it, and every write
+  then fails on the missing column. Drop it
+  (`DROP DATABASE books_demo_spa`) and let `ensureDatabase` rebuild it on the
+  next boot. The `title` columns on `books` and `series` landed this way.
+- **The comment reply cascade lives in the repository, not the foreign key.**
+  `comments.parentId` is `ON DELETE SET NULL`, and `commentRepository.remove`
+  walks the subtree and deletes it in one statement inside a transaction.
+  `ON DELETE CASCADE` on a self-reference fails with `ER_FK_DEPTH_EXCEEDED`
+  (errno 3008) past 15 levels — and takes the owning book's delete down with
+  it, because deleting a book cascades into comments and then recurses through
+  the replies. The measurement is recorded in `models/index.ts`.

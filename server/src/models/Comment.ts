@@ -10,7 +10,8 @@ import {
 } from 'sequelize';
 import type { Book } from './Book.ts';
 import type { User } from './User.ts';
-import type { PublicComment } from '../types/comment.ts';
+import type { CommentWithAuthor, PublicComment } from '../types/comment.ts';
+import type { AuthorSummary } from '../types/user.ts';
 
 export class Comment extends Model<
   InferAttributes<Comment>,
@@ -109,4 +110,17 @@ export function toPublicComment(comment: Comment): PublicComment {
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
   };
+}
+
+// The list shape. The author and the like figures are passed in rather than
+// read off an eager include, because the like counts arrive from a separate
+// aggregate query — see commentRepository.list for why that is one query per
+// page rather than one per comment.
+export function toCommentWithAuthor(
+  comment: Comment,
+  author: AuthorSummary,
+  likeCount: number,
+  viewerLikeId: number | null
+): CommentWithAuthor {
+  return { ...toPublicComment(comment), author, likeCount, viewerLikeId };
 }

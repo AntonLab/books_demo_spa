@@ -7,6 +7,7 @@ import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
+import { createSequelizeCommentRepository } from './repositories/commentRepository.ts';
 import { createSequelizeLikeRepository } from './repositories/likeRepository.ts';
 import { createSequelizePasswordResetRepository } from './repositories/passwordResetRepository.ts';
 import { createSequelizeSessionRepository } from './repositories/sessionRepository.ts';
@@ -47,6 +48,7 @@ async function main(): Promise<void> {
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),
+    commentRepository: createSequelizeCommentRepository(),
     likeRepository: createSequelizeLikeRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),

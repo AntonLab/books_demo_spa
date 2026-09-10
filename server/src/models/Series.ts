@@ -19,6 +19,7 @@ export class Series extends Model<
 > {
   declare id: CreationOptional<number>;
   declare userId: ForeignKey<User['id']>;
+  declare title: string;
   declare description: string;
   declare tags: string[];
   declare createdAt: CreationOptional<Date>;
@@ -44,6 +45,12 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
       // foreign key with errno 3780 on incompatible column types.
       userId: {
         type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+      },
+      // VARCHAR rather than the TEXT below it: a title is short, and only a
+      // bounded column can carry an index if one is ever wanted for it.
+      title: {
+        type: DataTypes.STRING(255),
         allowNull: false,
       },
       description: {
@@ -83,6 +90,7 @@ export function toPublicSeries(series: Series): PublicSeries {
   return {
     id: series.id,
     userId: series.userId,
+    title: series.title,
     description: series.description,
     tags: toTagArray(series.tags),
     createdAt: series.createdAt,

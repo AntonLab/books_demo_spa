@@ -83,6 +83,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     seriesId = (
       await Series.create({
         userId: ownerId,
+        title: 'Test Series',
         description: 'A trilogy',
         tags: [],
       })
@@ -93,6 +94,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'Book one',
       tags: ['sci-fi', 'epic'],
     });
@@ -108,6 +110,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Standalone',
       tags: [],
     });
@@ -120,6 +123,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Эпопея 📚',
       tags: ['фантастика', '📚'],
     });
@@ -135,6 +139,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       repository.create({
         userId: ownerId + 10_000,
         seriesId: null,
+        title: 'Test Book',
         description: 'Orphan',
         tags: [],
       }),
@@ -152,6 +157,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       repository.create({
         userId: ownerId,
         seriesId: seriesId + 10_000,
+        title: 'Test Book',
         description: 'Orphan',
         tags: [],
       }),
@@ -165,6 +171,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Standalone',
       tags: [],
     });
@@ -181,12 +188,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Tagged epic',
       tags: ['epic'],
     });
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Tagged epic-fantasy',
       tags: ['epic-fantasy'],
     });
@@ -198,16 +207,37 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(exact.items[0]?.description, 'Tagged epic');
   });
 
+  test('list finds a book by its title', async () => {
+    await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'The Dragon Gate',
+      description: 'unrelated prose',
+      tags: [],
+    });
+
+    const { items } = await repository.list({
+      limit: 20,
+      offset: 0,
+      q: 'Dragon Gate',
+    });
+
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.title, 'The Dragon Gate');
+  });
+
   test('the description search treats LIKE metacharacters literally', async () => {
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Contains a 100% real percent sign',
       tags: [],
     });
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'No metacharacter here',
       tags: [],
     });
@@ -222,6 +252,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     for (const description of ['One', 'Two', 'Three']) {
       await repository.create({
         userId: ownerId,
+        title: description,
         seriesId,
         description,
         tags: [],
@@ -230,6 +261,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Standalone',
       tags: [],
     });
@@ -244,6 +276,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'Original',
       tags: ['sci-fi', 'epic'],
     });
@@ -260,6 +293,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'Original',
       tags: ['sci-fi'],
     });
@@ -277,6 +311,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'Leaving the series',
       tags: [],
     });
@@ -290,6 +325,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'Doomed',
       tags: [],
     });
@@ -303,6 +339,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'Survivor',
       tags: [],
     });
@@ -318,12 +355,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
     await repository.create({
       userId: ownerId,
       seriesId,
+      title: 'Test Book',
       description: 'A',
       tags: [],
     });
     await repository.create({
       userId: ownerId,
       seriesId: null,
+      title: 'Test Book',
       description: 'B',
       tags: [],
     });

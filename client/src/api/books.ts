@@ -1,6 +1,6 @@
 import { request } from './client';
 import type { ListResponse } from '../types/api';
-import type { PublicBook } from '../types/book';
+import type { BookDetail, PublicBook } from '../types/book';
 
 export interface ListBooksParams {
   q?: string;
@@ -25,4 +25,10 @@ export const listBooks = (
   return request<ListResponse<PublicBook>>(
     query ? `/books?${query}` : '/books'
   );
+};
+
+// Returns BookDetail, not PublicBook: the detail endpoint embeds the author,
+// the series name and the like state, none of which the list carries.
+export const getBook = (id: number): Promise<BookDetail> => {
+  return request<BookDetail>(`/books/${id}`);
 };

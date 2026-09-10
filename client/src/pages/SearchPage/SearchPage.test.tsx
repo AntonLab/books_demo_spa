@@ -14,6 +14,7 @@ const book: PublicBook = {
   id: 1,
   userId: 3,
   seriesId: null,
+  title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: ['epic'],
   createdAt: '2026-09-01T00:00:00.000Z',

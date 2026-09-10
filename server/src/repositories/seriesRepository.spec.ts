@@ -82,6 +82,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('round-trips tags through the JSON column as a real array', async () => {
     const created = await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'A space opera',
       tags: ['sci-fi', 'epic'],
     });
@@ -95,6 +96,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('stores an empty tag list without a DDL default', async () => {
     const created = await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'No tags',
       tags: [],
     });
@@ -105,6 +107,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('tags survive multi-byte characters, thanks to utf8mb4', async () => {
     const created = await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Эпопея 📚',
       tags: ['фантастика', '📚'],
     });
@@ -119,6 +122,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create({
         userId: ownerId + 10_000,
+        title: 'Test Series',
         description: 'Orphan',
         tags: [],
       }),
@@ -131,11 +135,13 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('the tag filter matches through JSON_CONTAINS, not a substring', async () => {
     await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Tagged epic',
       tags: ['epic'],
     });
     await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Tagged epic-fantasy',
       tags: ['epic-fantasy'],
     });
@@ -150,11 +156,13 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('the description search treats LIKE metacharacters literally', async () => {
     await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Contains a 100% real percent sign',
       tags: [],
     });
     await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'No metacharacter here',
       tags: [],
     });
@@ -175,10 +183,16 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     ).id;
 
     for (const description of ['One', 'Two', 'Three']) {
-      await repository.create({ userId: ownerId, description, tags: [] });
+      await repository.create({
+        userId: ownerId,
+        title: description,
+        description,
+        tags: [],
+      });
     }
     await repository.create({
       userId: otherId,
+      title: 'Theirs',
       description: 'Theirs',
       tags: [],
     });
@@ -196,6 +210,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('an update replaces the whole tag array and leaves the owner alone', async () => {
     const created = await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Original',
       tags: ['sci-fi', 'epic'],
     });
@@ -210,6 +225,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('an update omitting tags leaves the stored ones untouched', async () => {
     const created = await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Original',
       tags: ['sci-fi'],
     });
@@ -225,6 +241,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   test('deleting the user cascades to their series', async () => {
     await repository.create({
       userId: ownerId,
+      title: 'Test Series',
       description: 'Doomed',
       tags: [],
     });
@@ -235,8 +252,18 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   });
 
   test('User.hasMany(Series) eager-loads under the `series` alias', async () => {
-    await repository.create({ userId: ownerId, description: 'A', tags: [] });
-    await repository.create({ userId: ownerId, description: 'B', tags: [] });
+    await repository.create({
+      userId: ownerId,
+      title: 'A',
+      description: 'A',
+      tags: [],
+    });
+    await repository.create({
+      userId: ownerId,
+      title: 'B',
+      description: 'B',
+      tags: [],
+    });
 
     const loaded = await User.findByPk(ownerId, {
       include: { association: 'series' },

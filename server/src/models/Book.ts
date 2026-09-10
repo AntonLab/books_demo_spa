@@ -21,6 +21,7 @@ export class Book extends Model<
   declare userId: ForeignKey<User['id']>;
   // Nullable and creation-optional: a book can stand alone, outside any series.
   declare seriesId: CreationOptional<ForeignKey<Series['id']> | null>;
+  declare title: string;
   declare description: string;
   declare tags: string[];
   declare createdAt: CreationOptional<Date>;
@@ -51,6 +52,12 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       seriesId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
+      },
+      // VARCHAR rather than the TEXT below it: a title is short, and only a
+      // bounded column can carry an index if one is ever wanted for it.
+      title: {
+        type: DataTypes.STRING(255),
+        allowNull: false,
       },
       description: {
         type: DataTypes.TEXT,
@@ -93,6 +100,7 @@ export function toPublicBook(book: Book): PublicBook {
     id: book.id,
     userId: book.userId,
     seriesId: book.seriesId ?? null,
+    title: book.title,
     description: book.description,
     tags: toTagArray(book.tags),
     createdAt: book.createdAt,
