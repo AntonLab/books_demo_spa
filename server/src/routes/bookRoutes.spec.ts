@@ -36,6 +36,7 @@ function createFakeRepository(): BookRepository {
         id: nextId,
         userId: input.userId,
         seriesId: input.seriesId,
+        title: input.title,
         description: input.description,
         tags: input.tags,
         createdAt: now,
@@ -98,6 +99,7 @@ function createFakeRepository(): BookRepository {
 const valid = {
   userId: KNOWN_USER_ID,
   seriesId: KNOWN_SERIES_ID,
+  title: 'The First Book',
   description: 'The first book in the trilogy',
   tags: ['sci-fi', 'epic'],
 };
@@ -152,6 +154,7 @@ test('POST defaults seriesId to null when omitted — a book need not be in a se
     async (base) => {
       const response = await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'Standalone',
         description: 'Standalone',
       });
 
@@ -167,6 +170,7 @@ test('POST defaults tags to an empty array when omitted', async () => {
     async (base) => {
       const response = await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'No Tags Yet',
         description: 'No tags yet',
       });
 
@@ -279,6 +283,7 @@ test('GET list filters by tag, owner and series', async () => {
       await post(base, valid);
       await post(base, {
         userId: KNOWN_USER_ID,
+        title: 'Standalone',
         description: 'Standalone',
         tags: ['drama'],
       });

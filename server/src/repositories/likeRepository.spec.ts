@@ -93,8 +93,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await User.destroy({ where: {}, truncate: false });
 
     userId = (await User.create(owner)).id;
-    bookId = (await Book.create({ userId, description: 'A novel', tags: [] }))
-      .id;
+    bookId = (
+      await Book.create({
+        userId,
+        title: 'A Novel',
+        description: 'A novel',
+        tags: [],
+      })
+    ).id;
     commentId = (
       await Comment.create({ userId, bookId, text: 'Loved the ending.' })
     ).id;

@@ -6,11 +6,17 @@ import {
   updateSeriesSchema,
 } from './series.ts';
 
-const valid = { userId: 1, description: 'A space opera', tags: ['sci-fi'] };
+const valid = {
+  userId: 1,
+  title: 'A Space Opera',
+  description: 'A space opera',
+  tags: ['sci-fi'],
+};
 
 test('tags default to an empty array, since the JSON column has no DDL default', () => {
   const parsed = createSeriesSchema.parse({
     userId: 1,
+    title: 'A Space Opera',
     description: 'A space opera',
   });
 

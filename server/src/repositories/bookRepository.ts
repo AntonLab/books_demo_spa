@@ -86,7 +86,17 @@ function buildWhere(query: ListBooksQuery): WhereOptions {
   }
 
   if (query.q) {
-    clauses.push({ description: { [Op.like]: containsPattern(query.q) } });
+    // Searches the title as well as the description, so `?q=` finds a book by
+    // its name. Both sides are a leading-wildcard LIKE and therefore a full
+    // scan — unavoidable for substring search, and the cost the description
+    // side already paid.
+    const pattern = containsPattern(query.q);
+    clauses.push({
+      [Op.or]: [
+        { title: { [Op.like]: pattern } },
+        { description: { [Op.like]: pattern } },
+      ],
+    });
   }
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
