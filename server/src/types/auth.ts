@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { REGISTRABLE_ROLES } from './permission.ts';
 
 // The field rules match createUserSchema in ./user.ts, minus `status`: a
 // registrant does not get to choose their own account state, so the key is
@@ -9,6 +10,11 @@ export const registerSchema = z.object({
   password: z.string().min(8).max(128),
   firstName: z.string().min(1).max(64),
   lastName: z.string().min(1).max(64),
+  // The only place a role is accepted from a public body, and it is narrowed to
+  // the two that are a statement of intent rather than a privilege. admin and
+  // superadmin are unreachable here by construction — see types/user.ts for
+  // why the general user schemas carry no role at all.
+  role: z.enum(REGISTRABLE_ROLES).default('user'),
 });
 
 // Deliberately unbounded on password, unlike registerSchema. Length rules here
