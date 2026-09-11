@@ -10,6 +10,7 @@ import type { AuthorSummary } from '../types/user.ts';
 import {
   AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
   TEST_USER,
   withApp,
   withAuthenticatedApp,
@@ -331,4 +332,43 @@ test('DELETE without a session is 401', async () => {
   await withApp({ commentRepository: createFakeRepository() }, async (base) => {
     assert.equal((await remove(base, 1, null)).status, 401);
   });
+});
+
+test('an admin may delete another user comment', async () => {
+  // Comments were the first resource to check ownership, and until now nobody
+  // could override it — which would leave a report with no possible outcome.
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await remove(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 204);
+    }
+  );
+});
+
+test('a plain user still may not touch another user comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await remove(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a plain user may still comment — roles accumulate', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 201);
+    }
+  );
 });
