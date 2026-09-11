@@ -7,8 +7,9 @@ import type {
 } from '../repositories/chapterRepository.ts';
 import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
 import {
-  AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
+  USER_IDS,
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
@@ -81,6 +82,14 @@ function createFakeRepository(): ChapterRepository {
     async remove(id) {
       return rows.delete(id);
     },
+
+    async findOwnerId(id) {
+      return rows.has(id) ? USER_IDS.author : null;
+    },
+
+    async findBookOwnerId(bookId) {
+      return bookId === KNOWN_BOOK_ID ? USER_IDS.author : null;
+    },
   };
 }
 
@@ -90,10 +99,13 @@ const valid = {
   text: 'It was a dark night.',
 };
 
+// Defaults to the author persona: create, update and delete all need `own` or
+// `any` scope on chapters, and `user` has `none` on all three, so AUTH_COOKIE
+// (the `user` persona) is not a usable default for a write in this file.
 const post = (
   base: string,
   body: unknown,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/chapters`, {
     method: 'POST',
@@ -108,7 +120,7 @@ const patch = (
   base: string,
   id: number,
   body: unknown,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/chapters/${id}`, {
     method: 'PATCH',
@@ -122,7 +134,7 @@ const patch = (
 const remove = (
   base: string,
   id: number,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/chapters/${id}`, {
     method: 'DELETE',
@@ -326,4 +338,54 @@ test('GET stays public', async () => {
   await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/chapters`)).status, 200);
   });
+});
+
+// --- The permission matrix: who may create, edit and delete a chapter. ---
+
+test('an author adds a chapter to their own book', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.author)).status, 201);
+    }
+  );
+});
+
+test('an author may not add a chapter to another author book', async () => {
+  // The hole this closes: gating books alone would leave the neighbouring
+  // endpoint open, and anyone could append to someone else's book.
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, valid, ROLE_COOKIES.otherAuthor);
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a plain user may not add a chapter at all', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 403);
+    }
+  );
+});
+
+test('an admin may edit any chapter but create none', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.admin)).status, 403);
+
+      const created = await json<PublicChapter>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+      assert.equal(
+        (await patch(base, created.id, { title: 'Fixed' }, ROLE_COOKIES.admin))
+          .status,
+        200
+      );
+    }
+  );
 });

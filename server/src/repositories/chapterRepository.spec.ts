@@ -57,6 +57,7 @@ const owner = {
 
 describe('chapterRepository against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
+  let ownerId: number;
   let bookId: number;
   const repository = createSequelizeChapterRepository();
 
@@ -79,7 +80,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
-    const ownerId = (await User.create(owner)).id;
+    ownerId = (await User.create(owner)).id;
     bookId = (
       await Book.create({
         userId: ownerId,
@@ -217,5 +218,22 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     await Book.destroy({ where: { id: bookId } });
 
     assert.equal((await repository.list({ limit: 20, offset: 0 })).total, 0);
+  });
+
+  test('findOwnerId resolves through the chapter book', async () => {
+    const chapter = await repository.create({
+      bookId,
+      title: 'Chapter One',
+      text: 'It was a dark night.',
+    });
+
+    // There is no chapters.userId: the owner is the book's owner, and
+    // denormalising it here would create a second source of truth that diverges
+    // the moment a book changes hands.
+    assert.equal(await repository.findOwnerId(chapter.id), ownerId);
+  });
+
+  test('findOwnerId is null for a chapter that is not there', async () => {
+    assert.equal(await repository.findOwnerId(999_999), null);
   });
 });
