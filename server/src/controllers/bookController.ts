@@ -49,17 +49,40 @@ export function createBookController(
     }
   };
 
+  // Filing a book under a series changes that series too — it starts listing
+  // the book — so the target series' owner has to answer as well as the
+  // book's. Without this an author could put their book into a stranger's
+  // series, and the series' owner could only undo it by deleting the series.
+  // chapterController.assertMayAddTo closes the same hole one level down.
+  //
+  // null (unlinking) and an absent key (leaving the link alone) touch no
+  // series, so neither needs a check. An absent series is still a 404 that
+  // blames the series, and it comes before the 403, as everywhere else.
+  const assertMayAddToSeries = async (
+    req: Request,
+    seriesId: number | null | undefined
+  ): Promise<void> => {
+    if (seriesId === null || seriesId === undefined) return;
+    if (req.permissionScope === 'any') return;
+
+    const ownerId = await repository.findSeriesOwnerId(seriesId);
+    if (ownerId === null) throw new NotFoundError('Series', seriesId);
+    if (ownerId !== req.user?.id) {
+      throw new ForbiddenError('You may only add books to your own series');
+    }
+  };
+
   return {
     create: async (req, res) => {
       if (!req.user) throw new UnauthorizedError();
 
+      const input = validatedBody<CreateBookInput>(req);
+      await assertMayAddToSeries(req, input.seriesId);
+
       // The owner comes from the session, never the body — otherwise an author
       // could create a book owned by someone else and the ownership rule above
       // would mean nothing.
-      const book = await repository.create({
-        ...validatedBody<CreateBookInput>(req),
-        userId: req.user.id,
-      });
+      const book = await repository.create({ ...input, userId: req.user.id });
       res.status(201).json(book);
     },
 
@@ -81,12 +104,13 @@ export function createBookController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
+      const input = validatedBody<UpdateBookInput>(req);
+      // The book first: a caller who may not touch it learns nothing about
+      // the series they named.
       await assertMayTouch(req, id);
+      await assertMayAddToSeries(req, input.seriesId);
 
-      const book = await repository.update(
-        id,
-        validatedBody<UpdateBookInput>(req)
-      );
+      const book = await repository.update(id, input);
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);
     },

@@ -22,8 +22,18 @@ import {
 // is that persona's id, not an arbitrary constant.
 const KNOWN_USER_ID = USER_IDS.author;
 const KNOWN_SERIES_ID = 7;
+// A series that exists but belongs to `otherAuthor`, not to the `author`
+// persona every book here is created by — the target an author must not be
+// able to file a book under.
+const OTHER_AUTHOR_SERIES_ID = 8;
 const VIEWER_LIKE_ID = 99;
 const UNOWNED_USER_ID = 999997;
+
+// Stands in for the series table: which series exist, and who owns each.
+const SERIES_OWNERS = new Map<number, number>([
+  [KNOWN_SERIES_ID, KNOWN_USER_ID],
+  [OTHER_AUTHOR_SERIES_ID, USER_IDS.otherAuthor],
+]);
 
 // Deliberately spelled out rather than derived from a PublicUser: the point of
 // the assertion below is that no email reaches the response, and a fixture
@@ -46,7 +56,7 @@ function createFakeRepository(): BookRepository {
       if (input.userId !== KNOWN_USER_ID) {
         throw new NotFoundError('User', input.userId);
       }
-      if (input.seriesId !== null && input.seriesId !== KNOWN_SERIES_ID) {
+      if (input.seriesId !== null && !SERIES_OWNERS.has(input.seriesId)) {
         throw new NotFoundError('Series', input.seriesId);
       }
 
@@ -105,7 +115,7 @@ function createFakeRepository(): BookRepository {
       if (
         input.seriesId !== null &&
         input.seriesId !== undefined &&
-        input.seriesId !== KNOWN_SERIES_ID
+        !SERIES_OWNERS.has(input.seriesId)
       ) {
         throw new NotFoundError('Series', input.seriesId);
       }
@@ -130,6 +140,10 @@ function createFakeRepository(): BookRepository {
 
     async findOwnerId(id) {
       return rows.get(id)?.userId ?? null;
+    },
+
+    async findSeriesOwnerId(seriesId) {
+      return SERIES_OWNERS.get(seriesId) ?? null;
     },
   };
 }
@@ -608,6 +622,119 @@ test('an admin may edit and delete any book', async () => {
       assert.equal(
         (await remove(base, created.id, ROLE_COOKIES.admin)).status,
         204
+      );
+    }
+  );
+});
+
+// --- Filing a book under a series: the series has to be the caller's too. ---
+
+test('an author may not create a book in another author series', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(
+        base,
+        { ...valid, seriesId: OTHER_AUTHOR_SERIES_ID },
+        ROLE_COOKIES.author
+      );
+      assert.equal(response.status, 403);
+
+      // Refused before the write, not written and then reported: the other
+      // author's series must not start listing the book.
+      const listed = await json<{ total: number }>(
+        await fetch(`${base}/api/books?seriesId=${OTHER_AUTHOR_SERIES_ID}`)
+      );
+      assert.equal(listed.total, 0);
+    }
+  );
+});
+
+test('an author may not move their own book into another author series', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { seriesId: OTHER_AUTHOR_SERIES_ID },
+        ROLE_COOKIES.author
+      );
+      assert.equal(response.status, 403);
+
+      const stored = await json<PublicBook>(
+        await fetch(`${base}/api/books/${created.id}`)
+      );
+      assert.equal(stored.seriesId, KNOWN_SERIES_ID);
+    }
+  );
+});
+
+test('an author may create a book in their own series', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(
+        base,
+        { ...valid, seriesId: KNOWN_SERIES_ID },
+        ROLE_COOKIES.author
+      );
+
+      assert.equal(response.status, 201);
+      assert.equal(
+        (await json<PublicBook>(response)).seriesId,
+        KNOWN_SERIES_ID
+      );
+    }
+  );
+});
+
+test('an author may unlink their book with seriesId: null', async () => {
+  // Leaving a series touches no series, so there is nothing to check.
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { seriesId: null },
+        ROLE_COOKIES.author
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicBook>(response)).seriesId, null);
+    }
+  );
+});
+
+test('an admin may file any book under any series', async () => {
+  // `any` skips the series check just as it skips the book's.
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { seriesId: OTHER_AUTHOR_SERIES_ID },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(
+        (await json<PublicBook>(response)).seriesId,
+        OTHER_AUTHOR_SERIES_ID
       );
     }
   );
