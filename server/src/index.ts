@@ -45,8 +45,10 @@ async function main(): Promise<void> {
   }
 
   // The matrix is reference data derived from code, so it is written on every
-  // boot and read into memory once. Without this the store is empty and every
-  // scope reads `none` — the server would refuse everything.
+  // boot and read back into memory. Requests do not depend on this — the store
+  // already answers from the code before any sync — but it is still the call
+  // that notices a missing `permissions` table. That means the schema was
+  // never provisioned, and failing loudly at boot beats discovering it later.
   await syncPermissions();
 
   const app = createApp({

@@ -275,10 +275,12 @@ value.
   while `sequelize.sync()` itself is gated to non-production. **A production
   boot therefore needs the `permissions` table to already exist** — nothing
   here creates it outside `sequelize.sync()` — or `syncPermissions()` throws
-  and the process never starts listening. That is deliberate: a server that
-  boots but silently answers `none` to everything is worse than one that
-  refuses to boot at all, but it means a production deploy must provision
-  that table (and the rest of the schema) before the first boot.
+  and the process never starts listening. That is deliberate, but not
+  because the server would otherwise refuse everything — the code seed above
+  means it would answer correctly without the table. A missing `permissions`
+  table means the schema was never provisioned, and failing loudly at boot
+  beats discovering it later. It does mean a production deploy must
+  provision that table (and the rest of the schema) before the first boot.
 - **Two-level enforcement.** `requirePermission(module, action)` — mounted
   before `validate`, like `requireAuth` — resolves the session, looks up
   `scopeFor(role, module, action)`, and refuses outright on `none`: **401
