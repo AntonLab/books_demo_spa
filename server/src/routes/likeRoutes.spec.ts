@@ -13,6 +13,7 @@ import type { PublicLike } from '../types/like.ts';
 import {
   AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
@@ -494,5 +495,20 @@ test('DELETE without a session is 401', async () => {
 test('GET stays public', async () => {
   await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/likes`)).status, 200);
+  });
+});
+
+test('a plain user may like — roles accumulate', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, onBook, ROLE_COOKIES.user)).status, 201);
+    }
+  );
+});
+
+test('an anonymous like is 401', async () => {
+  await withApp({ likeRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await post(base, onBook, null)).status, 401);
   });
 });

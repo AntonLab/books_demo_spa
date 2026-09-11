@@ -13,6 +13,7 @@ import {
 import type {
   CreateCommentInput,
   ListCommentsQuery,
+  PublicComment,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -45,12 +46,22 @@ export function createCommentController(
   //
   // 404 before 403 deliberately: reporting "forbidden" for a comment that does
   // not exist would leak which ids are real.
-  const assertOwned = async (id: number, userId: number): Promise<void> => {
+  //
+  // Returns the row it looked up, so a caller that also needs to inspect it
+  // does not pay for a second query. `any` skips the owner comparison
+  // entirely — that is what lets an admin act on a reported comment.
+  const assertOwned = async (
+    req: Request,
+    id: number
+  ): Promise<PublicComment> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
-    if (existing.userId !== userId) {
+
+    if (req.permissionScope === 'own' && existing.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
     }
+
+    return existing;
   };
 
   return {
@@ -82,7 +93,7 @@ export function createCommentController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(id, actorId(req));
+      await assertOwned(req, id);
 
       const comment = await repository.update(
         id,
@@ -94,7 +105,7 @@ export function createCommentController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(id, actorId(req));
+      await assertOwned(req, id);
 
       const removed = await repository.remove(id);
       if (!removed) throw new NotFoundError('Comment', id);
