@@ -94,9 +94,10 @@ export function createBookController(
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      // optionalAuth fills req.user when a session cookie resolves and leaves
-      // it unset otherwise; the repository takes null for "anonymous", which is
-      // what makes viewerLikeId come back empty.
+      // requirePermission fills req.user when a session cookie resolves and
+      // leaves it unset otherwise — `guest` has `read: any` on books, so an
+      // anonymous read still gets here. The repository takes null for
+      // "anonymous", which is what makes viewerLikeId come back empty.
       const book = await repository.findDetailById(id, req.user?.id ?? null);
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);

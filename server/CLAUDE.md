@@ -305,8 +305,9 @@ value.
   is the unaffected, separate public door every real signup uses — it reaches
   only `user`/`author`, via `REGISTRABLE_ROLES`, not the matrix.
 - **`PATCH /api/users/:id/role` is the one door for role changes**
-  (`routes/userRoleRoutes.ts`, mounted ahead of the plain `/users` routes so
-  Express matches `/:id/role` before `/:id` treats `role` as an id). Getting
+  (`routes/userRoleRoutes.ts`, mounted ahead of the plain `/users` routes for
+  readability only — `/:id` matches exactly one path segment, so it can never
+  match `/:id/role`, and the two paths do not collide in either order). Getting
   through the door only requires `users × update` from the matrix — `own`
   for `user`/`author`, `any` for `admin`/`superadmin` — because the matrix
   grades the resource, not the value being written; a second check inside
@@ -332,6 +333,15 @@ value.
   owns) and identity-from-session (see above) both live in code, not in a
   scope value — there is no `PermissionScope` that spells out "not
   yourself," so do not go looking for either rule in the permission table.
+  The reach of a comment delete is the same kind of thing, pointing the other
+  way: `commentRepository.remove` deletes the whole reply subtree, so a
+  `user` deleting their own comment under `own` also deletes every reply
+  beneath it, including other users' replies. The `own` check only compares
+  the owner of the comment named in the request; the subtree walk is
+  repository behaviour that predates the matrix, not something a scope
+  grants. Whether it should stay that way is the project owner's call — do
+  not read it as a matrix property, and do not change it as part of
+  permissions work.
 - **`admin`'s reach over accounts is broader than it may look, and nothing
   here narrows it.** The matrix grants `admin` `update: any` and
   `delete: any` on `users`, and `updateUserSchema` carries `email` and

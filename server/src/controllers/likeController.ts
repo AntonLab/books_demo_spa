@@ -50,8 +50,10 @@ export function createLikeController(
 
   return {
     create: async (req, res) => {
-      // requireAuth guarantees req.user here; the type is optional because
-      // most requests legitimately have none, so narrow rather than assert.
+      // requirePermission guarantees req.user here — `guest` has no create
+      // grant on likes, so an anonymous request is a 401 before it arrives —
+      // but the type is optional because most requests legitimately have
+      // none, so narrow rather than assert.
       if (!req.user) throw new UnauthorizedError();
 
       const like = await repository.create(

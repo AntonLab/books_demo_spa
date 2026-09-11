@@ -14,8 +14,10 @@ declare global {
       };
 
       // Optional, unlike `validated`: most requests legitimately have no user.
-      // Handlers mounted behind requireAuth can rely on it being set, and
-      // narrow it rather than asserting.
+      // Handlers behind requireAuth, or behind requirePermission on an action
+      // `guest` is refused, can rely on it being set, and narrow it rather
+      // than asserting. requirePermission on a public read sets it only when a
+      // session resolves.
       user?: import('./user.ts').PublicUser;
 
       // Set by requirePermission on a request it lets through, so the handler

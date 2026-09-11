@@ -8,8 +8,8 @@ import type { Action, Module } from '../types/permission.ts';
 // cannot judge `own` — the row is not loaded yet — so it hands the scope to
 // the handler and the controller compares owners from there.
 //
-// Mount it before `validate`, as requireAuth is mounted today, so a refused
-// request is never parsed or echoed back in a 400.
+// Mount it before `validate`, so a refused request is never parsed or echoed
+// back in a 400.
 export function createRequirePermission(
   deps: RequireAuthDeps
 ): (module: Module, action: Action) => RequestHandler {

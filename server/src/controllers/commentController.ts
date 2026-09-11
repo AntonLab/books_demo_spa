@@ -25,9 +25,10 @@ export interface CommentController {
   remove: RequestHandler;
 }
 
-// requireAuth guarantees req.user on every write, but the type is optional
-// because most requests legitimately have none. This narrows in one place
-// instead of asserting at three call sites.
+// requirePermission guarantees req.user on every write — `guest` has no write
+// grant on comments, so an anonymous write is a 401 before it gets here — but
+// the type is optional because most requests legitimately have none. This
+// narrows in one place instead of asserting at three call sites.
 function actorId(req: Request): number {
   if (!req.user) throw new UnauthorizedError();
   return req.user.id;
@@ -38,11 +39,11 @@ function actorId(req: Request): number {
 export function createCommentController(
   repository: CommentRepository
 ): CommentController {
-  // Comments are the first resource here to check ownership — books, series and
-  // chapters still let any signed-in user write another user's rows. The check
-  // lives in the controller rather than a middleware because it needs the
-  // repository, and because keeping both writes' rule in one place is what
-  // stops them drifting apart.
+  // The same ownership rule books, series, chapters and likes enforce: `own`
+  // may change only the caller's own comments. The check lives in the
+  // controller rather than a middleware because it needs the repository, and
+  // because keeping both writes' rule in one place is what stops them drifting
+  // apart.
   //
   // 404 before 403 deliberately: reporting "forbidden" for a comment that does
   // not exist would leak which ids are real.
