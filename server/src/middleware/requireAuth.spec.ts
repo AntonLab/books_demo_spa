@@ -26,7 +26,9 @@ const USER: PublicUser = {
 
 const VALID = 'valid-token';
 
-function deps(overrides: { userFound?: boolean } = {}) {
+function deps(
+  overrides: { userFound?: boolean; status?: PublicUser['status'] } = {}
+) {
   const sessionRepository = {
     async findValidByTokenHash(tokenHash: string) {
       return tokenHash === hashToken(VALID)
@@ -37,7 +39,9 @@ function deps(overrides: { userFound?: boolean } = {}) {
 
   const userRepository = {
     async findById(_id: number) {
-      return overrides.userFound === false ? null : USER;
+      return overrides.userFound === false
+        ? null
+        : { ...USER, status: overrides.status ?? USER.status };
     },
   } as UserRepository;
 
@@ -45,7 +49,7 @@ function deps(overrides: { userFound?: boolean } = {}) {
 }
 
 async function withServer(
-  overrides: { userFound?: boolean },
+  overrides: { userFound?: boolean; status?: PublicUser['status'] },
   fn: (base: string) => Promise<void>
 ): Promise<void> {
   const app = express();
@@ -92,6 +96,15 @@ test('an unknown or expired token is 401', async () => {
 
 test('a session whose user has been deleted is 401, not a crash', async () => {
   await withServer({ userFound: false }, async (base) => {
+    assert.equal(
+      (await get(base, `${SESSION_COOKIE_NAME}=${VALID}`)).status,
+      401
+    );
+  });
+});
+
+test('a session belonging to a blocked account is 401', async () => {
+  await withServer({ status: 'blocked' }, async (base) => {
     assert.equal(
       (await get(base, `${SESSION_COOKIE_NAME}=${VALID}`)).status,
       401

@@ -12,8 +12,8 @@ export interface RequireAuthDeps {
 
 // The cookie-to-user lookup both auth middlewares share. It reports "nobody"
 // for every failure — missing cookie, unknown token, expired session, deleted
-// user — because the two callers want opposite things from that answer and
-// neither needs to know which of the four happened.
+// user, blocked account — because the two callers want opposite things from
+// that answer and neither needs to know which of the five happened.
 export async function resolveSessionUser(
   deps: RequireAuthDeps,
   req: Request
@@ -27,7 +27,12 @@ export async function resolveSessionUser(
   );
   if (!session) return null;
 
-  // A session can outlive its user only in the window before the CASCADE
-  // commits; treat it as unauthenticated rather than throwing.
-  return await deps.userRepository.findById(session.userId);
+  const user = await deps.userRepository.findById(session.userId);
+
+  // Blocking deletes an account's sessions, but a login that read `active`
+  // just before the block can still create one after the purge. Treating a
+  // blocked account's session as no session closes that window for as long
+  // as the block lasts. A session can also outlive its user in the window
+  // before the CASCADE commits; that is the null case.
+  return user?.status === 'blocked' ? null : user;
 }

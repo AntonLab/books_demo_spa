@@ -6,6 +6,7 @@ import type {
   UserListResult,
 } from '../repositories/userRepository.ts';
 import { hashPassword } from '../password.ts';
+import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type { PublicUser } from '../types/user.ts';
 import {
   AUTH_COOKIE,
@@ -916,6 +917,43 @@ test('currentPassword alone is not a change', async () => {
         ROLE_COOKIES.user
       );
       assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('changing your own password clears the session cookie', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { password: 'brand-new-pass', currentPassword: PASSWORD },
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 200);
+      assert.match(
+        response.headers.get('set-cookie') ?? '',
+        new RegExp(`^${SESSION_COOKIE_NAME}=;`)
+      );
+    }
+  );
+});
+
+test("an admin changing someone else's password keeps their own cookie", async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { password: 'reset-by-admin' },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('set-cookie'), null);
     }
   );
 });

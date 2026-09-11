@@ -6,6 +6,7 @@ import {
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Comment } from '../models/Comment.ts';
+import { Session } from '../models/Session.ts';
 import { toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
 import { ConflictError } from '../types/errors.ts';
@@ -118,19 +119,42 @@ export function createSequelizeUserRepository(): UserRepository {
       return user ? toPublicUser(user) : null;
     },
 
+    // One transaction, so a block or a password change and the sessions it
+    // ends land together: a partial apply would leave the old sessions alive
+    // beside the new state, the exact thing this exists to prevent.
     async update(id, input) {
-      // unscoped so the instance carries the password, letting the beforeSave
-      // hook see a real change when the caller supplies a new one.
-      const user = await User.unscoped().findByPk(id);
-      if (!user) return null;
-
-      try {
-        await user.update(input);
-      } catch (error) {
-        asConflict(error);
+      const sequelize = User.sequelize;
+      if (!sequelize) {
+        throw new Error('User model is not initialised');
       }
 
-      return toPublicUser(user);
+      return sequelize.transaction(async (transaction) => {
+        // unscoped so the instance carries the password, letting the
+        // beforeSave hook see a real change when the caller supplies a new
+        // one. FOR UPDATE so two concurrent updates cannot both read the
+        // status as unblocked.
+        const user = await User.unscoped().findByPk(id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!user) return null;
+
+        const wasBlocked = user.status === 'blocked';
+        try {
+          await user.update(input, { transaction });
+        } catch (error) {
+          asConflict(error);
+        }
+
+        // Only the move into `blocked` ends sessions: re-blocking deletes
+        // nothing, and unblocking hands nothing back.
+        const becameBlocked = !wasBlocked && user.status === 'blocked';
+        if (input.password !== undefined || becameBlocked) {
+          await Session.destroy({ where: { userId: id }, transaction });
+        }
+
+        return toPublicUser(user);
+      });
     },
 
     // The account's comments stay behind as `deleted` tombstones, so the
