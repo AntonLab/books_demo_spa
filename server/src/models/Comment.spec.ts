@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
 import { Book, User, initModels } from './index.ts';
-import { Comment, toPublicComment } from './Comment.ts';
+import { Comment, toCommentWithAuthor, toPublicComment } from './Comment.ts';
+import { TOMBSTONES } from '../types/comment.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
 // reached through a narrow structural cast rather than `any`.
@@ -132,26 +133,53 @@ test('toPublicComment carries the body — a comment is its text', () => {
     userId: 2,
     bookId: 3,
     text: 'Loved the ending.',
-    isDeleted: false,
+    tombstone: null,
     createdAt: undefined,
     updatedAt: undefined,
   });
 });
 
-test('toPublicComment withholds the body of a deleted comment', () => {
+test('tombstone is a nullable ENUM of the two ways a comment is deleted', () => {
+  assert.match(createTableSql, /`tombstone` ENUM\('deleted', 'removed'\)/);
+  assert.doesNotMatch(
+    createTableSql,
+    /`tombstone` ENUM\('deleted', 'removed'\) NOT NULL/
+  );
+});
+
+test('toPublicComment withholds the text and the owner of either tombstone', () => {
+  for (const tombstone of TOMBSTONES) {
+    const comment = Comment.build({
+      id: 1,
+      parentId: null,
+      userId: 2,
+      bookId: 3,
+      text: 'Loved the ending.',
+      tombstone,
+    });
+
+    // The row still carries both; only the serialiser withholds them, which
+    // is what keeps every endpoint honest without each one remembering to.
+    assert.equal(comment.text, 'Loved the ending.');
+    const served = toPublicComment(comment);
+    assert.equal(served.text, '', tombstone);
+    assert.equal(served.userId, null, tombstone);
+    assert.equal(served.tombstone, tombstone);
+  }
+});
+
+test('toCommentWithAuthor names no author for a tombstone', () => {
   const comment = Comment.build({
     id: 1,
     parentId: null,
     userId: 2,
     bookId: 3,
     text: 'Loved the ending.',
-    isDeleted: true,
+    tombstone: 'removed',
   });
+  const author = { id: 2, login: 'Cass', firstName: 'Cass', lastName: 'Owner' };
 
-  // The row still carries the text; only the serialiser withholds it, which is
-  // what keeps every endpoint honest without each one remembering to.
-  assert.equal(comment.text, 'Loved the ending.');
-  assert.equal(toPublicComment(comment).text, '');
+  assert.equal(toCommentWithAuthor(comment, author, 0, null).author, null);
 });
 
 test('toPublicComment normalises a missing parentId to null, as books do for seriesId', () => {

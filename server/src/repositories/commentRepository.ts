@@ -13,6 +13,7 @@ import type {
   CreateCommentInput,
   ListCommentsQuery,
   PublicComment,
+  Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -31,7 +32,11 @@ export interface CommentRepository {
   ): Promise<CommentListResult>;
   findById(id: number): Promise<PublicComment | null>;
   update(id: number, input: UpdateCommentInput): Promise<PublicComment | null>;
-  remove(id: number): Promise<boolean>;
+  // `kind` is decided by the caller, who knows whether the actor owns the
+  // comment. Scoped to live rows, so a tombstone reports false.
+  remove(id: number, kind: Tombstone): Promise<boolean>;
+  // Only a `removed` comment comes back; null for anything else.
+  restore(id: number): Promise<PublicComment | null>;
 }
 
 // A rejected FK on `comments` means the referenced row does not exist.
@@ -65,7 +70,11 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
   const clauses: WhereOptions[] = [];
 
   if (query.bookId !== undefined) clauses.push({ bookId: query.bookId });
-  if (query.userId !== undefined) clauses.push({ userId: query.userId });
+  // Tombstones are anonymous, so an owner filter must never reach one — it
+  // would name exactly the person the tombstone hides.
+  if (query.userId !== undefined) {
+    clauses.push({ userId: query.userId, tombstone: null });
+  }
   if (query.parentId !== undefined) clauses.push({ parentId: query.parentId });
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
@@ -154,15 +163,27 @@ export function createSequelizeCommentRepository(): CommentRepository {
 
     // A soft delete: the row survives so its replies keep a parent, and the
     // thread stays readable around the gap. Only this comment is marked — a
-    // reply is somebody else's writing and is not theirs to remove.
-    async remove(id) {
-      // Scoped to rows not already deleted, so a second call reports false and
-      // the route answers 404 rather than a silent 204.
+    // reply is somebody else's writing and is not theirs to remove. Scoped to
+    // live rows, so a second call reports false and the route answers 404.
+    async remove(id, kind) {
       const [affected] = await Comment.update(
-        { isDeleted: true },
-        { where: { id, isDeleted: false } }
+        { tombstone: kind },
+        { where: { id, tombstone: null } }
       );
       return affected > 0;
+    },
+
+    // The inverse of a moderator's delete. Scoped to `removed`: an owner's
+    // deletion is theirs to make and nobody else's to undo.
+    async restore(id) {
+      const [affected] = await Comment.update(
+        { tombstone: null },
+        { where: { id, tombstone: 'removed' } }
+      );
+      if (affected === 0) return null;
+
+      const comment = await Comment.findByPk(id);
+      return comment ? toPublicComment(comment) : null;
     },
   };
 }
