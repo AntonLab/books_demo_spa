@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import { initUserModel, User } from './User.ts';
+import { initUserModel, toPublicUser, User } from './User.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
 // reached through a narrow structural cast rather than `any`.
@@ -75,4 +75,31 @@ test('timestamps exist and the primary key is an unsigned auto-increment integer
   assert.match(sql, /`createdAt` DATETIME NOT NULL/);
   assert.match(sql, /`updatedAt` DATETIME NOT NULL/);
   assert.match(sql, /`id` INTEGER UNSIGNED auto_increment/);
+});
+
+test('toPublicUser carries the role and defaults it to user', () => {
+  const user = User.build({
+    id: 1,
+    login: 'Someone',
+    email: 'someone@example.com',
+    password: 'hashed',
+    firstName: 'Some',
+    lastName: 'One',
+  });
+
+  assert.equal(toPublicUser(user).role, 'user');
+});
+
+test('toPublicUser carries an explicit role', () => {
+  const user = User.build({
+    id: 1,
+    login: 'Boss',
+    email: 'boss@example.com',
+    password: 'hashed',
+    firstName: 'The',
+    lastName: 'Boss',
+    role: 'superadmin',
+  });
+
+  assert.equal(toPublicUser(user).role, 'superadmin');
 });

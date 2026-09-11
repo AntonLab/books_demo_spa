@@ -30,7 +30,8 @@ export function createApp(deps: AppDeps): Express {
   const app = express();
 
   app.use(express.json());
-  // Express 5 can set cookies but not read them; requireAuth needs req.cookies.
+  // Express 5 can set cookies but not read them; resolveSessionUser, behind
+  // both requirePermission and requireAuth, needs req.cookies.
   app.use(cookieParser());
   app.use('/api', createApiRouter(deps));
   app.use(notFound);

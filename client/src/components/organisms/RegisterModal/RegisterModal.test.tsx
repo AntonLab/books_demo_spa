@@ -20,11 +20,12 @@ const user: PublicUser = {
   firstName: 'Bob',
   lastName: 'Bobson',
   status: 'active',
+  role: 'user',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-const fillValidForm = async (): Promise<void> => {
+const fillInTheForm = async (): Promise<void> => {
   await userEvent.type(screen.getByLabelText('Login'), 'bob');
   await userEvent.type(screen.getByLabelText('Email'), 'bob@example.com');
   await userEvent.type(screen.getByLabelText('First name'), 'Bob');
@@ -82,7 +83,7 @@ describe('RegisterModal submission', () => {
     mockedAuth.register.mockResolvedValue(user);
     renderWithProviders(<RegisterModal />);
 
-    await fillValidForm();
+    await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     await waitFor(() => {
@@ -94,6 +95,7 @@ describe('RegisterModal submission', () => {
       password: 'secret123',
       firstName: 'Bob',
       lastName: 'Bobson',
+      role: 'user',
     });
     // The server has no `confirm` field; zod would strip it silently.
     const sent = mockedAuth.register.mock.calls[0][0];
@@ -106,13 +108,44 @@ describe('RegisterModal submission', () => {
     store.dispatch(openModal('register'));
     const { queryClient } = renderWithProviders(<RegisterModal />, { store });
 
-    await fillValidForm();
+    await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     await waitFor(() => {
       expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
     });
     expect(store.getState().auth.activeModal).toBeNull();
+  });
+
+  it('registers as a plain user when the box is left alone', async () => {
+    mockedAuth.register.mockResolvedValue(user);
+
+    renderWithProviders(<RegisterModal />);
+    await fillInTheForm();
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+    // antd validates asynchronously, so the submit lands some ticks after the
+    // click; wait for it rather than relying on the click's tick to flush it.
+    await waitFor(() => {
+      expect(mockedAuth.register).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'user' })
+      );
+    });
+  });
+
+  it('registers as an author when the box is ticked', async () => {
+    mockedAuth.register.mockResolvedValue({ ...user, role: 'author' });
+
+    renderWithProviders(<RegisterModal />);
+    await fillInTheForm();
+    await userEvent.click(screen.getByRole('checkbox', { name: "I'm author" }));
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+    await waitFor(() => {
+      expect(mockedAuth.register).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'author' })
+      );
+    });
   });
 });
 
@@ -123,7 +156,7 @@ describe('RegisterModal conflict handling', () => {
     );
     renderWithProviders(<RegisterModal />);
 
-    await fillValidForm();
+    await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     expect(
@@ -139,7 +172,7 @@ describe('RegisterModal conflict handling', () => {
     );
     renderWithProviders(<RegisterModal />);
 
-    await fillValidForm();
+    await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     expect(
@@ -153,7 +186,7 @@ describe('RegisterModal conflict handling', () => {
     );
     renderWithProviders(<RegisterModal />);
 
-    await fillValidForm();
+    await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(

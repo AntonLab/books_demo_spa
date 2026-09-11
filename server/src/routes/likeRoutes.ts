@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createLikeController } from '../controllers/likeController.ts';
-import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createLikeSchema,
@@ -12,18 +12,30 @@ import type { RouteDeps } from './index.ts';
 
 export function createLikeRoutes(deps: RouteDeps): Router {
   const controller = createLikeController(deps.likeRepository);
-  const requireAuth = createRequireAuth(deps);
+  const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // Reads stay public: the client's book list must work logged out.
-  router.get('/', validate({ query: listLikesQuerySchema }), controller.list);
-  router.get('/:id', validate({ params: idParamSchema }), controller.getById);
+  // Every route runs through the matrix, reads included: every role has
+  // `read: any` on likes, which is what keeps the list and detail routes
+  // public — the client's book list must work logged out.
+  router.get(
+    '/',
+    requirePermission('likes', 'read'),
+    validate({ query: listLikesQuerySchema }),
+    controller.list
+  );
+  router.get(
+    '/:id',
+    requirePermission('likes', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getById
+  );
 
-  // requireAuth goes before validate on every write, so an unauthenticated
-  // request is refused without its body being parsed or echoed back in a 400.
+  // requirePermission goes before validate on every write, so a refused
+  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
-    requireAuth,
+    requirePermission('likes', 'create'),
     validate({ body: createLikeSchema }),
     controller.create
   );
@@ -32,13 +44,13 @@ export function createLikeRoutes(deps: RouteDeps): Router {
   // createLikeSchema's XOR is what guards the shape on the way in.
   router.patch(
     '/:id',
-    requireAuth,
+    requirePermission('likes', 'update'),
     validate({ params: idParamSchema, body: updateLikeSchema }),
     controller.update
   );
   router.delete(
     '/:id',
-    requireAuth,
+    requirePermission('likes', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
   );

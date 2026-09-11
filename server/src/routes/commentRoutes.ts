@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { createCommentController } from '../controllers/commentController.ts';
-import { createOptionalAuth } from '../middleware/optionalAuth.ts';
-import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createCommentSchema,
@@ -13,41 +12,48 @@ import type { RouteDeps } from './index.ts';
 
 export function createCommentRoutes(deps: RouteDeps): Router {
   const controller = createCommentController(deps.commentRepository);
-  const requireAuth = createRequireAuth(deps);
-  const optionalAuth = createOptionalAuth(deps);
+  const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // Reads stay public, like every resource but users — but the list runs
-  // through optionalAuth so a signed-in reader's own likes come back with it,
-  // without refusing an anonymous one.
+  // Every route runs through the matrix, reads included: every role has
+  // `read: any` on comments, which is what keeps the list and detail routes
+  // public. requirePermission resolves the session itself, so the list no
+  // longer needs optionalAuth to get a signed-in reader's own likes back with
+  // it.
   router.get(
     '/',
-    optionalAuth,
+    requirePermission('comments', 'read'),
     validate({ query: listCommentsQuerySchema }),
     controller.list
   );
-  router.get('/:id', validate({ params: idParamSchema }), controller.getById);
+  router.get(
+    '/:id',
+    requirePermission('comments', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getById
+  );
 
-  // requireAuth goes before validate on every write, so an unauthenticated
-  // request is refused without its body being parsed or echoed back in a 400.
+  // requirePermission goes before validate on every write, so a refused
+  // request is never parsed or echoed back in a 400.
   //
-  // Unlike the other resources, PATCH and DELETE also check ownership — see
-  // controllers/commentController.ts.
+  // PATCH and DELETE also check ownership in the controller, as books, series,
+  // chapters and likes do — see controllers/commentController.ts. There, `own`
+  // refuses another user's comment and `any` (admin) skips the check.
   router.post(
     '/',
-    requireAuth,
+    requirePermission('comments', 'create'),
     validate({ body: createCommentSchema }),
     controller.create
   );
   router.patch(
     '/:id',
-    requireAuth,
+    requirePermission('comments', 'update'),
     validate({ params: idParamSchema, body: updateCommentSchema }),
     controller.update
   );
   router.delete(
     '/:id',
-    requireAuth,
+    requirePermission('comments', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
   );

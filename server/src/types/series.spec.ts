@@ -6,8 +6,8 @@ import {
   updateSeriesSchema,
 } from './series.ts';
 
+// No userId: the owner comes from the session, never the body.
 const valid = {
-  userId: 1,
   title: 'A Space Opera',
   description: 'A space opera',
   tags: ['sci-fi'],
@@ -15,7 +15,6 @@ const valid = {
 
 test('tags default to an empty array, since the JSON column has no DDL default', () => {
   const parsed = createSeriesSchema.parse({
-    userId: 1,
     title: 'A Space Opera',
     description: 'A space opera',
   });
@@ -53,11 +52,6 @@ test('more than 20 tags is rejected', () => {
 
 test('an empty description is rejected', () => {
   assert.throws(() => createSeriesSchema.parse({ ...valid, description: '' }));
-});
-
-test('userId must be a positive integer', () => {
-  assert.throws(() => createSeriesSchema.parse({ ...valid, userId: 0 }));
-  assert.throws(() => createSeriesSchema.parse({ ...valid, userId: -1 }));
 });
 
 test('an update cannot move a series to another user', () => {
