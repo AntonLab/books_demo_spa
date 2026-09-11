@@ -122,14 +122,14 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('multi-byte text and titles survive, thanks to utf8mb4', async () => {
     const created = await repository.create({
       bookId,
-      title: 'Глава 1 📖',
-      text: 'Была тёмная ночь 🌙',
+      title: 'Chapter 1 📖',
+      text: 'It was a dark night 🌙',
     });
 
     const reloaded = await repository.findById(created.id);
 
-    assert.equal(reloaded?.title, 'Глава 1 📖');
-    assert.equal(reloaded?.text, 'Была тёмная ночь 🌙');
+    assert.equal(reloaded?.title, 'Chapter 1 📖');
+    assert.equal(reloaded?.text, 'It was a dark night 🌙');
   });
 
   test('the list omits the body entirely, rather than fetching and dropping it', async () => {
