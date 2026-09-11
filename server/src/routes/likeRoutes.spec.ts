@@ -590,3 +590,25 @@ test('an admin may delete another user like', async () => {
     }
   );
 });
+
+test('a moderator may not flip another user like', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository([FOREIGN_LIKE]) },
+    async (base) => {
+      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        const response = await patch(
+          base,
+          FOREIGN_LIKE_ID,
+          { isLike: false },
+          cookie
+        );
+        assert.equal(response.status, 403);
+      }
+
+      const found = await json<PublicLike>(
+        await fetch(`${base}/api/likes/${FOREIGN_LIKE_ID}`)
+      );
+      assert.equal(found.isLike, true);
+    }
+  );
+});
