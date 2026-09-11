@@ -7,6 +7,9 @@ export interface RegisterInput {
   password: string;
   firstName: string;
   lastName: string;
+  // The only role a public form may ask for. The server narrows it again, so
+  // this is a convenience, not the guard.
+  role?: 'user' | 'author';
 }
 
 export interface LoginInput {
