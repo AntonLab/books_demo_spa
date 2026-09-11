@@ -84,8 +84,8 @@ test('an admin moderates but does not author', () => {
   assert.equal(scope('admin', 'chapters', 'delete'), 'any');
   assert.equal(scope('admin', 'comments', 'delete'), 'any');
   // Without this, admin would inherit USER_GRANTS.likes verbatim — `own` on
-  // update/delete — and could not act on a reported like any more than a
-  // plain user could.
+  // delete — and could not act on a reported like any more than a plain user
+  // could.
   assert.equal(scope('admin', 'likes', 'delete'), 'any');
   assert.equal(scope('admin', 'reports', 'update'), 'any');
   // The one deliberate break in the accumulation: admins moderate, they do not

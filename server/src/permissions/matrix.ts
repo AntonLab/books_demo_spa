@@ -16,10 +16,13 @@ type RoleGrants = Partial<Record<Module, ModuleGrants>>;
 // Writing 140 rows by hand would bury the five decisions that actually matter
 // under a wall of denials.
 //
-// On `create`: a created row is yours by construction — its userId comes from
-// the session — so `own` and `any` mean the same thing there, and callers on
-// the create path only ever ask whether the scope is `none`. `own` is the
-// spelling used for a role that may create.
+// On `create`: a created row is the caller's by construction — its userId
+// comes from the session — so `own` and `any` mean the same thing there, and
+// `own` is the spelling a role that may create uses. The create path is not
+// scope-only, though: creating a book into a series checks that the caller
+// may touch that series (assertMayAddToSeries in controllers/bookController.ts),
+// and creating a chapter checks the owner of its book (assertMayAddTo in
+// controllers/chapterController.ts).
 const PUBLIC_READS: RoleGrants = {
   series: { read: 'any' },
   books: { read: 'any' },

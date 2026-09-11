@@ -96,17 +96,22 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   resources, not four — with `admin` and `superadmin` bypassing it wherever
   the matrix grants them `any` rather than `own`; chapters resolve ownership
   through their book, since `chapters` carries no `userId`. Deleting a
-  comment is a **soft delete** — `isDeleted` is set on that row alone, its
-  replies stay, and its text and author are withheld in every response.
-  Identity for a comment or a like still comes from the session, never the
-  request body; without that the ownership rules would be trivially
-  defeated. Role changes go through their own door,
+  comment leaves a **tombstone** — `deleted` by its own owner (or when that
+  owner's account is deleted) or `removed` by a moderator — rather than
+  removing the row, so its replies stay and its text and author are withheld
+  in every response; a moderator can undo a `removed` tombstone through
+  `POST /api/comments/:id/restore`. Blocking an account, and any successful
+  password change, both end every session that account holds, in the same
+  transaction as the update. Identity for a comment or a like still comes
+  from the session, never the request body; without that the ownership rules
+  would be trivially defeated. Role changes go through their own door,
   `PATCH /api/users/:id/role`: a row's owner may switch between `user` and
-  `author`, and only `superadmin` may set any other role on any account. See
+  `author`, and only `superadmin` may set any other role on any account. An
+  `admin` may manage only `user` and `author` accounts besides its own —
+  another admin or any superadmin is a 403 — while a `superadmin` reaches
+  every account but may not delete its own or change its own role. See
   `server/CLAUDE.md` for the full matrix, the cookie flags, the
-  SHA-256-not-argon2 choice for tokens, the login timing defence, and —
-  deliberately left unfixed pending a product decision — what `admin`'s
-  broad grant on `users` does and does not protect.
+  SHA-256-not-argon2 choice for tokens, and the login timing defence.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 

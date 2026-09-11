@@ -41,25 +41,21 @@ function actorId(req: Request): number {
 export function createCommentController(
   repository: CommentRepository
 ): CommentController {
-  // The same ownership rule books, series, chapters and likes enforce: `own`
-  // may change only the caller's own comments. The check lives in the
-  // controller rather than a middleware because it needs the repository, and
-  // because keeping both writes' rule in one place is what stops them drifting
-  // apart.
-  //
-  // 404 before 403 deliberately: reporting "forbidden" for a comment that does
-  // not exist would leak which ids are real.
+  // 404 before 403: reporting "forbidden" for a comment that does not exist
+  // would leak which ids are real.
   const findOrThrow = async (id: number): Promise<PublicComment> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
     return existing;
   };
 
-  // The same ownership rule books, series, chapters and likes enforce. `any`
-  // skips the comparison — that is what lets a moderator act on a reported
-  // comment. Every other value, a missing scope included, is compared: a
-  // handler mounted without requirePermission fails closed rather than acting
-  // as `any`.
+  // The same ownership rule books, series, chapters and likes enforce: `own`
+  // may change only the caller's own comments. `any` skips the comparison —
+  // that is what lets a moderator act on a reported comment. Every other
+  // value, a missing scope included, is compared: a handler mounted without
+  // requirePermission fails closed rather than acting as `any`. The check
+  // lives here rather than in a middleware because it needs the repository to
+  // load the row before an owner can be compared.
   const assertOwner = (req: Request, comment: PublicComment): void => {
     if (req.permissionScope !== 'any' && comment.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
