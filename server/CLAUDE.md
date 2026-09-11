@@ -277,10 +277,10 @@ value.
     with the indexes for exactly that reason. This is a domain invariant, not
     a matrix rule — no scope value spells out "not yourself," so do not go
     looking for it in the permission table.
-- **Deleting a comment leaves a tombstone, not a hole.** `DELETE
-/api/comments/:id` sets `tombstone` on that one row and touches nothing
-  else; the replies stay, so the thread reads around the gap rather than
-  losing everything under a withdrawn remark. There are two kinds
+- **Deleting a comment leaves a tombstone, not a hole.**
+  `DELETE /api/comments/:id` sets `tombstone` on that one row and touches
+  nothing else; the replies stay, so the thread reads around the gap rather
+  than losing everything under a withdrawn remark. There are two kinds
   (`Tombstone` in `types/comment.ts`):
   - **`deleted`** — the comment's own owner deleted it (an admin deleting
     their own comment is still an owner deletion, not moderation), or the
@@ -308,10 +308,10 @@ value.
   - **A tombstone takes no new activity.** Replying to one is 403
     (`You cannot reply to a deleted comment`, `commentRepository.create`);
     liking one, or flipping an existing like on one, is 403
-    (`You cannot like a deleted comment` / `You cannot change a like on a
-deleted comment`, `likeRepository`) — but removing your own existing
-    like from a tombstone is still allowed. Replies that already exist under
-    a tombstone behave normally.
+    (`You cannot like a deleted comment` /
+    `You cannot change a like on a deleted comment`, `likeRepository`) — but
+    removing your own existing like from a tombstone is still allowed.
+    Replies that already exist under a tombstone behave normally.
   - **A thread cannot be tombstoned wholesale.** Each reply belongs to its
     own author, and only they, a moderator, or their own account's deletion
     can turn it into a tombstone. That is the deliberate cost of keeping
@@ -445,11 +445,11 @@ deleted comment`, `likeRepository`) — but removing your own existing
   accounts whose role is `user` or `author` (`ADMIN_MANAGEABLE_ROLES`) —
   targeting another admin or any superadmin is a 403, and a missing id is
   still a 404 first, ahead of the rank check. A `superadmin` reaches every
-  account with no such
-  narrowing, but may not delete their own account (`userController.remove`)
-  or change their own role through `PATCH /api/users/:id/role`
-  (`userRoleRoutes.ts`); another superadmin may do both. A `user`/`author`
-  still reaches only their own row, refused without a database lookup.
+  account with no such narrowing, but may not delete their own account
+  (`userController.remove`) or change their own role through
+  `PATCH /api/users/:id/role` (`userRoleRoutes.ts`); another superadmin may
+  do both. A `user`/`author` still reaches only their own row, refused
+  without a database lookup.
   Nobody, at any role, changes their own `status` through
   `PATCH /api/users/:id` — a `status` key in the body of a request against
   your own row is a 403 even when the value would not change anything.
@@ -458,11 +458,12 @@ deleted comment`, `likeRepository`) — but removing your own existing
   never stored and never counts as a change on its own. The rank rule
   protects **accounts** only — moderating content ignores it, so an admin
   may remove a superadmin's comment. `admin` and `superadmin` also carry
-  `update: own` on `comments` and `likes` (see **Comments** above): a
-  moderator removes, and for comments restores, but never rewrites, someone
-  else's reaction or remark. Superadmin's blanket `any` therefore has two
-  carve-outs, not one: no `create` on `books`/`series`/`chapters`, and
-  `update: own` rather than `any` on `comments` and `likes`.
+  `update: own` on `comments` and `likes` (see **Deleting a comment leaves a
+  tombstone, not a hole** under **Auth** above): a moderator removes, and
+  for comments restores, but never rewrites, someone else's reaction or
+  remark. Superadmin's blanket `any` therefore has two carve-outs, not one:
+  no `create` on `books`/`series`/`chapters`, and `update: own` rather than
+  `any` on `comments` and `likes`.
 
 ## Runtime notes
 

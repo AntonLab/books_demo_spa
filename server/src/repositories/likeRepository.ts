@@ -91,8 +91,8 @@ async function assertLikeable(
       attributes: ['userId', 'tombstone'],
     });
     if (!comment) throw new NotFoundError('Comment', input.commentId);
-    // A tombstone takes no new reactions: its count is hidden, so a like
-    // there would be a vote nobody can see.
+    // A tombstone takes no new reactions: a like there would be a vote on a
+    // comment nobody can see.
     if (comment.tombstone !== null) {
       throw new ForbiddenError('You cannot like a deleted comment');
     }
