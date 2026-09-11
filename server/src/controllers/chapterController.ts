@@ -30,9 +30,14 @@ export function createChapterController(
   // the row — which is why this cannot live in the middleware, where the row
   // is not loaded yet.
   //
+  // Only `any` returns early, here and in assertMayAddTo below. Every other
+  // value, a missing scope included, falls through to the owner comparison: a
+  // handler mounted without requirePermission fails closed rather than acting
+  // as `any`.
+  //
   // 404 before 403, so a refusal cannot be used to probe which ids exist.
   const assertMayTouch = async (req: Request, id: number): Promise<void> => {
-    if (req.permissionScope !== 'own') return;
+    if (req.permissionScope === 'any') return;
 
     const ownerId = await repository.findOwnerId(id);
     if (ownerId === null) throw new NotFoundError('Chapter', id);
@@ -48,7 +53,7 @@ export function createChapterController(
     req: Request,
     bookId: number
   ): Promise<void> => {
-    if (req.permissionScope !== 'own') return;
+    if (req.permissionScope === 'any') return;
 
     const ownerId = await repository.findBookOwnerId(bookId);
     if (ownerId === null) throw new NotFoundError('Book', bookId);

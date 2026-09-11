@@ -49,7 +49,9 @@ export function createCommentController(
   //
   // Returns the row it looked up, so a caller that also needs to inspect it
   // does not pay for a second query. `any` skips the owner comparison
-  // entirely — that is what lets an admin act on a reported comment.
+  // entirely — that is what lets an admin act on a reported comment. Every
+  // other value, a missing scope included, is compared: a handler mounted
+  // without requirePermission fails closed rather than acting as `any`.
   const assertOwned = async (
     req: Request,
     id: number
@@ -57,7 +59,7 @@ export function createCommentController(
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
 
-    if (req.permissionScope === 'own' && existing.userId !== req.user?.id) {
+    if (req.permissionScope !== 'any' && existing.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
     }
 

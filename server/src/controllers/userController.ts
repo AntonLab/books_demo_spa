@@ -31,8 +31,12 @@ export function createUserController(
   // needed to find an owner: the row *is* the account, so its id is the
   // owner. That also means this never touches the database, so a refusal
   // here leaks nothing about which ids exist — there is nothing to probe.
+  //
+  // Only `any` returns early. Every other value, a missing scope included,
+  // falls through to the comparison: a handler mounted without
+  // requirePermission fails closed rather than acting as `any`.
   const assertMayTouch = async (req: Request, id: number): Promise<void> => {
-    if (req.permissionScope !== 'own') return;
+    if (req.permissionScope === 'any') return;
 
     if (req.user?.id !== id) {
       throw new ForbiddenError('You may only change your own account');
