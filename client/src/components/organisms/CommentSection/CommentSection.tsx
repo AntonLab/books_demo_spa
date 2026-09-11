@@ -71,7 +71,7 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
   // server — the tree is assembled in this component, so this is the only place
   // that already knows whether a comment has children.
   const visible = all.filter(
-    (item) => !item.isDeleted || repliesOf(item.id).length > 0
+    (item) => item.tombstone === null || repliesOf(item.id).length > 0
   );
   const roots = visible.filter((item) => item.parentId === null);
 
@@ -143,7 +143,7 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
         <div key={comment.id}>
           {renderComment(comment, true)}
           <div style={{ marginLeft: token.marginXL }}>
-            {/* `visible`, not `repliesOf`: a deleted reply holds nothing
+            {/* `visible`, not `repliesOf`: a tombstoned reply holds nothing
                 together, so it is dropped like any other tombstone leaf. */}
             {visible
               .filter((item) => item.parentId === comment.id)

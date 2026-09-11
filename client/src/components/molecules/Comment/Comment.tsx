@@ -1,7 +1,12 @@
 import type { FC } from 'react';
 import { Button, Space, theme, Typography } from 'antd';
 import { LikeButton } from '@/components/molecules/LikeButton';
-import type { CommentWithAuthor } from '@/types/comment';
+import type { CommentWithAuthor, Tombstone } from '@/types/comment';
+
+const TOMBSTONE_LABELS: Record<Tombstone, string> = {
+  deleted: '[deleted]',
+  removed: '[removed by moderator]',
+};
 
 interface CommentProps {
   comment: CommentWithAuthor;
@@ -32,13 +37,14 @@ export const Comment: FC<CommentProps> = ({
   const { token } = theme.useToken();
 
   // A tombstone carries no author, no text and no controls — not even for the
-  // person who deleted it. It exists only so its replies keep a parent to hang
-  // off; anything more would put back what deleting was meant to remove.
-  if (comment.isDeleted) {
+  // person who deleted or removed it. It exists only so its replies keep a
+  // parent to hang off; anything more would put back what deleting or
+  // removing was meant to take away.
+  if (comment.tombstone !== null) {
     return (
       <article style={{ marginBottom: token.marginSM }}>
         <Typography.Text type="secondary" italic>
-          [deleted]
+          {TOMBSTONE_LABELS[comment.tombstone]}
         </Typography.Text>
       </article>
     );

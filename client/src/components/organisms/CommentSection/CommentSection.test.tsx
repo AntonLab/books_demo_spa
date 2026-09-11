@@ -33,7 +33,7 @@ const root: CommentWithAuthor = {
   userId: 3,
   bookId: 1,
   text: 'A fine book',
-  isDeleted: false,
+  tombstone: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
@@ -211,7 +211,8 @@ describe('CommentSection', () => {
           id: 8,
           parentId: null,
           text: '',
-          isDeleted: true,
+          tombstone: 'deleted',
+          userId: null,
           author: null,
         },
       ],
@@ -228,7 +229,10 @@ describe('CommentSection', () => {
 
   it('keeps a deleted comment that still holds a reply', async () => {
     mockedComments.listComments.mockResolvedValue({
-      items: [{ ...root, text: '', isDeleted: true, author: null }, reply],
+      items: [
+        { ...root, text: '', tombstone: 'deleted', userId: null, author: null },
+        reply,
+      ],
       total: 2,
       limit: 100,
       offset: 0,
@@ -243,7 +247,16 @@ describe('CommentSection', () => {
 
   it('drops a deleted reply', async () => {
     mockedComments.listComments.mockResolvedValue({
-      items: [root, { ...reply, text: '', isDeleted: true, author: null }],
+      items: [
+        root,
+        {
+          ...reply,
+          text: '',
+          tombstone: 'deleted',
+          userId: null,
+          author: null,
+        },
+      ],
       total: 2,
       limit: 100,
       offset: 0,
@@ -253,6 +266,50 @@ describe('CommentSection', () => {
 
     expect(await screen.findByText('A fine book')).toBeInTheDocument();
     expect(screen.queryByText('[deleted]')).toBeNull();
+  });
+
+  it('drops a removed comment that holds no replies', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        root,
+        {
+          ...reply,
+          id: 8,
+          parentId: null,
+          text: '',
+          tombstone: 'removed',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(await screen.findByText('A fine book')).toBeInTheDocument();
+    expect(screen.queryByText('[removed by moderator]')).toBeNull();
+  });
+
+  it('keeps a removed comment that still holds a reply', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        { ...root, text: '', tombstone: 'removed', userId: null, author: null },
+        reply,
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(
+      await screen.findByText('[removed by moderator]')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Agreed')).toBeInTheDocument();
   });
 
   it('likes another user comment', async () => {
