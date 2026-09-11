@@ -369,6 +369,54 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal((await Comment.findByPk(comment.id))?.tombstone, 'deleted');
   });
 
+  test('deleting an account leaves its tombstones with the updatedAt they had', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Quiet',
+      email: 'quiet@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host3',
+      email: 'host3@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Third Host',
+      description: 'Hosts a third thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Said once',
+    });
+    // Pinned well in the past, so a bump to "now" cannot hide inside the
+    // column's one-second precision. Raw SQL, because a Model.update that
+    // carries only updatedAt issues no statement at all; and a UTC string
+    // rather than a Date, which a raw replacement formats in the machine's
+    // own zone instead of the connection's.
+    const earlier = new Date('2026-01-02T03:04:05Z');
+    await sequelize.query(
+      'UPDATE comments SET updatedAt = :at WHERE id = :id',
+      {
+        replacements: { at: '2026-01-02 03:04:05', id: comment.id },
+      }
+    );
+    assert.equal(
+      (await Comment.findByPk(comment.id))?.updatedAt.getTime(),
+      earlier.getTime()
+    );
+
+    await repository.remove(leaving.id);
+
+    // One timestamp shared by every tombstone the account left would link
+    // them to each other and to the moment of the delete.
+    const tombstone = await Comment.findByPk(comment.id);
+    assert.equal(tombstone?.tombstone, 'deleted');
+    assert.equal(tombstone?.updatedAt.getTime(), earlier.getTime());
+  });
+
   test('findByLoginWithPassword returns the stored hash for a known login', async () => {
     await repository.create({
       ...base,

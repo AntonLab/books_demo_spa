@@ -169,9 +169,11 @@ export function createSequelizeUserRepository(): UserRepository {
       }
 
       return sequelize.transaction(async (transaction) => {
+        // silent, or every tombstone this leaves shares one updatedAt — a
+        // stamp linking them to each other and to the moment of the delete.
         await Comment.update(
           { tombstone: 'deleted' },
-          { where: { userId: id }, transaction }
+          { where: { userId: id }, transaction, silent: true }
         );
         const deleted = await User.destroy({ where: { id }, transaction });
         return deleted > 0;
