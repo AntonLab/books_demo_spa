@@ -67,6 +67,9 @@ test('an author writes only their own content', () => {
 test('an admin moderates but does not author', () => {
   assert.equal(scope('admin', 'books', 'update'), 'any');
   assert.equal(scope('admin', 'books', 'delete'), 'any');
+  assert.equal(scope('admin', 'series', 'update'), 'any');
+  assert.equal(scope('admin', 'chapters', 'delete'), 'any');
+  assert.equal(scope('admin', 'comments', 'update'), 'any');
   assert.equal(scope('admin', 'comments', 'delete'), 'any');
   // Without this, admin would inherit USER_GRANTS.likes verbatim — `own` on
   // update/delete — and could not act on a reported like any more than a
@@ -87,4 +90,17 @@ test('a user may flip their own like, which the API exposes as PATCH /likes/:id'
   // gap rather than a policy: nobody can change their own reaction.
   assert.equal(scope('user', 'likes', 'update'), 'own');
   assert.equal(scope('author', 'likes', 'update'), 'own');
+});
+
+// `own` is only honoured where a controller compares owners, and that happens
+// on update and delete alone: no list or get-by-id handler reads
+// req.permissionScope. A `read: own` grant would therefore behave exactly like
+// `any` — every row, not just the caller's — while claiming otherwise. Teach a
+// read handler to filter by owner before letting one in.
+test('no role is granted own on read, which no read handler would honour', () => {
+  const ownReads = rows.filter(
+    (row) => row.action === 'read' && row.scope === 'own'
+  );
+
+  assert.deepEqual(ownReads, []);
 });

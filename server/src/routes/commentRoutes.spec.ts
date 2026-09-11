@@ -354,6 +354,23 @@ test('an admin may delete another user comment', async () => {
   );
 });
 
+test('an admin may edit another user comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await patch(
+        base,
+        FOREIGN_COMMENT_ID,
+        { text: 'Moderated' },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicComment>(response)).text, 'Moderated');
+    }
+  );
+});
+
 test('a plain user still may not touch another user comment', async () => {
   await withAuthenticatedApp(
     { commentRepository: createFakeRepository() },

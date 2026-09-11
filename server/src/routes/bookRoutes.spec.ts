@@ -600,6 +600,24 @@ test('an author may not edit another author book', async () => {
   );
 });
 
+test('an author may not delete another author book', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await remove(base, created.id, ROLE_COOKIES.otherAuthor);
+      assert.equal(response.status, 403);
+
+      // The row must survive the refused attempt, not just the status code.
+      const stillThere = await fetch(`${base}/api/books/${created.id}`);
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
 test('an admin may edit and delete any book', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },

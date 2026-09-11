@@ -16,6 +16,11 @@ import {
 
 const KNOWN_BOOK_ID = 1;
 
+// Stands in for the books table: which books exist, and who owns each. A
+// chapter has no owner of its own — it is owned through its book — so both
+// ownership lookups below read this rather than hard-coding a persona.
+const BOOK_OWNERS = new Map<number, number>([[KNOWN_BOOK_ID, USER_IDS.author]]);
+
 function createFakeRepository(): ChapterRepository {
   const rows = new Map<number, PublicChapter>();
   let nextId = 1;
@@ -83,12 +88,15 @@ function createFakeRepository(): ChapterRepository {
       return rows.delete(id);
     },
 
+    // Mirrors the real repository, which resolves a chapter's owner through
+    // the book it is stored under.
     async findOwnerId(id) {
-      return rows.has(id) ? USER_IDS.author : null;
+      const chapter = rows.get(id);
+      return chapter ? (BOOK_OWNERS.get(chapter.bookId) ?? null) : null;
     },
 
     async findBookOwnerId(bookId) {
-      return bookId === KNOWN_BOOK_ID ? USER_IDS.author : null;
+      return BOOK_OWNERS.get(bookId) ?? null;
     },
   };
 }
@@ -385,6 +393,64 @@ test('an admin may edit any chapter but create none', async () => {
         (await patch(base, created.id, { title: 'Fixed' }, ROLE_COOKIES.admin))
           .status,
         200
+      );
+    }
+  );
+});
+
+test('an author may not edit a chapter in another author book', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { title: 'Hijacked' },
+        ROLE_COOKIES.otherAuthor
+      );
+      assert.equal(response.status, 403);
+
+      const stored = await json<PublicChapter>(
+        await fetch(`${base}/api/chapters/${created.id}`)
+      );
+      assert.equal(stored.title, 'Chapter One');
+    }
+  );
+});
+
+test('an author may not delete a chapter in another author book', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await remove(base, created.id, ROLE_COOKIES.otherAuthor);
+      assert.equal(response.status, 403);
+
+      // The row must survive the refused attempt, not just the status code.
+      const stillThere = await fetch(`${base}/api/chapters/${created.id}`);
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
+test('an admin may delete a chapter in another author book', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      assert.equal(
+        (await remove(base, created.id, ROLE_COOKIES.admin)).status,
+        204
       );
     }
   );
