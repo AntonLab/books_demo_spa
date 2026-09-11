@@ -417,6 +417,47 @@ test('an author may not edit another author series', async () => {
   );
 });
 
+test('an author may not delete another author series', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await remove(base, created.id, ROLE_COOKIES.otherAuthor);
+      assert.equal(response.status, 403);
+
+      // The row must survive the refused attempt, not just the status code.
+      const stillThere = await fetch(`${base}/api/series/${created.id}`);
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
+test('an admin may edit another author series', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { description: 'Moderated' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 200);
+      assert.equal(
+        (await json<PublicSeries>(response)).description,
+        'Moderated'
+      );
+    }
+  );
+});
+
 test('an anonymous create is 401 and GET stays public', async () => {
   await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
     assert.equal((await post(base, valid, null)).status, 401);
