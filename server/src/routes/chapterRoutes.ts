@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createChapterController } from '../controllers/chapterController.ts';
-import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createChapterSchema,
@@ -12,34 +12,42 @@ import type { RouteDeps } from './index.ts';
 
 export function createChapterRoutes(deps: RouteDeps): Router {
   const controller = createChapterController(deps.chapterRepository);
-  const requireAuth = createRequireAuth(deps);
+  const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // Reads stay public: the client's book list must work logged out.
+  // Every route runs through the matrix, reads included: every role has
+  // `read: any` on chapters, which is what keeps the list and detail routes
+  // public.
   router.get(
     '/',
+    requirePermission('chapters', 'read'),
     validate({ query: listChaptersQuerySchema }),
     controller.list
   );
-  router.get('/:id', validate({ params: idParamSchema }), controller.getById);
+  router.get(
+    '/:id',
+    requirePermission('chapters', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getById
+  );
 
-  // requireAuth goes before validate on every write, so an unauthenticated
-  // request is refused without its body being parsed or echoed back in a 400.
+  // requirePermission goes before validate on every write, so a refused
+  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
-    requireAuth,
+    requirePermission('chapters', 'create'),
     validate({ body: createChapterSchema }),
     controller.create
   );
   router.patch(
     '/:id',
-    requireAuth,
+    requirePermission('chapters', 'update'),
     validate({ params: idParamSchema, body: updateChapterSchema }),
     controller.update
   );
   router.delete(
     '/:id',
-    requireAuth,
+    requirePermission('chapters', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
   );

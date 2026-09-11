@@ -1,5 +1,6 @@
 import { ForeignKeyConstraintError, Op } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
+import { Book } from '../models/Book.ts';
 import {
   Chapter,
   toChapterSummary,
@@ -28,6 +29,11 @@ export interface ChapterRepository {
   findById(id: number): Promise<PublicChapter | null>;
   update(id: number, input: UpdateChapterInput): Promise<PublicChapter | null>;
   remove(id: number): Promise<boolean>;
+  // Two lookups, not one: a create is checked against the *target book* before
+  // the chapter exists, while an update or delete is checked against the
+  // chapter that is already there.
+  findOwnerId(id: number): Promise<number | null>;
+  findBookOwnerId(bookId: number): Promise<number | null>;
 }
 
 // A rejected FK on `chapters.bookId` means the referenced book does not exist.
@@ -112,6 +118,19 @@ export function createSequelizeChapterRepository(): ChapterRepository {
     async remove(id) {
       const deleted = await Chapter.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    async findOwnerId(id) {
+      const chapter = await Chapter.findByPk(id, {
+        attributes: ['bookId'],
+        include: [{ model: Book, as: 'book', attributes: ['userId'] }],
+      });
+      return chapter?.book?.userId ?? null;
+    },
+
+    async findBookOwnerId(bookId) {
+      const book = await Book.findByPk(bookId, { attributes: ['userId'] });
+      return book?.userId ?? null;
     },
   };
 }
