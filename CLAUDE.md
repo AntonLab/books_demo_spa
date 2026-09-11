@@ -71,30 +71,39 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
   `Series.hasMany(Book)`, `Book.hasMany(Chapter)` and `hasMany(Like)` from
   each of `User`, `Book` and `Comment` — have a full CRUD API, though every
-  write on them now requires a session (see the auth bullet below). A like
-  points at exactly one of a book or a comment; that XOR is enforced in zod
-  and in a model validator, never by the database (see `server/CLAUDE.md`).
-  `Comment` (owned by a user and a book, with self-referential replies) now has
-  a full CRUD API too, at `/api/comments`. Books and series carry a `title`
-  column alongside their description, and `GET /api/books/:id` returns a
-  `BookDetail` embedding the author, the series name and the like state.
-  `npm run build` (`tsc -p tsconfig.build.json`) emits to `dist/`.
+  write on them now goes through the role-permission matrix (see the auth
+  bullet below). A like points at exactly one of a book or a comment; that
+  XOR is enforced in zod and in a model validator, never by the database (see
+  `server/CLAUDE.md`). `Comment` (owned by a user and a book, with
+  self-referential replies) now has a full CRUD API too, at `/api/comments`.
+  Books and series carry a `title` column alongside their description, and
+  `GET /api/books/:id` returns a `BookDetail` embedding the author, the
+  series name and the like state. `npm run build`
+  (`tsc -p tsconfig.build.json`) emits to `dist/`.
 - `server` has session-based auth at `/api/auth` — register, login, logout,
   me, and a two-step password reset — backed by `Session` and
-  `PasswordResetToken` models and an opaque token in an httpOnly `sid` cookie.
-  A `requireAuth` middleware guards every `POST`/`PATCH`/`DELETE` on the six
-  resources above, plus both reads on `/api/users`; all other `GET`s stay
-  public. An `optionalAuth` middleware sits on the two public reads that need
-  to know who is asking — `GET /api/books/:id` and `GET /api/comments` — so a
-  like button can render its state without a 401 for anonymous visitors.
-  Ownership is checked on **comments and likes only**: only a comment's author
-  may edit or delete it, and nobody may like their own book or comment (403
-  either way). On books, series and chapters it is still deliberately unchecked
-  — a signed-in user may write another user's rows, which stays out of scope by
-  design. Identity for a comment or a like comes from the session, never from
-  the request body; without that the ownership rules would be trivially
-  defeated. See `server/CLAUDE.md` for the cookie flags, the
-  SHA-256-not-argon2 choice for tokens, and the login timing defence.
+  `PasswordResetToken` models and an opaque token in an httpOnly `sid`
+  cookie. `requireAuth` now guards only `GET /api/auth/me`; every write on
+  the six resources above, plus both reads on `/api/users`, instead runs
+  through `requirePermission` and a role-permission matrix — five roles
+  (`guest`, `user`, `author`, `admin`, `superadmin`), each granted `none`,
+  `own` or `any` on every resource × action — so a request with no session
+  gets 401 and a signed-in role with no grant for that action gets 403.
+  `optionalAuth` is no longer mounted anywhere: `requirePermission` resolves
+  the session itself on every route, public reads included, so a like button
+  still renders its state for an anonymous visitor without it. Ownership is
+  enforced on **books, series, chapters, comments and likes** — five
+  resources, not four — with `admin` and `superadmin` bypassing it wherever
+  the matrix grants them `any` rather than `own`; chapters resolve ownership
+  through their book, since `chapters` carries no `userId`. Identity for a
+  comment or a like still comes from the session, never the request body;
+  without that the ownership rules would be trivially defeated. Role changes
+  go through their own door, `PATCH /api/users/:id/role`: a row's owner may
+  switch between `user` and `author`, and only `superadmin` may set any other
+  role on any account. See `server/CLAUDE.md` for the full matrix, the
+  cookie flags, the SHA-256-not-argon2 choice for tokens, the login timing
+  defence, and — deliberately left unfixed pending a product decision — what
+  `admin`'s broad grant on `users` does and does not protect.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 
