@@ -63,17 +63,25 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
   }
 
   const all = data?.items ?? [];
-  // The server returns a flat list; the two-level tree is assembled here.
-  const repliesOf = (id: number) => all.filter((item) => item.parentId === id);
 
-  // A tombstone earns its place only by holding replies together. One with
-  // nothing under it is pure noise, so it is dropped here rather than on the
-  // server — the tree is assembled in this component, so this is the only place
-  // that already knows whether a comment has children.
-  const visible = all.filter(
-    (item) => item.tombstone === null || repliesOf(item.id).length > 0
+  // The server returns a flat list; the two-level tree is assembled here, in
+  // one pass over it. Only roots and their direct replies render, so a
+  // tombstone earns its place only as a root keeping at least one live reply
+  // in its thread. Every other tombstone — a reply, or a root whose replies
+  // are all tombstones too — is noise, and is dropped here rather than on the
+  // server: this is the only place that already knows what hangs off what.
+  const liveReplies = new Map<number, CommentWithAuthor[]>();
+  for (const item of all) {
+    if (item.parentId === null || item.tombstone !== null) continue;
+    const siblings = liveReplies.get(item.parentId) ?? [];
+    siblings.push(item);
+    liveReplies.set(item.parentId, siblings);
+  }
+  const roots = all.filter(
+    (item) =>
+      item.parentId === null &&
+      (item.tombstone === null || liveReplies.has(item.id))
   );
-  const roots = visible.filter((item) => item.parentId === null);
 
   const submit = () => {
     const text = draft.trim();
@@ -143,11 +151,9 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
         <div key={comment.id}>
           {renderComment(comment, true)}
           <div style={{ marginLeft: token.marginXL }}>
-            {/* `visible`, not `repliesOf`: a tombstoned reply holds nothing
-                together, so it is dropped like any other tombstone leaf. */}
-            {visible
-              .filter((item) => item.parentId === comment.id)
-              .map((child) => renderComment(child, false))}
+            {(liveReplies.get(comment.id) ?? []).map((child) =>
+              renderComment(child, false)
+            )}
           </div>
         </div>
       ))}
