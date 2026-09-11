@@ -89,9 +89,9 @@ export interface PublicComment {
 // guarded. The like fields ride along for the reason the book detail carries
 // them — the alternative is one request per comment on screen.
 export interface CommentWithAuthor extends PublicComment {
-  // null on a deleted comment, which is what makes the tombstone anonymous.
-  // Non-null everywhere else: userId is NOT NULL, so there is always an author
-  // to name.
+  // null on a tombstone of either kind — a tombstone is anonymous, and one
+  // whose owner's account was deleted has no author to name at all. A live
+  // comment always has one.
   author: AuthorSummary | null;
   likeCount: number;
   viewerLikeId: number | null;

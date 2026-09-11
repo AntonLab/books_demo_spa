@@ -143,16 +143,16 @@ export function createSequelizeCommentRepository(): CommentRepository {
 
       return {
         items: rows.map((row) => {
-          // The include is unconditional and userId is NOT NULL, so this cannot
-          // be missing in practice; the guard is what keeps the NonAttribute's
-          // optionality honest without a non-null assertion.
-          if (!row.user) {
+          // A live comment always has its owner loaded: the include is
+          // unconditional. Only a tombstone can have none — its account was
+          // deleted — and a tombstone names no author anyway.
+          if (!row.user && (row.tombstone ?? null) === null) {
             throw new Error(`comment ${row.id} has no author loaded`);
           }
 
           return toCommentWithAuthor(
             row,
-            toAuthorSummary(row.user),
+            row.user ? toAuthorSummary(row.user) : null,
             counts.get(row.id) ?? 0,
             viewerLikes.get(row.id) ?? null
           );

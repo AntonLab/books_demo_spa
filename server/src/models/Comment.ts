@@ -27,7 +27,10 @@ export class Comment extends Model<
   // chapters.bookId: a top-level comment replies to nothing. The self-reference
   // is what makes the thread a tree.
   declare parentId: CreationOptional<ForeignKey<Comment['id']> | null>;
-  declare userId: ForeignKey<User['id']>;
+  // Nullable: a comment outlives its owner's account as a `deleted`
+  // tombstone, and the account's delete nulls this column. A live comment
+  // always has an owner.
+  declare userId: ForeignKey<User['id']> | null;
   declare bookId: ForeignKey<Book['id']>;
   declare text: string;
   // How the comment became a tombstone, or null while it is live. The row
@@ -62,9 +65,10 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
       },
       // Must match users.id / books.id exactly (INTEGER UNSIGNED) or MySQL
       // rejects the foreign key with errno 3780 on incompatible column types.
+      // allowNull is what makes the association's ON DELETE SET NULL legal.
       userId: {
         type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: false,
+        allowNull: true,
       },
       bookId: {
         type: DataTypes.INTEGER.UNSIGNED,
