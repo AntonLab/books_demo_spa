@@ -9,7 +9,7 @@ const comment: CommentWithAuthor = {
   userId: 3,
   bookId: 1,
   text: 'A fine chapter',
-  isDeleted: false,
+  tombstone: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
@@ -106,8 +106,9 @@ describe('Comment', () => {
   describe('a deleted comment', () => {
     const deleted: CommentWithAuthor = {
       ...comment,
+      tombstone: 'deleted',
       text: '',
-      isDeleted: true,
+      userId: null,
       author: null,
     };
 
@@ -125,5 +126,24 @@ describe('Comment', () => {
 
       expect(screen.queryByRole('button')).toBeNull();
     });
+  });
+
+  it('renders a removed comment as [removed by moderator], with no author or controls', () => {
+    render(
+      <Comment
+        {...baseProps}
+        isOwn
+        comment={{
+          ...baseProps.comment,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+        }}
+      />
+    );
+
+    expect(screen.getByText('[removed by moderator]')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
