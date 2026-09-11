@@ -13,10 +13,12 @@ import {
   initModels,
   Like,
   Series,
+  Session,
   User,
 } from '../models/index.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
+import { hashToken } from '../tokens.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
 
 function testDbConfig() {
@@ -232,6 +234,54 @@ describe('userRepository against real MySQL', { skip }, () => {
       await verifyPassword(after.password, 'brand new password'),
       true
     );
+  });
+
+  const openTwoSessions = async (userId: number): Promise<void> => {
+    const expiresAt = new Date(Date.now() + 60_000);
+    await Session.bulkCreate([
+      { userId, tokenHash: hashToken(`${userId}-a`), expiresAt },
+      { userId, tokenHash: hashToken(`${userId}-b`), expiresAt },
+    ]);
+  };
+
+  const sessionCount = (userId: number) => Session.count({ where: { userId } });
+
+  test('blocking an account ends its sessions in the same update', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { status: 'blocked' });
+
+    assert.equal(await sessionCount(created.id), 0);
+  });
+
+  test('re-blocking a blocked account and unblocking it leave sessions alone', async () => {
+    const created = await repository.create({ ...base, status: 'blocked' });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { status: 'blocked' });
+    assert.equal(await sessionCount(created.id), 2);
+
+    await repository.update(created.id, { status: 'active' });
+    assert.equal(await sessionCount(created.id), 2);
+  });
+
+  test('a password change ends every session', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { password: 'another-pass-1' });
+
+    assert.equal(await sessionCount(created.id), 0);
+  });
+
+  test('an ordinary edit leaves sessions alone', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { firstName: 'Renamed' });
+
+    assert.equal(await sessionCount(created.id), 2);
   });
 
   test('returns null for a missing record and false for a missing delete', async () => {

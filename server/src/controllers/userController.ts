@@ -6,6 +6,7 @@ import {
 } from '../middleware/validate.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { verifyPassword } from '../password.ts';
+import { clearSessionCookie } from '../sessionCookie.ts';
 import { AppError, ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CreateUserInput,
@@ -127,6 +128,14 @@ export function createUserController(
 
       const user = await repository.update(id, changes);
       if (!user) throw new NotFoundError('User', id);
+
+      // The repository has just ended every session this account had, the one
+      // carrying this request included; clearing the cookie keeps the browser
+      // from presenting a token that names nothing.
+      if (isOwnRow && changes.password !== undefined) {
+        clearSessionCookie(res);
+      }
+
       res.json(user);
     },
 
