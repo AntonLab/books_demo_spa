@@ -25,9 +25,30 @@ const KNOWN_COMMENT_ID = 1;
 // to be rejected.
 const OWN_BOOK_ID = 77;
 const OWN_COMMENT_ID = 88;
+const FOREIGN_LIKE_ID = 500;
+// Deliberately outside routeTestKit's USER_IDS, which reserves 2-5 as
+// always-resolvable personas — picking one of those here would make this
+// "foreign" row silently belong to a real persona instead.
+const FOREIGN_LIKE_OWNER_ID = 900;
 
-function createFakeRepository(): LikeRepository {
-  const rows = new Map<number, PublicLike>();
+// Seeded rather than posted: the fake's create() below only accepts
+// actorId === KNOWN_USER_ID, so there is no way to create a like as a
+// second persona through the API — the same technique commentRoutes.spec.ts
+// uses for FOREIGN_COMMENT_ID.
+const FOREIGN_LIKE: PublicLike = {
+  id: FOREIGN_LIKE_ID,
+  userId: FOREIGN_LIKE_OWNER_ID,
+  bookId: KNOWN_BOOK_ID,
+  commentId: null,
+  isLike: true,
+  createdAt: new Date(),
+};
+
+// `seed` defaults to empty: most tests count rows (`total`, a `bookId`
+// filter), so a row present in every repository would silently inflate
+// those counts. Only the ownership tests below opt into the foreign row.
+function createFakeRepository(seed: PublicLike[] = []): LikeRepository {
+  const rows = new Map<number, PublicLike>(seed.map((row) => [row.id, row]));
   let nextId = 1;
 
   return {
@@ -511,4 +532,61 @@ test('an anonymous like is 401', async () => {
   await withApp({ likeRepository: createFakeRepository() }, async (base) => {
     assert.equal((await post(base, onBook, null)).status, 401);
   });
+});
+
+test('a user may flip and then delete their own like', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicLike>(
+        await post(base, onBook, ROLE_COOKIES.user)
+      );
+
+      const patched = await patch(
+        base,
+        created.id,
+        { isLike: false },
+        ROLE_COOKIES.user
+      );
+      assert.equal(patched.status, 200);
+
+      const deleted = await remove(base, created.id, ROLE_COOKIES.user);
+      assert.equal(deleted.status, 204);
+    }
+  );
+});
+
+test('a plain user may not PATCH another user like', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository([FOREIGN_LIKE]) },
+    async (base) => {
+      const response = await patch(
+        base,
+        FOREIGN_LIKE_ID,
+        { isLike: false },
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a plain user may not DELETE another user like', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository([FOREIGN_LIKE]) },
+    async (base) => {
+      const response = await remove(base, FOREIGN_LIKE_ID, ROLE_COOKIES.user);
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('an admin may delete another user like', async () => {
+  await withAuthenticatedApp(
+    { likeRepository: createFakeRepository([FOREIGN_LIKE]) },
+    async (base) => {
+      const response = await remove(base, FOREIGN_LIKE_ID, ROLE_COOKIES.admin);
+      assert.equal(response.status, 204);
+    }
+  );
 });
