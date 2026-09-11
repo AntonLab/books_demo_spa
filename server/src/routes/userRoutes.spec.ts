@@ -92,13 +92,12 @@ function createFakeRepository(seed: PublicUser[] = []): UserRepository {
       const current = rows.get(id);
       if (!current) return null;
       conflicts(input.login ?? current.login, input.email ?? current.email, id);
+      // Applies every key it is handed rather than copying a named few. That
+      // is what lets "a role in a PATCH body is ignored" fail: a fake that
+      // never read `role` would pass it even if the schema let one through.
       const updated: PublicUser = {
         ...current,
-        login: input.login ?? current.login,
-        email: input.email ?? current.email,
-        firstName: input.firstName ?? current.firstName,
-        lastName: input.lastName ?? current.lastName,
-        status: input.status ?? current.status,
+        ...input,
         updatedAt: new Date(),
       };
       rows.set(id, updated);
@@ -205,6 +204,26 @@ test('POST creates a user and never echoes the password', async () => {
       assert.equal(body.login, 'Bob');
       assert.equal(body.status, 'pending');
       assert.equal('password' in body, false);
+    }
+  );
+});
+
+// The matrix grants `users × create` to superadmin alone. These two pin that:
+// guarding the route with a plain session check again would let both through.
+test('a plain user may not create an account through POST /api/users', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 403);
+    }
+  );
+});
+
+test('an admin may not create an account either — that is superadmin only', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.admin)).status, 403);
     }
   );
 });
