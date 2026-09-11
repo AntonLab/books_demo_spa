@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, theme } from 'antd';
+import { Alert, Button, Checkbox, Form, Input, Modal, theme } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { closeModal, openModal } from '@/store/authSlice';
 import { useRegister } from '@/queries/auth';
@@ -15,6 +15,7 @@ interface RegisterValues {
   confirm: string;
   firstName: string;
   lastName: string;
+  isAuthor?: boolean;
 }
 
 // The server already worked out which column collided and returns it as
@@ -38,12 +39,14 @@ export const RegisterModal: FC = () => {
     setFormError(null);
 
     try {
+      const { isAuthor } = values;
       await register.mutateAsync({
         login: values.login,
         email: values.email,
         password: values.password,
         firstName: values.firstName,
         lastName: values.lastName,
+        role: isAuthor === true ? 'author' : 'user',
       });
       // The reducer no longer sees the API result, so the modal closes itself.
       dispatch(closeModal());
@@ -159,6 +162,10 @@ export const RegisterModal: FC = () => {
           ]}
         >
           <Input.Password autoComplete="new-password" />
+        </Form.Item>
+
+        <Form.Item name="isAuthor" valuePropName="checked">
+          <Checkbox>I&apos;m author</Checkbox>
         </Form.Item>
 
         <Form.Item>
