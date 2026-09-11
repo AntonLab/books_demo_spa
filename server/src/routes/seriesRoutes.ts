@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createSeriesController } from '../controllers/seriesController.ts';
-import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createSeriesSchema,
@@ -12,30 +12,41 @@ import type { RouteDeps } from './index.ts';
 
 export function createSeriesRoutes(deps: RouteDeps): Router {
   const controller = createSeriesController(deps.seriesRepository);
-  const requireAuth = createRequireAuth(deps);
+  const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // Reads stay public: the client's book list must work logged out.
-  router.get('/', validate({ query: listSeriesQuerySchema }), controller.list);
-  router.get('/:id', validate({ params: idParamSchema }), controller.getById);
+  // Every route runs through the matrix, reads included: `guest` has `read:
+  // any` on series, which is what keeps the list and detail routes public.
+  router.get(
+    '/',
+    requirePermission('series', 'read'),
+    validate({ query: listSeriesQuerySchema }),
+    controller.list
+  );
+  router.get(
+    '/:id',
+    requirePermission('series', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getById
+  );
 
-  // requireAuth goes before validate on every write, so an unauthenticated
-  // request is refused without its body being parsed or echoed back in a 400.
+  // requirePermission goes before validate on every write, so a refused
+  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
-    requireAuth,
+    requirePermission('series', 'create'),
     validate({ body: createSeriesSchema }),
     controller.create
   );
   router.patch(
     '/:id',
-    requireAuth,
+    requirePermission('series', 'update'),
     validate({ params: idParamSchema, body: updateSeriesSchema }),
     controller.update
   );
   router.delete(
     '/:id',
-    requireAuth,
+    requirePermission('series', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
   );

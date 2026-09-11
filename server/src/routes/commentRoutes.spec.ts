@@ -10,6 +10,7 @@ import type { AuthorSummary } from '../types/user.ts';
 import {
   AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
   TEST_USER,
   withApp,
   withAuthenticatedApp,
@@ -17,7 +18,11 @@ import {
 
 const KNOWN_BOOK_ID = 1;
 // Owned by a different user, which is what the 403 cases turn on: TEST_USER is
-// id 1, and requireAuth resolves every authenticated request to them.
+// id 1, and requirePermission resolves every authenticated request to them.
+// This happens to equal 2, which routeTestKit's USER_IDS reserves for the
+// `author` persona — no test here acts as that persona against a row owned
+// by this id, so it does not change any test's meaning today, but a future
+// author-vs-author test in this file must pick a different id.
 const OTHER_USER_ID = TEST_USER.id + 1;
 const FOREIGN_COMMENT_ID = 500;
 
@@ -331,4 +336,60 @@ test('DELETE without a session is 401', async () => {
   await withApp({ commentRepository: createFakeRepository() }, async (base) => {
     assert.equal((await remove(base, 1, null)).status, 401);
   });
+});
+
+test('an admin may delete another user comment', async () => {
+  // Comments were the first resource to check ownership, and until now nobody
+  // could override it — which would leave a report with no possible outcome.
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await remove(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 204);
+    }
+  );
+});
+
+test('an admin may edit another user comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await patch(
+        base,
+        FOREIGN_COMMENT_ID,
+        { text: 'Moderated' },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicComment>(response)).text, 'Moderated');
+    }
+  );
+});
+
+test('a plain user still may not touch another user comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await remove(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a plain user may still comment — roles accumulate', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 201);
+    }
+  );
 });

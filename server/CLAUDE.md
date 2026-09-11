@@ -29,17 +29,22 @@ is untouched and stays cheap.
 `/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
 `POST /password-reset/request` and `POST /password-reset/confirm`. Both models
 hang off `User.hasMany(...)` with `ON DELETE CASCADE`. **Every write on the
-five resources above — `POST`, `PATCH`, `DELETE` — now requires a session**,
-and so do both reads on `/api/users`, because `PublicUser` carries an email
-address and an open list would be a scrapeable account directory. Every other
-`GET` stays public. See **Auth** below.
+five resources above — `POST`, `PATCH`, `DELETE` — and both reads on
+`/api/users` now go through the role-permission matrix** (see **Roles and
+permissions** below) rather than a blanket session check: a request with no
+session is refused with 401, and a signed-in role with no grant for that
+module/action is refused with 403. `/api/users` guards its reads too, because
+`PublicUser` carries an email address and an open list would be a scrapeable
+account directory. Every other `GET` stays public. See **Auth** and **Roles
+and permissions** below.
 
 `Comment` has a full CRUD API at `/api/comments`, built to the same
 five-file pattern as the others. `User.hasMany(Comment)`,
 `Book.hasMany(Comment)`, `Comment.hasMany(Like)` and the self-referential
-`Comment.hasMany(Comment, { as: 'replies' })` are all wired. Two things set it
-apart from the other five, both covered under **Auth**: the author comes from
-the session rather than the body, and `PATCH`/`DELETE` check ownership. Its
+`Comment.hasMany(Comment, { as: 'replies' })` are all wired. Like likes, its
+author comes from the session rather than the body, and `PATCH`/`DELETE`
+check ownership through the permission matrix's `own` scope — the same
+mechanism that now also gates books, series and chapters (see **Auth**). Its
 list endpoint returns a flat page — each row carrying `parentId`, an embedded
 `author`, a `likeCount` and the caller's `viewerLikeId` — and leaves tree
 assembly to the client, which keeps paging meaningful. Deleting a comment takes
@@ -91,32 +96,40 @@ added.
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `userRoutes.ts`,
-  `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `likeRoutes.ts`,
-  mounted under `/api`). `routeTestKit.testkit.ts` holds the harness the six
-  route specs share (`withApp`, `withAuthenticatedApp`, `AUTH_COOKIE`,
-  `json`); `tsconfig.build.json` excludes `*.testkit.ts` alongside `*.spec.ts`,
-  so neither is emitted to `dist/`.
+  `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`,
+  `commentRoutes.ts`, `likeRoutes.ts`, mounted under `/api`).
+  `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
+  `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
+  excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
+  `dist/`.
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
-  `chapterController.ts`, `likeController.ts`)
+  `chapterController.ts`, `commentController.ts`, `likeController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  `likeRepository.ts`, `sessionRepository.ts`, `passwordResetRepository.ts`,
-  Sequelize-backed; `likePattern.ts` holds the LIKE
-  escaping they share). Note the collision: `likePattern.ts` is about the SQL
-  `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
+  `commentRepository.ts`, `likeRepository.ts`, `sessionRepository.ts`,
+  `passwordResetRepository.ts`, Sequelize-backed; `likePattern.ts` holds the
+  LIKE escaping they share). Note the collision: `likePattern.ts` is about the
+  SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
   `Book.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `Session.ts`,
-  `PasswordResetToken.ts`, `index.ts`; `tagArray.ts`
+  `PasswordResetToken.ts`, `Permission.ts`, `index.ts`; `tagArray.ts`
   holds the JSON tag-column normalisation `Series` and `Book` share)
+- `src/permissions/` — `matrix.ts` (the role/module/action → scope
+  definition and `buildMatrixRows()`) and `permissionStore.ts` (the
+  in-memory cache `scopeFor()` reads and `syncPermissions()` writes); see
+  **Roles and permissions**.
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
   `sequelize.ts`)
-- `src/middleware/` — auth, validation, error handling (`requireAuth.ts`,
-  `errorHandler.ts`, `notFound.ts`, `validate.ts`)
+- `src/middleware/` — auth, permissions, validation, error handling
+  (`requireAuth.ts`, `requirePermission.ts`, `optionalAuth.ts` (unmounted —
+  see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
+  three build on), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `comment.ts`, `like.ts`, `auth.ts`, `errors.ts`,
-  `express.d.ts`)
+  `chapter.ts`, `comment.ts`, `like.ts`, `permission.ts` (`Role`, `Module`,
+  `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
+  `errors.ts`, `express.d.ts`)
 
 ## Environment
 
@@ -149,10 +162,13 @@ value.
   would be a self-inflicted denial of service. Hashing at rest still matters: a
   leaked dump must not hand over usable sessions. Only the hash is stored; the
   plaintext exists in the cookie and the reset link and nowhere else.
-- **`requireAuth` runs before `validate`** on every guarded route, so an
-  unauthenticated request is refused without its body being parsed or echoed
-  back in a 400. The visible consequence: an unauthenticated request with a
-  malformed body or id is a 401, not a 400.
+- **`requireAuth` guards only `GET /api/auth/me`** now; every write on the six
+  resources below runs through `requirePermission` instead (see **Roles and
+  permissions**). Both run before `validate` on the route they guard, so an
+  unauthenticated or disallowed request is refused without its body being
+  parsed or echoed back in a 400. The visible consequence: a request refused
+  by either middleware with a malformed body or id still comes back 401 or
+  403, never 400.
 - **Login gives one answer to two questions.** An unknown login and a wrong
   password both return 401 with an identical body, and the unknown-login path
   deliberately spends an argon2 verify against a cached dummy hash so the two
@@ -174,29 +190,41 @@ value.
   partial apply would leave a redeemed token beside a live pre-reset session,
   the exact state the flow exists to prevent. Unknown, expired and
   already-used tokens all fail with one 400 and one message.
-- **`optionalAuth` is the counterpart to `requireAuth`** for a public read that
-  still wants to know who is asking. It performs the same cookie lookup and
-  calls `next()` with `req.user` left unset when there is no valid session,
-  where `requireAuth` would answer 401. Both are built on `resolveSessionUser`
-  in `middleware/sessionUser.ts`, which reports "nobody" for all four failure
-  modes — missing cookie, unknown token, expired session, deleted user —
-  because the two callers draw opposite conclusions from that one answer.
-  It sits on `GET /api/books/:id` and `GET /api/comments`, which is what lets
-  them report `viewerLikeId` without breaking for anonymous visitors. Nothing
-  behind it may rely on `req.user` being set.
-- **Ownership is checked on comments and likes, and nowhere else.** Only a
-  comment's author may `PATCH` or `DELETE` it, and nobody may like their own
-  book or their own comment; all four refusals are 403. On books, series and
-  chapters ownership is still deliberately unchecked — a signed-in user may
-  write another user's rows, which stays out of scope by design.
-  - The comment check lives in `commentController`, not a middleware, because
-    it needs the repository — and it reports 404 before 403, so a refusal
-    cannot be used to probe which ids exist.
+- **`optionalAuth` is not mounted on any route.** It still exists in
+  `middleware/optionalAuth.ts` with its spec, built on the same
+  `resolveSessionUser` in `middleware/sessionUser.ts` that `requireAuth` and
+  `requirePermission` use — it reports "nobody" for all four failure modes
+  (missing cookie, unknown token, expired session, deleted user) and calls
+  `next()` with `req.user` left unset rather than answering 401. It used to
+  sit on `GET /api/books/:id` and `GET /api/comments` so those public reads
+  could report `viewerLikeId` without a 401 for anonymous visitors, but
+  `requirePermission` now resolves the session itself on every route,
+  including public reads, so nothing wires `optionalAuth` in any more. Do not
+  wire it back in on the assumption it is load-bearing; treat it as
+  unreferenced until it is either reused or deleted.
+- **Ownership is enforced on books, series, chapters, comments and likes.**
+  `admin` and `superadmin` bypass it — the matrix grants them `any` rather
+  than `own` on the module in question, so the check in the controller is
+  skipped outright. For the roles that only get `own` (`user` and `author` on
+  their own resources), only the row's owner may `PATCH` or `DELETE` it, and
+  nobody may like their own book or their own comment; every refusal is 403.
+  - The book, series, chapter, comment and like checks each live in their own
+    controller (`assertMayTouch` / `assertOwned`), not a middleware, because
+    they need the repository to load the row before an owner can be compared
+    — `requirePermission` only knows the scope, not the row. Every one reports
+    404 before 403, so a refusal cannot be used to probe which ids exist.
+  - **Chapters resolve ownership through their book**, because `chapters` has
+    no `userId` column: `chapterController.assertMayTouch` looks up the
+    chapter's `bookId` and then the book's owner, and `assertMayAddTo` does
+    the same for a `POST` that has no chapter yet to own — the target book
+    answers instead.
   - The self-like check lives in `likeRepository.create`, which loads the
     target to compare owners. It is the one check-then-write in that file, and
     it is safe where the uniqueness check would not be: a row's owner never
     changes, so the answer cannot go stale before the insert. Uniqueness stays
-    with the indexes for exactly that reason.
+    with the indexes for exactly that reason. This is a domain invariant, not
+    a matrix rule — no scope value spells out "not yourself," so do not go
+    looking for it in the permission table.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
@@ -204,6 +232,127 @@ value.
   like your own book" would both be defeated in one line, and the likes' unique
   indexes would be enforcing one like per _claimed_ user. `createLikeSchema`
   used to take one — that is a breaking change to `POST /api/likes`.
+
+## Roles and permissions
+
+- **Five roles, and one place they stop accumulating.** `ROLES` in
+  `types/permission.ts` is `guest`, `user`, `author`, `admin`, `superadmin`.
+  `guest` is not a storable value — `USER_ROLES` (what actually sits in
+  `users.role`) omits it — it is what `requirePermission` assumes when a
+  request carries no session, so a public read is described by a row in the
+  matrix rather than by the absence of a guard. Each role after `user`
+  layers more grants on top of the last, with one deliberate exception:
+  `admin` and `superadmin` both get no `create` on `books`, `series` or
+  `chapters`. Admins moderate; they do not author, and that stays true even
+  for the role that is `any` on literally everything else.
+- **The matrix is a `role × module × action → scope` table**
+  (`permissions/matrix.ts`, `models/Permission.ts`): seven modules (`users`,
+  `series`, `books`, `chapters`, `comments`, `likes`, `reports` — `reports`
+  is reserved for a moderation feature that has no model, controller or
+  route yet, so today it grants access to nothing), four actions (`create`,
+  `read`, `update`, `delete`), and a scope of `none` / `own` / `any` rather
+  than a boolean. A boolean could not tell "an `author` may update the books
+  they wrote" from "an `admin` may update anyone's book" — that distinction
+  would fall back into every controller instead of living in one table. On
+  `create` specifically, `own` and `any` mean the same thing: a created row
+  is the caller's by construction (its owner column is always the session's
+  user id), so `own` is simply the spelling a role that may create uses.
+  `PERMISSION_DEFINITION` in `matrix.ts` only spells out what is granted;
+  everything else expands to `none` when `buildMatrixRows()` produces one
+  row per role/module/action for the table, so a missing row can never be
+  mistaken for an accidental grant.
+- **Seeded wholesale at startup, read into memory once.** `permissionStore.ts`
+  keeps an in-process `Map` that answers `scopeFor(role, module, action)`.
+  The module seeds that map from `buildMatrixRows()` at import time — before
+  any database call — so `scopeFor` answers correctly in any process,
+  including a test that never touches MySQL; an empty-until-synced cache
+  would make that misconfiguration look identical to a deliberate 403.
+  `syncPermissions()` then replaces the `permissions` table wholesale inside
+  a transaction (destroy-then-`bulkCreate`, never an upsert — a partial
+  upsert would leave orphan rows for a module the code no longer has) and
+  reloads the map from what was actually written. `src/index.ts` calls
+  `syncPermissions()` unconditionally on every boot, including production,
+  while `sequelize.sync()` itself is gated to non-production. **A production
+  boot therefore needs the `permissions` table to already exist** — nothing
+  here creates it outside `sequelize.sync()` — or `syncPermissions()` throws
+  and the process never starts listening. That is deliberate, but not
+  because the server would otherwise refuse everything — the code seed above
+  means it would answer correctly without the table. A missing `permissions`
+  table means the schema was never provisioned, and failing loudly at boot
+  beats discovering it later. It does mean a production deploy must
+  provision that table (and the rest of the schema) before the first boot.
+- **Two-level enforcement.** `requirePermission(module, action)` — mounted
+  before `validate`, like `requireAuth` — resolves the session, looks up
+  `scopeFor(role, module, action)`, and refuses outright on `none`: **401
+  when there is no session at all** (the caller is refused a chance to
+  prove who they are), **403 when a resolved role has no grant** (the
+  caller is known and still not allowed). On `own` or `any` it lets the
+  request through and stamps `req.permissionScope`, because it cannot judge
+  `own` itself — the row is not loaded at that point. The controller's
+  `assertMayTouch`/`assertOwned` is the second level: `any` returns
+  immediately, `own` loads the row and compares its owner against
+  `req.user.id`, 404 before 403 as above.
+- **`role` appears in neither `createUserSchema` nor `updateUserSchema`.**
+  This is load-bearing, not incidental: `updateUserSchema` is
+  `createUserSchema.partial()`, so a `role` field added to the create schema
+  would appear on the update schema for free, and `PATCH /api/users/:id`
+  would let any signed-in caller promote themselves. Role changes travel
+  through their own schema (`updateRoleSchema`) and their own route instead.
+- **`POST /api/users` — the administrative create — is reachable only by
+  `superadmin`** now, because `ADMIN_GRANTS` gives `admin` no `create` on
+  `users`: an admin moderates existing accounts, it does not mint new ones.
+  Before this branch any signed-in user could call it. `POST /api/auth/register`
+  is the unaffected, separate public door every real signup uses — it reaches
+  only `user`/`author`, via `REGISTRABLE_ROLES`, not the matrix.
+- **`PATCH /api/users/:id/role` is the one door for role changes**
+  (`routes/userRoleRoutes.ts`, mounted ahead of the plain `/users` routes for
+  readability only — `/:id` matches exactly one path segment, so it can never
+  match `/:id/role`, and the two paths do not collide in either order). Getting
+  through the door only requires `users × update` from the matrix — `own`
+  for `user`/`author`, `any` for `admin`/`superadmin` — because the matrix
+  grades the resource, not the value being written; a second check inside
+  the handler decides which role a given caller may set. A `superadmin` may
+  set any role on any user. Anyone else may set a role only on their own
+  row, and only to `user` or `author` (`REGISTRABLE_ROLES` — the same pair
+  registration itself can reach): that includes `admin`, so an admin may
+  step themselves down to `user` or `author` but may not touch anyone
+  else's role, promote themselves to `admin`/`superadmin`, or promote
+  someone else at all. Switching between `user` and `author` is a
+  statement of intent, not a privilege grant — the real protection on an
+  author's account is that they may still only touch their own rows.
+- **The first `superadmin` is a manual SQL statement**, because nothing in
+  the API can grant that role — registration reaches only `user`/`author`,
+  and the role route requires an existing `superadmin` to create another:
+
+  ```sql
+  UPDATE users SET role = 'superadmin' WHERE login = '<your login>';
+  ```
+
+- **Matrix-governed access is not the same thing as a domain invariant.**
+  The self-like ban (`likeRepository.create` refuses a like whose target it
+  owns) and identity-from-session (see above) both live in code, not in a
+  scope value — there is no `PermissionScope` that spells out "not
+  yourself," so do not go looking for either rule in the permission table.
+  The reach of a comment delete is the same kind of thing, pointing the other
+  way: `commentRepository.remove` deletes the whole reply subtree, so a
+  `user` deleting their own comment under `own` also deletes every reply
+  beneath it, including other users' replies. The `own` check only compares
+  the owner of the comment named in the request; the subtree walk is
+  repository behaviour that predates the matrix, not something a scope
+  grants. Whether it should stay that way is the project owner's call — do
+  not read it as a matrix property, and do not change it as part of
+  permissions work.
+- **`admin`'s reach over accounts is broader than it may look, and nothing
+  here narrows it.** The matrix grants `admin` `update: any` and
+  `delete: any` on `users`, and `updateUserSchema` carries `email` and
+  `password` like every other field. An `admin` can therefore change any
+  other user's email or password through `PATCH /api/users/:id` —
+  including a `superadmin`'s — and nothing in the matrix, the schema or the
+  role route stops it; only role changes are walled off, through the
+  separate door above. Whether that is the intended shape of `admin` is an
+  open question the project owner is deciding separately — do not treat it
+  as a bug to fix here, and do not describe roles or the `superadmin`
+  account as protected from `admin` action.
 
 ## Runtime notes
 

@@ -1,11 +1,11 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import {
   validatedBody,
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CreateChapterInput,
   ListChaptersQuery,
@@ -25,11 +25,49 @@ export interface ChapterController {
 export function createChapterController(
   repository: ChapterRepository
 ): ChapterController {
+  // The other half of enforcement. requirePermission already refused `none`;
+  // `any` needs nothing more, and `own` is the only case that has to look at
+  // the row — which is why this cannot live in the middleware, where the row
+  // is not loaded yet.
+  //
+  // Only `any` returns early, here and in assertMayAddTo below. Every other
+  // value, a missing scope included, falls through to the owner comparison: a
+  // handler mounted without requirePermission fails closed rather than acting
+  // as `any`.
+  //
+  // 404 before 403, so a refusal cannot be used to probe which ids exist.
+  const assertMayTouch = async (req: Request, id: number): Promise<void> => {
+    if (req.permissionScope === 'any') return;
+
+    const ownerId = await repository.findOwnerId(id);
+    if (ownerId === null) throw new NotFoundError('Chapter', id);
+    if (ownerId !== req.user?.id) {
+      throw new ForbiddenError(
+        'You may only change chapters in your own books'
+      );
+    }
+  };
+
+  // A create has no chapter to own yet, so the target book answers instead.
+  const assertMayAddTo = async (
+    req: Request,
+    bookId: number
+  ): Promise<void> => {
+    if (req.permissionScope === 'any') return;
+
+    const ownerId = await repository.findBookOwnerId(bookId);
+    if (ownerId === null) throw new NotFoundError('Book', bookId);
+    if (ownerId !== req.user?.id) {
+      throw new ForbiddenError('You may only add chapters to your own books');
+    }
+  };
+
   return {
     create: async (req, res) => {
-      const chapter = await repository.create(
-        validatedBody<CreateChapterInput>(req)
-      );
+      const input = validatedBody<CreateChapterInput>(req);
+      await assertMayAddTo(req, input.bookId);
+
+      const chapter = await repository.create(input);
       res.status(201).json(chapter);
     },
 
@@ -50,6 +88,8 @@ export function createChapterController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
       const chapter = await repository.update(
         id,
         validatedBody<UpdateChapterInput>(req)
@@ -60,6 +100,8 @@ export function createChapterController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('Chapter', id);
       res.status(204).end();

@@ -7,13 +7,19 @@ import type {
 } from '../repositories/seriesRepository.ts';
 import type { PublicSeries } from '../types/series.ts';
 import {
-  AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
+  USER_IDS,
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
 
-const KNOWN_USER_ID = 1;
+// Every series in this suite is created by the `author` persona by default —
+// only `author` (and `admin`, on update/delete) has anything but `none` on
+// series in the matrix — so the "known valid user" the fake repository
+// accepts is that persona's id, not an arbitrary constant.
+const KNOWN_USER_ID = USER_IDS.author;
+const UNOWNED_USER_ID = 999997;
 
 function createFakeRepository(): SeriesRepository {
   const rows = new Map<number, PublicSeries>();
@@ -75,20 +81,27 @@ function createFakeRepository(): SeriesRepository {
     async remove(id) {
       return rows.delete(id);
     },
+
+    async findOwnerId(id) {
+      return rows.get(id)?.userId ?? null;
+    },
   };
 }
 
+// No userId: the owner comes from the session, never the body.
 const valid = {
-  userId: KNOWN_USER_ID,
   title: 'A Space Opera',
   description: 'A space opera in three parts',
   tags: ['sci-fi', 'epic'],
 };
 
+// Defaults to the author persona: create and update both need `own` or `any`
+// scope on series, and `user` has `none` on all three, so AUTH_COOKIE (the
+// `user` persona) is not a usable default for a write in this file.
 const post = (
   base: string,
   body: unknown,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/series`, {
     method: 'POST',
@@ -103,7 +116,7 @@ const patch = (
   base: string,
   id: number,
   body: unknown,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/series/${id}`, {
     method: 'PATCH',
@@ -112,6 +125,18 @@ const patch = (
       ...(cookie ? { cookie } : {}),
     },
     body: JSON.stringify(body),
+  });
+
+const remove = (
+  base: string,
+  id: number,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/series/${id}`, {
+    method: 'DELETE',
+    headers: {
+      ...(cookie ? { cookie } : {}),
+    },
   });
 
 test('POST creates a series and echoes its tags', async () => {
@@ -133,7 +158,6 @@ test('POST defaults tags to an empty array when omitted', async () => {
     { seriesRepository: createFakeRepository() },
     async (base) => {
       const response = await post(base, {
-        userId: KNOWN_USER_ID,
         title: 'No Tags Yet',
         description: 'No tags yet',
       });
@@ -165,7 +189,7 @@ test('POST rejects a missing description with 400', async () => {
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository() },
     async (base) => {
-      const response = await post(base, { userId: KNOWN_USER_ID });
+      const response = await post(base, {});
 
       assert.equal(response.status, 400);
       assert.match(
@@ -176,20 +200,10 @@ test('POST rejects a missing description with 400', async () => {
   );
 });
 
-test('POST against an unknown user is a 404, not a 500', async () => {
-  await withAuthenticatedApp(
-    { seriesRepository: createFakeRepository() },
-    async (base) => {
-      const response = await post(base, { ...valid, userId: 999 });
-
-      assert.equal(response.status, 404);
-      assert.match(
-        (await json<{ error: string }>(response)).error,
-        /User 999 not found/
-      );
-    }
-  );
-});
+// There is no longer a route-level way to reach an "unknown user" 404: userId
+// is not client-controlled, and authStubs only ever resolves known personas.
+// The repository-level mapping from a rejected FK to NotFoundError is still
+// covered directly in seriesRepository.spec.ts.
 
 test('GET list returns items with the paging envelope', async () => {
   await withAuthenticatedApp(
@@ -232,7 +246,7 @@ test('GET list filters by tag and by owner', async () => {
         await fetch(`${base}/api/series?userId=${KNOWN_USER_ID}`)
       );
       const byOther = await json<{ total: number }>(
-        await fetch(`${base}/api/series?userId=2`)
+        await fetch(`${base}/api/series?userId=${UNOWNED_USER_ID}`)
       );
 
       assert.equal(byTag.total, 1);
@@ -286,7 +300,7 @@ test('PATCH ignores userId rather than re-parenting the series', async () => {
     async (base) => {
       const created = await json<PublicSeries>(await post(base, valid));
       const response = await patch(base, created.id, {
-        userId: 2,
+        userId: UNOWNED_USER_ID,
         description: 'Rewritten',
       });
 
@@ -307,20 +321,23 @@ test('PATCH with an empty body is rejected with 400', async () => {
   );
 });
 
-test('DELETE removes the series, then reports 404', async () => {
+test('PATCH on a missing record is a 404', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await patch(base, 999, { tags: [] })).status, 404);
+    }
+  );
+});
+
+test('DELETE removes the series, then reports 404 on a second attempt', async () => {
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository() },
     async (base) => {
       const created = await json<PublicSeries>(await post(base, valid));
 
-      const first = await fetch(`${base}/api/series/${created.id}`, {
-        method: 'DELETE',
-        headers: { cookie: AUTH_COOKIE },
-      });
-      const second = await fetch(`${base}/api/series/${created.id}`, {
-        method: 'DELETE',
-        headers: { cookie: AUTH_COOKIE },
-      });
+      const first = await remove(base, created.id);
+      const second = await remove(base, created.id);
 
       assert.equal(first.status, 204);
       assert.equal(second.status, 404);
@@ -342,14 +359,108 @@ test('PATCH without a session is 401', async () => {
 
 test('DELETE without a session is 401', async () => {
   await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
-    const response = await fetch(`${base}/api/series/1`, { method: 'DELETE' });
-
-    assert.equal(response.status, 401);
+    assert.equal((await remove(base, 1, null)).status, 401);
   });
 });
 
 test('GET stays public', async () => {
   await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await fetch(`${base}/api/series`)).status, 200);
+  });
+});
+
+// --- The permission matrix: who may create, edit and delete a series. ---
+
+test('an author creates a series and a plain user may not', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.author)).status, 201);
+      assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 403);
+    }
+  );
+});
+
+test('an admin may not create a series but may delete any', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal((await post(base, valid, ROLE_COOKIES.admin)).status, 403);
+
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+      assert.equal(
+        (await remove(base, created.id, ROLE_COOKIES.admin)).status,
+        204
+      );
+    }
+  );
+});
+
+test('an author may not edit another author series', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { description: 'Hijacked' },
+        ROLE_COOKIES.otherAuthor
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('an author may not delete another author series', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await remove(base, created.id, ROLE_COOKIES.otherAuthor);
+      assert.equal(response.status, 403);
+
+      // The row must survive the refused attempt, not just the status code.
+      const stillThere = await fetch(`${base}/api/series/${created.id}`);
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
+test('an admin may edit another author series', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, valid, ROLE_COOKIES.author)
+      );
+
+      const response = await patch(
+        base,
+        created.id,
+        { description: 'Moderated' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 200);
+      assert.equal(
+        (await json<PublicSeries>(response)).description,
+        'Moderated'
+      );
+    }
+  );
+});
+
+test('an anonymous create is 401 and GET stays public', async () => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await post(base, valid, null)).status, 401);
     assert.equal((await fetch(`${base}/api/series`)).status, 200);
   });
 });

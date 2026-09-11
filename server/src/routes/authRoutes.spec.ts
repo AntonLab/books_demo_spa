@@ -12,6 +12,7 @@ import type {
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import type { CreateUserInput, PublicUser, UserStatus } from '../types/user.ts';
+import type { UserRole } from '../types/permission.ts';
 
 const registration = {
   login: 'Bob',
@@ -27,7 +28,7 @@ function createFakeUsers(seed: { status?: UserStatus } = {}) {
   let nextId = 1;
 
   const repository = {
-    async create(input: CreateUserInput) {
+    async create(input: CreateUserInput, role: UserRole = 'user') {
       if ([...rows.values()].some((row) => row.login === input.login)) {
         throw new ConflictError('login');
       }
@@ -42,6 +43,7 @@ function createFakeUsers(seed: { status?: UserStatus } = {}) {
         firstName: input.firstName,
         lastName: input.lastName,
         status: input.status ?? 'pending',
+        role,
         password: await hashPassword(input.password, 'test'),
         createdAt: now,
         updatedAt: now,
@@ -254,6 +256,31 @@ test('POST /register reports which field collided', async () => {
     assert.deepEqual((await json<{ details: unknown }>(response)).details, {
       field: 'login',
     });
+  });
+});
+
+test('POST /register creates an author when the box is ticked', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const response = await post(base, 'register', {
+      ...registration,
+      role: 'author',
+    });
+
+    assert.equal(response.status, 201);
+    assert.equal((await json<PublicUser>(response)).role, 'author');
+  });
+});
+
+test('POST /register refuses to make an admin', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const response = await post(base, 'register', {
+      ...registration,
+      role: 'admin',
+    });
+
+    assert.equal(response.status, 400);
   });
 });
 

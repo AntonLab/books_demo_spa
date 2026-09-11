@@ -13,6 +13,7 @@ import {
 import type {
   CreateCommentInput,
   ListCommentsQuery,
+  PublicComment,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -24,9 +25,10 @@ export interface CommentController {
   remove: RequestHandler;
 }
 
-// requireAuth guarantees req.user on every write, but the type is optional
-// because most requests legitimately have none. This narrows in one place
-// instead of asserting at three call sites.
+// requirePermission guarantees req.user on every write — `guest` has no write
+// grant on comments, so an anonymous write is a 401 before it gets here — but
+// the type is optional because most requests legitimately have none. This
+// narrows in one place instead of asserting at three call sites.
 function actorId(req: Request): number {
   if (!req.user) throw new UnauthorizedError();
   return req.user.id;
@@ -37,20 +39,32 @@ function actorId(req: Request): number {
 export function createCommentController(
   repository: CommentRepository
 ): CommentController {
-  // Comments are the first resource here to check ownership — books, series and
-  // chapters still let any signed-in user write another user's rows. The check
-  // lives in the controller rather than a middleware because it needs the
-  // repository, and because keeping both writes' rule in one place is what
-  // stops them drifting apart.
+  // The same ownership rule books, series, chapters and likes enforce: `own`
+  // may change only the caller's own comments. The check lives in the
+  // controller rather than a middleware because it needs the repository, and
+  // because keeping both writes' rule in one place is what stops them drifting
+  // apart.
   //
   // 404 before 403 deliberately: reporting "forbidden" for a comment that does
   // not exist would leak which ids are real.
-  const assertOwned = async (id: number, userId: number): Promise<void> => {
+  //
+  // Returns the row it looked up, so a caller that also needs to inspect it
+  // does not pay for a second query. `any` skips the owner comparison
+  // entirely — that is what lets an admin act on a reported comment. Every
+  // other value, a missing scope included, is compared: a handler mounted
+  // without requirePermission fails closed rather than acting as `any`.
+  const assertOwned = async (
+    req: Request,
+    id: number
+  ): Promise<PublicComment> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
-    if (existing.userId !== userId) {
+
+    if (req.permissionScope !== 'any' && existing.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
     }
+
+    return existing;
   };
 
   return {
@@ -64,8 +78,8 @@ export function createCommentController(
 
     list: async (req, res) => {
       const query = validatedQuery<ListCommentsQuery>(req);
-      // optionalAuth fills req.user when a session cookie resolves; null is
-      // what makes viewerLikeId come back empty for an anonymous visitor.
+      // requirePermission sets req.user when a session resolves; null is what
+      // makes viewerLikeId come back empty for an anonymous visitor.
       const { items, total } = await repository.list(
         query,
         req.user?.id ?? null
@@ -82,7 +96,7 @@ export function createCommentController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(id, actorId(req));
+      await assertOwned(req, id);
 
       const comment = await repository.update(
         id,
@@ -94,7 +108,7 @@ export function createCommentController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(id, actorId(req));
+      await assertOwned(req, id);
 
       const removed = await repository.remove(id);
       if (!removed) throw new NotFoundError('Comment', id);

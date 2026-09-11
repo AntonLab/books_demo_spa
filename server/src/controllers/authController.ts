@@ -75,14 +75,17 @@ export function createAuthController(deps: AuthControllerDeps): AuthController {
 
   return {
     register: async (req, res) => {
-      const input = validatedBody<RegisterInput>(req);
+      const { role, ...input } = validatedBody<RegisterInput>(req);
       // status is set here, not accepted from the body: the column defaults to
       // 'pending' and there is no verification flow to clear it, so a
       // registrant would otherwise be unable to log in.
-      const user = await deps.userRepository.create({
-        ...input,
-        status: 'active',
-      });
+      //
+      // role travels as its own argument, so it cannot ride in with the rest of
+      // the body on any other create path.
+      const user = await deps.userRepository.create(
+        { ...input, status: 'active' },
+        role
+      );
 
       setSessionCookie(res, await openSession(user.id));
       res.status(201).json(user);

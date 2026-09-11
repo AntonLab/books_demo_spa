@@ -15,6 +15,7 @@ import type {
   UpdateUserInput,
   UserStatus,
 } from '../types/user.ts';
+import type { UserRole } from '../types/permission.ts';
 
 export interface UserListResult {
   items: PublicUser[];
@@ -22,11 +23,18 @@ export interface UserListResult {
 }
 
 export interface UserRepository {
-  create(input: CreateUserInput): Promise<PublicUser>;
+  // The role is a separate argument rather than part of CreateUserInput, so
+  // the type itself says it is not caller-supplied body data — the same shape
+  // as `actorId` on the comment and like repositories.
+  create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
   findById(id: number): Promise<PublicUser | null>;
   update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
+  // The one door role changes travel through — see userRoleRoutes.ts. Its own
+  // method rather than a field on update(), so a role can never ride in
+  // alongside an ordinary field edit.
+  updateRole(id: number, role: UserRole): Promise<PublicUser | null>;
   findByLoginWithPassword(
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
@@ -80,9 +88,9 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
 
 export function createSequelizeUserRepository(): UserRepository {
   return {
-    async create(input) {
+    async create(input, role = 'user') {
       try {
-        const user = await User.create(input);
+        const user = await User.create({ ...input, role });
         return toPublicUser(user);
       } catch (error) {
         asConflict(error);
@@ -123,6 +131,14 @@ export function createSequelizeUserRepository(): UserRepository {
     async remove(id) {
       const deleted = await User.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    async updateRole(id, role) {
+      const user = await User.findByPk(id);
+      if (!user) return null;
+
+      await user.update({ role });
+      return toPublicUser(user);
     },
 
     // The one place the password column is read. unscoped() bypasses the

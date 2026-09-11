@@ -21,8 +21,10 @@ const descriptionSchema = z.string().min(1).max(BOOK_DESCRIPTION_MAX_LENGTH);
 // whitespace-only title fails min(1) rather than landing as an empty string.
 const titleSchema = z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH);
 
+// No userId: the owner comes from the session, never the body. Without that,
+// an author could create a book owned by someone else, and "you may only edit
+// your own books" would mean nothing.
 export const createBookSchema = z.object({
-  userId: idSchema,
   title: titleSchema,
   // Optional by design: a book need not belong to a series. Both an omitted
   // key and an explicit null land as null, so the column has one empty value

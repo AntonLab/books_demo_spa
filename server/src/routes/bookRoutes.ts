@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
-import { createOptionalAuth } from '../middleware/optionalAuth.ts';
-import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createBookSchema,
@@ -13,38 +12,44 @@ import type { RouteDeps } from './index.ts';
 
 export function createBookRoutes(deps: RouteDeps): Router {
   const controller = createBookController(deps.bookRepository);
-  const requireAuth = createRequireAuth(deps);
-  const optionalAuth = createOptionalAuth(deps);
+  const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // Reads stay public: the client's book list must work logged out.
-  router.get('/', validate({ query: listBooksQuerySchema }), controller.list);
-  // optionalAuth, not requireAuth: the route stays public, but a signed-in
-  // visitor's id is what fills in viewerLikeId on the detail response.
+  // Every route runs through the matrix, reads included: `guest` has `read:
+  // any` on books, which is what keeps the list and detail routes public.
+  router.get(
+    '/',
+    requirePermission('books', 'read'),
+    validate({ query: listBooksQuerySchema }),
+    controller.list
+  );
+  // No separate optionalAuth: requirePermission resolves the session itself
+  // and sets req.user whenever one exists, so the detail handler still fills
+  // in viewerLikeId for a signed-in caller.
   router.get(
     '/:id',
-    optionalAuth,
+    requirePermission('books', 'read'),
     validate({ params: idParamSchema }),
     controller.getById
   );
 
-  // requireAuth goes before validate on every write, so an unauthenticated
-  // request is refused without its body being parsed or echoed back in a 400.
+  // requirePermission goes before validate on every write, so a refused
+  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
-    requireAuth,
+    requirePermission('books', 'create'),
     validate({ body: createBookSchema }),
     controller.create
   );
   router.patch(
     '/:id',
-    requireAuth,
+    requirePermission('books', 'update'),
     validate({ params: idParamSchema, body: updateBookSchema }),
     controller.update
   );
   router.delete(
     '/:id',
-    requireAuth,
+    requirePermission('books', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
   );
