@@ -10,10 +10,12 @@ export interface RequireAuthDeps {
   userRepository: UserRepository;
 }
 
-// The cookie-to-user lookup both auth middlewares share. It reports "nobody"
-// for every failure — missing cookie, unknown token, expired session, deleted
-// user, blocked account — because the two callers want opposite things from
-// that answer and neither needs to know which of the five happened.
+// The cookie-to-user lookup shared by every auth middleware. It reports
+// "nobody" for every failure — missing cookie, unknown token, expired
+// session, deleted user, blocked account — because each of its three callers
+// (requireAuth, requirePermission, optionalAuth) draws its own conclusion
+// from that answer and none of them needs to know which of the five
+// happened.
 export async function resolveSessionUser(
   deps: RequireAuthDeps,
   req: Request
