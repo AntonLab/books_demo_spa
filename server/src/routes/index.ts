@@ -32,12 +32,13 @@ export interface RouteDeps {
 export function createApiRouter(deps: RouteDeps): Router {
   const router = Router();
   // Every factory takes the whole RouteDeps rather than its own repository:
-  // each one builds a requireAuth, which needs the session and user
-  // repositories alongside the resource's own.
+  // each one builds a requirePermission (authRoutes a requireAuth), which
+  // needs the session and user repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
-  // The role routes mount first so /:id/role is matched ahead of /:id —
-  // Express tries routers in mount order, and the plain user routes would
-  // otherwise treat "role" as an id.
+  // The role routes mount first for readability — the narrower path reads
+  // first. The order is not load-bearing: `/:id` matches exactly one path
+  // segment, so it can never match `/:id/role`, and the two routers do not
+  // collide whichever is mounted first.
   router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));

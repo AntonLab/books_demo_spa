@@ -36,9 +36,9 @@ export function createCommentRoutes(deps: RouteDeps): Router {
   // requirePermission goes before validate on every write, so a refused
   // request is never parsed or echoed back in a 400.
   //
-  // Unlike the other resources, PATCH and DELETE also check ownership — see
-  // controllers/commentController.ts. There, `own` still refuses another
-  // user's comment, but `any` (admin) now skips that check.
+  // PATCH and DELETE also check ownership in the controller, as books, series,
+  // chapters and likes do — see controllers/commentController.ts. There, `own`
+  // refuses another user's comment and `any` (admin) skips the check.
   router.post(
     '/',
     requirePermission('comments', 'create'),
