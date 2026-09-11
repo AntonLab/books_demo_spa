@@ -13,7 +13,7 @@ import type {
   CreateUserInput,
   ListUsersQuery,
   PublicUser,
-  UpdateUserInput,
+  UserChanges,
   UserStatus,
 } from '../types/user.ts';
 import type { UserRole } from '../types/permission.ts';
@@ -30,7 +30,7 @@ export interface UserRepository {
   create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
   findById(id: number): Promise<PublicUser | null>;
-  update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
+  update(id: number, input: UserChanges): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
   // The one door role changes travel through — see userRoleRoutes.ts. Its own
   // method rather than a field on update(), so a role can never ride in
@@ -40,6 +40,10 @@ export interface UserRepository {
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
   findByEmail(email: string): Promise<PublicUser | null>;
+  // The stored hash for one account, for the controller to check a
+  // currentPassword against. As narrow as findByLoginWithPassword, for the
+  // same reason: the hash must not travel further than the check.
+  findPasswordHashById(id: number): Promise<string | null>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -173,6 +177,13 @@ export function createSequelizeUserRepository(): UserRepository {
     async findByEmail(email) {
       const user = await User.findOne({ where: { email } });
       return user ? toPublicUser(user) : null;
+    },
+
+    async findPasswordHashById(id) {
+      const user = await User.unscoped().findByPk(id, {
+        attributes: ['password'],
+      });
+      return user ? user.password : null;
     },
   };
 }

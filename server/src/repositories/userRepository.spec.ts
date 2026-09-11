@@ -380,4 +380,16 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.ok(found);
     assert.equal('password' in found, false);
   });
+
+  test('findPasswordHashById returns the stored hash, and it verifies', async () => {
+    const created = await repository.create(base);
+    const hash = await repository.findPasswordHashById(created.id);
+
+    assert.ok(hash);
+    assert.equal(await verifyPassword(hash, base.password), true);
+  });
+
+  test('findPasswordHashById returns null for a missing id', async () => {
+    assert.equal(await repository.findPasswordHashById(999_999), null);
+  });
 });

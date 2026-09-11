@@ -5,6 +5,7 @@ import type {
   UserRepository,
   UserListResult,
 } from '../repositories/userRepository.ts';
+import { hashPassword } from '../password.ts';
 import type { PublicUser } from '../types/user.ts';
 import {
   AUTH_COOKIE,
@@ -14,6 +15,16 @@ import {
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
+
+// Targets only: no cookie resolves to these ids. They are what lets a spec
+// prove one admin cannot touch another, and that a superadmin can.
+const OTHER_ADMIN_ID = 6;
+const OTHER_SUPERADMIN_ID = 7;
+
+// Every seeded and created row shares one known password, hashed once with
+// the deliberately weak test parameters.
+const PASSWORD = 'hunter2hunter2';
+const PASSWORD_HASH = await hashPassword(PASSWORD, 'test');
 
 // Rows for the personas the role tests act on. Seeded directly rather than
 // posted, because POST now requires a superadmin session (the matrix grants
@@ -38,6 +49,8 @@ function seedPersonaRows(): PublicUser[] {
     row(USER_IDS.author, 'author'),
     row(USER_IDS.admin, 'admin'),
     row(USER_IDS.superadmin, 'superadmin'),
+    row(OTHER_ADMIN_ID, 'admin'),
+    row(OTHER_SUPERADMIN_ID, 'superadmin'),
   ];
 }
 
@@ -124,6 +137,10 @@ function createFakeRepository(seed: PublicUser[] = []): UserRepository {
 
     async findByEmail() {
       return null;
+    },
+
+    async findPasswordHashById(id) {
+      return rows.has(id) ? PASSWORD_HASH : null;
     },
   };
 }
@@ -599,6 +616,324 @@ test('an admin may not set another user role either, not even the superadmin', a
       );
 
       assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('an admin may edit user and author accounts', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      for (const id of [USER_IDS.user, USER_IDS.author]) {
+        const response = await patch(
+          base,
+          id,
+          { firstName: 'Edited' },
+          ROLE_COOKIES.admin
+        );
+        assert.equal(response.status, 200, `target ${id}`);
+      }
+    }
+  );
+});
+
+test('an admin may not edit another admin or a superadmin', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      for (const id of [OTHER_ADMIN_ID, USER_IDS.superadmin]) {
+        const response = await patch(
+          base,
+          id,
+          { password: 'takeover-attempt' },
+          ROLE_COOKIES.admin
+        );
+        assert.equal(response.status, 403, `target ${id}`);
+      }
+    }
+  );
+});
+
+test('an admin may not delete another admin or a superadmin', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      for (const id of [OTHER_ADMIN_ID, USER_IDS.superadmin]) {
+        assert.equal(
+          (await remove(base, id, ROLE_COOKIES.admin)).status,
+          403,
+          `target ${id}`
+        );
+        const stillThere = await fetch(`${base}/api/users/${id}`, {
+          headers: { cookie: ROLE_COOKIES.superadmin },
+        });
+        assert.equal(stillThere.status, 200, `target ${id}`);
+      }
+    }
+  );
+});
+
+test('an admin may delete a user account', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await remove(base, USER_IDS.user, ROLE_COOKIES.admin);
+      assert.equal(response.status, 204);
+    }
+  );
+});
+
+test('an admin may edit and delete their own account', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const edited = await patch(
+        base,
+        USER_IDS.admin,
+        { firstName: 'Self' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(edited.status, 200);
+      assert.equal(
+        (await remove(base, USER_IDS.admin, ROLE_COOKIES.admin)).status,
+        204
+      );
+    }
+  );
+});
+
+test('an admin acting on a missing account gets 404, not 403', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const edited = await patch(
+        base,
+        999,
+        { firstName: 'Nobody' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(edited.status, 404);
+      assert.equal((await remove(base, 999, ROLE_COOKIES.admin)).status, 404);
+    }
+  );
+});
+
+test('a superadmin may edit and delete another superadmin', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const edited = await patch(
+        base,
+        OTHER_SUPERADMIN_ID,
+        { firstName: 'Peer' },
+        ROLE_COOKIES.superadmin
+      );
+      assert.equal(edited.status, 200);
+      assert.equal(
+        (await remove(base, OTHER_SUPERADMIN_ID, ROLE_COOKIES.superadmin))
+          .status,
+        204
+      );
+    }
+  );
+});
+
+test('a superadmin may not delete their own account', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await remove(
+        base,
+        USER_IDS.superadmin,
+        ROLE_COOKIES.superadmin
+      );
+      assert.equal(response.status, 403);
+
+      const stillThere = await fetch(
+        `${base}/api/users/${USER_IDS.superadmin}`,
+        { headers: { cookie: ROLE_COOKIES.superadmin } }
+      );
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
+test('a superadmin may not change their own role', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.superadmin,
+        { role: 'user' },
+        ROLE_COOKIES.superadmin
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a superadmin may still change another superadmin role', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        OTHER_SUPERADMIN_ID,
+        { role: 'admin' },
+        ROLE_COOKIES.superadmin
+      );
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicUser>(response)).role, 'admin');
+    }
+  );
+});
+
+test('nobody may change their own status, whatever their role', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      for (const persona of ['user', 'admin', 'superadmin'] as const) {
+        const response = await patch(
+          base,
+          USER_IDS[persona],
+          { status: 'active' },
+          ROLE_COOKIES[persona]
+        );
+        assert.equal(response.status, 403, persona);
+      }
+    }
+  );
+});
+
+test('an admin may block a user account', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { status: 'blocked' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicUser>(response)).status, 'blocked');
+    }
+  );
+});
+
+test('changing your own password needs your current password', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const change = { password: 'brand-new-pass' };
+      const as = ROLE_COOKIES.user;
+
+      assert.equal((await patch(base, USER_IDS.user, change, as)).status, 400);
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.user,
+            { ...change, currentPassword: 'not-the-password' },
+            as
+          )
+        ).status,
+        403
+      );
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.user,
+            { ...change, currentPassword: PASSWORD },
+            as
+          )
+        ).status,
+        200
+      );
+    }
+  );
+});
+
+test('changing your own email needs your current password too', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const change = { email: 'moved@example.com' };
+      const as = ROLE_COOKIES.user;
+
+      assert.equal((await patch(base, USER_IDS.user, change, as)).status, 400);
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.user,
+            { ...change, currentPassword: 'not-the-password' },
+            as
+          )
+        ).status,
+        403
+      );
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.user,
+            { ...change, currentPassword: PASSWORD },
+            as
+          )
+        ).status,
+        200
+      );
+    }
+  );
+});
+
+test("an admin changing a user's password needs no current password", async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { password: 'reset-by-admin' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 200);
+    }
+  );
+});
+
+test('currentPassword alone is not a change', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { currentPassword: PASSWORD },
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('currentPassword never reaches the stored row', async () => {
+  // The fake applies every key it is handed, so a controller that forgot to
+  // strip the proof would echo it straight back.
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { email: 'kept@example.com', currentPassword: PASSWORD },
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 200);
+      assert.equal('currentPassword' in (await json<object>(response)), false);
     }
   );
 });
