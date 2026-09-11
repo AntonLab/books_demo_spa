@@ -184,6 +184,16 @@ const patchRole = (
     body: JSON.stringify(body),
   });
 
+const remove = (
+  base: string,
+  id: number,
+  cookie: string | null = AUTH_COOKIE
+) =>
+  fetch(`${base}/api/users/${id}`, {
+    method: 'DELETE',
+    ...(cookie ? { headers: { cookie } } : {}),
+  });
+
 test('POST creates a user and never echoes the password', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository() },
@@ -353,6 +363,22 @@ test('DELETE returns 204 once and 404 afterwards', async () => {
   );
 });
 
+test('a plain user may not DELETE another user account', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await remove(base, USER_IDS.author, ROLE_COOKIES.user);
+      assert.equal(response.status, 403);
+
+      // The row must survive the refused attempt, not just the status code.
+      const stillThere = await fetch(`${base}/api/users/${USER_IDS.author}`, {
+        headers: { cookie: ROLE_COOKIES.superadmin },
+      });
+      assert.equal(stillThere.status, 200);
+    }
+  );
+});
+
 test('an unknown route returns a JSON 404', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository() },
@@ -510,6 +536,46 @@ test('an admin may not set roles — that is superadmin only', async () => {
         base,
         USER_IDS.author,
         { role: 'admin' },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+// Targets a different row with a role that would be self-service on the
+// caller's own row. Only the own-row half of the guard refuses this — if it
+// were dropped, this request would be indistinguishable from the owner
+// tests above (both are the self-service `user`/`author` list), and any
+// signed-in user could set someone else's role.
+test('a plain user may not set another user role, even to a self-service one', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.author,
+        { role: 'user' },
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+// Same shape one role up: an admin is not superadmin, so the own-row guard
+// still applies and refuses touching someone else's role — including
+// demoting the superadmin to `user`.
+test('an admin may not set another user role either, not even the superadmin', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.superadmin,
+        { role: 'user' },
         ROLE_COOKIES.admin
       );
 
