@@ -44,6 +44,9 @@ export interface BookRepository {
   // The cheapest question the ownership check can ask: one indexed column, no
   // eager loads, no serialisation.
   findOwnerId(id: number): Promise<number | null>;
+  // The same question about the series a book is being filed under, asked
+  // before the write — mirrors chapterRepository.findBookOwnerId one level up.
+  findSeriesOwnerId(seriesId: number): Promise<number | null>;
 }
 
 // A rejected FK on `books` means the referenced row does not exist. Reporting
@@ -204,6 +207,13 @@ export function createSequelizeBookRepository(): BookRepository {
     async findOwnerId(id) {
       const book = await Book.findByPk(id, { attributes: ['userId'] });
       return book?.userId ?? null;
+    },
+
+    async findSeriesOwnerId(seriesId) {
+      const series = await Series.findByPk(seriesId, {
+        attributes: ['userId'],
+      });
+      return series?.userId ?? null;
     },
   };
 }
