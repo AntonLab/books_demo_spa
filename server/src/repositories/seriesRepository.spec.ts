@@ -108,14 +108,14 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     const created = await repository.create({
       userId: ownerId,
       title: 'Test Series',
-      description: 'Эпопея 📚',
-      tags: ['фантастика', '📚'],
+      description: 'Epic 📚',
+      tags: ['sci-fi', '📚'],
     });
 
     const reloaded = await repository.findById(created.id);
 
-    assert.equal(reloaded?.description, 'Эпопея 📚');
-    assert.deepEqual(reloaded?.tags, ['фантастика', '📚']);
+    assert.equal(reloaded?.description, 'Epic 📚');
+    assert.deepEqual(reloaded?.tags, ['sci-fi', '📚']);
   });
 
   test('a create against an unknown user surfaces as NotFoundError, not a raw FK error', async () => {
