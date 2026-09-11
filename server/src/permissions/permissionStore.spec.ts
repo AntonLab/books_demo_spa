@@ -10,7 +10,7 @@ import { parseConfig } from '../db/config.ts';
 import { initModels } from '../models/index.ts';
 import { Permission } from '../models/Permission.ts';
 import { buildMatrixRows } from './matrix.ts';
-import { scopeFor, syncPermissions } from './permissionStore.ts';
+import { loadMatrix, scopeFor, syncPermissions } from './permissionStore.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
 // in parallel processes, and two suites calling sync({ force: true }) on one
@@ -77,8 +77,13 @@ describe('permissionStore against real MySQL', { skip }, () => {
   // Each test seeds or reads the table on its own terms, so it starts from
   // empty rather than inheriting rows a previous test's syncPermissions call
   // left behind.
+  //
+  // The in-memory store is emptied too. It seeds itself from the same code
+  // syncPermissions writes, so without this a scopeFor assertion below would
+  // pass even if syncPermissions never reloaded the map from the table.
   beforeEach(async () => {
     await Permission.destroy({ where: {}, truncate: false });
+    loadMatrix([]);
   });
 
   test('syncPermissions writes every row and scopeFor reads them back', async () => {
