@@ -429,10 +429,12 @@ deleted comment`, `likeRepository`) — but removing your own existing
 - **`admin`'s reach over accounts is settled: `user` and `author` only, plus
   itself.** `userController.assertMayTouch` layers the rank rule on top of
   the matrix's `update: any` / `delete: any` for `admin` on `users`: an admin
-  may `PATCH` their own row, and may `PATCH` or `DELETE` only accounts whose
-  role is `user` or `author` (`ADMIN_MANAGEABLE_ROLES`) — targeting another
-  admin or any superadmin is a 403, and a missing id is still a 404 first,
-  ahead of the rank check. A `superadmin` reaches every account with no such
+  may `PATCH` **or `DELETE`** their own row — an admin may delete its own
+  account, unlike a superadmin — and may `PATCH` or `DELETE` only other
+  accounts whose role is `user` or `author` (`ADMIN_MANAGEABLE_ROLES`) —
+  targeting another admin or any superadmin is a 403, and a missing id is
+  still a 404 first, ahead of the rank check. A `superadmin` reaches every
+  account with no such
   narrowing, but may not delete their own account (`userController.remove`)
   or change their own role through `PATCH /api/users/:id/role`
   (`userRoleRoutes.ts`); another superadmin may do both. A `user`/`author`
