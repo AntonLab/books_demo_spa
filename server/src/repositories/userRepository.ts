@@ -31,6 +31,10 @@ export interface UserRepository {
   findById(id: number): Promise<PublicUser | null>;
   update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
+  // The one door role changes travel through — see userRoleRoutes.ts. Its own
+  // method rather than a field on update(), so a role can never ride in
+  // alongside an ordinary field edit.
+  updateRole(id: number, role: UserRole): Promise<PublicUser | null>;
   findByLoginWithPassword(
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
@@ -127,6 +131,14 @@ export function createSequelizeUserRepository(): UserRepository {
     async remove(id) {
       const deleted = await User.destroy({ where: { id } });
       return deleted > 0;
+    },
+
+    async updateRole(id, role) {
+      const user = await User.findByPk(id);
+      if (!user) return null;
+
+      await user.update({ role });
+      return toPublicUser(user);
     },
 
     // The one place the password column is read. unscoped() bypasses the
