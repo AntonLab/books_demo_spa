@@ -124,9 +124,13 @@ describe('RegisterModal submission', () => {
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
-    expect(mockedAuth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'user' })
-    );
+    // antd validates asynchronously, so the submit lands some ticks after the
+    // click; wait for it rather than relying on the click's tick to flush it.
+    await waitFor(() => {
+      expect(mockedAuth.register).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'user' })
+      );
+    });
   });
 
   it('registers as an author when the box is ticked', async () => {
@@ -137,9 +141,11 @@ describe('RegisterModal submission', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: "I'm author" }));
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
-    expect(mockedAuth.register).toHaveBeenCalledWith(
-      expect.objectContaining({ role: 'author' })
-    );
+    await waitFor(() => {
+      expect(mockedAuth.register).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'author' })
+      );
+    });
   });
 });
 
