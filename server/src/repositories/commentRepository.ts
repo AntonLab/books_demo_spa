@@ -166,13 +166,24 @@ export function createSequelizeCommentRepository(): CommentRepository {
       return comment ? toPublicComment(comment) : null;
     },
 
+    // Scoped to live rows, like remove(). The controller already refuses a
+    // tombstone, but an edit it let in while the comment was live can still
+    // lose the race to a moderator's removal — and text written onto the
+    // hidden row would be published by a later restore no moderator saw.
     async update(id, input) {
-      const comment = await Comment.findByPk(id);
-      if (!comment) return null;
-
       // No FK mapping here: updateCommentSchema carries only `text`, so an
       // update cannot violate a constraint.
-      await comment.update(input);
+      const [changed] = await Comment.update(input, {
+        where: { id, tombstone: null },
+      });
+
+      const comment = await Comment.findByPk(id);
+      if (!comment) return null;
+      // Sequelize connects with FOUND_ROWS off, so MySQL counts changed rows,
+      // not matched ones — and a live comment resubmitted unchanged within
+      // the column's one-second precision changes nothing. Only a tombstone
+      // turns that 0 into a refusal.
+      if (changed === 0 && comment.tombstone !== null) return null;
       return toPublicComment(comment);
     },
 

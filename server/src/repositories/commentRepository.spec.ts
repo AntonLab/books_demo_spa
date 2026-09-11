@@ -417,4 +417,34 @@ describe('commentRepository against real MySQL', { skip }, () => {
     assert.equal(updated?.text, 'second');
     assert.equal(updated?.userId, readerId);
   });
+
+  test('update refuses a tombstone and leaves its stored text alone', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'Before removal' },
+      readerId
+    );
+    // The edit was let in while the comment was live and lost the race to a
+    // moderator's removal.
+    await repository.remove(comment.id, 'removed');
+
+    assert.equal(
+      await repository.update(comment.id, { text: 'Slipped in' }),
+      null
+    );
+    assert.equal((await Comment.findByPk(comment.id))?.text, 'Before removal');
+  });
+
+  test('update still answers when the text is resubmitted unchanged', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'Same words' },
+      readerId
+    );
+
+    // Within the same second nothing on the row changes at all; the update
+    // must still count it as matched rather than report it missing.
+    const updated = await repository.update(comment.id, { text: 'Same words' });
+
+    assert.equal(updated?.id, comment.id);
+    assert.equal(updated?.text, 'Same words');
+  });
 });
