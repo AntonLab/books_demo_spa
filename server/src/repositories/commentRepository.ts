@@ -7,7 +7,7 @@ import {
 } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CommentWithAuthor,
   CreateCommentInput,
@@ -83,6 +83,21 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
     async create(input, actorId) {
+      // A reply needs a live parent. Checked before the insert because the
+      // foreign key only knows the parent exists, not that it is a tombstone.
+      // A parent tombstoned between this check and the insert leaves the
+      // reply under a fresh tombstone — the same outcome as replying a moment
+      // earlier, so the window is harmless.
+      if (input.parentId !== null) {
+        const parent = await Comment.findByPk(input.parentId, {
+          attributes: ['id', 'tombstone'],
+        });
+        if (!parent) throw new NotFoundError('Comment', input.parentId);
+        if (parent.tombstone !== null) {
+          throw new ForbiddenError('You cannot reply to a deleted comment');
+        }
+      }
+
       try {
         // userId comes from the caller's session, never from the body.
         const comment = await Comment.create({ ...input, userId: actorId });

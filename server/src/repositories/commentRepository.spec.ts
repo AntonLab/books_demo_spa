@@ -15,7 +15,7 @@ import {
   Series,
   User,
 } from '../models/index.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeCommentRepository } from './commentRepository.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
@@ -127,6 +127,38 @@ describe('commentRepository against real MySQL', { skip }, () => {
         readerId
       ),
       NotFoundError
+    );
+  });
+
+  test('a reply to a tombstone of either kind is refused', async () => {
+    for (const kind of ['deleted', 'removed'] as const) {
+      const parent = await repository.create(
+        { bookId, parentId: null, text: `Parent (${kind})` },
+        ownerId
+      );
+      await repository.remove(parent.id, kind);
+
+      await assert.rejects(
+        repository.create(
+          { bookId, parentId: parent.id, text: 'Too late' },
+          readerId
+        ),
+        (error: unknown) =>
+          error instanceof ForbiddenError &&
+          error.message === 'You cannot reply to a deleted comment'
+      );
+    }
+  });
+
+  test('a reply to a missing parent is a 404 naming the comment', async () => {
+    await assert.rejects(
+      repository.create(
+        { bookId, parentId: 999_999, text: 'To nobody' },
+        readerId
+      ),
+      (error: unknown) =>
+        error instanceof NotFoundError &&
+        error.message === 'Comment 999999 not found'
     );
   });
 

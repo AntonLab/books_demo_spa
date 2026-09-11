@@ -439,19 +439,38 @@ test('an admin may delete another user comment', async () => {
   );
 });
 
-test('an admin may edit another user comment', async () => {
+test('a moderator may not edit another user comment — moderators remove, they do not rewrite', async () => {
   await withAuthenticatedApp(
     { commentRepository: createFakeRepository() },
     async (base) => {
+      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        const response = await patch(
+          base,
+          FOREIGN_COMMENT_ID,
+          { text: 'Moderated' },
+          cookie
+        );
+        assert.equal(response.status, 403);
+      }
+      assert.equal((await getOne(base, FOREIGN_COMMENT_ID)).text, 'Not yours');
+    }
+  );
+});
+
+test('an admin may still edit their own comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(
+        await post(base, valid, ROLE_COOKIES.admin)
+      );
       const response = await patch(
         base,
-        FOREIGN_COMMENT_ID,
-        { text: 'Moderated' },
+        created.id,
+        { text: 'Second thoughts' },
         ROLE_COOKIES.admin
       );
-
       assert.equal(response.status, 200);
-      assert.equal((await json<PublicComment>(response)).text, 'Moderated');
     }
   );
 });
