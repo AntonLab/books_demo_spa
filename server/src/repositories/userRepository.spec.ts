@@ -1,13 +1,20 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
-import { initModels, User } from '../models/index.ts';
+import {
+  Book,
+  Comment,
+  initModels,
+  Like,
+  Series,
+  User,
+} from '../models/index.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
@@ -70,13 +77,18 @@ describe('userRepository against real MySQL', { skip }, () => {
     await sequelize.close();
   });
 
-  // A DELETE rather than TRUNCATE: MySQL refuses to truncate a table referenced
-  // by a foreign key, and series now points at users. ON DELETE CASCADE clears
-  // any children along with it.
-  const clearUsers = () => User.destroy({ where: {} });
+  // Children first: deleting a user no longer cascades into their comments
+  // (userId goes SET NULL instead), so those rows must be cleared explicitly
+  // before the user that owned the book they live under.
+  beforeEach(async () => {
+    await Like.destroy({ where: {}, truncate: false });
+    await Comment.destroy({ where: {}, truncate: false });
+    await Book.destroy({ where: {}, truncate: false });
+    await Series.destroy({ where: {}, truncate: false });
+    await User.destroy({ where: {}, truncate: false });
+  });
 
   test('stores a hash rather than the plaintext, and it verifies', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     const row = await User.unscoped().findByPk(created.id);
@@ -86,14 +98,12 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('never returns the password field', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal('password' in created, false);
   });
 
   test('Bob and bob are different logins', async () => {
-    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
     const lower = await repository.create({
       ...base,
@@ -106,7 +116,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a repeated login is rejected', async () => {
-    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
 
     await assert.rejects(
@@ -118,7 +127,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('email stays case-insensitive, so Bob@ collides with bob@', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'first',
@@ -137,7 +145,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('paginates and reports the total', async () => {
-    await clearUsers();
     for (let i = 0; i < 5; i += 1) {
       await repository.create({
         ...base,
@@ -152,7 +159,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('filters by status', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'a',
@@ -176,7 +182,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('search stays case-insensitive even though login is not', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'Bob',
@@ -188,7 +193,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a literal % in q is escaped rather than matching every row', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'alice',
@@ -205,7 +209,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('updates a single field and leaves the rest alone', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     const updated = await repository.update(created.id, {
@@ -217,7 +220,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('re-hashes when the password changes', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
     const before = await User.unscoped().findByPk(created.id);
 
@@ -233,19 +235,88 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('returns null for a missing record and false for a missing delete', async () => {
-    await clearUsers();
-
     assert.equal(await repository.findById(9999), null);
     assert.equal(await repository.update(9999, { firstName: 'X' }), null);
     assert.equal(await repository.remove(9999), false);
   });
 
   test('removes an existing record once', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.remove(created.id), false);
+  });
+
+  test('deleting an account turns its comments into deleted tombstones and keeps replies attached', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Leaving',
+      email: 'leaving@example.com',
+    });
+    const staying = await repository.create({
+      ...base,
+      login: 'Staying',
+      email: 'staying@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host',
+      email: 'host@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Host Book',
+      description: 'Hosts the thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'My words',
+    });
+    const reply = await Comment.create({
+      bookId: book.id,
+      userId: staying.id,
+      parentId: comment.id,
+      text: 'A reply',
+    });
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    const tombstone = await Comment.findByPk(comment.id);
+    assert.equal(tombstone?.tombstone, 'deleted');
+    assert.equal(tombstone?.userId, null);
+    assert.equal((await Comment.findByPk(reply.id))?.parentId, comment.id);
+  });
+
+  test('a removed comment becomes deleted when its owner account goes', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Removed',
+      email: 'removed@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host2',
+      email: 'host2@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Second Host',
+      description: 'Hosts another thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Moderated once',
+      tombstone: 'removed',
+    });
+
+    await repository.remove(leaving.id);
+
+    // Nothing can be restored to an owner who no longer exists.
+    assert.equal((await Comment.findByPk(comment.id))?.tombstone, 'deleted');
   });
 
   test('findByLoginWithPassword returns the stored hash for a known login', async () => {

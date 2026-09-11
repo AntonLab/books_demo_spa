@@ -5,6 +5,7 @@ import {
   where as sequelizeWhere,
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
+import { Comment } from '../models/Comment.ts';
 import { toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
 import { ConflictError } from '../types/errors.ts';
@@ -128,9 +129,25 @@ export function createSequelizeUserRepository(): UserRepository {
       return toPublicUser(user);
     },
 
+    // The account's comments stay behind as `deleted` tombstones, so the
+    // replies other people wrote under them keep their thread. They are marked
+    // in the same transaction as the delete: the foreign key then nulls their
+    // owner, and a comment with no owner must never be live. Comments on the
+    // account's own books are the exception — they go with the books.
     async remove(id) {
-      const deleted = await User.destroy({ where: { id } });
-      return deleted > 0;
+      const sequelize = User.sequelize;
+      if (!sequelize) {
+        throw new Error('User model is not initialised');
+      }
+
+      return sequelize.transaction(async (transaction) => {
+        await Comment.update(
+          { tombstone: 'deleted' },
+          { where: { userId: id }, transaction }
+        );
+        const deleted = await User.destroy({ where: { id }, transaction });
+        return deleted > 0;
+      });
     },
 
     async updateRole(id, role) {

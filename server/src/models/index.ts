@@ -83,12 +83,15 @@ export function initModels(sequelize: Sequelize): Models {
 
   User.hasMany(Comment, {
     as: 'comments',
-    foreignKey: 'userId',
-    // Same reasoning as series and books: a comment with no author answers to
-    // nobody. This reaches further than it looks — deleting a user removes
-    // comments other people may have replied to, which is exactly the case the
-    // SET NULL below has to survive.
-    onDelete: 'CASCADE',
+    // allowNull is restated so Sequelize does not infer NOT NULL from the
+    // association and quietly make SET NULL illegal.
+    foreignKey: { name: 'userId', allowNull: true },
+    // SET NULL, unlike every other owner reference here: a comment is part of
+    // a conversation other people replied to, so it outlives its owner's
+    // account as a tombstone. userRepository.remove marks the account's
+    // comments `deleted` in the same transaction as the delete; this then
+    // nulls their owner. A comment with no owner is therefore never live.
+    onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
   });
   Comment.belongsTo(User, { as: 'user', foreignKey: 'userId' });

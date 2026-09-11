@@ -263,6 +263,35 @@ describe('commentRepository against real MySQL', { skip }, () => {
     assert.equal(tombstone?.userId, null);
   });
 
+  test('the list serves a tombstone whose owner account is gone, with no author', async () => {
+    const leaving = await User.create({
+      login: 'GoneAway',
+      email: 'gone@example.com',
+      password: 'hunter2hunter2',
+      firstName: 'Gone',
+      lastName: 'Away',
+    });
+    const created = await repository.create(
+      { bookId, parentId: null, text: 'Left behind' },
+      leaving.id
+    );
+    await Comment.update(
+      { tombstone: 'deleted' },
+      { where: { id: created.id } }
+    );
+    await User.destroy({ where: { id: leaving.id } });
+
+    const { items } = await repository.list(
+      { limit: 20, offset: 0, bookId },
+      null
+    );
+    const tombstone = items.find((item) => item.id === created.id);
+
+    assert.notEqual(tombstone, undefined);
+    assert.equal(tombstone?.author, null);
+    assert.equal(tombstone?.userId, null);
+  });
+
   test('the list leaves tombstones out of a ?userId= filter', async () => {
     const kept = await repository.create(
       { bookId, parentId: null, text: 'Visible' },

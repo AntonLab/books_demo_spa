@@ -44,7 +44,7 @@ test('text is TEXT, not the MEDIUMTEXT a chapter body needs', () => {
 
 test('the foreign keys match the columns they reference (INTEGER UNSIGNED)', () => {
   assert.match(createTableSql, /`id` INTEGER UNSIGNED auto_increment/);
-  assert.match(createTableSql, /`userId` INTEGER UNSIGNED NOT NULL/);
+  assert.match(createTableSql, /`userId` INTEGER UNSIGNED,/);
   assert.match(createTableSql, /`bookId` INTEGER UNSIGNED NOT NULL/);
 });
 
@@ -52,14 +52,19 @@ test('parentId is nullable — a top-level comment replies to nothing', () => {
   assert.match(createTableSql, /`parentId` INTEGER UNSIGNED,/);
 });
 
-test('the owning user and book cascade, as they do for series and chapters', () => {
-  assert.match(
-    createTableSql,
-    /FOREIGN KEY \(`userId`\) REFERENCES `users` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
-  );
+test('the owning book cascades, as it does for chapters', () => {
   assert.match(
     createTableSql,
     /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+  );
+});
+
+// Unlike every other owner reference: a comment is part of a conversation
+// other people replied to, so it outlives its owner's account as a tombstone.
+test("an account's delete unlinks its comments rather than cascading into them", () => {
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`userId`\) REFERENCES `users` \(`id`\) ON DELETE SET NULL ON UPDATE CASCADE/
   );
 });
 
