@@ -55,6 +55,11 @@ const ADMIN_GRANTS: RoleGrants = {
   books: { read: 'any', update: 'any', delete: 'any' },
   chapters: { read: 'any', update: 'any', delete: 'any' },
   comments: { read: 'any', create: 'own', update: 'any', delete: 'any' },
+  // Without this override, admin inherits USER_GRANTS.likes verbatim —
+  // `own` on update/delete — and could not act on a reported like any more
+  // than a plain user could. Mirrors comments: an admin may still like
+  // things as themselves (create stays `own`), but moderates any row.
+  likes: { read: 'any', create: 'own', update: 'any', delete: 'any' },
   reports: { read: 'any', create: 'any', update: 'any', delete: 'any' },
 };
 

@@ -18,7 +18,11 @@ import {
 
 const KNOWN_BOOK_ID = 1;
 // Owned by a different user, which is what the 403 cases turn on: TEST_USER is
-// id 1, and requireAuth resolves every authenticated request to them.
+// id 1, and requirePermission resolves every authenticated request to them.
+// This happens to equal 2, which routeTestKit's USER_IDS reserves for the
+// `author` persona — no test here acts as that persona against a row owned
+// by this id, so it does not change any test's meaning today, but a future
+// author-vs-author test in this file must pick a different id.
 const OTHER_USER_ID = TEST_USER.id + 1;
 const FOREIGN_COMMENT_ID = 500;
 

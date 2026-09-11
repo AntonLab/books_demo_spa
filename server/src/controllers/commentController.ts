@@ -75,8 +75,8 @@ export function createCommentController(
 
     list: async (req, res) => {
       const query = validatedQuery<ListCommentsQuery>(req);
-      // optionalAuth fills req.user when a session cookie resolves; null is
-      // what makes viewerLikeId come back empty for an anonymous visitor.
+      // requirePermission sets req.user when a session resolves; null is what
+      // makes viewerLikeId come back empty for an anonymous visitor.
       const { items, total } = await repository.list(
         query,
         req.user?.id ?? null
