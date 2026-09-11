@@ -14,6 +14,7 @@ import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
+import { createUserRoleRoutes } from './userRoleRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
 export interface RouteDeps {
@@ -34,6 +35,10 @@ export function createApiRouter(deps: RouteDeps): Router {
   // each one builds a requireAuth, which needs the session and user
   // repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
+  // The role routes mount first so /:id/role is matched ahead of /:id —
+  // Express tries routers in mount order, and the plain user routes would
+  // otherwise treat "role" as an id.
+  router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
   router.use('/books', createBookRoutes(deps));

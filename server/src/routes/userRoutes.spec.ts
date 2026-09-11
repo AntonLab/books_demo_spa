@@ -9,12 +9,40 @@ import type { PublicUser } from '../types/user.ts';
 import {
   AUTH_COOKIE,
   json,
+  ROLE_COOKIES,
+  USER_IDS,
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
 
-function createFakeRepository(): UserRepository {
-  const rows = new Map<number, PublicUser>();
+// Rows for the personas the role tests act on. Seeded directly rather than
+// posted, because POST now requires a superadmin session (the matrix grants
+// `users × create` to superadmin alone) and would otherwise assign its own
+// ids instead of the fixed ones ROLE_COOKIES/USER_IDS depend on.
+function seedPersonaRows(): PublicUser[] {
+  const now = new Date();
+  const row = (id: number, role: PublicUser['role']): PublicUser => ({
+    id,
+    login: `persona-${id}`,
+    email: `persona-${id}@example.com`,
+    firstName: 'Persona',
+    lastName: 'User',
+    status: 'active',
+    role,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return [
+    row(USER_IDS.user, 'user'),
+    row(USER_IDS.author, 'author'),
+    row(USER_IDS.admin, 'admin'),
+    row(USER_IDS.superadmin, 'superadmin'),
+  ];
+}
+
+function createFakeRepository(seed: PublicUser[] = []): UserRepository {
+  const rows = new Map<number, PublicUser>(seed.map((row) => [row.id, row]));
   let nextId = 1;
 
   const conflicts = (login: string, email: string, skipId?: number): void => {
@@ -81,6 +109,14 @@ function createFakeRepository(): UserRepository {
       return rows.delete(id);
     },
 
+    async updateRole(id, role) {
+      const current = rows.get(id);
+      if (!current) return null;
+      const updated: PublicUser = { ...current, role, updatedAt: new Date() };
+      rows.set(id, updated);
+      return updated;
+    },
+
     // No request in this file reaches auth lookups; the fake only needs to
     // satisfy the interface.
     async findByLoginWithPassword() {
@@ -101,13 +137,46 @@ const valid = {
   lastName: 'Bobsson',
 };
 
+// The matrix grants `users × create` to superadmin alone — this is the
+// administrative create, not registration — so the structural tests below
+// (validation, conflicts, paging) act as that persona by default.
 const post = (
   base: string,
   body: unknown,
-  cookie: string | null = AUTH_COOKIE
+  cookie: string | null = ROLE_COOKIES.superadmin
 ) =>
   fetch(`${base}/api/users`, {
     method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const patch = (
+  base: string,
+  id: number,
+  body: unknown,
+  cookie: string | null = AUTH_COOKIE
+) =>
+  fetch(`${base}/api/users/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const patchRole = (
+  base: string,
+  id: number,
+  body: unknown,
+  cookie: string | null = AUTH_COOKIE
+) =>
+  fetch(`${base}/api/users/${id}/role`, {
+    method: 'PATCH',
     headers: {
       'content-type': 'application/json',
       ...(cookie ? { cookie } : {}),
@@ -332,4 +401,119 @@ test('GET /api/users/:id requires a session for the same reason', async () => {
   await withApp({ userRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/users/1`)).status, 401);
   });
+});
+
+test('a user may edit their own row and not another', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.user,
+            { firstName: 'New' },
+            ROLE_COOKIES.user
+          )
+        ).status,
+        200
+      );
+      assert.equal(
+        (
+          await patch(
+            base,
+            USER_IDS.author,
+            { firstName: 'Hijack' },
+            ROLE_COOKIES.user
+          )
+        ).status,
+        403
+      );
+    }
+  );
+});
+
+test('a role in a PATCH body is ignored', async () => {
+  // The field is absent from the schema rather than filtered in the handler,
+  // so this cannot regress by someone forgetting a check.
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patch(
+        base,
+        USER_IDS.user,
+        { firstName: 'New', role: 'superadmin' },
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicUser>(response)).role, 'user');
+    }
+  );
+});
+
+test('the owner may switch between user and author', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.user,
+        { role: 'author' },
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicUser>(response)).role, 'author');
+    }
+  );
+});
+
+test('the owner may not promote themselves to admin', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.user,
+        { role: 'admin' },
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('a superadmin may set any role on anyone', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.user,
+        { role: 'admin' },
+        ROLE_COOKIES.superadmin
+      );
+
+      assert.equal(response.status, 200);
+      assert.equal((await json<PublicUser>(response)).role, 'admin');
+    }
+  );
+});
+
+test('an admin may not set roles — that is superadmin only', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await patchRole(
+        base,
+        USER_IDS.author,
+        { role: 'admin' },
+        ROLE_COOKIES.admin
+      );
+
+      assert.equal(response.status, 403);
+    }
+  );
 });

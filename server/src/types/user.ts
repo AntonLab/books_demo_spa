@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UserRole } from './permission.ts';
+import { USER_ROLES, type UserRole } from './permission.ts';
 
 // `as const` union rather than an enum, per the repository rules.
 export const USER_STATUSES = ['active', 'blocked', 'pending'] as const;
@@ -37,9 +37,17 @@ export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+// Its own schema, deliberately not part of updateUserSchema: the role travels
+// through one door with its own guard, so it can never ride in alongside a
+// name change.
+export const updateRoleSchema = z.object({
+  role: z.enum(USER_ROLES),
+});
+
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 
 // The password is absent by construction: it must never reach a response.
 export interface PublicUser {
