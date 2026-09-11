@@ -268,6 +268,33 @@ describe('CommentSection', () => {
     expect(screen.queryByText('[deleted]')).toBeNull();
   });
 
+  it('drops a deleted comment whose only reply is deleted too', async () => {
+    // Other replied to Reader, Other deleted the reply, then Reader deleted
+    // the root.
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        { ...root, text: '', tombstone: 'deleted', userId: null, author: null },
+        {
+          ...reply,
+          text: '',
+          tombstone: 'deleted',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    // Rendered only once the thread has loaded, whatever it holds.
+    await screen.findByText('Sign in to join the discussion.');
+    expect(screen.queryByText('[deleted]')).toBeNull();
+    expect(screen.getByText('No comments yet.')).toBeInTheDocument();
+  });
+
   it('drops a removed comment that holds no replies', async () => {
     mockedComments.listComments.mockResolvedValue({
       items: [

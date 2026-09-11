@@ -251,8 +251,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     `CommentSection` assembles the two-level tree itself: the server returns a
     flat page and the component groups it, so there is no recursive component
     and a reply carries no Reply button. It also **drops a tombstone that
-    holds no replies**, of either kind — a tombstone earns its place only by
-    keeping a thread together, and this component is the one place that
+    holds no live replies**, of either kind — a tombstone earns its place only
+    by keeping live replies in their thread, and since only two levels
+    render, that means a root with at least one live direct reply; a
+    tombstoned reply is always dropped. This component is the one place that
     already knows whether a comment has children, so the server is not asked
     to. A tombstone that survives renders through the molecule as `[deleted]`
     or `[removed by moderator]` (`TOMBSTONE_LABELS` in `Comment.tsx`), with no
