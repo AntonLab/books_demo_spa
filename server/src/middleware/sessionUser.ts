@@ -31,10 +31,12 @@ export async function resolveSessionUser(
 
   const user = await deps.userRepository.findById(session.userId);
 
-  // Blocking deletes an account's sessions, but a login that read `active`
-  // just before the block can still create one after the purge. Treating a
-  // blocked account's session as no session closes that window for as long
-  // as the block lasts. A session can also outlive its user in the window
-  // before the CASCADE commits; that is the null case.
+  // A second layer, not the fix. Blocking deletes an account's sessions, and
+  // login re-checks the status under a lock before it opens one (see
+  // sessionRepository.createIfCredentialCurrent), so a block normally leaves
+  // nothing behind for this to catch. It still catches a block written
+  // straight into the table, which purges nothing. A session can also
+  // outlive its user in the window before the CASCADE commits; that is the
+  // null case.
   return user?.status === 'blocked' ? null : user;
 }

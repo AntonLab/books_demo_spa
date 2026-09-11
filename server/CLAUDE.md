@@ -184,21 +184,32 @@ value.
   status change and the session cleanup in one transaction, and only fires
   the cleanup on the transition into `blocked` from something else — moving
   an already-blocked account to `blocked` again, or unblocking it, deletes no
-  sessions. See the accepted race below for the one window this leaves open.
+  sessions. A login still verifying when the block lands cannot slip a
+  session past the cleanup; see below.
 - **Every successful password change through `PATCH /api/users/:id` ends
   every session on that account**, in the same transaction as the update —
   the session that made the change included. When the change is to the
   caller's own account, the response also clears the `sid` cookie, so the
   browser stops presenting a token that now names nothing
   (`userController.update`).
-- **A known race is accepted rather than fixed.** A login reads the account's
-  status, spends an argon2 verify, and only then opens its session; if a
-  concurrent block's `Session.destroy` lands in that window, the new session
-  survives the purge. `resolveSessionUser` treating a blocked account's
-  session as no session at all closes the practical hole: that leftover
-  session is useless for as long as the block lasts, and works again only if
-  the account is later unblocked. Harmless, since only someone who already
-  holds the password can end up with one.
+- **A login in flight cannot outlive a block or a password change.** argon2
+  is slow enough for either to commit, and purge the account's sessions,
+  while a login is still verifying. So `createIfCredentialCurrent` in
+  `repositories/sessionRepository.ts` re-reads the account under a shared
+  lock (`SELECT … FOR SHARE`, which Sequelize sends as
+  `LOCK IN SHARE MODE`) in the same transaction as the session insert, and
+  inserts nothing unless the hash is still the one just verified and the
+  account is not blocked — 401 `Invalid credentials` or 403
+  `Account is blocked` otherwise, with no cookie. The lock either makes the
+  re-read wait for a change in flight and see it, or makes the change wait
+  for the insert and then purge that session with the rest, so the two rules
+  above hold against concurrent logins too. `register` opens its session
+  without the re-check: a brand-new account has nothing in flight.
+- **A blocked account's session is no session at all.** `resolveSessionUser`
+  (`middleware/sessionUser.ts`) reports nobody for it, so a guarded route
+  answers 401 and a public route serves the caller as a guest. Behind the
+  re-check above it is a second layer, and the only one for a block written
+  straight into the table, which purges no sessions.
 - **`pending` restricts nothing today.** It is `users.status`'s default in
   `models/User.ts`, so `POST /api/users` with no `status` in the body creates
   one; it is reserved for a future email-verification step, and until that
