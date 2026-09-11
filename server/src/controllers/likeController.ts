@@ -34,12 +34,14 @@ export function createLikeController(
   // removing someone else's like is not a plain user's call to make. Mirrors
   // commentController's assertOwned: 404 before 403, so a refusal cannot be
   // used to probe which ids exist, and `any` (admin) skips the owner
-  // comparison entirely.
+  // comparison entirely. Every other value, a missing scope included, is
+  // compared: a handler mounted without requirePermission fails closed rather
+  // than acting as `any`.
   const assertOwned = async (req: Request, id: number): Promise<PublicLike> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Like', id);
 
-    if (req.permissionScope === 'own' && existing.userId !== req.user?.id) {
+    if (req.permissionScope !== 'any' && existing.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own likes');
     }
 
