@@ -130,20 +130,33 @@ describe('commentRepository against real MySQL', { skip }, () => {
     );
   });
 
-  test('remove marks the comment rather than deleting the row', async () => {
-    const comment = await repository.create(
-      { bookId, parentId: null, text: 'goodbye' },
-      readerId
+  test('remove marks the comment with the given tombstone and keeps its text on the row', async () => {
+    const created = await repository.create(
+      { bookId, parentId: null, text: 'Gone soon' },
+      ownerId
     );
 
-    assert.equal(await repository.remove(comment.id), true);
+    assert.equal(await repository.remove(created.id, 'removed'), true);
 
-    const reloaded = await repository.findById(comment.id);
-    assert.notEqual(reloaded, null);
-    assert.equal(reloaded?.isDeleted, true);
-    // The row keeps its author: the foreign key and the ownership check both
-    // hang off it.
-    assert.equal(reloaded?.userId, readerId);
+    const row = await Comment.findByPk(created.id);
+    assert.equal(row?.tombstone, 'removed');
+    assert.equal(row?.text, 'Gone soon');
+
+    const served = await repository.findById(created.id);
+    assert.equal(served?.tombstone, 'removed');
+    assert.equal(served?.text, '');
+    assert.equal(served?.userId, null);
+  });
+
+  test('remove refuses a comment that is already a tombstone', async () => {
+    const created = await repository.create(
+      { bookId, parentId: null, text: 'Once' },
+      ownerId
+    );
+
+    assert.equal(await repository.remove(created.id, 'deleted'), true);
+    assert.equal(await repository.remove(created.id, 'removed'), false);
+    assert.equal((await Comment.findByPk(created.id))?.tombstone, 'deleted');
   });
 
   test('remove keeps the replies, so the thread stays readable', async () => {
@@ -156,48 +169,89 @@ describe('commentRepository against real MySQL', { skip }, () => {
       ownerId
     );
 
-    await repository.remove(root.id);
+    await repository.remove(root.id, 'deleted');
 
     const reloaded = await repository.findById(child.id);
     assert.notEqual(reloaded, null);
-    assert.equal(reloaded?.isDeleted, false);
+    assert.equal(reloaded?.tombstone, null);
     assert.equal(reloaded?.parentId, root.id);
   });
 
-  test('remove reports false on a comment already deleted', async () => {
-    const comment = await repository.create(
-      { bookId, parentId: null, text: 'goodbye' },
-      readerId
-    );
-
-    assert.equal(await repository.remove(comment.id), true);
-    // What makes a second DELETE a 404 rather than a silent 204.
-    assert.equal(await repository.remove(comment.id), false);
-  });
-
   test('remove reports false on a comment that is not there', async () => {
-    assert.equal(await repository.remove(999_999), false);
+    assert.equal(await repository.remove(999_999, 'deleted'), false);
   });
 
-  test('the text survives in the database but not in the list', async () => {
-    const comment = await repository.create(
-      { bookId, parentId: null, text: 'secret' },
-      readerId
+  test('restore brings back a removed comment, text and owner included', async () => {
+    const created = await repository.create(
+      { bookId, parentId: null, text: 'Mistaken removal' },
+      ownerId
     );
-    await repository.remove(comment.id);
+    await repository.remove(created.id, 'removed');
 
-    // Still on the row — the flag is the only thing remove() changes.
-    const row = await Comment.findByPk(comment.id);
-    assert.equal(row?.text, 'secret');
+    const restored = await repository.restore(created.id);
 
-    // Blanked on the way out, in one place: the serialiser.
+    assert.equal(restored?.tombstone, null);
+    assert.equal(restored?.text, 'Mistaken removal');
+    assert.equal(restored?.userId, ownerId);
+  });
+
+  test('restore returns null for a deleted comment, a live one and a missing id', async () => {
+    const deleted = await repository.create(
+      { bookId, parentId: null, text: 'Mine to delete' },
+      ownerId
+    );
+    await repository.remove(deleted.id, 'deleted');
+    const live = await repository.create(
+      { bookId, parentId: null, text: 'Still here' },
+      ownerId
+    );
+
+    assert.equal(await repository.restore(deleted.id), null);
+    assert.equal(await repository.restore(live.id), null);
+    assert.equal(await repository.restore(999_999), null);
+    assert.equal((await Comment.findByPk(deleted.id))?.tombstone, 'deleted');
+  });
+
+  test('the list serves a tombstone without its text, author or owner id', async () => {
+    const created = await repository.create(
+      { bookId, parentId: null, text: 'Hidden' },
+      ownerId
+    );
+    await repository.remove(created.id, 'deleted');
+
     const { items } = await repository.list(
       { limit: 20, offset: 0, bookId },
       null
     );
-    assert.equal(items[0]?.text, '');
-    assert.equal(items[0]?.author, null);
-    assert.equal(items[0]?.isDeleted, true);
+    const tombstone = items.find((item) => item.id === created.id);
+
+    assert.equal(tombstone?.tombstone, 'deleted');
+    assert.equal(tombstone?.text, '');
+    assert.equal(tombstone?.author, null);
+    assert.equal(tombstone?.userId, null);
+  });
+
+  test('the list leaves tombstones out of a ?userId= filter', async () => {
+    const kept = await repository.create(
+      { bookId, parentId: null, text: 'Visible' },
+      ownerId
+    );
+    const gone = await repository.create(
+      { bookId, parentId: null, text: 'Removed' },
+      ownerId
+    );
+    await repository.remove(gone.id, 'removed');
+
+    const { items, total } = await repository.list(
+      { limit: 20, offset: 0, userId: ownerId },
+      null
+    );
+
+    assert.deepEqual(
+      items.map((item) => item.id),
+      [kept.id]
+    );
+    assert.equal(total, 1);
   });
 
   test('deleting a book with a nested thread still works', async () => {

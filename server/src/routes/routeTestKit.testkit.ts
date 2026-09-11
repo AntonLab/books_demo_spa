@@ -23,6 +23,7 @@ export function createUnusedRepository<T>(name: string): T {
     findDetailById: unreachable,
     update: unreachable,
     remove: unreachable,
+    restore: unreachable,
     // The auth-era methods. The stub is built from a fixed key list and cast,
     // so a method missing here is a runtime "not a function" rather than a
     // compile error — every repository method any route can reach must appear.
