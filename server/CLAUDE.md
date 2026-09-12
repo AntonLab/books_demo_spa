@@ -71,6 +71,16 @@ scripts below still run from this directory, or from the root with `-w server`.
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
   silently skip that suite instead of failing loudly)
+- `posttest` — `node --env-file-if-exists=.env.local ./src/db/dropTestDatabases.testkit.ts`,
+  which drops every schema the MySQL-backed suites created. Never run it by
+  hand: npm runs it automatically after `npm test`, and **only when `npm test`
+  exited 0** — npm skips a `post*` script when the script it follows fails.
+  That is the whole design. A green run leaves no schemas behind; a red one
+  leaves its rows exactly where they are, so a failure can be inspected in the
+  database that produced it. It is a no-op when `DB_USER` is unset or MySQL is
+  unreachable, because those are the same conditions under which the suites
+  skipped rather than passed — failing there would turn a green run red for
+  nothing.
 - `npm run typecheck` — `tsc --noEmit` (type-check only)
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`,
   which calls `createConfig` in the repo-root `eslint.config.base.mjs`; the
@@ -123,7 +133,10 @@ added.
   in-memory cache `scopeFor()` reads and `syncPermissions()` writes); see
   **Roles and permissions**.
 - `src/db/` — database connection / config (`config.ts`, `ensureDatabase.ts`,
-  `sequelize.ts`)
+  `sequelize.ts`). `dropTestDatabases.testkit.ts` is the teardown counterpart
+  of `ensureDatabase` — the `posttest` entry point, carrying the `.testkit.ts`
+  suffix so `tsconfig.build.json` keeps it out of `dist/` like every other
+  test-support file. It is a script, not a module: nothing imports it.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`requireAuth.ts`, `requirePermission.ts`, `optionalAuth.ts` (unmounted —
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
@@ -672,10 +685,10 @@ snippets — still get wrong. Verified against the 5.x router and request source
   that destroyed `User` first would leave orphaned `Comment` rows behind
   instead of clearing them, so every suite that touches comments clears
   `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
-  own schema
-  (`books_demo_spa_test`, `books_demo_spa_test_series`,
-  `books_demo_spa_test_books`, `books_demo_spa_test_chapters`,
-  `books_demo_spa_test_likes`) — `node:test`
+  own schema — nine of them, `books_demo_spa_test` plus
+  `books_demo_spa_test_` and the suite's name (`series`, `books`, `chapters`,
+  `likes`, `comments`, `sessions`, `password_resets`, `permissions`) —
+  because `node:test`
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
   Clear children before parents:
@@ -684,6 +697,12 @@ snippets — still get wrong. Verified against the 5.x router and request source
   still-cascading foreign key) and `User` (its no-longer-cascading one).
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
+  That per-suite naming is also what the `posttest` cleanup keys on: those
+  nine names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
+  `dropTestDatabases.testkit.ts` drops whatever `SHOW DATABASES` reports under
+  that prefix rather than a list it would have to be told to update. Name a
+  tenth suite's schema the same way and it is cleaned up for free; name it
+  anything else and it is left on disk forever.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
   this is an ESM package — `.js` migrations are parsed as ESM, so the CLI's
   `module.exports` template will throw. Name them `.cjs` or author them as ESM.
