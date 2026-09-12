@@ -15,6 +15,11 @@ Express app under `/api`. Routes, controllers, repositories, models, and
 middleware are all wired for those six. `node:test` is the test runner
 (`npm test`).
 
+Neither `Book` nor `Chapter` carries a draft or visibility state: a row
+created through the API is world-readable the instant it exists. "Publish" in
+this repo's language means "create," not a two-step release — there is no way
+to save a chapter privately before showing it to readers.
+
 `books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
 alongside their `description`, which now unambiguously means the annotation.
 The `?q=` filter on both matches either column.
@@ -157,13 +162,9 @@ value.
   and cleared through one shared options object in `sessionCookie.ts`, because
   a `clearCookie` whose options differ from the `cookie` that set it leaves the
   original in place.
-- **Tokens are hashed with SHA-256, not argon2.** argon2 is slow by design to
-  make low-entropy passwords expensive to guess; a 256-bit random token cannot
-  be guessed at any speed, so that cost buys nothing — and a session token is
-  verified on _every_ authenticated request, where argon2's ~19 MiB working set
-  would be a self-inflicted denial of service. Hashing at rest still matters: a
-  leaked dump must not hand over usable sessions. Only the hash is stored; the
-  plaintext exists in the cookie and the reset link and nowhere else.
+- **Tokens are hashed with SHA-256, not argon2** (ADR-0001). Only the hash is
+  stored; the plaintext exists in the cookie and the reset link and nowhere
+  else.
 - **`requireAuth` guards only `GET /api/auth/me`** now; every write on the six
   resources below runs through `requirePermission` instead (see **Roles and
   permissions**). Both run before `validate` on the route they guard, so an
@@ -186,6 +187,14 @@ value.
   an already-blocked account to `blocked` again, or unblocking it, deletes no
   sessions. A login still verifying when the block lands cannot slip a
   session past the cleanup; see below.
+- **Blocking an account does not touch its content.** No query anywhere
+  filters books, series, chapters, comments or likes by their author's
+  `status`, so a blocked account's published work stays exactly as visible to
+  every reader as before the block — only sign-in and existing sessions are
+  cut off. Hiding or removing a blocked author's content is a deliberate,
+  separate moderator action (`admin`/`superadmin` already hold `any` on
+  `update`/`delete` for books, series and chapters), not an automatic
+  consequence of the block.
 - **Every successful password change through `PATCH /api/users/:id` ends
   every session on that account**, in the same transaction as the update —
   the session that made the change included. When the change is to the
@@ -277,7 +286,7 @@ value.
     with the indexes for exactly that reason. This is a domain invariant, not
     a matrix rule — no scope value spells out "not yourself," so do not go
     looking for it in the permission table.
-- **Deleting a comment leaves a tombstone, not a hole.**
+- **Deleting a comment leaves a tombstone, not a hole** (ADR-0003).
   `DELETE /api/comments/:id` sets `tombstone` on that one row and touches
   nothing else; the replies stay, so the thread reads around the gap rather
   than losing everything under a withdrawn remark. There are two kinds
@@ -316,6 +325,13 @@ value.
     own author, and only they, a moderator, or their own account's deletion
     can turn it into a tombstone. That is the deliberate cost of keeping
     replies alive.
+  - **The tombstone promise ends where the book does** (ADR-0004). It covers a
+    withdrawn comment, not a vanished book: `Book.hasMany(Comment)` cascades,
+    so deleting a book — including the cascade from deleting its author's
+    account — hard-deletes every comment on it, other people's threads
+    included, with no tombstone behind them. Deliberate, not an oversight;
+    marking those rows first would change nothing, since the cascade destroys
+    them either way.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
@@ -579,23 +595,16 @@ snippets — still get wrong. Verified against the 5.x router and request source
   worth representing, and `SET NULL` would be illegal on the column anyway.
   Between them the two associations cover both shapes — consult which one an
   optional link deserves before copying either.
-- **`comments.parentId` is a third shape, and InnoDB's cascade depth is what
-  chooses it**: the column is a self-reference (a reply points at the comment
-  it answers), nullable because a top-level comment answers nothing. It looks
-  like a candidate for `ON DELETE CASCADE` — delete a comment, lose its
-  subtree — but a self-referential cascade recurses, and InnoDB caps a cascade
-  chain at 15. Measured on MySQL 8.0.46: with `CASCADE`, deleting a thread
-  nested deeper than 15 fails with `ER_FK_DEPTH_EXCEEDED` (errno 3008), and so
-  does deleting the _book_ that owns it, because `books` → `comments` then
-  recurses through the replies; a bulk `DELETE FROM comments` fails the same
-  way, which would take the test teardown with it. `RESTRICT` fares no better
-  — that book delete then fails with errno 1451. `SET NULL` leaves every one
-  of those working, at the cost of promoting a deleted comment's direct replies
-  to top level, so that is what `Comment.hasMany(Comment)` declares. Comment
-  deletion is soft now (see **Deleting a comment leaves a tombstone, not a
-  hole** under Auth), so `DELETE /api/comments/:id` never reaches this
-  column at all; the association's `SET NULL` only ever fires when a book
-  cascades away its comments wholesale, not from removing one comment.
+- **`comments.parentId` is a third shape**: the column is a self-reference (a
+  reply points at the comment it answers), nullable because a top-level
+  comment answers nothing, and declared `SET NULL` rather than `CASCADE` or
+  `RESTRICT` (ADR-0002) — a bulk `DELETE FROM comments` or a cascading book
+  delete would otherwise fail past 15 levels of nesting, which would take the
+  test teardown down with it. Comment deletion is soft now (see **Deleting a
+  comment leaves a tombstone, not a hole** under Auth), so
+  `DELETE /api/comments/:id` never reaches this column at all; the
+  association's `SET NULL` only ever fires when a book cascades away its
+  comments wholesale, not from removing one comment.
 - **A self-referential `ON UPDATE CASCADE` is a lie**: MySQL will not recurse
   an update through the table it is already updating, so it silently behaves
   like `RESTRICT` (verified — the update fails with errno 1451). The replies
@@ -704,8 +713,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   delete, so by the time the foreign key nulls their `userId` the row is
   already a tombstone, and an owner-less comment is therefore never live.
   Comments on the account's own books are the exception —
-  `Book.hasMany(Comment)` still cascades, so those go with the books, same as
-  before.
+  `Book.hasMany(Comment)` still cascades, so those go with the books, other
+  people's threads included; see **The tombstone promise ends where the book
+  does** under Auth, and ADR-0004, for why that is deliberate.
 - **`DELETE /api/comments/:id` no longer deletes anything.**
   `commentRepository.remove` sets `tombstone` and stops there — see
   **Deleting a comment leaves a tombstone, not a hole** under Auth.
