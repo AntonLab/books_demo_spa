@@ -69,22 +69,25 @@ Everything is mounted under `/api`:
 | Prefix          | Resource                                                                                |
 | --------------- | --------------------------------------------------------------------------------------- |
 | `/api/auth`     | `register`, `login`, `logout`, `me`, `password-reset/request`, `password-reset/confirm` |
-| `/api/users`    | CRUD (both reads require a session)                                                     |
+| `/api/users`    | CRUD (both reads require a session), plus `PATCH /:id/role` for role changes            |
 | `/api/series`   | CRUD                                                                                    |
 | `/api/books`    | CRUD                                                                                    |
 | `/api/chapters` | CRUD                                                                                    |
+| `/api/comments` | CRUD, plus `POST /:id/restore` for a moderator-removed comment                          |
 | `/api/likes`    | CRUD (a like points at exactly one of a book or a comment)                              |
 
 Authentication is session-based: an opaque token in an httpOnly `sid` cookie,
-stored hashed. `GET`s are public except on `/api/users`; every `POST`, `PATCH`
-and `DELETE` requires a session. Row ownership is deliberately not enforced —
-a signed-in user may write another user's rows, which is out of scope for the
-demo.
+stored hashed. Every write, plus both reads on `/api/users`, runs through a
+five-role permission matrix (`guest`, `user`, `author`, `admin`, `superadmin`)
+instead of a blanket session check: a request with no session gets 401, and a
+signed-in role with no grant for that action gets 403. Ownership is enforced
+on books, series, chapters, comments and likes — only a row's owner, or an
+`admin`/`superadmin` acting as moderator, may change it. See
+`server/CLAUDE.md` for the full matrix, account blocking, and the tombstone
+rules on deleted comments.
 
 Password-reset links are not emailed: the only delivery implemented writes the
 link to the server log, so copy it from there when exercising the flow.
-
-A `Comment` model exists (with self-referential replies) but has no HTTP API yet.
 
 ## Scripts
 

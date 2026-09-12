@@ -20,6 +20,10 @@ _Avoid_: Anonymous user
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
 role assumed for someone with no session; no Account holds it.
 
+**Scope**:
+How far a Role's grant on an action reaches: `none` refuses it, `own` limits
+it to rows the Account owns, `any` reaches every row regardless of Owner.
+
 **User**:
 The entry-level Role: reads, comments and likes.
 _Avoid_: "user" for any Account
@@ -36,8 +40,9 @@ Accounts.
 The top Role, and the only one that reaches Admin and Superadmin Accounts.
 
 **Owner**:
-The Account a Book, Series, Chapter, Comment or Like belongs to. Whoever wrote
-a comment is its Owner.
+The Account a Book, Series, Comment or Like belongs to. Whoever wrote a
+comment is its Owner. A Chapter has no Owner column of its own — it takes its
+Book's.
 _Avoid_: Author (for a comment's writer), creator
 
 **Moderator**:
@@ -53,7 +58,19 @@ sessions.
 An Account status reserved for a future email-verification step. Today it
 restricts nothing: a Pending Account signs in like an active one.
 
+### Content
+
+**Series**:
+An optional grouping of an Author's Books; a Book may stand alone with no
+Series.
+_Avoid_: Collection
+
 ### Comments
+
+**Comment**:
+A remark an Account (its Owner) posts on a Book, optionally in reply to
+another Comment.
+_Avoid_: Post, message
 
 **Tombstone**:
 A Deleted or Removed comment. It stays in its thread so its replies keep their
@@ -68,3 +85,10 @@ _Avoid_: Removed comment (that one a Moderator made)
 **Removed comment**:
 A Tombstone a Moderator made. A Moderator can restore it; nobody can edit it.
 _Avoid_: Deleted comment (that one its Owner made)
+
+### Likes
+
+**Like**:
+An Account's vote of approval on exactly one Book or one Comment, never both
+at once.
+_Avoid_: Vote, favorite, upvote
