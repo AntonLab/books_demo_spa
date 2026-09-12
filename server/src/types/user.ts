@@ -22,9 +22,15 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = createUserSchema
   .partial()
-  .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field must be provided',
-  });
+  .extend({
+    // Proof of identity for changing your own password or email. Never
+    // stored: the controller strips it before the repository sees the body.
+    currentPassword: z.string().min(1).max(128).optional(),
+  })
+  .refine(
+    (value) => Object.keys(value).some((key) => key !== 'currentPassword'),
+    { message: 'At least one field must be provided' }
+  );
 
 export const listUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -48,6 +54,9 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
+
+// What the repository applies: the body minus the proof that gated it.
+export type UserChanges = Omit<UpdateUserInput, 'currentPassword'>;
 
 // The password is absent by construction: it must never reach a response.
 export interface PublicUser {

@@ -10,10 +10,12 @@ export interface RequireAuthDeps {
   userRepository: UserRepository;
 }
 
-// The cookie-to-user lookup both auth middlewares share. It reports "nobody"
-// for every failure — missing cookie, unknown token, expired session, deleted
-// user — because the two callers want opposite things from that answer and
-// neither needs to know which of the four happened.
+// The cookie-to-user lookup shared by every auth middleware. It reports
+// "nobody" for every failure — missing cookie, unknown token, expired
+// session, deleted user, blocked account — because each of its three callers
+// (requireAuth, requirePermission, optionalAuth) draws its own conclusion
+// from that answer and none of them needs to know which of the five
+// happened.
 export async function resolveSessionUser(
   deps: RequireAuthDeps,
   req: Request
@@ -27,7 +29,14 @@ export async function resolveSessionUser(
   );
   if (!session) return null;
 
-  // A session can outlive its user only in the window before the CASCADE
-  // commits; treat it as unauthenticated rather than throwing.
-  return await deps.userRepository.findById(session.userId);
+  const user = await deps.userRepository.findById(session.userId);
+
+  // A second layer, not the fix. Blocking deletes an account's sessions, and
+  // login re-checks the status under a lock before it opens one (see
+  // sessionRepository.createIfCredentialCurrent), so a block normally leaves
+  // nothing behind for this to catch. It still catches a block written
+  // straight into the table, which purges nothing. A session can also
+  // outlive its user in the window before the CASCADE commits; that is the
+  // null case.
+  return user?.status === 'blocked' ? null : user;
 }

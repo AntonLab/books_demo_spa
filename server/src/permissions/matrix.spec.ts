@@ -22,14 +22,18 @@ test('the matrix covers every role, module and action exactly once', () => {
 // The invariant that stops a bad seed from locking everyone out. Cheaper than
 // carving an exception for superadmin into the enforcement path, and it fails
 // exactly when the seed is wrong.
-test('superadmin has any on everything except creating content', () => {
+test('superadmin has any on everything except creating content and rewriting comments or likes', () => {
   for (const module of MODULES) {
     for (const action of ACTIONS) {
-      const expected =
+      const createsContent =
         action === 'create' &&
-        (module === 'books' || module === 'series' || module === 'chapters')
-          ? 'none'
-          : 'any';
+        (module === 'books' || module === 'series' || module === 'chapters');
+      const rewritesReaction =
+        action === 'update' && (module === 'comments' || module === 'likes');
+
+      let expected = 'any';
+      if (createsContent) expected = 'none';
+      else if (rewritesReaction) expected = 'own';
 
       assert.equal(
         scope('superadmin', module, action),
@@ -37,6 +41,15 @@ test('superadmin has any on everything except creating content', () => {
         `superadmin/${module}/${action}`
       );
     }
+  }
+});
+
+test("moderators remove comments and likes but never rewrite someone else's", () => {
+  for (const role of ['admin', 'superadmin']) {
+    assert.equal(scope(role, 'comments', 'update'), 'own', `${role} comments`);
+    assert.equal(scope(role, 'comments', 'delete'), 'any', `${role} comments`);
+    assert.equal(scope(role, 'likes', 'update'), 'own', `${role} likes`);
+    assert.equal(scope(role, 'likes', 'delete'), 'any', `${role} likes`);
   }
 });
 
@@ -69,12 +82,10 @@ test('an admin moderates but does not author', () => {
   assert.equal(scope('admin', 'books', 'delete'), 'any');
   assert.equal(scope('admin', 'series', 'update'), 'any');
   assert.equal(scope('admin', 'chapters', 'delete'), 'any');
-  assert.equal(scope('admin', 'comments', 'update'), 'any');
   assert.equal(scope('admin', 'comments', 'delete'), 'any');
   // Without this, admin would inherit USER_GRANTS.likes verbatim — `own` on
-  // update/delete — and could not act on a reported like any more than a
-  // plain user could.
-  assert.equal(scope('admin', 'likes', 'update'), 'any');
+  // delete — and could not act on a reported like any more than a plain user
+  // could.
   assert.equal(scope('admin', 'likes', 'delete'), 'any');
   assert.equal(scope('admin', 'reports', 'update'), 'any');
   // The one deliberate break in the accumulation: admins moderate, they do not

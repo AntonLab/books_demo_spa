@@ -92,19 +92,55 @@ function createFakeUsers(seed: { status?: UserStatus } = {}) {
     row.password = await hashPassword(plaintext, 'test');
   }
 
-  return { repository, setPassword };
+  // What the session fake re-reads when login opens a session, standing in
+  // for the real repository's locking read of the account row. The seeded
+  // status wins here too, so both reads agree about a blocked account.
+  function credentialOf(
+    id: number
+  ): { password: string; status: UserStatus } | null {
+    const row = rows.get(id);
+    return row
+      ? { password: row.password, status: seed.status ?? row.status }
+      : null;
+  }
+
+  return { repository, setPassword, credentialOf };
 }
 
-function createFakeSessions() {
+function createFakeSessions(users: ReturnType<typeof createFakeUsers>) {
   const rows = new Map<string, SessionRecord>();
   let nextId = 1;
 
+  function insert(
+    userId: number,
+    tokenHash: string,
+    expiresAt: Date
+  ): SessionRecord {
+    const record = { id: nextId, userId, expiresAt };
+    nextId += 1;
+    rows.set(tokenHash, record);
+    return record;
+  }
+
   const repository: SessionRepository = {
     async create(userId, tokenHash, expiresAt) {
-      const record = { id: nextId, userId, expiresAt };
-      nextId += 1;
-      rows.set(tokenHash, record);
-      return record;
+      return insert(userId, tokenHash, expiresAt);
+    },
+    // The real re-check happens under a row lock inside a transaction; here
+    // it is a plain comparison, which is enough for a single-threaded fake.
+    async createIfCredentialCurrent(
+      userId,
+      tokenHash,
+      expiresAt,
+      verifiedPasswordHash
+    ) {
+      const current = users.credentialOf(userId);
+      if (!current || current.password !== verifiedPasswordHash) {
+        return 'credential-changed';
+      }
+      if (current.status === 'blocked') return 'blocked';
+      insert(userId, tokenHash, expiresAt);
+      return 'created';
     },
     async findValidByTokenHash(tokenHash) {
       const record = rows.get(tokenHash);
@@ -170,8 +206,8 @@ function createFakeResets(
 }
 
 function authDeps(seed: { status?: UserStatus } = {}) {
-  const sessions = createFakeSessions();
   const users = createFakeUsers(seed);
+  const sessions = createFakeSessions(users);
   const resets = createFakeResets(users, sessions);
   const delivered: { email: string; token: string }[] = [];
 

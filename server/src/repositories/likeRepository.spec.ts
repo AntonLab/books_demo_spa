@@ -253,6 +253,39 @@ describe('likeRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('a like on a tombstone is refused', async () => {
+    await Comment.update(
+      { tombstone: 'deleted' },
+      { where: { id: commentId } }
+    );
+
+    await assert.rejects(
+      repository.create({ bookId: null, commentId, isLike: true }, likerId),
+      (error: unknown) =>
+        error instanceof ForbiddenError &&
+        error.message === 'You cannot like a deleted comment'
+    );
+  });
+
+  test('flipping a like on a tombstone is refused, removing it is not', async () => {
+    const like = await repository.create(
+      { bookId: null, commentId, isLike: true },
+      likerId
+    );
+    await Comment.update(
+      { tombstone: 'removed' },
+      { where: { id: commentId } }
+    );
+
+    await assert.rejects(
+      repository.update(like.id, { isLike: false }),
+      (error: unknown) =>
+        error instanceof ForbiddenError &&
+        error.message === 'You cannot change a like on a deleted comment'
+    );
+    assert.equal(await repository.remove(like.id), true);
+  });
+
   test('a like by an unknown user is a NotFoundError naming the user', async () => {
     await assert.rejects(
       repository.create(

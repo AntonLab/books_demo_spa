@@ -10,7 +10,12 @@ import {
 } from 'sequelize';
 import type { Book } from './Book.ts';
 import type { User } from './User.ts';
-import type { CommentWithAuthor, PublicComment } from '../types/comment.ts';
+import {
+  TOMBSTONES,
+  type CommentWithAuthor,
+  type PublicComment,
+  type Tombstone,
+} from '../types/comment.ts';
 import type { AuthorSummary } from '../types/user.ts';
 
 export class Comment extends Model<
@@ -22,9 +27,15 @@ export class Comment extends Model<
   // chapters.bookId: a top-level comment replies to nothing. The self-reference
   // is what makes the thread a tree.
   declare parentId: CreationOptional<ForeignKey<Comment['id']> | null>;
-  declare userId: ForeignKey<User['id']>;
+  // Nullable: a comment outlives its owner's account as a `deleted`
+  // tombstone, and the account's delete nulls this column. A live comment
+  // always has an owner.
+  declare userId: ForeignKey<User['id']> | null;
   declare bookId: ForeignKey<Book['id']>;
   declare text: string;
+  // How the comment became a tombstone, or null while it is live. The row
+  // survives either way so its replies keep a parent to hang off.
+  declare tombstone: CreationOptional<Tombstone | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -54,9 +65,10 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
       },
       // Must match users.id / books.id exactly (INTEGER UNSIGNED) or MySQL
       // rejects the foreign key with errno 3780 on incompatible column types.
+      // allowNull is what makes the association's ON DELETE SET NULL legal.
       userId: {
         type: DataTypes.INTEGER.UNSIGNED,
-        allowNull: false,
+        allowNull: true,
       },
       bookId: {
         type: DataTypes.INTEGER.UNSIGNED,
@@ -68,6 +80,14 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
       text: {
         type: DataTypes.TEXT,
         allowNull: false,
+      },
+      // A literal DEFAULT is legal on an ENUM, so NULL-by-default lives in the
+      // DDL — and no create schema accepts it, since a comment is never born
+      // a tombstone.
+      tombstone: {
+        type: DataTypes.ENUM(...TOMBSTONES),
+        allowNull: true,
+        defaultValue: null,
       },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
@@ -97,16 +117,23 @@ export function initCommentModel(sequelize: Sequelize): typeof Comment {
   return Comment;
 }
 
+// The one place a tombstone's text and owner are withheld. Blanking here rather
+// than at each call site is what stops a future endpoint from serving them by
+// omission — the row still carries both, so anything reading the model
+// directly would.
 export function toPublicComment(comment: Comment): PublicComment {
+  const tombstone = comment.tombstone ?? null;
+
   return {
     id: comment.id,
     // Normalised the way toPublicBook normalises seriesId: an unset optional
     // foreign key is undefined on a freshly built instance, and the API
     // contract promises null.
     parentId: comment.parentId ?? null,
-    userId: comment.userId,
+    userId: tombstone === null ? comment.userId : null,
     bookId: comment.bookId,
-    text: comment.text,
+    text: tombstone === null ? comment.text : '',
+    tombstone,
     createdAt: comment.createdAt,
     updatedAt: comment.updatedAt,
   };
@@ -118,9 +145,16 @@ export function toPublicComment(comment: Comment): PublicComment {
 // page rather than one per comment.
 export function toCommentWithAuthor(
   comment: Comment,
-  author: AuthorSummary,
+  author: AuthorSummary | null,
   likeCount: number,
   viewerLikeId: number | null
 ): CommentWithAuthor {
-  return { ...toPublicComment(comment), author, likeCount, viewerLikeId };
+  return {
+    ...toPublicComment(comment),
+    // Withheld alongside the text: a tombstone naming its owner defeats the
+    // point of deleting it.
+    author: (comment.tombstone ?? null) === null ? author : null,
+    likeCount,
+    viewerLikeId,
+  };
 }

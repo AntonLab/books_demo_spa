@@ -27,8 +27,8 @@ const userWithRole = (role: UserRole): PublicUser => ({
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 });
 
-function deps(role: UserRole) {
-  const user = userWithRole(role);
+function deps(role: UserRole, status: PublicUser['status'] = 'active') {
+  const user = { ...userWithRole(role), status };
 
   return {
     sessionRepository: {
@@ -50,10 +50,11 @@ function run(
   role: UserRole,
   cookies: Record<string, string>,
   module: Parameters<ReturnType<typeof createRequirePermission>>[0],
-  action: Parameters<ReturnType<typeof createRequirePermission>>[1]
+  action: Parameters<ReturnType<typeof createRequirePermission>>[1],
+  status: PublicUser['status'] = 'active'
 ): Promise<{ req: Request; error: unknown }> {
   const req = { cookies } as unknown as Request;
-  const handler = createRequirePermission(deps(role))(module, action);
+  const handler = createRequirePermission(deps(role, status))(module, action);
 
   return new Promise((resolve) => {
     void handler(req, {} as Response, (error?: unknown) =>
@@ -105,4 +106,15 @@ test('an admin may not create a book', async () => {
   const { error } = await run('admin', { sid: TOKEN }, 'books', 'create');
 
   assert.ok(error instanceof ForbiddenError);
+});
+
+test('a blocked account is served as a guest', async () => {
+  const read = await run('user', { sid: TOKEN }, 'books', 'read', 'blocked');
+  assert.equal(read.error, undefined);
+  assert.equal(read.req.permissionScope, 'any');
+  assert.equal(read.req.user, undefined);
+
+  const write = await run('user', { sid: TOKEN }, 'books', 'create', 'blocked');
+  assert.ok(write.error instanceof UnauthorizedError);
+  assert.equal((write.error as UnauthorizedError).statusCode, 401);
 });

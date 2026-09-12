@@ -14,6 +14,7 @@ import type {
   CreateCommentInput,
   ListCommentsQuery,
   PublicComment,
+  Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -23,6 +24,7 @@ export interface CommentController {
   getById: RequestHandler;
   update: RequestHandler;
   remove: RequestHandler;
+  restore: RequestHandler;
 }
 
 // requirePermission guarantees req.user on every write — `guest` has no write
@@ -39,32 +41,25 @@ function actorId(req: Request): number {
 export function createCommentController(
   repository: CommentRepository
 ): CommentController {
-  // The same ownership rule books, series, chapters and likes enforce: `own`
-  // may change only the caller's own comments. The check lives in the
-  // controller rather than a middleware because it needs the repository, and
-  // because keeping both writes' rule in one place is what stops them drifting
-  // apart.
-  //
-  // 404 before 403 deliberately: reporting "forbidden" for a comment that does
-  // not exist would leak which ids are real.
-  //
-  // Returns the row it looked up, so a caller that also needs to inspect it
-  // does not pay for a second query. `any` skips the owner comparison
-  // entirely — that is what lets an admin act on a reported comment. Every
-  // other value, a missing scope included, is compared: a handler mounted
-  // without requirePermission fails closed rather than acting as `any`.
-  const assertOwned = async (
-    req: Request,
-    id: number
-  ): Promise<PublicComment> => {
+  // 404 before 403: reporting "forbidden" for a comment that does not exist
+  // would leak which ids are real.
+  const findOrThrow = async (id: number): Promise<PublicComment> => {
     const existing = await repository.findById(id);
     if (!existing) throw new NotFoundError('Comment', id);
+    return existing;
+  };
 
-    if (req.permissionScope !== 'any' && existing.userId !== req.user?.id) {
+  // The same ownership rule books, series, chapters and likes enforce: `own`
+  // may change only the caller's own comments. `any` skips the comparison —
+  // that is what lets a moderator act on a reported comment. Every other
+  // value, a missing scope included, is compared: a handler mounted without
+  // requirePermission fails closed rather than acting as `any`. The check
+  // lives here rather than in a middleware because it needs the repository to
+  // load the row before an owner can be compared.
+  const assertOwner = (req: Request, comment: PublicComment): void => {
+    if (req.permissionScope !== 'any' && comment.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
     }
-
-    return existing;
   };
 
   return {
@@ -96,7 +91,14 @@ export function createCommentController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(req, id);
+      const existing = await findOrThrow(id);
+
+      // Before the owner check: nobody — moderators included — may put text
+      // back under a tombstone.
+      if (existing.tombstone !== null) {
+        throw new ForbiddenError('A deleted comment cannot be edited');
+      }
+      assertOwner(req, existing);
 
       const comment = await repository.update(
         id,
@@ -108,11 +110,35 @@ export function createCommentController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertOwned(req, id);
+      const existing = await findOrThrow(id);
 
-      const removed = await repository.remove(id);
+      // Already a tombstone: there is nothing left to delete, for anyone.
+      if (existing.tombstone !== null) throw new NotFoundError('Comment', id);
+      assertOwner(req, existing);
+
+      // The owner deleting their own comment — an admin included — is a
+      // deletion; anyone else reached this line through `any` and is
+      // moderating.
+      const kind: Tombstone =
+        existing.userId === actorId(req) ? 'deleted' : 'removed';
+      const removed = await repository.remove(id, kind);
       if (!removed) throw new NotFoundError('Comment', id);
       res.status(204).end();
+    },
+
+    restore: async (req, res) => {
+      // Only a moderator restores. Refused before any lookup, so the answer
+      // says nothing about which ids exist.
+      if (req.permissionScope !== 'any') {
+        throw new ForbiddenError('Only a moderator may restore a comment');
+      }
+
+      const { id } = validatedParams<{ id: number }>(req);
+      const restored = await repository.restore(id);
+      // Missing, live and owner-deleted all land here: none has anything a
+      // moderator could restore.
+      if (!restored) throw new NotFoundError('Comment', id);
+      res.json(restored);
     },
   };
 }

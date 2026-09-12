@@ -63,9 +63,25 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
   }
 
   const all = data?.items ?? [];
-  // The server returns a flat list; the two-level tree is assembled here.
-  const roots = all.filter((item) => item.parentId === null);
-  const repliesOf = (id: number) => all.filter((item) => item.parentId === id);
+
+  // The server returns a flat list; the two-level tree is assembled here, in
+  // one pass over it. Only roots and their direct replies render, so a
+  // tombstone earns its place only as a root keeping at least one live reply
+  // in its thread. Every other tombstone — a reply, or a root whose replies
+  // are all tombstones too — is noise, and is dropped here rather than on the
+  // server: this is the only place that already knows what hangs off what.
+  const liveReplies = new Map<number, CommentWithAuthor[]>();
+  for (const item of all) {
+    if (item.parentId === null || item.tombstone !== null) continue;
+    const siblings = liveReplies.get(item.parentId) ?? [];
+    siblings.push(item);
+    liveReplies.set(item.parentId, siblings);
+  }
+  const roots = all.filter(
+    (item) =>
+      item.parentId === null &&
+      (item.tombstone === null || liveReplies.has(item.id))
+  );
 
   const submit = () => {
     const text = draft.trim();
@@ -135,7 +151,9 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
         <div key={comment.id}>
           {renderComment(comment, true)}
           <div style={{ marginLeft: token.marginXL }}>
-            {repliesOf(comment.id).map((child) => renderComment(child, false))}
+            {(liveReplies.get(comment.id) ?? []).map((child) =>
+              renderComment(child, false)
+            )}
           </div>
         </div>
       ))}

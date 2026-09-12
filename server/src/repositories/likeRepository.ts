@@ -68,11 +68,12 @@ function asMissingReference(
 // One like per user per target, enforced by the unique indexes rather than a
 // findOne before the insert — that would be a check-then-write race and an
 // extra query on every like. Changing one's mind is a PATCH, not a second POST.
-// Nobody may like their own book or their own comment. This is the one
-// check-then-write in this repository, and it is safe where the uniqueness
-// check would not be: a row's owner never changes, so there is no window for
-// the answer to go stale between the SELECT and the INSERT.
-async function assertNotSelfLike(
+// Nobody may like their own book or their own comment, and nobody may like a
+// tombstoned comment. This is the one check-then-write in this repository,
+// and it is safe where the uniqueness check would not be: a row's owner never
+// changes, so there is no window for the answer to go stale between the
+// SELECT and the INSERT.
+async function assertLikeable(
   input: CreateLikeInput,
   actorId: number
 ): Promise<void> {
@@ -87,9 +88,14 @@ async function assertNotSelfLike(
 
   if (input.commentId !== null) {
     const comment = await Comment.findByPk(input.commentId, {
-      attributes: ['userId'],
+      attributes: ['userId', 'tombstone'],
     });
     if (!comment) throw new NotFoundError('Comment', input.commentId);
+    // A tombstone takes no new reactions: a like there would be a vote on a
+    // comment nobody can see.
+    if (comment.tombstone !== null) {
+      throw new ForbiddenError('You cannot like a deleted comment');
+    }
     if (comment.userId === actorId) {
       throw new ForbiddenError('You cannot like your own comment');
     }
@@ -130,7 +136,7 @@ function buildWhere(query: ListLikesQuery): WhereOptions {
 export function createSequelizeLikeRepository(): LikeRepository {
   return {
     async create(input, actorId) {
-      await assertNotSelfLike(input, actorId);
+      await assertLikeable(input, actorId);
 
       try {
         const like = await Like.create({ ...input, userId: actorId });
@@ -165,6 +171,20 @@ export function createSequelizeLikeRepository(): LikeRepository {
     async update(id, input) {
       const like = await Like.findByPk(id);
       if (!like) return null;
+
+      // Flipping counts as a new reaction as far as a tombstone is concerned.
+      // Removing your own like does not, which is why remove() has no such
+      // check.
+      if (like.commentId !== null) {
+        const comment = await Comment.findByPk(like.commentId, {
+          attributes: ['tombstone'],
+        });
+        if (comment !== null && comment.tombstone !== null) {
+          throw new ForbiddenError(
+            'You cannot change a like on a deleted comment'
+          );
+        }
+      }
 
       // Neither an FK nor a unique mapping here: updateLikeSchema carries
       // isLike alone, so an update can touch neither a foreign key nor a

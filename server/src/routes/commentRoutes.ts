@@ -58,5 +58,15 @@ export function createCommentRoutes(deps: RouteDeps): Router {
     controller.remove
   );
 
+  // Restoring is the inverse of a moderator's delete, so it rides on the same
+  // grant, `comments × delete`. The controller then requires `any`: an owner's
+  // `own` gets them through this door and no further.
+  router.post(
+    '/:id/restore',
+    requirePermission('comments', 'delete'),
+    validate({ params: idParamSchema }),
+    controller.restore
+  );
+
   return router;
 }

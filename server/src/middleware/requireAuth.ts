@@ -9,7 +9,7 @@ export type { RequireAuthDeps };
 
 export function createRequireAuth(deps: RequireAuthDeps): RequestHandler {
   return async (req, _res, next) => {
-    // The four ways this can fail are all one answer here: no user, so 401.
+    // The five ways this can fail are all one answer here: no user, so 401.
     // optionalAuth shares the lookup and draws the opposite conclusion.
     const user = await resolveSessionUser(deps, req);
     if (!user) {

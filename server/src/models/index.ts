@@ -83,12 +83,15 @@ export function initModels(sequelize: Sequelize): Models {
 
   User.hasMany(Comment, {
     as: 'comments',
-    foreignKey: 'userId',
-    // Same reasoning as series and books: a comment with no author answers to
-    // nobody. This reaches further than it looks — deleting a user removes
-    // comments other people may have replied to, which is exactly the case the
-    // SET NULL below has to survive.
-    onDelete: 'CASCADE',
+    // allowNull is restated so Sequelize does not infer NOT NULL from the
+    // association and quietly make SET NULL illegal.
+    foreignKey: { name: 'userId', allowNull: true },
+    // SET NULL, unlike every other owner reference here: a comment is part of
+    // a conversation other people replied to, so it outlives its owner's
+    // account as a tombstone. userRepository.remove marks the account's
+    // comments `deleted` in the same transaction as the delete; this then
+    // nulls their owner. A comment with no owner is therefore never live.
+    onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
   });
   Comment.belongsTo(User, { as: 'user', foreignKey: 'userId' });
@@ -113,13 +116,14 @@ export function initModels(sequelize: Sequelize): Models {
   //                       into comments then recurses through the replies.
   //   ON DELETE RESTRICT  that same book delete fails with errno 1451, the
   //                       cascade tripping over replies it may not remove.
-  //   ON DELETE SET NULL  both stay working; a deleted comment leaves its
-  //                       direct replies behind as top-level comments.
+  //   ON DELETE SET NULL  both stay working.
   //
-  // So SET NULL, on the same reasoning that gave books.seriesId its: unlinking
-  // beats destroying records nobody asked to delete. Removing a whole subtree
-  // is an application-level operation (walk it, then delete in one statement
-  // inside a transaction), not something to hand to InnoDB.
+  // The API never hard-deletes a comment — DELETE leaves a tombstone — so a
+  // reply keeps its parent for as long as the book lasts. What SET NULL
+  // protects now is the one hard delete left: the book's cascade into its
+  // comments, whether the book goes directly or with its owner's account,
+  // and a bulk DELETE FROM comments such as the test teardown. Both keep
+  // working at any thread depth.
   Comment.hasMany(Comment, {
     as: 'replies',
     // allowNull is restated here so Sequelize does not infer NOT NULL from the

@@ -5,6 +5,8 @@ import {
   where as sequelizeWhere,
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
+import { Comment } from '../models/Comment.ts';
+import { Session } from '../models/Session.ts';
 import { toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
 import { ConflictError } from '../types/errors.ts';
@@ -12,7 +14,7 @@ import type {
   CreateUserInput,
   ListUsersQuery,
   PublicUser,
-  UpdateUserInput,
+  UserChanges,
   UserStatus,
 } from '../types/user.ts';
 import type { UserRole } from '../types/permission.ts';
@@ -29,7 +31,7 @@ export interface UserRepository {
   create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
   findById(id: number): Promise<PublicUser | null>;
-  update(id: number, input: UpdateUserInput): Promise<PublicUser | null>;
+  update(id: number, input: UserChanges): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
   // The one door role changes travel through — see userRoleRoutes.ts. Its own
   // method rather than a field on update(), so a role can never ride in
@@ -39,6 +41,10 @@ export interface UserRepository {
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
   findByEmail(email: string): Promise<PublicUser | null>;
+  // The stored hash for one account, for the controller to check a
+  // currentPassword against. As narrow as findByLoginWithPassword, for the
+  // same reason: the hash must not travel further than the check.
+  findPasswordHashById(id: number): Promise<string | null>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -113,24 +119,65 @@ export function createSequelizeUserRepository(): UserRepository {
       return user ? toPublicUser(user) : null;
     },
 
+    // One transaction, so a block or a password change and the sessions it
+    // ends land together: a partial apply would leave the old sessions alive
+    // beside the new state, the exact thing this exists to prevent.
     async update(id, input) {
-      // unscoped so the instance carries the password, letting the beforeSave
-      // hook see a real change when the caller supplies a new one.
-      const user = await User.unscoped().findByPk(id);
-      if (!user) return null;
-
-      try {
-        await user.update(input);
-      } catch (error) {
-        asConflict(error);
+      const sequelize = User.sequelize;
+      if (!sequelize) {
+        throw new Error('User model is not initialised');
       }
 
-      return toPublicUser(user);
+      return sequelize.transaction(async (transaction) => {
+        // unscoped so the instance carries the password, letting the
+        // beforeSave hook see a real change when the caller supplies a new
+        // one. FOR UPDATE so two concurrent updates cannot both read the
+        // status as unblocked.
+        const user = await User.unscoped().findByPk(id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!user) return null;
+
+        const wasBlocked = user.status === 'blocked';
+        try {
+          await user.update(input, { transaction });
+        } catch (error) {
+          asConflict(error);
+        }
+
+        // Only the move into `blocked` ends sessions: re-blocking deletes
+        // nothing, and unblocking hands nothing back.
+        const becameBlocked = !wasBlocked && user.status === 'blocked';
+        if (input.password !== undefined || becameBlocked) {
+          await Session.destroy({ where: { userId: id }, transaction });
+        }
+
+        return toPublicUser(user);
+      });
     },
 
+    // The account's comments stay behind as `deleted` tombstones, so the
+    // replies other people wrote under them keep their thread. They are marked
+    // in the same transaction as the delete: the foreign key then nulls their
+    // owner, and a comment with no owner must never be live. Comments on the
+    // account's own books are the exception — they go with the books.
     async remove(id) {
-      const deleted = await User.destroy({ where: { id } });
-      return deleted > 0;
+      const sequelize = User.sequelize;
+      if (!sequelize) {
+        throw new Error('User model is not initialised');
+      }
+
+      return sequelize.transaction(async (transaction) => {
+        // silent, or every tombstone this leaves shares one updatedAt — a
+        // stamp linking them to each other and to the moment of the delete.
+        await Comment.update(
+          { tombstone: 'deleted' },
+          { where: { userId: id }, transaction, silent: true }
+        );
+        const deleted = await User.destroy({ where: { id }, transaction });
+        return deleted > 0;
+      });
     },
 
     async updateRole(id, role) {
@@ -156,6 +203,13 @@ export function createSequelizeUserRepository(): UserRepository {
     async findByEmail(email) {
       const user = await User.findOne({ where: { email } });
       return user ? toPublicUser(user) : null;
+    },
+
+    async findPasswordHashById(id) {
+      const user = await User.unscoped().findByPk(id, {
+        attributes: ['password'],
+      });
+      return user ? user.password : null;
     },
   };
 }
