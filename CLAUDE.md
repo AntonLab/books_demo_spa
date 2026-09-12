@@ -114,6 +114,18 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   SHA-256-not-argon2 choice for tokens, and the login timing defence.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
+- `server/src/db/seed.ts` fills the database with the demo data — ten accounts
+  (one superadmin, one admin, three authors, five readers, all sharing the
+  password `Password123!`), each author's 1-2 series of 4-5 books plus 1-3
+  standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
+  with a scattering of tombstones, and likes on both books and comments. Run
+  it with `npm run seed -w server -- --force`; **the flag is required because
+  it deletes every row in the six content tables first**, and without it the
+  script only reports what it found. Counts come from a fixed PRNG seed, so
+  the shape is reproducible; the dates are anchored to the run, so the newest
+  chapter is always a few days old. See `server/CLAUDE.md` for the personas,
+  the two safety guards, and why it writes through the models rather than the
+  API.
 
 ## Quality Gates
 
