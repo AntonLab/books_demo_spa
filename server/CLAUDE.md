@@ -47,9 +47,11 @@ check ownership through the permission matrix's `own` scope — the same
 mechanism that now also gates books, series and chapters (see **Auth**). Its
 list endpoint returns a flat page — each row carrying `parentId`, an embedded
 `author`, a `likeCount` and the caller's `viewerLikeId` — and leaves tree
-assembly to the client, which keeps paging meaningful. Deleting a comment takes
-its whole reply subtree with it; see **Sequelize & MySQL conventions** for why
-that cascade is not a foreign key.
+assembly to the client, which keeps paging meaningful. Deletion is soft:
+`DELETE /api/comments/:id` sets a `tombstone` (`'deleted'` or `'removed'`) on
+that one row instead of removing it, so its replies keep a parent, and its
+text and author are withheld on the way out; `POST /api/comments/:id/restore`
+reverses a moderator's `removed` tombstone. See **Auth**.
 
 ## Development Commands
 
@@ -178,6 +180,40 @@ value.
   under load, and an ESM import binding cannot be spied on from outside.
 - **A blocked account is checked after the password, not before**, or the 403
   would tell an attacker without the password that the account exists.
+- **Blocking an account ends its sessions.** `userRepository.update` runs the
+  status change and the session cleanup in one transaction, and only fires
+  the cleanup on the transition into `blocked` from something else — moving
+  an already-blocked account to `blocked` again, or unblocking it, deletes no
+  sessions. A login still verifying when the block lands cannot slip a
+  session past the cleanup; see below.
+- **Every successful password change through `PATCH /api/users/:id` ends
+  every session on that account**, in the same transaction as the update —
+  the session that made the change included. When the change is to the
+  caller's own account, the response also clears the `sid` cookie, so the
+  browser stops presenting a token that now names nothing
+  (`userController.update`).
+- **A login in flight cannot outlive a block or a password change.** argon2
+  is slow enough for either to commit, and purge the account's sessions,
+  while a login is still verifying. So `createIfCredentialCurrent` in
+  `repositories/sessionRepository.ts` re-reads the account under a shared
+  lock (`SELECT … FOR SHARE`, which Sequelize sends as
+  `LOCK IN SHARE MODE`) in the same transaction as the session insert, and
+  inserts nothing unless the hash is still the one just verified and the
+  account is not blocked — 401 `Invalid credentials` or 403
+  `Account is blocked` otherwise, with no cookie. The lock either makes the
+  re-read wait for a change in flight and see it, or makes the change wait
+  for the insert and then purge that session with the rest, so the two rules
+  above hold against concurrent logins too. `register` opens its session
+  without the re-check: a brand-new account has nothing in flight.
+- **A blocked account's session is no session at all.** `resolveSessionUser`
+  (`middleware/sessionUser.ts`) reports nobody for it, so a guarded route
+  answers 401 and a public route serves the caller as a guest. Behind the
+  re-check above it is a second layer, and the only one for a block written
+  straight into the table, which purges no sessions.
+- **`pending` restricts nothing today.** It is `users.status`'s default in
+  `models/User.ts`, so `POST /api/users` with no `status` in the body creates
+  one; it is reserved for a future email-verification step, and until that
+  exists a `pending` account signs in exactly like an `active` one.
 - **Login always opens a new session** rather than reusing an existing row,
   which is what rules out session fixation.
 - **Reset requests always answer 202**, whether or not the address exists —
@@ -193,9 +229,10 @@ value.
 - **`optionalAuth` is not mounted on any route.** It still exists in
   `middleware/optionalAuth.ts` with its spec, built on the same
   `resolveSessionUser` in `middleware/sessionUser.ts` that `requireAuth` and
-  `requirePermission` use — it reports "nobody" for all four failure modes
-  (missing cookie, unknown token, expired session, deleted user) and calls
-  `next()` with `req.user` left unset rather than answering 401. It used to
+  `requirePermission` use — it reports "nobody" for all five failure modes
+  (missing cookie, unknown token, expired session, deleted user, blocked
+  account) and calls `next()` with `req.user` left unset rather than
+  answering 401. It used to
   sit on `GET /api/books/:id` and `GET /api/comments` so those public reads
   could report `viewerLikeId` without a 401 for anonymous visitors, but
   `requirePermission` now resolves the session itself on every route,
@@ -218,6 +255,21 @@ value.
     chapter's `bookId` and then the book's owner, and `assertMayAddTo` does
     the same for a `POST` that has no chapter yet to own — the target book
     answers instead.
+  - **Creating into another resource checks that resource's owner too.**
+    `bookController.assertMayAddToSeries` checks the caller may touch the
+    target series before a book is filed into it, because filing a book into
+    a series changes the series as well as the book — without the check an
+    author could put a book into a stranger's series, and the series' owner
+    could only undo it by deleting the series. `null` (unlinking) and an
+    absent key (leaving the link alone) touch no series and need no check; a
+    named series that does not exist is still a 404 that blames the series,
+    ahead of the book's own 403.
+  - **A comment resolves its tombstone before any owner comparison.** A
+    tombstone's `userId` is `null`, so comparing it against `req.user.id`
+    would refuse everyone, owner included. `commentController.update` and
+    `.remove` therefore reject a tombstone outright — `PATCH` with 403,
+    `DELETE` with 404, since there is nothing left to delete a second time —
+    before `assertOwner` ever runs.
   - The self-like check lives in `likeRepository.create`, which loads the
     target to compare owners. It is the one check-then-write in that file, and
     it is safe where the uniqueness check would not be: a row's owner never
@@ -225,6 +277,45 @@ value.
     with the indexes for exactly that reason. This is a domain invariant, not
     a matrix rule — no scope value spells out "not yourself," so do not go
     looking for it in the permission table.
+- **Deleting a comment leaves a tombstone, not a hole.**
+  `DELETE /api/comments/:id` sets `tombstone` on that one row and touches
+  nothing else; the replies stay, so the thread reads around the gap rather
+  than losing everything under a withdrawn remark. There are two kinds
+  (`Tombstone` in `types/comment.ts`):
+  - **`deleted`** — the comment's own owner deleted it (an admin deleting
+    their own comment is still an owner deletion, not moderation), or the
+    owner's account was deleted (see **Sequelize & MySQL conventions**
+    below). Nobody restores a `deleted` comment.
+  - **`removed`** — a moderator (`admin` or `superadmin`, acting under `any`)
+    deleted someone else's comment. `POST /api/comments/:id/restore` reverses
+    this: it requires the caller's `comments × delete` scope to resolve to
+    `any` — whoever removed it, not necessarily the same moderator — refuses
+    anyone else with 403 before any lookup, and answers 404 for a missing id,
+    a live comment, and a `deleted` comment alike, since none of them has
+    anything a moderator could restore. Success is 200 with the comment.
+  - **Both kinds are anonymous the same way.** `text` comes back `''`,
+    `author` comes back `null`, and `userId` comes back `null`
+    (`toPublicComment` / `toCommentWithAuthor` in `models/Comment.ts`); the
+    text itself stays on the row, and blanking in one place rather than at
+    each call site is what stops a future endpoint serving it by omission.
+    `GET /api/comments?userId=` never returns a tombstone of either kind — an
+    owner filter naming a tombstoned row would out exactly the person it
+    hides (`buildWhere` in `commentRepository.ts`).
+  - **A tombstone is immutable.** `PATCH` on one is 403 for everyone, since
+    editing it would put text back under a heading saying the author
+    withdrew it. A second `DELETE` is a 404 for everyone: there is nothing
+    left to delete.
+  - **A tombstone takes no new activity.** Replying to one is 403
+    (`You cannot reply to a deleted comment`, `commentRepository.create`);
+    liking one, or flipping an existing like on one, is 403
+    (`You cannot like a deleted comment` /
+    `You cannot change a like on a deleted comment`, `likeRepository`) — but
+    removing your own existing like from a tombstone is still allowed.
+    Replies that already exist under a tombstone behave normally.
+  - **A thread cannot be tombstoned wholesale.** Each reply belongs to its
+    own author, and only they, a moderator, or their own account's deletion
+    can turn it into a tombstone. That is the deliberate cost of keeping
+    replies alive.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
@@ -256,7 +347,12 @@ value.
   would fall back into every controller instead of living in one table. On
   `create` specifically, `own` and `any` mean the same thing: a created row
   is the caller's by construction (its owner column is always the session's
-  user id), so `own` is simply the spelling a role that may create uses.
+  user id), so `own` is simply the spelling a role that may create uses — but
+  the create path is not scope-only. Creating a book into a series checks
+  that the caller may touch that series (`assertMayAddToSeries` in
+  `controllers/bookController.ts`), and creating a chapter checks the owner
+  of its book (`assertMayAddTo` in `controllers/chapterController.ts`); both
+  run after the matrix has already let the request through.
   `PERMISSION_DEFINITION` in `matrix.ts` only spells out what is granted;
   everything else expands to `none` when `buildMatrixRows()` produces one
   row per role/module/action for the table, so a missing row can never be
@@ -333,26 +429,41 @@ value.
   owns) and identity-from-session (see above) both live in code, not in a
   scope value — there is no `PermissionScope` that spells out "not
   yourself," so do not go looking for either rule in the permission table.
-  The reach of a comment delete is the same kind of thing, pointing the other
-  way: `commentRepository.remove` deletes the whole reply subtree, so a
-  `user` deleting their own comment under `own` also deletes every reply
-  beneath it, including other users' replies. The `own` check only compares
-  the owner of the comment named in the request; the subtree walk is
-  repository behaviour that predates the matrix, not something a scope
-  grants. Whether it should stay that way is the project owner's call — do
-  not read it as a matrix property, and do not change it as part of
-  permissions work.
-- **`admin`'s reach over accounts is broader than it may look, and nothing
-  here narrows it.** The matrix grants `admin` `update: any` and
-  `delete: any` on `users`, and `updateUserSchema` carries `email` and
-  `password` like every other field. An `admin` can therefore change any
-  other user's email or password through `PATCH /api/users/:id` —
-  including a `superadmin`'s — and nothing in the matrix, the schema or the
-  role route stops it; only role changes are walled off, through the
-  separate door above. Whether that is the intended shape of `admin` is an
-  open question the project owner is deciding separately — do not treat it
-  as a bug to fix here, and do not describe roles or the `superadmin`
-  account as protected from `admin` action.
+  A comment's tombstone rules are the same kind of thing: nothing in the
+  matrix says a tombstone refuses new activity — `commentRepository.create`
+  refuses a reply to one, `likeRepository.create`/`.update` refuse a like or
+  a like flip on one (removing your own existing like is still allowed), and
+  a tombstone is immutable — `commentController.update` answers 403 for
+  everyone and `.remove` answers 404 for everyone, since there is nothing
+  left on the row to delete a second time. See **Deleting a comment leaves a
+  tombstone, not a hole** above.
+- **`admin`'s reach over accounts is settled: `user` and `author` only, plus
+  itself.** `userController.assertMayTouch` layers the rank rule on top of
+  the matrix's `update: any` / `delete: any` for `admin` on `users`: an admin
+  may `PATCH` **or `DELETE`** their own row — an admin may delete its own
+  account, unlike a superadmin — and may `PATCH` or `DELETE` only other
+  accounts whose role is `user` or `author` (`ADMIN_MANAGEABLE_ROLES`) —
+  targeting another admin or any superadmin is a 403, and a missing id is
+  still a 404 first, ahead of the rank check. A `superadmin` reaches every
+  account with no such narrowing, but may not delete their own account
+  (`userController.remove`) or change their own role through
+  `PATCH /api/users/:id/role` (`userRoleRoutes.ts`); another superadmin may
+  do both. A `user`/`author` still reaches only their own row, refused
+  without a database lookup.
+  Nobody, at any role, changes their own `status` through
+  `PATCH /api/users/:id` — a `status` key in the body of a request against
+  your own row is a 403 even when the value would not change anything.
+  Changing your own `password` or `email` additionally requires
+  `currentPassword` in the same body (missing → 400, wrong → 403); it is
+  never stored and never counts as a change on its own. The rank rule
+  protects **accounts** only — moderating content ignores it, so an admin
+  may remove a superadmin's comment. `admin` and `superadmin` also carry
+  `update: own` on `comments` and `likes` (see **Deleting a comment leaves a
+  tombstone, not a hole** under **Auth** above): a moderator removes, and
+  for comments restores, but never rewrites, someone else's reaction or
+  remark. Superadmin's blanket `any` therefore has two carve-outs, not one:
+  no `create` on `books`/`series`/`chapters`, and `update: own` rather than
+  `any` on `comments` and `likes`.
 
 ## Runtime notes
 
@@ -480,9 +591,11 @@ snippets — still get wrong. Verified against the 5.x router and request source
   way, which would take the test teardown with it. `RESTRICT` fares no better
   — that book delete then fails with errno 1451. `SET NULL` leaves every one
   of those working, at the cost of promoting a deleted comment's direct replies
-  to top level, so that is what `Comment.hasMany(Comment)` declares. Deleting a
-  whole subtree belongs in application code: walk it, then delete in one
-  statement inside a transaction.
+  to top level, so that is what `Comment.hasMany(Comment)` declares. Comment
+  deletion is soft now (see **Deleting a comment leaves a tombstone, not a
+  hole** under Auth), so `DELETE /api/comments/:id` never reaches this
+  column at all; the association's `SET NULL` only ever fires when a book
+  cascades away its comments wholesale, not from removing one comment.
 - **A self-referential `ON UPDATE CASCADE` is a lie**: MySQL will not recurse
   an update through the table it is already updating, so it silently behaves
   like `RESTRICT` (verified — the update fails with errno 1451). The replies
@@ -552,9 +665,14 @@ snippets — still get wrong. Verified against the 5.x router and request source
   (re-parenting is not a field edit), but `seriesId` is present in
   `updateBookSchema`, where an explicit `null` is how a book leaves a series.
 - **Foreign keys constrain the test teardown**: MySQL refuses to `TRUNCATE` a
-  table referenced by a foreign key, so the suites clear users with
-  `destroy({ where: {} })` and let `ON DELETE CASCADE` take the children.
-  Each MySQL-backed suite also syncs its own schema
+  table referenced by a foreign key, so the suites clear rows with
+  `destroy({ where: {} })` and let `ON DELETE CASCADE` take most of the
+  children — except comments, which no longer go with their owner now that
+  `comments.userId` is `SET NULL` rather than `CASCADE` (see below): a suite
+  that destroyed `User` first would leave orphaned `Comment` rows behind
+  instead of clearing them, so every suite that touches comments clears
+  `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
+  own schema
   (`books_demo_spa_test`, `books_demo_spa_test_series`,
   `books_demo_spa_test_books`, `books_demo_spa_test_chapters`,
   `books_demo_spa_test_likes`) — `node:test`
@@ -562,7 +680,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `sync({ force: true })` on one database drop each other's tables mid-run.
   Clear children before parents:
   `Like` → `Comment` → `Chapter` → `Book` → `Series` → `User`; `Like` is the
-  leaf of every chain, and `Comment` must precede `Book`.
+  leaf of every chain, and `Comment` must precede both `Book` (its
+  still-cascading foreign key) and `User` (its no-longer-cascading one).
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
@@ -574,11 +693,25 @@ snippets — still get wrong. Verified against the 5.x router and request source
   column therefore never reaches a database created before it, and every write
   then fails on the missing column. Drop it
   (`DROP DATABASE books_demo_spa`) and let `ensureDatabase` rebuild it on the
-  next boot. The `title` columns on `books` and `series` landed this way.
-- **The comment reply cascade lives in the repository, not the foreign key.**
-  `comments.parentId` is `ON DELETE SET NULL`, and `commentRepository.remove`
-  walks the subtree and deletes it in one statement inside a transaction.
-  `ON DELETE CASCADE` on a self-reference fails with `ER_FK_DEPTH_EXCEEDED`
-  (errno 3008) past 15 levels — and takes the owning book's delete down with
-  it, because deleting a book cascades into comments and then recurses through
-  the replies. The measurement is recorded in `models/index.ts`.
+  next boot. The `title` columns on `books` and `series` landed this way, and
+  so did this branch's `comments` table: `tombstone` is a new column and
+  `userId` changed from `NOT NULL` to nullable, so a database created before
+  this branch needs the same drop-and-rebuild.
+- **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
+  reference in this schema that is not `CASCADE`.** A comment outlives its
+  owner's account, as a tombstone: `userRepository.remove` marks every one of
+  the account's comments `deleted` in the same transaction as the account
+  delete, so by the time the foreign key nulls their `userId` the row is
+  already a tombstone, and an owner-less comment is therefore never live.
+  Comments on the account's own books are the exception —
+  `Book.hasMany(Comment)` still cascades, so those go with the books, same as
+  before.
+- **`DELETE /api/comments/:id` no longer deletes anything.**
+  `commentRepository.remove` sets `tombstone` and stops there — see
+  **Deleting a comment leaves a tombstone, not a hole** under Auth.
+  `comments.parentId` stays `ON DELETE SET NULL` regardless, because deleting
+  a _book_ still hard-cascades into its comments: `ON DELETE CASCADE` on the
+  self-reference fails with `ER_FK_DEPTH_EXCEEDED` (errno 3008) past 15
+  levels and takes the book's delete down with it. The measurement is
+  recorded in `models/index.ts`, and `commentRepository.spec.ts` covers a
+  20-deep thread.

@@ -1,15 +1,24 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import mysql from 'mysql2/promise';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
-import { initModels, User } from '../models/index.ts';
+import {
+  Book,
+  Comment,
+  initModels,
+  Like,
+  Series,
+  Session,
+  User,
+} from '../models/index.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
+import { hashToken } from '../tokens.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
 
 function testDbConfig() {
@@ -70,13 +79,18 @@ describe('userRepository against real MySQL', { skip }, () => {
     await sequelize.close();
   });
 
-  // A DELETE rather than TRUNCATE: MySQL refuses to truncate a table referenced
-  // by a foreign key, and series now points at users. ON DELETE CASCADE clears
-  // any children along with it.
-  const clearUsers = () => User.destroy({ where: {} });
+  // Children first: deleting a user no longer cascades into their comments
+  // (userId goes SET NULL instead), so those rows must be cleared explicitly
+  // before the user that owned the book they live under.
+  beforeEach(async () => {
+    await Like.destroy({ where: {}, truncate: false });
+    await Comment.destroy({ where: {}, truncate: false });
+    await Book.destroy({ where: {}, truncate: false });
+    await Series.destroy({ where: {}, truncate: false });
+    await User.destroy({ where: {}, truncate: false });
+  });
 
   test('stores a hash rather than the plaintext, and it verifies', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     const row = await User.unscoped().findByPk(created.id);
@@ -86,14 +100,12 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('never returns the password field', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal('password' in created, false);
   });
 
   test('Bob and bob are different logins', async () => {
-    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
     const lower = await repository.create({
       ...base,
@@ -106,7 +118,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a repeated login is rejected', async () => {
-    await clearUsers();
     await repository.create({ ...base, login: 'Bob', email: 'a@example.com' });
 
     await assert.rejects(
@@ -118,7 +129,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('email stays case-insensitive, so Bob@ collides with bob@', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'first',
@@ -137,7 +147,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('paginates and reports the total', async () => {
-    await clearUsers();
     for (let i = 0; i < 5; i += 1) {
       await repository.create({
         ...base,
@@ -152,7 +161,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('filters by status', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'a',
@@ -176,7 +184,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('search stays case-insensitive even though login is not', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'Bob',
@@ -188,7 +195,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('a literal % in q is escaped rather than matching every row', async () => {
-    await clearUsers();
     await repository.create({
       ...base,
       login: 'alice',
@@ -205,7 +211,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('updates a single field and leaves the rest alone', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     const updated = await repository.update(created.id, {
@@ -217,7 +222,6 @@ describe('userRepository against real MySQL', { skip }, () => {
   });
 
   test('re-hashes when the password changes', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
     const before = await User.unscoped().findByPk(created.id);
 
@@ -232,20 +236,185 @@ describe('userRepository against real MySQL', { skip }, () => {
     );
   });
 
-  test('returns null for a missing record and false for a missing delete', async () => {
-    await clearUsers();
+  const openTwoSessions = async (userId: number): Promise<void> => {
+    const expiresAt = new Date(Date.now() + 60_000);
+    await Session.bulkCreate([
+      { userId, tokenHash: hashToken(`${userId}-a`), expiresAt },
+      { userId, tokenHash: hashToken(`${userId}-b`), expiresAt },
+    ]);
+  };
 
+  const sessionCount = (userId: number) => Session.count({ where: { userId } });
+
+  test('blocking an account ends its sessions in the same update', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { status: 'blocked' });
+
+    assert.equal(await sessionCount(created.id), 0);
+  });
+
+  test('re-blocking a blocked account and unblocking it leave sessions alone', async () => {
+    const created = await repository.create({ ...base, status: 'blocked' });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { status: 'blocked' });
+    assert.equal(await sessionCount(created.id), 2);
+
+    await repository.update(created.id, { status: 'active' });
+    assert.equal(await sessionCount(created.id), 2);
+  });
+
+  test('a password change ends every session', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { password: 'another-pass-1' });
+
+    assert.equal(await sessionCount(created.id), 0);
+  });
+
+  test('an ordinary edit leaves sessions alone', async () => {
+    const created = await repository.create({ ...base });
+    await openTwoSessions(created.id);
+
+    await repository.update(created.id, { firstName: 'Renamed' });
+
+    assert.equal(await sessionCount(created.id), 2);
+  });
+
+  test('returns null for a missing record and false for a missing delete', async () => {
     assert.equal(await repository.findById(9999), null);
     assert.equal(await repository.update(9999, { firstName: 'X' }), null);
     assert.equal(await repository.remove(9999), false);
   });
 
   test('removes an existing record once', async () => {
-    await clearUsers();
     const created = await repository.create({ ...base });
 
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.remove(created.id), false);
+  });
+
+  test('deleting an account turns its comments into deleted tombstones and keeps replies attached', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Leaving',
+      email: 'leaving@example.com',
+    });
+    const staying = await repository.create({
+      ...base,
+      login: 'Staying',
+      email: 'staying@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host',
+      email: 'host@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Host Book',
+      description: 'Hosts the thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'My words',
+    });
+    const reply = await Comment.create({
+      bookId: book.id,
+      userId: staying.id,
+      parentId: comment.id,
+      text: 'A reply',
+    });
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    const tombstone = await Comment.findByPk(comment.id);
+    assert.equal(tombstone?.tombstone, 'deleted');
+    assert.equal(tombstone?.userId, null);
+    assert.equal((await Comment.findByPk(reply.id))?.parentId, comment.id);
+  });
+
+  test('a removed comment becomes deleted when its owner account goes', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Removed',
+      email: 'removed@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host2',
+      email: 'host2@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Second Host',
+      description: 'Hosts another thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Moderated once',
+      tombstone: 'removed',
+    });
+
+    await repository.remove(leaving.id);
+
+    // Nothing can be restored to an owner who no longer exists.
+    assert.equal((await Comment.findByPk(comment.id))?.tombstone, 'deleted');
+  });
+
+  test('deleting an account leaves its tombstones with the updatedAt they had', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Quiet',
+      email: 'quiet@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host3',
+      email: 'host3@example.com',
+    });
+    const book = await Book.create({
+      userId: host.id,
+      title: 'Third Host',
+      description: 'Hosts a third thread',
+      tags: [],
+    });
+    const comment = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Said once',
+    });
+    // Pinned well in the past, so a bump to "now" cannot hide inside the
+    // column's one-second precision. Raw SQL, because a Model.update that
+    // carries only updatedAt issues no statement at all; and a UTC string
+    // rather than a Date, which a raw replacement formats in the machine's
+    // own zone instead of the connection's.
+    const earlier = new Date('2026-01-02T03:04:05Z');
+    await sequelize.query(
+      'UPDATE comments SET updatedAt = :at WHERE id = :id',
+      {
+        replacements: { at: '2026-01-02 03:04:05', id: comment.id },
+      }
+    );
+    assert.equal(
+      (await Comment.findByPk(comment.id))?.updatedAt.getTime(),
+      earlier.getTime()
+    );
+
+    await repository.remove(leaving.id);
+
+    // One timestamp shared by every tombstone the account left would link
+    // them to each other and to the moment of the delete.
+    const tombstone = await Comment.findByPk(comment.id);
+    assert.equal(tombstone?.tombstone, 'deleted');
+    assert.equal(tombstone?.updatedAt.getTime(), earlier.getTime());
   });
 
   test('findByLoginWithPassword returns the stored hash for a known login', async () => {
@@ -308,5 +477,17 @@ describe('userRepository against real MySQL', { skip }, () => {
     const found = await repository.findByEmail('auth5@example.com');
     assert.ok(found);
     assert.equal('password' in found, false);
+  });
+
+  test('findPasswordHashById returns the stored hash, and it verifies', async () => {
+    const created = await repository.create(base);
+    const hash = await repository.findPasswordHashById(created.id);
+
+    assert.ok(hash);
+    assert.equal(await verifyPassword(hash, base.password), true);
+  });
+
+  test('findPasswordHashById returns null for a missing id', async () => {
+    assert.equal(await repository.findPasswordHashById(999_999), null);
   });
 });

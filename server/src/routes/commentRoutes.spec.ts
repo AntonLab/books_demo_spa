@@ -46,9 +46,14 @@ function createFakeRepository(): CommentRepository {
     userId: OTHER_USER_ID,
     bookId: KNOWN_BOOK_ID,
     text: 'Not yours',
+    tombstone: null,
     createdAt: now,
     updatedAt: now,
   });
+
+  // Mirrors toPublicComment: a tombstone withholds its text and its owner.
+  const publicView = (row: PublicComment): PublicComment =>
+    row.tombstone === null ? row : { ...row, text: '', userId: null };
 
   return {
     async create(input, actorId) {
@@ -65,6 +70,7 @@ function createFakeRepository(): CommentRepository {
         userId: actorId,
         bookId: input.bookId,
         text: input.text,
+        tombstone: null,
         createdAt: created,
         updatedAt: created,
       };
@@ -77,7 +83,8 @@ function createFakeRepository(): CommentRepository {
       const all = [...rows.values()].filter(
         (row) =>
           (query.bookId === undefined || row.bookId === query.bookId) &&
-          (query.userId === undefined || row.userId === query.userId) &&
+          (query.userId === undefined ||
+            (row.tombstone === null && row.userId === query.userId)) &&
           (query.parentId === undefined || row.parentId === query.parentId)
       );
 
@@ -85,8 +92,9 @@ function createFakeRepository(): CommentRepository {
         items: all
           .slice(query.offset, query.offset + query.limit)
           .map((row): CommentWithAuthor => ({
-            ...row,
-            author: AUTHOR,
+            ...publicView(row),
+            // Mirrors the real serialiser: a tombstone is anonymous.
+            author: row.tombstone === null ? AUTHOR : null,
             likeCount: 0,
             // Mirrors the real repository: only a signed-in caller can have a
             // like of their own to report.
@@ -97,7 +105,8 @@ function createFakeRepository(): CommentRepository {
     },
 
     async findById(id) {
-      return rows.get(id) ?? null;
+      const row = rows.get(id);
+      return row ? publicView(row) : null;
     },
 
     async update(id, input) {
@@ -113,8 +122,24 @@ function createFakeRepository(): CommentRepository {
       return updated;
     },
 
-    async remove(id) {
-      return rows.delete(id);
+    // A soft delete, like the real repository: scoped to live rows, so a
+    // second call reports false. The stored row keeps its text, as MySQL's
+    // does; publicView is what withholds it.
+    async remove(id, kind) {
+      const current = rows.get(id);
+      if (!current || current.tombstone !== null) return false;
+
+      rows.set(id, { ...current, tombstone: kind });
+      return true;
+    },
+
+    async restore(id) {
+      const current = rows.get(id);
+      if (!current || current.tombstone !== 'removed') return null;
+
+      const restored: PublicComment = { ...current, tombstone: null };
+      rows.set(id, restored);
+      return restored;
     },
   };
 }
@@ -157,6 +182,19 @@ const remove = (
     method: 'DELETE',
     headers: cookie ? { cookie } : {},
   });
+
+const restore = (
+  base: string,
+  id: number,
+  cookie: string | null = ROLE_COOKIES.admin
+) =>
+  fetch(`${base}/api/comments/${id}/restore`, {
+    method: 'POST',
+    headers: cookie ? { cookie } : {},
+  });
+
+const getOne = async (base: string, id: number): Promise<PublicComment> =>
+  json<PublicComment>(await fetch(`${base}/api/comments/${id}`));
 
 const valid = { bookId: KNOWN_BOOK_ID, text: 'A fine book' };
 
@@ -241,7 +279,7 @@ test('GET list stays public and reports no viewer like for an anonymous reader',
       const body = await json<{ items: CommentWithAuthor[]; total: number }>(
         response
       );
-      assert.equal(body.items[0]?.author.login, TEST_USER.login);
+      assert.equal(body.items[0]?.author?.login, TEST_USER.login);
       assert.equal(body.items[0]?.viewerLikeId, null);
     }
   );
@@ -323,6 +361,53 @@ test('DELETE removes your own comment', async () => {
   );
 });
 
+test('DELETE leaves the comment in the list as a tombstone', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      await remove(base, created.id);
+
+      const body = await json<{ items: CommentWithAuthor[] }>(
+        await fetch(`${base}/api/comments?bookId=${KNOWN_BOOK_ID}`)
+      );
+
+      // Still there, so any replies keep a parent to hang off.
+      const tombstone = body.items.find((item) => item.id === created.id);
+      assert.notEqual(tombstone, undefined);
+      assert.equal(tombstone?.tombstone, 'deleted');
+      assert.equal(tombstone?.text, '');
+      assert.equal(tombstone?.author, null);
+      assert.equal(tombstone?.userId, null);
+    }
+  );
+});
+
+test('PATCH refuses a tombstone with 403, even for a moderator', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      await remove(base, created.id);
+
+      const response = await patch(base, created.id, { text: 'Back again' });
+      assert.equal(response.status, 403);
+
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        const moderated = await patch(
+          base,
+          FOREIGN_COMMENT_ID,
+          { text: 'Back again' },
+          cookie
+        );
+        assert.equal(moderated.status, 403);
+      }
+    }
+  );
+});
+
 test('DELETE refuses another user comment with 403', async () => {
   await withAuthenticatedApp(
     { commentRepository: createFakeRepository() },
@@ -354,19 +439,38 @@ test('an admin may delete another user comment', async () => {
   );
 });
 
-test('an admin may edit another user comment', async () => {
+test('a moderator may not edit another user comment — moderators remove, they do not rewrite', async () => {
   await withAuthenticatedApp(
     { commentRepository: createFakeRepository() },
     async (base) => {
+      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        const response = await patch(
+          base,
+          FOREIGN_COMMENT_ID,
+          { text: 'Moderated' },
+          cookie
+        );
+        assert.equal(response.status, 403);
+      }
+      assert.equal((await getOne(base, FOREIGN_COMMENT_ID)).text, 'Not yours');
+    }
+  );
+});
+
+test('an admin may still edit their own comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(
+        await post(base, valid, ROLE_COOKIES.admin)
+      );
       const response = await patch(
         base,
-        FOREIGN_COMMENT_ID,
-        { text: 'Moderated' },
+        created.id,
+        { text: 'Second thoughts' },
         ROLE_COOKIES.admin
       );
-
       assert.equal(response.status, 200);
-      assert.equal((await json<PublicComment>(response)).text, 'Moderated');
     }
   );
 });
@@ -390,6 +494,161 @@ test('a plain user may still comment — roles accumulate', async () => {
     { commentRepository: createFakeRepository() },
     async (base) => {
       assert.equal((await post(base, valid, ROLE_COOKIES.user)).status, 201);
+    }
+  );
+});
+
+test('DELETE by the owner leaves a deleted tombstone', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      assert.equal((await remove(base, created.id)).status, 204);
+
+      const tombstone = await getOne(base, created.id);
+      assert.equal(tombstone.tombstone, 'deleted');
+      assert.equal(tombstone.text, '');
+      assert.equal(tombstone.userId, null);
+    }
+  );
+});
+
+test('an admin deleting another user comment leaves a removed tombstone', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const response = await remove(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 204);
+      assert.equal(
+        (await getOne(base, FOREIGN_COMMENT_ID)).tombstone,
+        'removed'
+      );
+    }
+  );
+});
+
+test('an admin deleting their own comment leaves a deleted tombstone, not a removed one', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(
+        await post(base, valid, ROLE_COOKIES.admin)
+      );
+      assert.equal(
+        (await remove(base, created.id, ROLE_COOKIES.admin)).status,
+        204
+      );
+      assert.equal((await getOne(base, created.id)).tombstone, 'deleted');
+    }
+  );
+});
+
+test('DELETE on a tombstone is 404, whoever asks', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      for (const cookie of [
+        ROLE_COOKIES.admin,
+        ROLE_COOKIES.superadmin,
+        ROLE_COOKIES.user,
+      ]) {
+        const response = await remove(base, FOREIGN_COMMENT_ID, cookie);
+        assert.equal(response.status, 404);
+      }
+    }
+  );
+});
+
+test('a moderator restores a removed comment with its text and owner', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      const response = await restore(base, FOREIGN_COMMENT_ID);
+      assert.equal(response.status, 200);
+
+      const restored = await json<PublicComment>(response);
+      assert.equal(restored.tombstone, null);
+      assert.equal(restored.text, 'Not yours');
+      assert.equal(restored.userId, OTHER_USER_ID);
+    }
+  );
+});
+
+test('a superadmin may restore what an admin removed', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      const response = await restore(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.superadmin
+      );
+      assert.equal(response.status, 200);
+    }
+  );
+});
+
+test('restore answers 404 for a deleted comment, a live one and a missing id', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicComment>(await post(base, valid));
+      await remove(base, created.id);
+
+      assert.equal((await restore(base, created.id)).status, 404);
+      assert.equal((await restore(base, FOREIGN_COMMENT_ID)).status, 404);
+      assert.equal((await restore(base, 9_999)).status, 404);
+    }
+  );
+});
+
+test('a plain user may not restore a comment', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      const response = await restore(
+        base,
+        FOREIGN_COMMENT_ID,
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 403);
+      assert.equal(
+        (await getOne(base, FOREIGN_COMMENT_ID)).tombstone,
+        'removed'
+      );
+    }
+  );
+});
+
+test('restore without a session is 401', async () => {
+  await withApp({ commentRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await restore(base, FOREIGN_COMMENT_ID, null)).status, 401);
+  });
+});
+
+test('GET ?userId= leaves tombstones out, so the filter cannot name their owners', async () => {
+  await withAuthenticatedApp(
+    { commentRepository: createFakeRepository() },
+    async (base) => {
+      await remove(base, FOREIGN_COMMENT_ID, ROLE_COOKIES.admin);
+
+      const body = await json<{ items: CommentWithAuthor[]; total: number }>(
+        await fetch(`${base}/api/comments?userId=${OTHER_USER_ID}`)
+      );
+      assert.deepEqual(body.items, []);
+      assert.equal(body.total, 0);
     }
   );
 });

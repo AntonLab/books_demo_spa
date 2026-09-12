@@ -63,6 +63,8 @@ function dummyPasswordHash(): Promise<string> {
 export function createAuthController(deps: AuthControllerDeps): AuthController {
   const verify = deps.verify ?? verifyPassword;
 
+  // register's only: a brand-new account has nothing in flight that could
+  // invalidate the session before it is written. login opens its own below.
   async function openSession(userId: number): Promise<string> {
     const token = createToken();
     await deps.sessionRepository.create(
@@ -120,7 +122,27 @@ export function createAuthController(deps: AuthControllerDeps): AuthController {
 
       // A fresh row every login; the previous cookie is replaced, never
       // reused. This is what rules out session fixation.
-      setSessionCookie(res, await openSession(user.id));
+      //
+      // Opened only if the account still holds the hash verified above and is
+      // still not blocked. A password change or a block can commit while the
+      // verify runs, and its session purge would then already be behind us —
+      // see sessionRepository.createIfCredentialCurrent for how the re-check
+      // closes that window.
+      const token = createToken();
+      const opening = await deps.sessionRepository.createIfCredentialCurrent(
+        user.id,
+        hashToken(token),
+        new Date(Date.now() + SESSION_TTL_MS),
+        credential.password
+      );
+      if (opening === 'credential-changed') {
+        throw new UnauthorizedError('Invalid credentials');
+      }
+      if (opening === 'blocked') {
+        throw new ForbiddenError('Account is blocked');
+      }
+
+      setSessionCookie(res, token);
       res.json(user);
     },
 

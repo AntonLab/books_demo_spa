@@ -55,6 +55,22 @@ test('update accepts a single field but rejects an empty body', () => {
   assert.throws(() => updateUserSchema.parse({}));
 });
 
+test('update rejects a body carrying only currentPassword — proof is not a change', () => {
+  assert.equal(
+    updateUserSchema.safeParse({ currentPassword: 'hunter2hunter2' }).success,
+    false
+  );
+});
+
+test('update accepts currentPassword alongside a change', () => {
+  const parsed = updateUserSchema.parse({
+    password: 'brand-new-pass',
+    currentPassword: 'hunter2hunter2',
+  });
+
+  assert.equal(parsed.currentPassword, 'hunter2hunter2');
+});
+
 test('list query applies defaults and coerces strings', () => {
   assert.deepEqual(listUsersQuerySchema.parse({}), { limit: 20, offset: 0 });
   assert.equal(listUsersQuerySchema.parse({ limit: '50' }).limit, 50);

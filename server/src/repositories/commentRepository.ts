@@ -7,12 +7,13 @@ import {
 } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CommentWithAuthor,
   CreateCommentInput,
   ListCommentsQuery,
   PublicComment,
+  Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
 
@@ -31,7 +32,11 @@ export interface CommentRepository {
   ): Promise<CommentListResult>;
   findById(id: number): Promise<PublicComment | null>;
   update(id: number, input: UpdateCommentInput): Promise<PublicComment | null>;
-  remove(id: number): Promise<boolean>;
+  // `kind` is decided by the caller, who knows whether the actor owns the
+  // comment. Scoped to live rows, so a tombstone reports false.
+  remove(id: number, kind: Tombstone): Promise<boolean>;
+  // Only a `removed` comment comes back; null for anything else.
+  restore(id: number): Promise<PublicComment | null>;
 }
 
 // A rejected FK on `comments` means the referenced row does not exist.
@@ -65,41 +70,34 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
   const clauses: WhereOptions[] = [];
 
   if (query.bookId !== undefined) clauses.push({ bookId: query.bookId });
-  if (query.userId !== undefined) clauses.push({ userId: query.userId });
+  // Tombstones are anonymous, so an owner filter must never reach one — it
+  // would name exactly the person the tombstone hides.
+  if (query.userId !== undefined) {
+    clauses.push({ userId: query.userId, tombstone: null });
+  }
   if (query.parentId !== undefined) clauses.push({ parentId: query.parentId });
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
 }
 
-// Walks the reply tree breadth-first and returns every id at or below `rootId`.
-//
-// The foreign key stays ON DELETE SET NULL rather than CASCADE, because InnoDB
-// cannot recurse a self-referential cascade past 15 levels without
-// ER_FK_DEPTH_EXCEEDED — and that failure takes the owning book's delete down
-// with it, not just the thread's. Collecting the ids here and issuing one
-// DELETE has no depth limit at all. The measurement behind that choice is
-// recorded in models/index.ts.
-async function collectSubtreeIds(rootId: number): Promise<number[]> {
-  const ids = [rootId];
-  let frontier = [rootId];
-
-  while (frontier.length > 0) {
-    const children = await Comment.findAll({
-      attributes: ['id'],
-      where: { parentId: frontier },
-      raw: true,
-    });
-
-    frontier = children.map((child) => child.id);
-    ids.push(...frontier);
-  }
-
-  return ids;
-}
-
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
     async create(input, actorId) {
+      // A reply needs a live parent. Checked before the insert because the
+      // foreign key only knows the parent exists, not that it is a tombstone.
+      // A parent tombstoned between this check and the insert leaves the
+      // reply under a fresh tombstone — the same outcome as replying a moment
+      // earlier, so the window is harmless.
+      if (input.parentId !== null) {
+        const parent = await Comment.findByPk(input.parentId, {
+          attributes: ['id', 'tombstone'],
+        });
+        if (!parent) throw new NotFoundError('Comment', input.parentId);
+        if (parent.tombstone !== null) {
+          throw new ForbiddenError('You cannot reply to a deleted comment');
+        }
+      }
+
       try {
         // userId comes from the caller's session, never from the body.
         const comment = await Comment.create({ ...input, userId: actorId });
@@ -145,16 +143,16 @@ export function createSequelizeCommentRepository(): CommentRepository {
 
       return {
         items: rows.map((row) => {
-          // The include is unconditional and userId is NOT NULL, so this cannot
-          // be missing in practice; the guard is what keeps the NonAttribute's
-          // optionality honest without a non-null assertion.
-          if (!row.user) {
+          // A live comment always has its owner loaded: the include is
+          // unconditional. Only a tombstone can have none — its account was
+          // deleted — and a tombstone names no author anyway.
+          if (!row.user && (row.tombstone ?? null) === null) {
             throw new Error(`comment ${row.id} has no author loaded`);
           }
 
           return toCommentWithAuthor(
             row,
-            toAuthorSummary(row.user),
+            row.user ? toAuthorSummary(row.user) : null,
             counts.get(row.id) ?? 0,
             viewerLikes.get(row.id) ?? null
           );
@@ -168,32 +166,50 @@ export function createSequelizeCommentRepository(): CommentRepository {
       return comment ? toPublicComment(comment) : null;
     },
 
+    // Scoped to live rows, like remove(). The controller already refuses a
+    // tombstone, but an edit it let in while the comment was live can still
+    // lose the race to a moderator's removal — and text written onto the
+    // hidden row would be published by a later restore no moderator saw.
     async update(id, input) {
-      const comment = await Comment.findByPk(id);
-      if (!comment) return null;
-
       // No FK mapping here: updateCommentSchema carries only `text`, so an
       // update cannot violate a constraint.
-      await comment.update(input);
+      const [changed] = await Comment.update(input, {
+        where: { id, tombstone: null },
+      });
+
+      const comment = await Comment.findByPk(id);
+      if (!comment) return null;
+      // Sequelize connects with FOUND_ROWS off, so MySQL counts changed rows,
+      // not matched ones — and a live comment resubmitted unchanged within
+      // the column's one-second precision changes nothing. Only a tombstone
+      // turns that 0 into a refusal.
+      if (changed === 0 && comment.tombstone !== null) return null;
       return toPublicComment(comment);
     },
 
-    async remove(id) {
-      const sequelize = Comment.sequelize;
-      if (!sequelize) {
-        throw new Error('Comment model is not initialised');
-      }
+    // A soft delete: the row survives so its replies keep a parent, and the
+    // thread stays readable around the gap. Only this comment is marked — a
+    // reply is somebody else's writing and is not theirs to remove. Scoped to
+    // live rows, so a second call reports false and the route answers 404.
+    async remove(id, kind) {
+      const [affected] = await Comment.update(
+        { tombstone: kind },
+        { where: { id, tombstone: null } }
+      );
+      return affected > 0;
+    },
 
-      // The walk and the delete share a transaction so a reply posted midway
-      // cannot be orphaned by a delete that has already collected its ids.
-      return sequelize.transaction(async (transaction) => {
-        const ids = await collectSubtreeIds(id);
-        const deleted = await Comment.destroy({
-          where: { id: ids },
-          transaction,
-        });
-        return deleted > 0;
-      });
+    // The inverse of a moderator's delete. Scoped to `removed`: an owner's
+    // deletion is theirs to make and nobody else's to undo.
+    async restore(id) {
+      const [affected] = await Comment.update(
+        { tombstone: null },
+        { where: { id, tombstone: 'removed' } }
+      );
+      if (affected === 0) return null;
+
+      const comment = await Comment.findByPk(id);
+      return comment ? toPublicComment(comment) : null;
     },
   };
 }

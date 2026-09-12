@@ -44,6 +44,13 @@ export function createUserRoleRoutes(deps: RouteDeps): Router {
         REGISTRABLE_ROLES as readonly string[]
       ).includes(role);
 
+      // A superadmin's own role is another superadmin's call. Stepping down
+      // would otherwise be one request away from the self-deletion they may
+      // not make — and the last superadmin stepping down strands the system.
+      if (isSuperadmin && isOwnRow) {
+        throw new ForbiddenError('A superadmin may not change their own role');
+      }
+
       // Switching between user and author is a statement of intent, not a
       // privilege — the real protection is that an author may only touch their
       // own rows. Everything above that is superadmin's alone.
