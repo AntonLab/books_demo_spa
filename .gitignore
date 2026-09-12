@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-# There is no root package.json: `client/` and `server/` are installed and built
-# separately, so the rules below are written to match at any depth rather than
-# being repeated per package.
+# `client/` and `server/` are npm workspaces under one root package.json, but each
+# still builds into its own directory, so the rules below are written to match at
+# any depth rather than being repeated per package.
 
 # dependencies
 node_modules/
@@ -27,11 +27,13 @@ npm-debug.log*
 /.claude
 
 # agent working notes — plans and specs generated per task, not project docs.
-# docs/agents/ is the exception: it configures the engineering skills, so it is
-# checked in. `/docs/*` matches direct children only, so un-ignoring the
-# directory is enough to let the files inside it through.
+# Two exceptions are checked in: docs/agents/ configures the engineering skills,
+# and docs/adr/ holds the architecture decision records those skills are told to
+# read. `/docs/*` matches direct children only, so un-ignoring a directory is
+# enough to let the files inside it through.
 /docs/*
 !/docs/agents/
+!/docs/adr/
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 /.superpowers
