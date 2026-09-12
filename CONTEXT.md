@@ -60,6 +60,22 @@ restricts nothing: a Pending Account signs in like an active one.
 
 ### Content
 
+**Book**:
+A work by one Author, read as a sequence of Chapters and optionally grouped
+into a Series.
+_Avoid_: Title, work
+
+**Chapter**:
+One instalment of a Book, and the unit a reader reads. It belongs to exactly
+one Book and never stands alone.
+_Avoid_: Part, section, episode
+
+**Published**:
+The only state a Book or a Chapter has. Creating one makes it readable by
+everyone, so "publish" here means "create": there is no draft to keep
+privately first, and nothing is held back for a release.
+_Avoid_: Live, released — both imply a draft state that does not exist here
+
 **Series**:
 An optional grouping of an Author's Books; a Book may stand alone with no
 Series.
