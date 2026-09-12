@@ -72,6 +72,12 @@ scripts below still run from this directory, or from the root with `-w server`.
   config extends `tsconfig.json` (which in turn extends the repo-root
   `tsconfig.base.json`) but excludes `src/**/*.spec.ts`, so test files
   are never emitted
+- `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
+  which fills the database with the demo data (see **Demo seed** below).
+  **It deletes every row in the six content tables**, so it does nothing
+  without `--force`: `npm run seed -w server -- --force` from the repo root,
+  or `npm run seed -- --force` from here. Without the flag it prints the row
+  counts it found and exits
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
@@ -142,6 +148,10 @@ added.
   of `ensureDatabase` — the `posttest` entry point, carrying the `.testkit.ts`
   suffix so `tsconfig.build.json` keeps it out of `dist/` like every other
   test-support file. It is a script, not a module: nothing imports it.
+  `seed.ts` is the demo seed (see **Demo seed**), also a script nothing
+  imports — it carries no suffix, because `.testkit.ts` means _test support_
+  and this is neither, so `tsconfig.build.json` names it in `exclude`
+  directly rather than growing a second suffix convention for one file.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`requireAuth.ts`, `requirePermission.ts`, `optionalAuth.ts` (unmounted —
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
@@ -165,6 +175,66 @@ value.
 | `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                  |
 | `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not. |
 | `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
+
+## Demo seed
+
+`src/db/seed.ts` fills the database with the data the demo version is shown
+with: ten accounts, three authors' back catalogues, and the comment threads and
+likes that make the reader-facing pages look lived-in. Run it with
+`npm run seed -w server -- --force`.
+
+**Accounts** — all ten `active`, all sharing the password `Password123!`, each
+with `<login>@example.com`:
+
+| Login           | Name                                | Role         |
+| --------------- | ----------------------------------- | ------------ |
+| `superadmin`    | Olga Ivanova                        | `superadmin` |
+| `admin`         | Daniel Reeves                       | `admin`      |
+| `mhale`         | Margaret Hale — gothic / historical | `author`     |
+| `ipetrov`       | Ivan Petrov — hard SF               | `author`     |
+| `nquinn`        | Nora Quinn — urban fantasy          | `author`     |
+| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory  | `user`       |
+
+Logins are functional but the names are real ones, because the name is what the
+UI shows: an `AuthorSummary` beside every book and every live comment. A thread
+where "User Two" answers "User Four" reads as a test run, not a demo.
+
+**Content** — each author gets 1-2 series of 4-5 books plus 1-3 standalone
+books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Tags come
+from a per-genre pool, with `mystery` and `slow-burn` deliberately shared
+across two authors each, so `?tag=` returns more than one author's work.
+
+Three things about it are worth knowing before changing it:
+
+- **It writes through the models, not the API.** `POST /api/auth/register` can
+  only mint a `user`, so the admin and superadmin would need a back door
+  anyway. The payloads are still parsed by the same zod schemas the routes use
+  (`createUserSchema`, `createBookSchema`, …), so nothing lands that the API
+  would refuse; only the fields those schemas deliberately withhold — the
+  owner, and the role — are attached afterwards.
+- **Accounts go through `create()`, everything else through `bulkCreate()`.**
+  `bulkCreate` defaults to `individualHooks: false`, which would skip
+  `User.beforeSave` and store the password in clear text. The reverse also
+  matters: comments are inserted one thread level at a time, because a reply
+  needs its parent's id, and on MySQL `bulkCreate` back-fills ids from the
+  insert's first id plus the row count. `writeThreads` throws if an id comes
+  back missing rather than silently linking replies to nothing.
+- **Dates are anchored to the run, not to a constant**, so the newest chapter
+  is always 2-5 days old. The cadence is derived from `PUBLICATION_WINDOW_DAYS`
+  rather than fixed: ~180 chapters per author cannot be spaced a week apart
+  inside 14 months, so the window wins and the gaps scale to fit. `createdAt`
+  is passed explicitly and `{ silent: true }` is what stops `save()` from
+  overwriting the backdated `updatedAt`.
+
+It deletes `likes` → `comments` → `chapters` → `books` → `series` → `users` by
+explicit enumeration rather than leaning on the cascades, which would work
+today and start leaving rows behind the day an `onDelete` changes.
+`permissions` is untouched: it is reference data `syncPermissions()` derives
+from code. The delete and every insert share one transaction, so a failure
+leaves the previous demo intact.
+
+Two guards: `NODE_ENV=production` is refused whatever the flags, and a
+`DB_NAME` other than `books_demo_spa` is warned about loudly before the delete.
 
 ## Auth
 
