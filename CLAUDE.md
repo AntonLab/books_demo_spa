@@ -32,7 +32,10 @@ in `server` — so each `package.json` still says what that package needs.
 
 ## Stack
 
-- Node.js >= 22.5, TypeScript
+- Node.js >= 22.18, TypeScript. The floor is set by the server, which runs
+  `.ts` files with no flag (type stripping is unflagged from 22.18) and loads
+  `.env.local` through `--env-file-if-exists` (22.9). `.nvmrc` pins the
+  version CI runs, the current LTS line.
 - Frontend: React 19
 - Backend: Express 5, Sequelize 6 (MySQL via `mysql2`)
 
