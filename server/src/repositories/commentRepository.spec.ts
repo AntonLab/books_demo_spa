@@ -22,6 +22,7 @@ import {
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeCommentRepository } from './commentRepository.ts';
+import { commentRepositoryContract } from './commentRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
@@ -532,4 +533,27 @@ describe('commentRepository against real MySQL', { skip }, () => {
     await Book.update({ status: 'complete' }, { where: { id: bookId } });
     assert.equal(await total(null), 1);
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  commentRepositoryContract(async () => ({
+    repository,
+    async anAccount() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...reader,
+        login: `ContractReader${contractAccounts}`,
+        email: `contract-reader-${contractAccounts}@example.com`,
+      });
+      return user.id;
+    },
+    async aBook() {
+      const book = await createCreditedBook(
+        { title: 'Contract Book', description: 'x', tags: [] },
+        [ownerId]
+      );
+      return book.id;
+    },
+  }));
 });

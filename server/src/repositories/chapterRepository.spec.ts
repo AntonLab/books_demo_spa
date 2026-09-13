@@ -15,6 +15,7 @@ import {
   StateConflictError,
 } from '../types/errors.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
+import { chapterRepositoryContract } from './chapterRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
@@ -604,4 +605,28 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('a reorder of a missing book reports it rather than throwing', async () => {
     assert.equal(await repository.reorder(bookId + 10_000, [1]), false);
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  chapterRepositoryContract(async () => ({
+    repository,
+    async anAuthor() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...owner,
+        login: `ContractAuthor${contractAccounts}`,
+        email: `contract-author-${contractAccounts}@example.com`,
+        role: 'author',
+      });
+      return user.id;
+    },
+    async aBook(coAuthorIds) {
+      const book = await createCreditedBook(
+        { title: 'Contract Book', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return book.id;
+    },
+  }));
 });

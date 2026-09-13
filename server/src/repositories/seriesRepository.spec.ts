@@ -21,6 +21,7 @@ import {
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
+import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the users suite's: node:test runs spec
@@ -663,4 +664,28 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       assert.equal((await repository.findById(empty.id, viewer))?.id, empty.id);
     }
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  seriesRepositoryContract(async () => ({
+    repository,
+    async anAuthor() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...coAuthor,
+        login: `ContractAuthor${contractAccounts}`,
+        email: `contract-author-${contractAccounts}@example.com`,
+        role: 'author',
+      });
+      return user.id;
+    },
+    async aBookIn(seriesId) {
+      const book = await createCreditedBook(
+        { title: 'Contract Book', description: 'x', tags: [], seriesId },
+        [ownerId]
+      );
+      return book.id;
+    },
+  }));
 });

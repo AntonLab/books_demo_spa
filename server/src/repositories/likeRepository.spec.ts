@@ -27,6 +27,7 @@ import {
   NotFoundError,
 } from '../types/errors.ts';
 import { createSequelizeLikeRepository } from './likeRepository.ts';
+import { likeRepositoryContract } from './likeRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
@@ -489,4 +490,35 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await Book.update({ status: 'in_progress' }, { where: { id: bookId } });
     assert.equal(await total(null), 2);
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  likeRepositoryContract(async () => ({
+    repository,
+    async anAccount() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...liker,
+        login: `ContractLiker${contractAccounts}`,
+        email: `contract-liker-${contractAccounts}@example.com`,
+      });
+      return user.id;
+    },
+    async aBook(coAuthorIds) {
+      const book = await createCreditedBook(
+        { title: 'Contract Book', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return book.id;
+    },
+    async aComment(onBookId, ownerId) {
+      const comment = await Comment.create({
+        userId: ownerId,
+        bookId: onBookId,
+        text: 'A comment',
+      });
+      return comment.id;
+    },
+  }));
 });

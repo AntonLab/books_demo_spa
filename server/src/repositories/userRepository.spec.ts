@@ -27,6 +27,7 @@ import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { hashToken } from '../tokens.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
+import { userRepositoryContract } from './userRepository.contract.testkit.ts';
 
 function testDbConfig() {
   const config = parseConfig({
@@ -661,4 +662,8 @@ describe('userRepository against real MySQL', { skip }, () => {
       ['ipetrov']
     );
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  userRepositoryContract(async () => ({ repository }));
 });
