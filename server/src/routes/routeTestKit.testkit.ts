@@ -34,6 +34,7 @@ export function createUnusedRepository<T>(name: string): T {
     invalidateAllForUser: unreachable,
     redeem: unreachable,
     findByLoginWithPassword: unreachable,
+    listAuthors: unreachable,
     findByEmail: unreachable,
     findPasswordHashById: unreachable,
   } as T;

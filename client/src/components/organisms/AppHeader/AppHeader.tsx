@@ -28,9 +28,11 @@ export const AppHeader: FC = () => {
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
     { key: '/series', label: 'Series' },
-    // Only for a signed-in user. This conditional entry is what makes logging
-    // in and out visible in the UI rather than only in the store.
-    ...(user ? [{ key: '/my-books', label: 'My Books' }] : []),
+    // Only for an account holding the author Role: that is who can be credited
+    // on a book, so nobody else has anything to find there.
+    ...(user?.role === 'author'
+      ? [{ key: '/my-books', label: 'My Books' }]
+      : []),
   ];
 
   const accountItems: MenuProps['items'] = [

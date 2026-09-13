@@ -98,6 +98,11 @@ function createFakeRepository(seed: PublicUser[] = []): UserRepository {
       };
     },
 
+    // Not reached from /api/users; authorRoutes.spec.ts drives the search.
+    async listAuthors() {
+      return [];
+    },
+
     async findById(id) {
       return rows.get(id) ?? null;
     },

@@ -51,6 +51,14 @@ which likewise carries `authors` and no `userId`.
 `DELETE /api/series/:id/books/:bookId` takes a book out of a series from the
 series' side (204). See **Co-authors** under **Auth**.
 
+`GET /api/authors?q=` is the Co-author picker's search
+(`routes/authorRoutes.ts`, `userRepository.listAuthors`): accounts holding the
+`author` Role that are not blocked, matched by login or name, answered as
+`{ items: AuthorSummary[] }` with no email and no paging (`limit` 1-50). It
+rides on `users × read`, so any signed-in caller may search and a guest is
+refused with 401. It is a route of its own rather than a flag on
+`/api/users`, which answers with `PublicUser`, email included.
+
 `Session` and `PasswordResetToken` back a full session-based auth API at
 `/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
 `POST /password-reset/request` and `POST /password-reset/confirm`. Both models
@@ -139,8 +147,8 @@ added.
   set/clear helpers
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
-- `src/routes/` — Express route definitions (`authRoutes.ts`, `userRoutes.ts`,
-  `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`,
+- `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
+  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`,
   `commentRoutes.ts`, `likeRoutes.ts`, mounted under `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`

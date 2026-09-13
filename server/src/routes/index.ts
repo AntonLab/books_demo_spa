@@ -8,6 +8,7 @@ import type { PasswordResetRepository } from '../repositories/passwordResetRepos
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
+import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
@@ -39,6 +40,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   // first. The order is not load-bearing: `/:id` matches exactly one path
   // segment, so it can never match `/:id/role`, and the two routers do not
   // collide whichever is mounted first.
+  router.use('/authors', createAuthorRoutes(deps));
   router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));

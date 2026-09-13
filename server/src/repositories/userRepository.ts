@@ -11,11 +11,13 @@ import { Comment } from '../models/Comment.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
-import { toPublicUser, User } from '../models/User.ts';
+import { toAuthorSummary, toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
+  AuthorSummary,
   CreateUserInput,
+  ListAuthorsQuery,
   ListUsersQuery,
   PublicUser,
   UserChanges,
@@ -34,6 +36,9 @@ export interface UserRepository {
   // as `actorId` on the comment and like repositories.
   create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
+  // The accounts that can be made a Co-author — Role `author`, not blocked —
+  // as AuthorSummary, so the picker that searches them never sees an email.
+  listAuthors(query: ListAuthorsQuery): Promise<AuthorSummary[]>;
   findById(id: number): Promise<PublicUser | null>;
   update(id: number, input: UserChanges): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
@@ -146,6 +151,35 @@ export function createSequelizeUserRepository(): UserRepository {
       });
 
       return { items: rows.map(toPublicUser), total: count };
+    },
+
+    async listAuthors(query) {
+      const clauses: WhereOptions[] = [
+        { role: 'author' },
+        { status: { [Op.ne]: 'blocked' } },
+      ];
+      if (query.q) {
+        const pattern = containsPattern(query.q);
+        clauses.push({
+          [Op.or]: [
+            // The same case-insensitive override the directory search uses:
+            // `login` carries a case-sensitive collation.
+            sequelizeWhere(literal('`login` COLLATE utf8mb4_0900_ai_ci'), {
+              [Op.like]: pattern,
+            }),
+            { firstName: { [Op.like]: pattern } },
+            { lastName: { [Op.like]: pattern } },
+          ],
+        });
+      }
+
+      const authors = await User.findAll({
+        where: { [Op.and]: clauses },
+        attributes: ['id', 'login', 'firstName', 'lastName'],
+        limit: query.limit,
+        order: [['id', 'ASC']],
+      });
+      return authors.map(toAuthorSummary);
     },
 
     async findById(id) {
