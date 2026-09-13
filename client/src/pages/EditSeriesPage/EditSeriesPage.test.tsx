@@ -69,6 +69,20 @@ const renderPage = (session: PublicUser | null = account()) => {
   );
 };
 
+// This page carries antd's full stylesheet into jsdom, and there the first
+// *ByRole query after any DOM change costs about a third of a second — the
+// accessible-name computation calls getComputedStyle over and over. A
+// findBy*Role retries that on every change, so on a slower CI runner it could
+// try once before its one-second timeout and fail with the page still loading.
+// So these tests wait on text, which costs a millisecond, and ask for a role
+// once the page has settled.
+const booksLoaded = () => screen.findByText('Wyrm');
+
+// Even so, each test here spends most of a second locally on the role queries
+// the drag handles need — they are labelled, with no text to find them by —
+// and CI runs this file about 2.5 times slower, close to Jest's 5 s default.
+jest.setTimeout(10_000);
+
 const bookTitlesOnScreen = () =>
   screen
     .getAllByRole('button', { name: /^Reorder / })
@@ -108,7 +122,7 @@ describe('EditSeriesPage', () => {
   it('lists every book in Series order with its status, a co-author’s draft included', async () => {
     renderPage();
 
-    await screen.findByRole('button', { name: 'Reorder Hatchling' });
+    await booksLoaded();
     expect(bookTitlesOnScreen()).toEqual(['Hatchling', 'Wyrm', 'Cora’s Draft']);
     expect(screen.getByRole('link', { name: 'Hatchling' })).toHaveAttribute(
       'href',
@@ -124,15 +138,14 @@ describe('EditSeriesPage', () => {
     mockedSeries.removeBookFromSeries.mockResolvedValue(undefined);
     renderPage();
 
-    const removeButtons = await screen.findAllByRole('button', {
-      name: 'Remove from series',
-    });
-    await userEvent.click(removeButtons[1]);
+    await booksLoaded();
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Remove from series' })[1]
+    );
     expect(mockedSeries.removeBookFromSeries).not.toHaveBeenCalled();
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Take it out' })
-    );
+    await screen.findByText('Take this book out of the series?');
+    await userEvent.click(screen.getByRole('button', { name: 'Take it out' }));
 
     await waitFor(() =>
       expect(mockedSeries.removeBookFromSeries).toHaveBeenCalledWith(12, 2)
@@ -150,9 +163,8 @@ describe('EditSeriesPage', () => {
       screen.getByRole('button', { name: 'Delete series' })
     );
     expect(mockedSeries.deleteSeries).not.toHaveBeenCalled();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Delete' })
-    );
+    await screen.findByText('Delete this series?');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() =>
       expect(mockedSeries.deleteSeries).toHaveBeenCalledWith(12)
@@ -174,8 +186,9 @@ describe('EditSeriesPage', () => {
     renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
 
     expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    await screen.findByText('Cora’s Draft');
     expect(
-      await screen.findByRole('link', { name: 'Cora’s Draft' })
+      screen.getByRole('link', { name: 'Cora’s Draft' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
@@ -202,8 +215,9 @@ describe('EditSeriesPage Series order', () => {
     mockedSeries.reorderSeriesBooks.mockReturnValue(new Promise(() => {}));
     renderPage();
 
+    await booksLoaded();
     await moveWithKeyboard(
-      await screen.findByRole('button', { name: 'Reorder Hatchling' }),
+      screen.getByRole('button', { name: 'Reorder Hatchling' }),
       'ArrowDown'
     );
 
@@ -220,8 +234,9 @@ describe('EditSeriesPage Series order', () => {
       .mockReturnValue(new Promise(() => {}));
     renderPage();
 
+    await booksLoaded();
     await moveWithKeyboard(
-      await screen.findByRole('button', { name: 'Reorder Hatchling' }),
+      screen.getByRole('button', { name: 'Reorder Hatchling' }),
       'ArrowDown'
     );
 
@@ -243,8 +258,9 @@ describe('EditSeriesPage Series order', () => {
       .mockResolvedValue({ items: [first, second] });
     renderPage();
 
+    await booksLoaded();
     await moveWithKeyboard(
-      await screen.findByRole('button', { name: 'Reorder Wyrm' }),
+      screen.getByRole('button', { name: 'Reorder Wyrm' }),
       'ArrowUp'
     );
 
@@ -253,8 +269,8 @@ describe('EditSeriesPage Series order', () => {
         'A co-author changed the books of this series while you were reordering them. This is their current order.'
       )
     ).toBeInTheDocument();
-    await waitFor(() =>
-      expect(bookTitlesOnScreen()).toEqual(['Hatchling', 'Wyrm'])
-    );
+    // Waits for the refetched list on the cheap query, then reads its order once.
+    await waitFor(() => expect(screen.queryByText('Cora’s Draft')).toBeNull());
+    expect(bookTitlesOnScreen()).toEqual(['Hatchling', 'Wyrm']);
   });
 });
