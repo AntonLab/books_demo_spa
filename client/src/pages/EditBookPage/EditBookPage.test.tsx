@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { EditBookPage } from './EditBookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authorsApi from '@/api/authors';
+import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as seriesApi from '@/api/series';
@@ -215,5 +217,119 @@ describe('EditBookPage chapters', () => {
 
     await screen.findByLabelText('Title');
     expect(screen.queryByRole('link', { name: 'Add chapter' })).toBeNull();
+  });
+});
+
+describe('EditBookPage Reading order', () => {
+  const chapterNamed = (id: number, title: string) => ({
+    id,
+    bookId: 1,
+    title,
+    publishedAt: '2026-09-02T00:00:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  });
+  const page = (items: ReturnType<typeof chapterNamed>[]) => ({
+    items,
+    total: items.length,
+    limit: 100,
+    offset: 0,
+  });
+  const one = chapterNamed(1, 'One');
+  const two = chapterNamed(2, 'Two');
+  const three = chapterNamed(3, 'Three');
+
+  const titlesOnScreen = () =>
+    screen
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((text) => ['One', 'Two', 'Three', 'Four'].includes(text ?? ''));
+
+  let restoreLayout: () => void;
+  beforeEach(() => {
+    restoreLayout = layOutSortableRows();
+  });
+  afterEach(() => restoreLayout());
+
+  it('shows the new order at once and saves it on drop', async () => {
+    let finishSave: () => void = () => {};
+    mockedChapters.reorderChapters.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishSave = resolve;
+      })
+    );
+    mockedChapters.listChapters
+      .mockResolvedValueOnce(page([one, two, three]))
+      .mockResolvedValue(page([two, one, three]));
+    renderPage();
+
+    await moveWithKeyboard(
+      await screen.findByRole('button', { name: 'Reorder One' }),
+      'ArrowDown'
+    );
+
+    expect(mockedChapters.reorderChapters).toHaveBeenCalledWith(1, [2, 1, 3]);
+    expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
+
+    finishSave();
+    await waitFor(() =>
+      expect(mockedChapters.listChapters).toHaveBeenCalledTimes(2)
+    );
+    expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
+  });
+
+  it('puts the old order back when the save fails', async () => {
+    let failSave: (error: Error) => void = () => {};
+    mockedChapters.reorderChapters.mockReturnValue(
+      new Promise<void>((_resolve, reject) => {
+        failSave = reject;
+      })
+    );
+    // The list the server would still answer with, so the refetch after the
+    // failure cannot be what restores the order.
+    mockedChapters.listChapters
+      .mockResolvedValueOnce(page([one, two, three]))
+      .mockReturnValue(new Promise(() => {}));
+    renderPage();
+
+    await moveWithKeyboard(
+      await screen.findByRole('button', { name: 'Reorder One' }),
+      'ArrowDown'
+    );
+    expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
+
+    failSave(new ApiError(500, 'Internal Server Error'));
+
+    expect(
+      await screen.findByText('Could not save the new chapter order.')
+    ).toBeInTheDocument();
+    expect(titlesOnScreen()).toEqual(['One', 'Two', 'Three']);
+  });
+
+  it('on a conflict reloads the chapters and says why the order changed', async () => {
+    mockedChapters.reorderChapters.mockRejectedValue(
+      new ApiError(
+        409,
+        'The chapters of this book changed since you loaded them'
+      )
+    );
+    mockedChapters.listChapters
+      .mockResolvedValueOnce(page([one, two, three]))
+      .mockResolvedValue(page([one, two, three, chapterNamed(4, 'Four')]));
+    renderPage();
+
+    await moveWithKeyboard(
+      await screen.findByRole('button', { name: 'Reorder Three' }),
+      'ArrowUp'
+    );
+
+    expect(
+      await screen.findByText(
+        'A co-author changed the chapters while you were reordering them. This is their current order.'
+      )
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(titlesOnScreen()).toEqual(['One', 'Two', 'Three', 'Four'])
+    );
   });
 });

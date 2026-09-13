@@ -61,6 +61,20 @@ export const updateChapterSchema = z
     { message: 'At least one field must be provided' }
   );
 
+// A book's whole Reading order, first chapter first. The whole list rather
+// than a single move, so the repository can tell when it was drawn from a
+// chapter set that has since changed. The cap keeps one request's FIELD()
+// argument list bounded without refusing any real book.
+export const reorderChaptersSchema = z.object({
+  chapterIds: z
+    .array(idSchema)
+    .min(1)
+    .max(5_000)
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: 'Each chapter may appear only once',
+    }),
+});
+
 export const listChaptersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
@@ -78,6 +92,7 @@ export const idParamSchema = z.object({
 export type CreateChapterInput = z.infer<typeof createChapterSchema>;
 export type PublishedAtInput = z.infer<typeof publishedAtSchema>;
 export type UpdateChapterInput = z.infer<typeof updateChapterSchema>;
+export type ReorderChaptersInput = z.infer<typeof reorderChaptersSchema>;
 export type ListChaptersQuery = z.infer<typeof listChaptersQuerySchema>;
 
 // The full record, returned by GET /api/chapters/:id.

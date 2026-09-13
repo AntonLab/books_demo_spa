@@ -10,6 +10,7 @@ import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CreateChapterInput,
   ListChaptersQuery,
+  ReorderChaptersInput,
   UpdateChapterInput,
 } from '../types/chapter.ts';
 
@@ -19,6 +20,7 @@ export interface ChapterController {
   getById: RequestHandler;
   update: RequestHandler;
   remove: RequestHandler;
+  reorder: RequestHandler;
 }
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -54,26 +56,28 @@ export function createChapterController(
     }
   };
 
-  // A create has no chapter to own yet, so the target book answers instead.
-  const assertMayAddTo = async (
+  // A create has no chapter to own yet, and a reorder touches the book's
+  // chapters as a whole, so the book answers for both.
+  const assertMayChangeChaptersOf = async (
     req: Request,
-    bookId: number
+    bookId: number,
+    refusal: string
   ): Promise<void> => {
     if (req.permissionScope === 'any') return;
 
     const coAuthorIds = await repository.findBookCoAuthorIds(bookId);
     if (coAuthorIds === null) throw new NotFoundError('Book', bookId);
-    if (!isCredited(req, coAuthorIds)) {
-      throw new ForbiddenError(
-        'You may only add chapters to books you co-author'
-      );
-    }
+    if (!isCredited(req, coAuthorIds)) throw new ForbiddenError(refusal);
   };
 
   return {
     create: async (req, res) => {
       const input = validatedBody<CreateChapterInput>(req);
-      await assertMayAddTo(req, input.bookId);
+      await assertMayChangeChaptersOf(
+        req,
+        input.bookId,
+        'You may only add chapters to books you co-author'
+      );
 
       const chapter = await repository.create(input);
       res.status(201).json(chapter);
@@ -112,6 +116,20 @@ export function createChapterController(
 
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('Chapter', id);
+      res.status(204).end();
+    },
+
+    reorder: async (req, res) => {
+      const { id: bookId } = validatedParams<{ id: number }>(req);
+      await assertMayChangeChaptersOf(
+        req,
+        bookId,
+        'You may only reorder chapters in books you co-author'
+      );
+
+      const { chapterIds } = validatedBody<ReorderChaptersInput>(req);
+      const found = await repository.reorder(bookId, chapterIds);
+      if (!found) throw new NotFoundError('Book', bookId);
       res.status(204).end();
     },
   };

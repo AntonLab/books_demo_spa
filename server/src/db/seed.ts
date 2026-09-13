@@ -1147,6 +1147,7 @@ async function writeContent(
     title: string;
     text: string;
     publishedAt: Date | null;
+    position: number;
     createdAt: Date;
     updatedAt: Date;
   }[] = [];
@@ -1199,7 +1200,7 @@ async function writeContent(
         });
       }
 
-      for (const chapter of book.chapters) {
+      for (const [index, chapter] of book.chapters.entries()) {
         const parsed = createChapterSchema.parse({
           bookId: row.id,
           title: chapter.title,
@@ -1212,6 +1213,9 @@ async function writeContent(
           // Attached after the parse, like a book's status: the schema's
           // publishedAt is 'now' or a future moment, and the seed backdates.
           publishedAt: chapter.publishedAt,
+          // The Reading order is the order the plan wrote them in, 1-based
+          // like the positions chapterRepository appends.
+          position: index + 1,
           createdAt: chapter.createdAt,
           updatedAt: chapter.createdAt,
         });

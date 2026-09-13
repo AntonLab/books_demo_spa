@@ -12,11 +12,12 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
-import { ChapterList } from '@/components/organisms/ChapterList';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
+import { SortableChapterList } from '@/components/organisms/SortableChapterList';
+import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
-import { useChapters } from '@/queries/chapters';
+import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { useMySeries } from '@/queries/series';
 
 export const EditBookPage: FC = () => {
@@ -32,6 +33,7 @@ export const EditBookPage: FC = () => {
   const update = useUpdateBook(bookId);
   const remove = useDeleteBook(bookId);
   const chapters = useChapters(bookId);
+  const reorder = useReorderChapters(bookId);
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -63,6 +65,9 @@ export const EditBookPage: FC = () => {
     book.series && !own.some((entry) => entry.id === book.series?.id)
       ? [...own, book.series]
       : own;
+
+  const reorderConflict =
+    reorder.error instanceof ApiError && reorder.error.status === 409;
 
   const handleSubmit = (values: BookFormValues) => {
     update.mutate(values);
@@ -120,15 +125,28 @@ export const EditBookPage: FC = () => {
           <Link to={`/books/${book.id}/chapters/new`}>Add chapter</Link>
         )}
       </Space>
+      {/* A 409 has already brought in the current list; this says why the
+          order just moved under the author's hands. */}
+      {reorder.error && (
+        <Alert
+          type={reorderConflict ? 'warning' : 'error'}
+          title={
+            reorderConflict
+              ? 'A co-author changed the chapters while you were reordering them. This is their current order.'
+              : 'Could not save the new chapter order.'
+          }
+          style={{ marginBottom: token.margin }}
+        />
+      )}
       {/* Every chapter, drafts and scheduled ones included: the server returns
           them all to a Co-author or a Moderator, and this is where they are
-          worked on. */}
-      <ChapterList
+          worked on and put in Reading order. */}
+      <SortableChapterList
         bookId={book.id}
         items={chapters.data?.items ?? []}
         isPending={chapters.isPending}
         isError={chapters.isError}
-        editable
+        onReorder={(chapterIds) => reorder.mutate(chapterIds)}
       />
 
       <Divider />

@@ -41,6 +41,24 @@ and answers 409 without writing if the chapter changed since.
 `chapters.updatedAt` is `DATETIME(3)` for exactly that reason — two
 Co-authors saving within one second would otherwise read as one version.
 
+A book's chapters follow its **Reading order** — `chapters.position`, an
+`INTEGER UNSIGNED NOT NULL` that orders every chapter list, public or not
+(`ORDER BY position, id`), and is never sent to a client. A new chapter is
+appended: `chapterRepository.create` locks the book row and takes the last
+position plus one, so two chapters added at once cannot share a place.
+Positions are 1-based and gapped after a delete, which nothing notices, since
+only their order matters. `PUT /api/books/:id/chapter-order` takes
+`{ chapterIds }` — every chapter of the book, once each, first chapter first —
+and answers 204 (`routes/chapterOrderRoutes.ts`, handled by
+`chapterController.reorder`). Under the same book-row lock it compares the
+ids with the book's current chapters and answers 409, changing nothing, if a
+chapter was added or deleted since the list was drawn; otherwise one
+`UPDATE … SET position = FIELD(id, …)` rewrites them all. That update is
+`silent`, so no chapter's `updatedAt` moves and a Co-author with a chapter
+open is not handed a 409 for text nobody touched. It rides on
+`chapters × update`, and `own` means a Co-author of the book, exactly as for
+adding a chapter.
+
 `books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
 alongside their `description`, which now unambiguously means the annotation.
 The `?q=` filter on both matches either column.
@@ -162,7 +180,7 @@ added.
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
-  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`,
+  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`,
   `commentRoutes.ts`, `likeRoutes.ts`, mounted under `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
@@ -262,7 +280,8 @@ older book is Complete (`statusOf` in `planAuthor`). A Draft book's last two
 chapters are Draft chapters; every In progress book's next chapter is Scheduled
 over the coming days, and the author's newest In progress book has its next two
 scheduled (`publicationOf`); every other chapter was published when it was
-written.
+written. Each book's chapters take positions 1…N in the order the plan wrote
+them, so the Reading order starts out as the order of writing.
 
 Three things about it are worth knowing before changing it:
 
@@ -411,8 +430,9 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
   - **Chapters resolve ownership through their book**, because `chapters` has
     no `userId` column: `chapterController.assertMayTouch` looks up the
     chapter's `bookId` and then the book's Co-authors
-    (`chapterRepository.findCoAuthorIds`), and `assertMayAddTo` does the same
-    for a `POST` that has no chapter yet to own — the target book answers
+    (`chapterRepository.findCoAuthorIds`), and `assertMayChangeChaptersOf`
+    does the same for a `POST` that has no chapter yet to own and for a
+    reorder, which changes the book's chapters as a whole — the book answers
     instead (`findBookCoAuthorIds`).
   - **Filing a book into a series takes a Co-author of both.**
     `bookController.assertMayAddToSeries` checks the caller co-authors the
@@ -596,8 +616,8 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
   a role that may create uses — but the create path is not scope-only.
   Creating a book into a series checks that the caller may touch that series
   (`assertMayAddToSeries` in `controllers/bookController.ts`), and creating a
-  chapter checks that the caller co-authors its book (`assertMayAddTo` in
-  `controllers/chapterController.ts`); both
+  chapter checks that the caller co-authors its book
+  (`assertMayChangeChaptersOf` in `controllers/chapterController.ts`); both
   run after the matrix has already let the request through.
   `PERMISSION_DEFINITION` in `matrix.ts` only spells out what is granted;
   everything else expands to `none` when `buildMatrixRows()` produces one
@@ -963,7 +983,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   too. So does `books.status`: a database without the column fails every read
   that filters on it. And `chapters.publishedAt` is new while
   `chapters.updatedAt` gained millisecond precision, neither of which
-  `sync()` applies to an existing table.
+  `sync()` applies to an existing table. Nor does it add
+  `chapters.position`, a `NOT NULL` column every chapter insert and list
+  needs, or swap the `(bookId, id)` index for `(bookId, position)`.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of
