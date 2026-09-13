@@ -236,13 +236,13 @@ Every action is pinned to a full commit SHA with its version in a trailing
 comment; Dependabot moves both. Keep that form when adding a step — a tag can
 be re-pointed, a SHA cannot.
 
-A ruleset on each of `dev` and `main` requires a PR to merge (no approvals,
-since the repo has one maintainer), blocks force-pushes and deletion, and
-requires all seven checks above to pass; the admin role may bypass it. The
-branch need not be up to date with its base before merging. The required
-checks are matched **by name**: renaming a job, or the CodeQL matrix, leaves
-the ruleset waiting on a check that never reports, so update the rulesets in
-the same change.
+One repository ruleset, `Protect dev and main` (Settings → Rules), covers both
+branches: it requires a PR to merge (no approvals, since the repo has one
+maintainer), blocks force-pushes and deletion, and requires all seven checks
+above to pass; the admin role may bypass it. The branch need not be up to date
+with its base before merging. The required checks are matched **by name**:
+renaming a job, or the CodeQL matrix, leaves the ruleset waiting on a check
+that never reports, so update the ruleset in the same change.
 
 ## Anti-Patterns
 

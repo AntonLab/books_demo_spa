@@ -21,7 +21,7 @@ concurrency:
 jobs:
   analyze:
     # Rendered as "Analyze (actions)" and "Analyze (javascript-typescript)",
-    # the two names the rulesets require.
+    # the two names the ruleset on dev and main requires.
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
