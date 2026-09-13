@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AuthorSummary } from './user.ts';
 
 export const SERIES_TAG_MAX_LENGTH = 32;
 export const SERIES_MAX_TAGS = 20;
@@ -20,9 +21,10 @@ const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
 // whitespace-only title fails min(1) rather than landing as an empty string.
 const titleSchema = z.string().trim().min(1).max(SERIES_TITLE_MAX_LENGTH);
 
-// No userId: the owner comes from the session, never the body. Without that,
-// an author could create a series owned by someone else, and "you may only
-// edit your own series" would mean nothing.
+// No userId: the first Co-author is whoever is signed in, never someone the
+// body names. Without that, an author could create a series credited to
+// someone else, and "you may only edit series you co-author" would mean
+// nothing.
 export const createSeriesSchema = z.object({
   title: titleSchema,
   description: descriptionSchema,
@@ -32,11 +34,10 @@ export const createSeriesSchema = z.object({
 });
 
 // Spelled out rather than derived from createSeriesSchema with
-// `.omit().partial()`, for two reasons. userId is absent by construction:
-// ownership is decided at creation, and moving a series between users is a
-// re-parenting operation, not a field edit. And `.partial()` does not undo a
-// `.default()` — a PATCH body without `tags` would still parse as `tags: []`
-// and wipe the stored tags.
+// `.omit().partial()`, because `.partial()` does not undo a `.default()` — a
+// PATCH body without `tags` would still parse as `tags: []` and wipe the
+// stored tags. Who is credited is not a field here either: Co-authors change
+// through /api/series/:id/co-authors.
 export const updateSeriesSchema = z
   .object({
     title: titleSchema,
@@ -62,13 +63,32 @@ export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+// Local copies of the books' co-author schemas, for the reason idParamSchema
+// above gives.
+export const addCoAuthorSchema = z.object({
+  userId: userIdSchema,
+});
+
+export const coAuthorParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive(),
+});
+
+export const seriesBookParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  bookId: z.coerce.number().int().positive(),
+});
+
 export type CreateSeriesInput = z.infer<typeof createSeriesSchema>;
+export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateSeriesInput = z.infer<typeof updateSeriesSchema>;
 export type ListSeriesQuery = z.infer<typeof listSeriesQuerySchema>;
 
+// No userId: a series has no single owner (ADR-0005).
 export interface PublicSeries {
   id: number;
-  userId: number;
+  // Every Co-author, in the order they were credited, as on a book.
+  authors: AuthorSummary[];
   title: string;
   description: string;
   tags: string[];

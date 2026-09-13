@@ -8,6 +8,8 @@ import type { WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
+import { Series } from '../models/Series.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
 import { toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
@@ -94,6 +96,36 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
 }
 
+interface CreditedWorks {
+  // Every work the account is credited on.
+  workIds: number[];
+  // One entry per credit on those works, every Co-author included.
+  creditWorkIds: number[];
+}
+
+// Reads the works an account is credited on, locks them, and only then counts
+// their credits, so the count cannot change underneath the caller. The reads
+// are passed in because books and series keep their credits in two tables.
+async function lockCreditedWorks(
+  userId: number,
+  lock: (workIds: number[]) => Promise<unknown>,
+  creditedWorkIds: (userId: number) => Promise<number[]>,
+  creditsOn: (workIds: number[]) => Promise<number[]>
+): Promise<CreditedWorks> {
+  const workIds = await creditedWorkIds(userId);
+  if (workIds.length === 0) return { workIds, creditWorkIds: [] };
+
+  await lock(workIds);
+  return { workIds, creditWorkIds: await creditsOn(workIds) };
+}
+
+// The works whose only credit is the account's own.
+function soleCredits({ workIds, creditWorkIds }: CreditedWorks): number[] {
+  return workIds.filter(
+    (workId) => creditWorkIds.filter((id) => id === workId).length === 1
+  );
+}
+
 export function createSequelizeUserRepository(): UserRepository {
   return {
     async create(input, role = 'user') {
@@ -166,11 +198,13 @@ export function createSequelizeUserRepository(): UserRepository {
     // books this account was the last Co-author of are the exception — they go
     // with those books (ADR-0004).
     //
-    // A book with other Co-authors stays: the account's credit cascades away
-    // with the account and the rest keep the book (ADR-0005). The books are
-    // locked before they are counted, the same lock bookRepository's
-    // removeCoAuthor takes, so a co-author leaving at the same moment cannot
-    // leave a book credited to nobody.
+    // A book or series with other Co-authors stays: the account's credit
+    // cascades away with the account and the rest keep the work (ADR-0005).
+    // One this account was the last Co-author of is deleted — a series only
+    // unlinks its books, a book takes its chapters and comments with it. The
+    // works are locked before they are counted, the same lock each
+    // repository's removeCoAuthor takes, so a co-author leaving at the same
+    // moment cannot leave a work credited to nobody.
     async remove(id) {
       const sequelize = User.sequelize;
       if (!sequelize) {
@@ -178,33 +212,68 @@ export function createSequelizeUserRepository(): UserRepository {
       }
 
       return sequelize.transaction(async (transaction) => {
-        const creditedBookIds = (
-          await BookAuthor.findAll({
-            where: { userId: id },
-            attributes: ['bookId'],
-            transaction,
-          })
-        ).map((credit) => credit.bookId);
+        const soleSeriesIds = soleCredits(
+          await lockCreditedWorks(
+            id,
+            (seriesIds) =>
+              Series.findAll({
+                where: { id: seriesIds },
+                attributes: ['id'],
+                lock: transaction.LOCK.UPDATE,
+                transaction,
+              }),
+            async (userId) =>
+              (
+                await SeriesAuthor.findAll({
+                  where: { userId },
+                  attributes: ['seriesId'],
+                  transaction,
+                })
+              ).map((credit) => credit.seriesId),
+            async (seriesIds) =>
+              (
+                await SeriesAuthor.findAll({
+                  where: { seriesId: seriesIds },
+                  attributes: ['seriesId'],
+                  transaction,
+                })
+              ).map((credit) => credit.seriesId)
+          )
+        );
+        if (soleSeriesIds.length > 0) {
+          await Series.destroy({ where: { id: soleSeriesIds }, transaction });
+        }
 
-        if (creditedBookIds.length > 0) {
-          await Book.findAll({
-            where: { id: creditedBookIds },
-            attributes: ['id'],
-            lock: transaction.LOCK.UPDATE,
-            transaction,
-          });
-          const credits = await BookAuthor.findAll({
-            where: { bookId: creditedBookIds },
-            attributes: ['bookId'],
-            transaction,
-          });
-          const soleBookIds = creditedBookIds.filter(
-            (bookId) =>
-              credits.filter((credit) => credit.bookId === bookId).length === 1
-          );
-          if (soleBookIds.length > 0) {
-            await Book.destroy({ where: { id: soleBookIds }, transaction });
-          }
+        const soleBookIds = soleCredits(
+          await lockCreditedWorks(
+            id,
+            (bookIds) =>
+              Book.findAll({
+                where: { id: bookIds },
+                attributes: ['id'],
+                lock: transaction.LOCK.UPDATE,
+                transaction,
+              }),
+            async (userId) =>
+              (
+                await BookAuthor.findAll({
+                  where: { userId },
+                  attributes: ['bookId'],
+                  transaction,
+                })
+              ).map((credit) => credit.bookId),
+            async (bookIds) =>
+              (
+                await BookAuthor.findAll({
+                  where: { bookId: bookIds },
+                  attributes: ['bookId'],
+                  transaction,
+                })
+              ).map((credit) => credit.bookId)
+          )
+        );
+        if (soleBookIds.length > 0) {
+          await Book.destroy({ where: { id: soleBookIds }, transaction });
         }
 
         // silent, or every tombstone this leaves shares one updatedAt — a

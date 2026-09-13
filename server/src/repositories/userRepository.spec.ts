@@ -14,10 +14,14 @@ import {
   initModels,
   Like,
   Series,
+  SeriesAuthor,
   Session,
   User,
 } from '../models/index.ts';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import {
+  createCreditedBook,
+  createCreditedSeries,
+} from '../models/creditedBook.testkit.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { hashToken } from '../tokens.ts';
@@ -368,6 +372,50 @@ describe('userRepository against real MySQL', { skip }, () => {
       credits.map((credit) => credit.userId),
       [staying.id]
     );
+  });
+
+  test('deleting an account keeps its shared series and deletes the ones it alone was credited on', async () => {
+    const leaving = await repository.create(
+      { ...base, login: 'LeavingSeries', email: 'leaving-series@example.com' },
+      'author'
+    );
+    const staying = await repository.create(
+      { ...base, login: 'StayingSeries', email: 'staying-series@example.com' },
+      'author'
+    );
+    const shared = await createCreditedSeries(
+      { title: 'Shared', description: 'Co-planned', tags: [] },
+      [leaving.id, staying.id]
+    );
+    const solo = await createCreditedSeries(
+      { title: 'Solo', description: 'Planned alone', tags: [] },
+      [leaving.id]
+    );
+    // Credited to the account that stays, so only the series' deletion — not
+    // the leaving account's own books — can touch it.
+    const filed = await createCreditedBook(
+      {
+        title: 'Filed',
+        description: 'In the solo series',
+        tags: [],
+        seriesId: solo.id,
+      },
+      [staying.id]
+    );
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    assert.equal(await Series.findByPk(solo.id), null);
+    assert.ok(await Series.findByPk(shared.id));
+    const credits = await SeriesAuthor.findAll({
+      where: { seriesId: shared.id },
+    });
+    assert.deepEqual(
+      credits.map((credit) => credit.userId),
+      [staying.id]
+    );
+    // The series goes; the book in it only leaves it.
+    assert.equal((await Book.findByPk(filed.id))?.seriesId, null);
   });
 
   test('a removed comment becomes deleted when its owner account goes', async () => {

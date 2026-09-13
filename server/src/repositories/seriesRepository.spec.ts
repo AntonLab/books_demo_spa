@@ -7,8 +7,15 @@ import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
-import { initModels, Series, User } from '../models/index.ts';
-import { NotFoundError } from '../types/errors.ts';
+import {
+  Book,
+  initModels,
+  Series,
+  SeriesAuthor,
+  User,
+} from '../models/index.ts';
+import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 
 // A schema of its own rather than the users suite's: node:test runs spec
@@ -55,6 +62,14 @@ const owner = {
   lastName: 'Owner',
 };
 
+const coAuthor = {
+  login: 'SeriesCoAuthor',
+  email: 'series-coauthor@example.com',
+  password: 'hunter2hunter2',
+  firstName: 'Cora',
+  lastName: 'Author',
+};
+
 describe('seriesRepository against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
   let ownerId: number;
@@ -73,10 +88,228 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   });
 
   beforeEach(async () => {
-    // series first: the foreign key forbids clearing users out from under it.
+    // Children first: the foreign keys forbid clearing users out from under
+    // them. Books are cleared by hand, since a series only unlinks its books.
+    await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
+  });
+
+  test('creating a series credits its creator as its only co-author', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Solo',
+      tags: [],
+    });
+
+    const expected = [
+      {
+        id: ownerId,
+        login: 'SeriesOwner',
+        firstName: 'Ola',
+        lastName: 'Owner',
+      },
+    ];
+    assert.deepEqual(created.authors, expected);
+    assert.deepEqual(
+      (await repository.findById(created.id))?.authors,
+      expected
+    );
+  });
+
+  test('a co-author is credited after the ones already there', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+
+    const updated = await repository.addCoAuthor(created.id, coAuthorId);
+
+    assert.deepEqual(
+      updated?.authors.map((author) => author.login),
+      ['SeriesOwner', 'SeriesCoAuthor']
+    );
+  });
+
+  test('only an account holding the author role can be made a co-author', async () => {
+    const readerId = (await User.create({ ...coAuthor, role: 'user' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+
+    await assert.rejects(
+      repository.addCoAuthor(created.id, readerId),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 400 &&
+        /author role/i.test(error.message)
+    );
+    assert.equal((await repository.findById(created.id))?.authors.length, 1);
+  });
+
+  test('crediting an account that does not exist blames the user', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+
+    await assert.rejects(
+      repository.addCoAuthor(created.id, ownerId + 10_000),
+      (error: unknown) =>
+        error instanceof NotFoundError &&
+        /User \d+ not found/.test(error.message)
+    );
+  });
+
+  test('crediting a co-author twice is a conflict', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+    await repository.addCoAuthor(created.id, coAuthorId);
+
+    await assert.rejects(
+      repository.addCoAuthor(created.id, coAuthorId),
+      (error: unknown) => error instanceof AppError && error.statusCode === 409
+    );
+  });
+
+  test('removing a co-author leaves the rest credited', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+    await repository.addCoAuthor(created.id, coAuthorId);
+
+    const updated = await repository.removeCoAuthor(created.id, ownerId);
+
+    assert.deepEqual(
+      updated?.authors.map((author) => author.id),
+      [coAuthorId]
+    );
+  });
+
+  test('the last co-author cannot be removed', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Solo',
+      tags: [],
+    });
+
+    await assert.rejects(
+      repository.removeCoAuthor(created.id, ownerId),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        /last co-author/i.test(error.message)
+    );
+    assert.equal((await repository.findById(created.id))?.authors.length, 1);
+  });
+
+  test('removing an account that is not credited is a 404, even on a solo series', async () => {
+    const strangerId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Solo',
+      tags: [],
+    });
+
+    await assert.rejects(
+      repository.removeCoAuthor(created.id, strangerId),
+      (error: unknown) =>
+        error instanceof NotFoundError &&
+        /Co-author \d+ not found/.test(error.message)
+    );
+  });
+
+  test('the userId filter matches a series through any of its co-authors', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const shared = await repository.create({
+      userId: ownerId,
+      title: 'Shared Series',
+      description: 'Shared',
+      tags: [],
+    });
+    await repository.addCoAuthor(shared.id, coAuthorId);
+    await repository.create({
+      userId: ownerId,
+      title: 'Solo Series',
+      description: 'Solo',
+      tags: [],
+    });
+
+    const page = await repository.list({
+      limit: 20,
+      offset: 0,
+      userId: coAuthorId,
+    });
+
+    assert.equal(page.total, 1);
+    assert.equal(page.items[0]?.title, 'Shared Series');
+  });
+
+  test('removing a book from a series unlinks it and leaves the book standing', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Holds a book',
+      tags: [],
+    });
+    const filed = await createCreditedBook(
+      {
+        title: 'Filed',
+        description: 'In the series',
+        tags: [],
+        seriesId: created.id,
+      },
+      [ownerId]
+    );
+
+    assert.equal(await repository.removeBook(created.id, filed.id), true);
+
+    assert.equal((await Book.findByPk(filed.id))?.seriesId, null);
+  });
+
+  test('removing a book that is not in the series is a 404 on the book', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Empty',
+      tags: [],
+    });
+    const standalone = await createCreditedBook(
+      { title: 'Standalone', description: 'In no series', tags: [] },
+      [ownerId]
+    );
+
+    await assert.rejects(
+      repository.removeBook(created.id, standalone.id),
+      (error: unknown) =>
+        error instanceof NotFoundError &&
+        /Book \d+ not found/.test(error.message)
+    );
+    assert.equal(
+      await repository.removeBook(created.id + 10_000, standalone.id),
+      false
+    );
   });
 
   test('round-trips tags through the JSON column as a real array', async () => {
@@ -173,7 +406,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.match(matches.items[0]?.description ?? '', /100% real/);
   });
 
-  test('the owner filter and paging envelope agree on the total', async () => {
+  test('the co-author filter and paging envelope agree on the total', async () => {
     const otherId = (
       await User.create({
         ...owner,
@@ -207,7 +440,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(page.items.length, 2);
   });
 
-  test('an update replaces the whole tag array and leaves the owner alone', async () => {
+  test('an update replaces the whole tag array and leaves the co-authors alone', async () => {
     const created = await repository.create({
       userId: ownerId,
       title: 'Test Series',
@@ -218,7 +451,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     const updated = await repository.update(created.id, { tags: ['drama'] });
 
     assert.deepEqual(updated?.tags, ['drama']);
-    assert.equal(updated?.userId, ownerId);
+    assert.deepEqual(
+      updated?.authors.map((author) => author.id),
+      [ownerId]
+    );
     assert.equal(updated?.description, 'Original');
   });
 
@@ -238,37 +474,31 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.deepEqual(updated?.tags, ['sci-fi']);
   });
 
-  test('deleting the user cascades to their series', async () => {
-    await repository.create({
+  // The foreign key alone only drops the credit. Whether the series goes too is
+  // userRepository.remove's decision, covered in userRepository.spec.ts.
+  test('deleting a user row drops their credits and nothing else', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Credited',
+      tags: [],
+    });
+
+    await User.destroy({ where: { id: ownerId } });
+
+    assert.equal(await SeriesAuthor.count(), 0);
+    assert.ok(await Series.findByPk(created.id));
+  });
+
+  test('deleting a series drops its credits', async () => {
+    const created = await repository.create({
       userId: ownerId,
       title: 'Test Series',
       description: 'Doomed',
       tags: [],
     });
 
-    await User.destroy({ where: { id: ownerId } });
-
-    assert.equal(await Series.count(), 0);
-  });
-
-  test('User.hasMany(Series) eager-loads under the `series` alias', async () => {
-    await repository.create({
-      userId: ownerId,
-      title: 'A',
-      description: 'A',
-      tags: [],
-    });
-    await repository.create({
-      userId: ownerId,
-      title: 'B',
-      description: 'B',
-      tags: [],
-    });
-
-    const loaded = await User.findByPk(ownerId, {
-      include: { association: 'series' },
-    });
-
-    assert.equal(loaded?.series?.length, 2);
+    assert.equal(await repository.remove(created.id), true);
+    assert.equal(await SeriesAuthor.count(), 0);
   });
 });

@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the seven content
+// Destructive by design: with --force it deletes every row in the eight content
 // tables before inserting. Without --force it reports what it found and exits
 // without writing.
 
@@ -30,6 +30,7 @@ import {
   Comment,
   Like,
   Series,
+  SeriesAuthor,
   User,
   initModels,
 } from '../models/index.ts';
@@ -632,6 +633,8 @@ interface PlannedSeries {
   title: string;
   description: string;
   tags: string[];
+  // Every Co-author in credit order, the author it was planned under first.
+  coAuthorLogins: string[];
   createdAt: Date;
 }
 
@@ -778,6 +781,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
         title: genre.seriesTitles[index],
         description: description(rng, genre, rng.int(3, 4)),
         tags: rng.sample(genre.tags, rng.int(3, 5)),
+        coAuthorLogins: [spec.login],
         createdAt: new Date(
           first.createdAt.getTime() - rng.int(2, 10) * DAY_MS
         ),
@@ -795,9 +799,30 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   };
 }
 
+// The last author's first series gains the first author as a second
+// Co-author. Its books stay credited to the last author alone: a series and
+// the books in it keep independent Co-author lists.
+function shareSeries(authors: readonly PlannedAuthor[]): PlannedAuthor[] {
+  const last = authors.length - 1;
+  const partner = authors[0].spec.login;
+
+  return authors.map((author, index) =>
+    index !== last
+      ? author
+      : {
+          ...author,
+          series: author.series.map((entry, seriesIndex) =>
+            seriesIndex === 0
+              ? { ...entry, coAuthorLogins: [...entry.coAuthorLogins, partner] }
+              : entry
+          ),
+        }
+  );
+}
+
 // Two standalone books gain a second Co-author: each author's last standalone
 // book is shared with the next author in AUTHORS. Standalone, so neither book
-// sits in a series only one of its Co-authors owns.
+// has to be filed under a series its new Co-author is not credited on.
 function shareBooks(authors: readonly PlannedAuthor[]): PlannedAuthor[] {
   return authors.map((author, index) => {
     if (index >= SHARED_BOOK_COUNT) return author;
@@ -934,7 +959,9 @@ function planThreads(
 }
 
 function buildPlan(rng: Rng): Plan {
-  const authors = shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)));
+  const authors = shareSeries(
+    shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
+  );
   const earliest = Math.min(
     ...authors.map((author) => author.createdAt.getTime())
   );
@@ -981,6 +1008,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Chapter,
   BookAuthor,
   Book,
+  SeriesAuthor,
   Series,
   User,
 ];
@@ -1054,6 +1082,11 @@ async function writeContent(
 
   const bookIds = new Map<PlannedBook, number>();
   const creditRows: { bookId: number; userId: number; createdAt: Date }[] = [];
+  const seriesCreditRows: {
+    seriesId: number;
+    userId: number;
+    createdAt: Date;
+  }[] = [];
   const chapterRows: {
     bookId: number;
     title: string;
@@ -1064,23 +1097,22 @@ async function writeContent(
   let seriesCount = 0;
 
   for (const author of plan.authors) {
-    // A series still has a single owner; only books take Co-authors so far.
-    const userId = idOf(author.spec.login);
-
     const seriesIds: number[] = [];
     for (const entry of author.series) {
       const fields = createSeriesSchema.parse(entry);
       const row = await Series.create(
-        {
-          ...fields,
-          userId,
-          createdAt: entry.createdAt,
-          updatedAt: entry.createdAt,
-        },
+        { ...fields, createdAt: entry.createdAt, updatedAt: entry.createdAt },
         { transaction, silent: true }
       );
       seriesIds.push(row.id);
       seriesCount += 1;
+      for (const login of entry.coAuthorLogins) {
+        seriesCreditRows.push({
+          seriesId: row.id,
+          userId: idOf(login),
+          createdAt: entry.createdAt,
+        });
+      }
     }
 
     for (const book of author.books) {
@@ -1119,6 +1151,9 @@ async function writeContent(
     }
   }
 
+  await insertInBatches(seriesCreditRows, (batch) =>
+    SeriesAuthor.bulkCreate(batch, { transaction })
+  );
   await insertInBatches(creditRows, (batch) =>
     BookAuthor.bulkCreate(batch, { transaction })
   );

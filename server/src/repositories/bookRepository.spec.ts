@@ -8,6 +8,7 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { Book, BookAuthor, initModels, Series, User } from '../models/index.ts';
+import { createCreditedSeries } from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 
@@ -89,12 +90,10 @@ describe('bookRepository against real MySQL', { skip }, () => {
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
     seriesId = (
-      await Series.create({
-        userId: ownerId,
-        title: 'Test Series',
-        description: 'A trilogy',
-        tags: [],
-      })
+      await createCreditedSeries(
+        { title: 'Test Series', description: 'A trilogy', tags: [] },
+        [ownerId]
+      )
     ).id;
   });
 

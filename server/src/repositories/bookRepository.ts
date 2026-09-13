@@ -9,6 +9,7 @@ import {
 import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
+import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
@@ -64,8 +65,8 @@ export interface BookRepository {
   findCoAuthorIds(id: number): Promise<number[] | null>;
   // The same question about the series a book is being filed under, asked
   // before the write — mirrors chapterRepository.findBookCoAuthorIds one level
-  // up. A series still has a single owner until it gets Co-authors of its own.
-  findSeriesOwnerId(seriesId: number): Promise<number | null>;
+  // up. null when the series is not there.
+  findSeriesCoAuthorIds(seriesId: number): Promise<number[] | null>;
 }
 
 // A rejected FK while creating a book means a referenced row does not exist.
@@ -347,11 +348,6 @@ export function createSequelizeBookRepository(): BookRepository {
       return credits.map((credit) => credit.userId);
     },
 
-    async findSeriesOwnerId(seriesId) {
-      const series = await Series.findByPk(seriesId, {
-        attributes: ['userId'],
-      });
-      return series?.userId ?? null;
-    },
+    findSeriesCoAuthorIds,
   };
 }
