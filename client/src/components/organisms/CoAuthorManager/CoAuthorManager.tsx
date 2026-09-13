@@ -9,6 +9,7 @@ import {
   theme,
   Typography,
 } from 'antd';
+import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { useAuthorSearch } from '@/queries/authors';
 import {
   useAddCoAuthor,
@@ -123,8 +124,12 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
           // The server searches; filtering the returned page again would only
           // hide matches it found by first or last name.
           filterOption={false}
+          // Held to the length the server accepts: past it every search is a
+          // 400, which would read here as "No authors found".
           searchValue={term}
-          onSearch={setTerm}
+          onSearch={(value) =>
+            setTerm(value.slice(0, AUTHOR_SEARCH_MAX_LENGTH))
+          }
           value={null}
           loading={search.isFetching}
           notFoundContent={search.isFetching ? null : 'No authors found'}
