@@ -1,4 +1,4 @@
-import { USER_ROLES, USER_STATUSES } from 'shared';
+import { AUTHOR_SEARCH_MAX_LENGTH, USER_ROLES, USER_STATUSES } from 'shared';
 import { z } from 'zod';
 
 // The response shapes and the status union are the client's contract too, so
@@ -48,7 +48,7 @@ export const listUsersQuerySchema = z.object({
 // paging, and a short cap keeps each keystroke's answer small.
 export const listAuthorsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
-  q: z.string().min(1).max(64).optional(),
+  q: z.string().min(1).max(AUTHOR_SEARCH_MAX_LENGTH).optional(),
 });
 
 export const idParamSchema = z.object({
