@@ -15,6 +15,7 @@ import { createChapterOrderRoutes } from './chapterOrderRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
+import { createSeriesBookRoutes } from './seriesBookRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoleRoutes } from './userRoleRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
@@ -44,6 +45,9 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/authors', createAuthorRoutes(deps));
   router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
+  // Neither path collides with seriesRoutes': GET /:id/books and
+  // PUT /:id/book-order are routes it does not have.
+  router.use('/series', createSeriesBookRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
   // Like the role routes: `/:id` never matches `/:id/chapter-order`, so the
   // order of these two is not load-bearing either.

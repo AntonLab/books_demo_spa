@@ -9,7 +9,11 @@ import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { Book, BookAuthor, initModels, Series, User } from '../models/index.ts';
 import { createCreditedSeries } from '../models/creditedBook.testkit.ts';
-import { AppError, NotFoundError } from '../types/errors.ts';
+import {
+  AppError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import type { Viewer } from './visibility.ts';
 
@@ -663,6 +667,146 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const reloaded = await repository.findById(created.id);
     assert.equal(reloaded?.description, 'Survivor');
     assert.equal(reloaded?.seriesId, null);
+  });
+
+  // --- Series order (CONTEXT.md). ---
+
+  const fileBook = (title: string, into: number | null = seriesId) =>
+    createPublished({
+      userId: ownerId,
+      seriesId: into,
+      title,
+      description: title,
+      tags: [],
+    });
+
+  const seriesTitles = async (id: number = seriesId): Promise<string[]> =>
+    (await listAsGuest({ limit: 20, offset: 0, seriesId: id })).items.map(
+      (book) => book.title
+    );
+
+  test('a book filed into a series is appended at the end of the Series order', async () => {
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    await repository.reorderInSeries(seriesId, [two.id, one.id]);
+
+    await fileBook('Three');
+    const standalone = await fileBook('Moved in', null);
+    await repository.update(standalone.id, { seriesId });
+
+    assert.deepEqual(await seriesTitles(), ['Two', 'One', 'Three', 'Moved in']);
+  });
+
+  test('a book keeps its place when saved into the same series, and is appended when moved to another', async () => {
+    const other = await createCreditedSeries(
+      { title: 'Other', description: 'x', tags: [] },
+      [ownerId]
+    );
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    await fileBook('Elsewhere', other.id);
+
+    // Appending it again would put One after Two.
+    await repository.update(one.id, { seriesId, description: 'Resaved' });
+    assert.deepEqual(await seriesTitles(), ['One', 'Two']);
+
+    await repository.update(one.id, { seriesId: other.id });
+    assert.deepEqual(await seriesTitles(other.id), ['Elsewhere', 'One']);
+    assert.deepEqual(await seriesTitles(), ['Two']);
+
+    await repository.update(two.id, { seriesId: null });
+    assert.equal((await Book.findByPk(two.id))?.seriesPosition, null);
+  });
+
+  test('books filed into a series at the same moment still get a place each', async () => {
+    await Promise.all(
+      ['A', 'B', 'C', 'D', 'E'].map((title) => fileBook(title))
+    );
+
+    const positions = (
+      await Book.findAll({
+        where: { seriesId },
+        attributes: ['seriesPosition'],
+      })
+    ).map((book) => book.seriesPosition);
+    assert.equal(new Set(positions).size, 5);
+  });
+
+  test('a series reorder rewrites the order its lists follow, and the editor list keeps its drafts', async () => {
+    const one = await fileBook('One');
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId,
+      title: 'Draft',
+      description: 'Not out',
+      tags: [],
+    });
+    const three = await fileBook('Three');
+
+    assert.equal(
+      await repository.reorderInSeries(seriesId, [three.id, draft.id, one.id]),
+      true
+    );
+
+    assert.deepEqual(await seriesTitles(), ['Three', 'One']);
+    const editorList = await repository.listInSeries(seriesId);
+    assert.deepEqual(
+      editorList?.map((book) => [book.title, book.status]),
+      [
+        ['Three', 'in_progress'],
+        ['Draft', 'draft'],
+        ['One', 'in_progress'],
+      ]
+    );
+    // A summary: the draft's title and status, never its text.
+    assert.deepEqual(Object.keys(editorList?.[1] ?? {}).sort(), [
+      'authors',
+      'id',
+      'status',
+      'title',
+    ]);
+    assert.deepEqual(
+      editorList?.[0]?.authors.map((author) => author.id),
+      [ownerId]
+    );
+  });
+
+  test('a series reorder leaves every book version alone', async () => {
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    const before = (await Book.findByPk(one.id))?.updatedAt.getTime();
+
+    await repository.reorderInSeries(seriesId, [two.id, one.id]);
+
+    assert.equal((await Book.findByPk(one.id))?.updatedAt.getTime(), before);
+  });
+
+  test('a series reorder that does not name exactly the books in the series is a conflict and changes nothing', async () => {
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    const standalone = await fileBook('Standalone', null);
+
+    for (const bookIds of [
+      [two.id],
+      [two.id, one.id, one.id + 10_000],
+      [two.id, standalone.id],
+    ]) {
+      await assert.rejects(
+        repository.reorderInSeries(seriesId, bookIds),
+        (error: unknown) => error instanceof StateConflictError,
+        JSON.stringify(bookIds)
+      );
+    }
+
+    assert.deepEqual(await seriesTitles(), ['One', 'Two']);
+  });
+
+  test('a missing series has no books to list or reorder', async () => {
+    assert.equal(await repository.listInSeries(seriesId + 10_000), null);
+    assert.equal(
+      await repository.reorderInSeries(seriesId + 10_000, [1]),
+      false
+    );
   });
 
   test('a series eager-loads its books under the `books` alias', async () => {

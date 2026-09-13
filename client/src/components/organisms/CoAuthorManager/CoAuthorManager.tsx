@@ -1,30 +1,45 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Alert, Button, List, Select, theme, Typography } from 'antd';
+import {
+  Alert,
+  Button,
+  List,
+  Popconfirm,
+  Select,
+  theme,
+  Typography,
+} from 'antd';
 import { useAuthorSearch } from '@/queries/authors';
-import { useAddCoAuthor, useRemoveCoAuthor } from '@/queries/books';
+import {
+  useAddCoAuthor,
+  useRemoveCoAuthor,
+  type CreditedWork,
+} from '@/queries/coAuthors';
 import type { AuthorSummary } from '@/types/user';
 
 interface CoAuthorManagerProps {
-  bookId: number;
+  // A book or a series: both keep their Co-authors the same way, through
+  // parallel endpoints.
+  work: CreditedWork;
   authors: AuthorSummary[];
   // Whoever is signed in, so their own row offers Leave rather than Remove.
   viewerId: number;
-  // True for a Co-author. A Moderator may edit a book but never change who is
+  // True for a Co-author. A Moderator may edit a work but never change who is
   // credited on it, so for anyone else the list is read-only.
   canManage: boolean;
-  // Called once the viewer has left: the book is no longer theirs to edit.
+  // Called once the viewer has left: the work is no longer theirs to edit.
   onLeave: () => void;
 }
 
 const nameOf = (author: AuthorSummary): string =>
   `${author.firstName} ${author.lastName}`;
 
-// Every action here is immediate, unlike the book's fields: a credit is one
-// request each, and the server's answer — a refusal included — belongs next
-// to the list it changes rather than behind a Save button.
+// Every action here is its own request, unlike the work's fields: a credit is
+// one request each, and the server's answer — a refusal included — belongs
+// next to the list it changes rather than behind a Save button. Only leaving
+// asks first, because it cannot be undone from this page.
 export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
-  bookId,
+  work,
   authors,
   viewerId,
   canManage,
@@ -33,13 +48,13 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
   const { token } = theme.useToken();
   const [term, setTerm] = useState('');
   const search = useAuthorSearch(term);
-  const add = useAddCoAuthor(bookId);
-  const remove = useRemoveCoAuthor(bookId);
+  const add = useAddCoAuthor(work);
+  const remove = useRemoveCoAuthor(work);
 
   const failure = add.error ?? remove.error;
   const credited = new Set(authors.map((author) => author.id));
   // The last Co-author cannot leave; the server refuses it with a 409, so it is
-  // not offered. They delete the book instead.
+  // not offered. They delete the work instead.
   const canLeave = authors.length > 1;
 
   const candidates = (search.data ?? []).filter(
@@ -63,24 +78,37 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
         rowKey="id"
         renderItem={(author) => {
           const isViewer = author.id === viewerId;
+          const loading = remove.isPending && remove.variables === author.id;
           const actions =
             !canManage || (isViewer && !canLeave)
               ? []
-              : [
-                  <Button
-                    key="action"
-                    size="small"
-                    danger={!isViewer}
-                    loading={remove.isPending && remove.variables === author.id}
-                    onClick={() =>
-                      remove.mutate(author.id, {
-                        onSuccess: isViewer ? onLeave : undefined,
-                      })
-                    }
-                  >
-                    {isViewer ? 'Leave' : 'Remove'}
-                  </Button>,
-                ];
+              : isViewer
+                ? [
+                    <Popconfirm
+                      key="action"
+                      title={`Leave this ${work.kind}?`}
+                      description="Only its other co-authors can credit you again."
+                      okText="Yes, leave"
+                      onConfirm={() =>
+                        remove.mutate(author.id, { onSuccess: onLeave })
+                      }
+                    >
+                      <Button size="small" loading={loading}>
+                        Leave
+                      </Button>
+                    </Popconfirm>,
+                  ]
+                : [
+                    <Button
+                      key="action"
+                      size="small"
+                      danger
+                      loading={loading}
+                      onClick={() => remove.mutate(author.id)}
+                    >
+                      Remove
+                    </Button>,
+                  ];
 
           return <List.Item actions={actions}>{nameOf(author)}</List.Item>;
         }}

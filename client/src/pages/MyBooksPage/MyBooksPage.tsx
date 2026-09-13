@@ -1,18 +1,34 @@
 import type { FC } from 'react';
-import { Alert, Button, Space, Tabs, Typography } from 'antd';
-import { useNavigate } from 'react-router';
+import {
+  Alert,
+  Button,
+  Empty,
+  Flex,
+  List,
+  Skeleton,
+  Space,
+  Tabs,
+  theme,
+  Typography,
+} from 'antd';
+import { Link, useNavigate } from 'react-router';
 import { BookList } from '@/components/organisms/BookList';
 import { useSession } from '@/queries/auth';
 import { useMyBooks } from '@/queries/books';
+import { useMySeries } from '@/queries/series';
 
-// Every book the signed-in author co-authors, in any status. The list comes
-// from `?userId=` naming the caller, which is the one book list the server
-// widens to drafts. A Series tab joins the Books tab with the series form.
+// Every book the signed-in author co-authors, in any status, and every series
+// they co-author. The books come from `?userId=` naming the caller, which is
+// the one book list the server widens to drafts; the series from the same
+// filter on /api/series, which shows a Co-author their series even before it
+// holds a published book.
 export const MyBooksPage: FC = () => {
+  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { data: session } = useSession();
   const isAuthor = session?.role === 'author';
   const books = useMyBooks(isAuthor ? session.id : undefined);
+  const series = useMySeries(isAuthor ? session.id : undefined);
 
   if (!isAuthor) {
     return (
@@ -25,6 +41,35 @@ export const MyBooksPage: FC = () => {
       </>
     );
   }
+
+  const seriesTab = () => {
+    if (series.isError) {
+      return <Alert type="error" title="Could not load your series." />;
+    }
+    if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
+    if (series.data.items.length === 0) {
+      return <Empty description="You have not started a series yet." />;
+    }
+
+    return (
+      <List
+        dataSource={series.data.items}
+        rowKey="id"
+        renderItem={(entry) => (
+          <List.Item>
+            <Space direction="vertical" size={0}>
+              <Link to={`/series/${entry.id}/edit`}>{entry.title}</Link>
+              <Typography.Text type="secondary">
+                {entry.authors
+                  .map((author) => `${author.firstName} ${author.lastName}`)
+                  .join(', ')}
+              </Typography.Text>
+            </Space>
+          </List.Item>
+        )}
+      />
+    );
+  };
 
   return (
     <>
@@ -51,6 +96,20 @@ export const MyBooksPage: FC = () => {
                 error={books.error}
                 emptyText="You have not written a book yet."
               />
+            ),
+          },
+          {
+            key: 'series',
+            label: 'Series',
+            children: (
+              <>
+                <Flex justify="flex-end" style={{ marginBottom: token.margin }}>
+                  <Button onClick={() => void navigate('/series/new')}>
+                    Create series
+                  </Button>
+                </Flex>
+                {seriesTab()}
+              </>
             ),
           },
         ]}

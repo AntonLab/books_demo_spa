@@ -22,7 +22,22 @@ export async function createCreditedBook(
 ): Promise<Book> {
   // Published unless the fixture says otherwise: most suites are not about
   // Draft books, and a draft would hide the very rows they read back.
-  const book = await Book.create({ status: 'in_progress', ...fixture });
+  // Appended to its series, as bookRepository files a book, so a suite's
+  // series lists come back in the order it created them.
+  const last =
+    fixture.seriesId === undefined || fixture.seriesId === null
+      ? null
+      : await Book.max<number | null, Book>('seriesPosition', {
+          where: { seriesId: fixture.seriesId },
+        });
+  const book = await Book.create({
+    status: 'in_progress',
+    ...fixture,
+    seriesPosition:
+      fixture.seriesId === undefined || fixture.seriesId === null
+        ? null
+        : (last ?? 0) + 1,
+  });
   for (const userId of coAuthorIds) {
     await BookAuthor.create({ bookId: book.id, userId });
   }

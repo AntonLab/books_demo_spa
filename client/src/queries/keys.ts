@@ -19,5 +19,8 @@ export const queryKeys = {
   chapter: (id: number) => ['chapters', id] as const,
   comments: (bookId: number) => ['comments', { bookId }] as const,
   series: (params: ListSeriesParams) => ['series', params] as const,
+  // Keyed by a bare id, like `book`, so neither collides with `series`.
+  seriesDetail: (id: number) => ['series', id] as const,
+  seriesBooks: (id: number) => ['series', id, 'books'] as const,
   authors: (q: string) => ['authors', { q }] as const,
 };

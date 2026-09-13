@@ -26,6 +26,9 @@ const EditChapterPage = lazy(() =>
     default: m.EditChapterPage,
   }))
 );
+const EditSeriesPage = lazy(() =>
+  import('@/pages/EditSeriesPage').then((m) => ({ default: m.EditSeriesPage }))
+);
 const EditBookPage = lazy(() =>
   import('@/pages/EditBookPage').then((m) => ({ default: m.EditBookPage }))
 );
@@ -40,6 +43,9 @@ const NewBookPage = lazy(() =>
 );
 const NewChapterPage = lazy(() =>
   import('@/pages/NewChapterPage').then((m) => ({ default: m.NewChapterPage }))
+);
+const NewSeriesPage = lazy(() =>
+  import('@/pages/NewSeriesPage').then((m) => ({ default: m.NewSeriesPage }))
 );
 const NotFoundPage = lazy(() =>
   import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
@@ -106,7 +112,10 @@ export const AppShell: FC = () => {
                 element={<EditChapterPage />}
               />
               <Route path="/search" element={<SearchPage />} />
+              {/* The public series page is still a stub; only authoring is built. */}
               <Route path="/series" element={<SeriesPage />} />
+              <Route path="/series/new" element={<NewSeriesPage />} />
+              <Route path="/series/:id/edit" element={<EditSeriesPage />} />
               <Route path="/my-books" element={<MyBooksPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="*" element={<NotFoundPage />} />
