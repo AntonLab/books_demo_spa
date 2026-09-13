@@ -9,6 +9,7 @@ import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import {
   Book,
+  BookAuthor,
   Comment,
   initModels,
   Like,
@@ -16,6 +17,7 @@ import {
   Session,
   User,
 } from '../models/index.ts';
+import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { hashToken } from '../tokens.ts';
@@ -313,12 +315,10 @@ describe('userRepository against real MySQL', { skip }, () => {
       login: 'Host',
       email: 'host@example.com',
     });
-    const book = await Book.create({
-      userId: host.id,
-      title: 'Host Book',
-      description: 'Hosts the thread',
-      tags: [],
-    });
+    const book = await createCreditedBook(
+      { title: 'Host Book', description: 'Hosts the thread', tags: [] },
+      [host.id]
+    );
     const comment = await Comment.create({
       bookId: book.id,
       userId: leaving.id,
@@ -339,6 +339,37 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal((await Comment.findByPk(reply.id))?.parentId, comment.id);
   });
 
+  test('deleting an account keeps its shared books and deletes the ones it alone was credited on', async () => {
+    const leaving = await repository.create(
+      { ...base, login: 'LeavingAuthor', email: 'leaving-author@example.com' },
+      'author'
+    );
+    const staying = await repository.create(
+      { ...base, login: 'StayingAuthor', email: 'staying-author@example.com' },
+      'author'
+    );
+    // Created by the leaving account, so a cascade keyed on "who made it"
+    // would take the shared book down too.
+    const shared = await createCreditedBook(
+      { title: 'Shared', description: 'Co-written', tags: [] },
+      [leaving.id, staying.id]
+    );
+    const solo = await createCreditedBook(
+      { title: 'Solo', description: 'Written alone', tags: [] },
+      [leaving.id]
+    );
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    assert.equal(await Book.findByPk(solo.id), null);
+    assert.ok(await Book.findByPk(shared.id));
+    const credits = await BookAuthor.findAll({ where: { bookId: shared.id } });
+    assert.deepEqual(
+      credits.map((credit) => credit.userId),
+      [staying.id]
+    );
+  });
+
   test('a removed comment becomes deleted when its owner account goes', async () => {
     const leaving = await repository.create({
       ...base,
@@ -350,12 +381,10 @@ describe('userRepository against real MySQL', { skip }, () => {
       login: 'Host2',
       email: 'host2@example.com',
     });
-    const book = await Book.create({
-      userId: host.id,
-      title: 'Second Host',
-      description: 'Hosts another thread',
-      tags: [],
-    });
+    const book = await createCreditedBook(
+      { title: 'Second Host', description: 'Hosts another thread', tags: [] },
+      [host.id]
+    );
     const comment = await Comment.create({
       bookId: book.id,
       userId: leaving.id,
@@ -380,12 +409,10 @@ describe('userRepository against real MySQL', { skip }, () => {
       login: 'Host3',
       email: 'host3@example.com',
     });
-    const book = await Book.create({
-      userId: host.id,
-      title: 'Third Host',
-      description: 'Hosts a third thread',
-      tags: [],
-    });
+    const book = await createCreditedBook(
+      { title: 'Third Host', description: 'Hosts a third thread', tags: [] },
+      [host.id]
+    );
     const comment = await Comment.create({
       bookId: book.id,
       userId: leaving.id,

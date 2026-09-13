@@ -27,9 +27,12 @@ export const BookPage: FC = () => {
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
 
-  // Mirrors the server: signed in, and not your own book. The server answers
-  // 403 either way — this only avoids offering what would fail.
-  const canLike = Boolean(session) && session?.id !== book.author.id;
+  // Mirrors the server: signed in, and not one of the book's Co-authors. The
+  // server answers 403 either way — this only avoids offering what would fail.
+  const canLike =
+    session !== null &&
+    session !== undefined &&
+    !book.authors.some((author) => author.id === session.id);
 
   return (
     <article>
@@ -37,7 +40,9 @@ export const BookPage: FC = () => {
 
       <Space size={token.marginSM} wrap>
         <Typography.Text>
-          {`${book.author.firstName} ${book.author.lastName}`}
+          {book.authors
+            .map((author) => `${author.firstName} ${author.lastName}`)
+            .join(', ')}
         </Typography.Text>
         {book.series && (
           <Link to={`/series?id=${book.series.id}`}>{book.series.title}</Link>

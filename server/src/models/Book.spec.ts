@@ -45,21 +45,14 @@ test('tags carries no DDL default — MySQL forbids one on a JSON column', () =>
   assert.doesNotMatch(createTableSql, /`tags` JSON[^,]*DEFAULT/);
 });
 
-test('userId matches users.id exactly, or MySQL rejects the foreign key', () => {
-  assert.match(createTableSql, /`userId` INTEGER UNSIGNED NOT NULL/);
+test('books carries no owner column — its Co-authors live in book_authors', () => {
+  assert.doesNotMatch(createTableSql, /`userId`/);
   assert.match(createTableSql, /`id` INTEGER UNSIGNED auto_increment/);
 });
 
 test('seriesId is nullable — a book need not belong to a series', () => {
   assert.match(createTableSql, /`seriesId` INTEGER UNSIGNED(?! NOT NULL)/);
   assert.doesNotMatch(createTableSql, /`seriesId` INTEGER UNSIGNED NOT NULL/);
-});
-
-test('User.hasMany(Book) emits a cascading foreign key to users', () => {
-  assert.match(
-    createTableSql,
-    /FOREIGN KEY \(`userId`\) REFERENCES `users` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
-  );
 });
 
 test('Series.hasMany(Book) unlinks rather than deletes, since seriesId is optional', () => {
@@ -82,34 +75,31 @@ test('the table is InnoDB with the utf8mb4 default collation', () => {
   );
 });
 
-test('both owner filters are indexed alongside id, so neither needs a filesort', () => {
+test('the series filter is indexed alongside id, so it needs no filesort', () => {
   assert.deepEqual(
     Book.options.indexes?.map((index) => index.fields),
-    [
-      ['userId', 'id'],
-      ['seriesId', 'id'],
-    ]
+    [['seriesId', 'id']]
   );
 });
 
-test('Book belongs to both User and Series under distinct aliases', () => {
-  assert.equal(Book.associations.user?.associationType, 'BelongsTo');
-  assert.equal(Book.associations.user?.target.name, 'User');
+test('Book belongs to a Series and reaches its Co-authors through credits', () => {
   assert.equal(Book.associations.series?.associationType, 'BelongsTo');
   assert.equal(Book.associations.series?.target.name, 'Series');
+  assert.equal(Book.associations.credits?.associationType, 'HasMany');
+  assert.equal(Book.associations.credits?.target.name, 'BookAuthor');
+  assert.equal(Book.associations.user, undefined);
 });
 
 test('toPublicBook copies the tag array rather than aliasing the model', () => {
   const book = Book.build({
     id: 1,
-    userId: 2,
     seriesId: 3,
     title: 'Test Book',
     description: 'A novel',
     tags: ['sci-fi'],
   });
 
-  const output = toPublicBook(book);
+  const output = toPublicBook(book, []);
   output.tags.push('mutated');
 
   assert.deepEqual(book.tags, ['sci-fi']);
@@ -118,7 +108,6 @@ test('toPublicBook copies the tag array rather than aliasing the model', () => {
 test('toPublicBook parses a JSON string, should a driver return one raw', () => {
   const book = Book.build({
     id: 1,
-    userId: 2,
     title: 'Test Book',
     description: 'A novel',
     tags: ['sci-fi'],
@@ -127,19 +116,18 @@ test('toPublicBook parses a JSON string, should a driver return one raw', () => 
   // normalisation it would be spread character by character.
   book.setDataValue('tags', '["sci-fi","epic"]' as unknown as string[]);
 
-  assert.deepEqual(toPublicBook(book).tags, ['sci-fi', 'epic']);
+  assert.deepEqual(toPublicBook(book, []).tags, ['sci-fi', 'epic']);
 });
 
 test('toPublicBook reports a standalone book as seriesId: null, never undefined', () => {
   const book = Book.build({
     id: 1,
-    userId: 2,
     title: 'Test Book',
     description: 'Standalone',
     tags: [],
   });
 
-  const output = toPublicBook(book);
+  const output = toPublicBook(book, []);
 
   assert.equal(output.seriesId, null);
   assert.ok('seriesId' in output);

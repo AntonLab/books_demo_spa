@@ -16,6 +16,7 @@ import {
   Series,
   User,
 } from '../models/index.ts';
+import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import {
   ConflictError,
   ForbiddenError,
@@ -110,12 +111,10 @@ describe('likeRepository against real MySQL', { skip }, () => {
     userId = (await User.create(owner)).id;
     likerId = (await User.create(liker)).id;
     bookId = (
-      await Book.create({
-        userId,
-        title: 'A Novel',
-        description: 'A novel',
-        tags: [],
-      })
+      await createCreditedBook(
+        { title: 'A Novel', description: 'A novel', tags: [] },
+        [userId]
+      )
     ).id;
     commentId = (
       await Comment.create({ userId, bookId, text: 'Loved the ending.' })
@@ -240,6 +239,30 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       // The book belongs to `owner`, and `owner` is the actor here.
       repository.create({ bookId, commentId: null, isLike: true }, userId),
+      (error: unknown) =>
+        error instanceof ForbiddenError && error.statusCode === 403
+    );
+  });
+
+  test('no co-author may like the book, not only the one who created it', async () => {
+    const coAuthorId = (
+      await User.create({
+        ...owner,
+        login: 'LikeCoAuthor',
+        email: 'like-coauthor@example.com',
+        role: 'author',
+      })
+    ).id;
+    const shared = await createCreditedBook(
+      { title: 'Shared Novel', description: 'Co-written', tags: [] },
+      [userId, coAuthorId]
+    );
+
+    await assert.rejects(
+      repository.create(
+        { bookId: shared.id, commentId: null, isLike: true },
+        coAuthorId
+      ),
       (error: unknown) =>
         error instanceof ForbiddenError && error.statusCode === 403
     );
