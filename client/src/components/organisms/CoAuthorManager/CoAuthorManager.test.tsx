@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { CoAuthorManager } from './CoAuthorManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { ApiError } from '@/api/client';
@@ -92,6 +93,21 @@ describe('CoAuthorManager', () => {
     await userEvent.click(option);
 
     expect(mockedBooks.addCoAuthor).toHaveBeenCalledWith(1, ivan.id);
+  });
+
+  it('stops a search term at the length the server accepts', async () => {
+    renderManager();
+    const tooLong = 'p'.repeat(AUTHOR_SEARCH_MAX_LENGTH + 6);
+
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.paste(tooLong);
+
+    const accepted = tooLong.slice(0, AUTHOR_SEARCH_MAX_LENGTH);
+    await waitFor(() =>
+      expect(mockedAuthors.searchAuthors).toHaveBeenCalledWith(accepted)
+    );
+    expect(mockedAuthors.searchAuthors).not.toHaveBeenCalledWith(tooLong);
+    expect(screen.getByRole('combobox')).toHaveValue(accepted);
   });
 
   it('removes another co-author', async () => {
