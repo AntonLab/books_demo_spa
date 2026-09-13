@@ -15,6 +15,7 @@ import {
   StateConflictError,
 } from '../types/errors.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
+import { bookRepositoryContract } from './bookRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the users' or series' suite: node:test runs
@@ -898,4 +899,28 @@ describe('bookRepository against real MySQL', { skip }, () => {
 
     assert.equal(loadedSeries?.books?.length, 1);
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  bookRepositoryContract(async () => ({
+    repository,
+    async anAuthor() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...coAuthor,
+        login: `ContractAuthor${contractAccounts}`,
+        email: `contract-author-${contractAccounts}@example.com`,
+        role: 'author',
+      });
+      return user.id;
+    },
+    async aSeries(coAuthorIds) {
+      const series = await createCreditedSeries(
+        { title: 'Contract Series', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return series.id;
+    },
+  }));
 });
