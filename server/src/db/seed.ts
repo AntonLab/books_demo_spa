@@ -42,13 +42,10 @@ import { createLikeSchema } from '../types/like.ts';
 import type { UserRole } from '../types/permission.ts';
 import { createSeriesSchema } from '../types/series.ts';
 import { createUserSchema } from '../types/user.ts';
-import { loadConfig, type AppConfig } from './config.ts';
+import { loadConfig } from './config.ts';
 import { ensureDatabase } from './ensureDatabase.ts';
+import { assertSafeTarget } from './seedGuards.ts';
 import { createSequelize } from './sequelize.ts';
-
-// The schema this seed is written for. Any other name needs --force, which is
-// the same flag that authorises the delete — one gesture, two guards.
-const DEMO_DATABASE = 'books_demo_spa';
 
 // One password for all ten accounts. This is demo data on a developer's
 // machine, not a credential: it is printed at the end of a run so nobody has
@@ -1444,23 +1441,6 @@ async function countExisting(): Promise<Record<string, number>> {
   }
 
   return counts;
-}
-
-function assertSafeTarget(config: AppConfig, force: boolean): void {
-  // Unconditional: no flag makes wiping a production database this script's
-  // business.
-  if (config.env === 'production') {
-    throw new Error(
-      'Refusing to seed: NODE_ENV is production, and this script deletes rows.'
-    );
-  }
-
-  if (force && config.db.database !== DEMO_DATABASE) {
-    logger.warn(
-      `--force given for a database other than ${DEMO_DATABASE}; every row in its content tables will be deleted`,
-      { database: config.db.database }
-    );
-  }
 }
 
 async function main(): Promise<void> {
