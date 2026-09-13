@@ -28,6 +28,15 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
 // without it a component reading a custom quark would get `undefined` in
 // tests only, and that divergence would be invisible.
 //
+// It mirrors production in everything but one flag. `zeroRuntime` stops antd
+// injecting its CSS-in-JS rules; the DOM, class names and tokens stay the
+// same. With the rules in place every getComputedStyle — which role queries,
+// user-event's pointer-events check and antd's popup alignment all call —
+// matches each element against well over a thousand of them, cold again after
+// every render, and they pile up across a file's tests. That put single tests
+// past Jest's 5 s timeout under a loaded run. The price: a role query no longer
+// treats an element hidden only by antd's stylesheet as hidden.
+//
 // The query client is fresh per render unless the test supplies one. A shared
 // client would leak cached data between tests, which is the usual way a query
 // suite turns order-dependent. Both it and the store are returned so a test
@@ -50,7 +59,7 @@ export const renderWithProviders = (
     return (
       <QueryClientProvider client={queryClient}>
         <Provider store={store}>
-          <ConfigProvider theme={appTheme}>
+          <ConfigProvider theme={{ ...appTheme, zeroRuntime: true }}>
             <MemoryRouter initialEntries={[route]}>
               {path ? (
                 <Routes>
