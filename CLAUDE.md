@@ -58,7 +58,9 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   listing books, a header with nav, search and auth state, four auth modals
   against `/api/auth` (login, register, forgot/reset password), a `/search`
   page, a `/books/:id` book page (title, author, series, annotation, chapters,
-  comments) and a `/books/:bookId/chapters/:chapterId` reader — built on antd
+  comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
+  first authoring pages — `/my-books`, `/books/new` and `/books/:id/edit`
+  (fields, status, Co-authors, delete) — built on antd
   6, react-router, TanStack Query and Redux
   Toolkit. The split between the last two is deliberate: **TanStack Query
   owns everything fetched** (the session, the book list, each search term,

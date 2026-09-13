@@ -17,9 +17,9 @@ the first component needs it rather than leaving empty folders around.
 | Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx` |
 | Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                               |
 | Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                             |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `ChapterList`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals                                   |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `BookForm`, `ChapterList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals    |
 | Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                      |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The nine routed pages                                                                                                                            |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The eleven routed pages                                                                                                                          |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 24 (15 components, 9 pages) follow this layout, and the `@/` alias is
+All 28 (17 components, 11 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -177,9 +177,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   which a route test cannot point at an arbitrary path.
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
-  responses into a typed `ApiError`), plus `auth.ts`, `books.ts`,
-  `chapters.ts`, `comments.ts` and `likes.ts`, the
-  per-resource typed calls built on it. Since the TanStack Query migration
+  responses into a typed `ApiError`), plus `auth.ts`, `authors.ts` (`searchAuthors`, the Co-author picker's
+  search), `books.ts` (reads, plus `createBook`, `updateBook`, `deleteBook`,
+  `addCoAuthor` and `removeCoAuthor`), `chapters.ts`, `comments.ts`,
+  `likes.ts` and `series.ts` (`listSeries`), the per-resource typed calls
+  built on it. Since the TanStack Query migration
   these are the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`,
   not called directly from components.
 
@@ -192,7 +194,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
   auth mutations), `books.ts` (`useBooks`, `useSearchBooks`, `useBook`,
-  `BOOKS_PAGE_SIZE`), `chapters.ts` (`useChapters`, `useChapter`),
+  `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
+  list that includes their drafts — and five book mutations that all
+  invalidate the whole `books` prefix, since one write can move a book in or
+  out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
+  term), `series.ts` (`useMySeries`), `chapters.ts` (`useChapters`, `useChapter`),
   `comments.ts` (`useComments` plus the three comment mutations) and
   `likes.ts` (`useToggleLike`). Flat files, like `src/api/` and `src/store/`,
   and outside the Atomic Design levels for the same reason.
@@ -228,8 +234,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     click, and uses a text glyph because `@ant-design/icons` is not a
     dependency here); `Comment` (presentational — the name is free because
     antd removed its own `Comment` in v5).
-  - `organisms/` — `AppHeader` (nav menu, `SearchBar`, and the three auth
-    states — signed out / loading / signed in); `AuthModals` (reads
+  - `organisms/` — `AppHeader` (nav menu — "My Books" only for the `author`
+    Role — `SearchBar`, and the three auth states — signed out / loading /
+    signed in); `BookForm` (presentational fields for creating and editing a
+    book; `showStatus` adds the status radios, which creating leaves out
+    because every new book is a draft, and "No series" travels as 0 inside the
+    form and leaves as `null`); `CoAuthorManager` (a book's byline with
+    immediate Remove / Leave and a search-as-you-type picker over
+    `/api/authors`; read-only unless `canManage`, and the last Co-author is
+    never offered Leave); `AuthModals` (reads
     `activeModal` from `authSlice` and renders only that one, so only one
     modal is ever mounted at a time) plus `LoginModal`, `RegisterModal` (an
     "I'm author" checkbox maps to `role: isAuthor ? 'author' : 'user'` on the
@@ -270,7 +283,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
   `SearchPage`, `BookPage` (`/books/:id`), `ChapterPage`
-  (`/books/:bookId/chapters/:chapterId`), `MyBooksPage`, `ProfilePage`,
+  (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
+  author's own books, drafts included, and "Create book"), `NewBookPage`
+  (`/books/new`: the book's fields only, then on to editing it),
+  `EditBookPage` (`/books/:id/edit`: fields and status, `CoAuthorManager`, and
+  delete behind a `Popconfirm`; a Moderator gets the form but a read-only
+  byline), `ProfilePage`,
   `SeriesPage`, `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
@@ -435,8 +453,8 @@ Test the inputs and the outputs: props in, rendered DOM and fired callbacks
 out. Do not assert on internal state — a test that knows how a component
 stores something breaks on every refactor that changes nothing a user sees.
 
-Every component and page has a test file. The stub pages (`MyBooksPage`,
-`ProfilePage`, `SeriesPage`) take no props and have nothing to click, so
+Every component and page has a test file. The stub pages (`ProfilePage`,
+`SeriesPage`) take no props and have nothing to click, so
 their tests cover only the heading and the placeholder — that is the whole
 contract, not a shortcut.
 

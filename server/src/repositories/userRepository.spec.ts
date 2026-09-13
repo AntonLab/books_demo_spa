@@ -565,4 +565,69 @@ describe('userRepository against real MySQL', { skip }, () => {
   test('findPasswordHashById returns null for a missing id', async () => {
     assert.equal(await repository.findPasswordHashById(999_999), null);
   });
+
+  test('listAuthors finds active authors by login or name, and never names an email', async () => {
+    await repository.create(
+      {
+        ...base,
+        login: 'mhale',
+        email: 'mhale@example.com',
+        firstName: 'Margaret',
+        lastName: 'Hale',
+        status: 'active',
+      },
+      'author'
+    );
+    await repository.create(
+      {
+        ...base,
+        login: 'ipetrov',
+        email: 'ipetrov@example.com',
+        firstName: 'Ivan',
+        lastName: 'Petrov',
+        status: 'active',
+      },
+      'author'
+    );
+    // A reader and a blocked author: neither can be credited on a book.
+    await repository.create(
+      { ...base, login: 'halereader', email: 'reader@example.com' },
+      'user'
+    );
+    await repository.create(
+      {
+        ...base,
+        login: 'blockedhale',
+        email: 'blocked@example.com',
+        firstName: 'Hale',
+        status: 'blocked',
+      },
+      'author'
+    );
+
+    const everyone = await repository.listAuthors({ limit: 20 });
+    assert.deepEqual(
+      everyone.map((author) => author.login),
+      ['mhale', 'ipetrov']
+    );
+    assert.deepEqual(Object.keys(everyone[0] ?? {}).sort(), [
+      'firstName',
+      'id',
+      'lastName',
+      'login',
+    ]);
+
+    assert.deepEqual(
+      (await repository.listAuthors({ limit: 20, q: 'HALE' })).map(
+        (author) => author.login
+      ),
+      ['mhale']
+    );
+    assert.deepEqual(
+      (await repository.listAuthors({ limit: 20, q: 'Ivan' })).map(
+        (author) => author.login
+      ),
+      ['ipetrov']
+    );
+  });
 });
