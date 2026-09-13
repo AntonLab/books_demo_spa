@@ -1,0 +1,246 @@
+import { NotFoundError } from '../types/errors.ts';
+import type { BookDetail, PublicBook } from '../types/book.ts';
+import type { AuthorSummary } from '../types/user.ts';
+import type { BookListResult, BookRepository } from './bookRepository.ts';
+import type { Actor } from './notificationRepository.ts';
+import type { Viewer } from './visibility.ts';
+
+// A series as the fake knows it: enough to answer who co-authors it and what a
+// book's detail calls it.
+export interface FakeSeries {
+  title: string;
+  coAuthorIds: number[];
+}
+
+export interface FakeBookRepositoryOptions {
+  // The accounts that exist, by id. Stands in for users.id: a credit naming
+  // anyone else is refused, and a response's `authors` carries these
+  // summaries.
+  accounts?: ReadonlyMap<number, AuthorSummary>;
+  // The series that exist, by id. Read, never written, so a caller may keep
+  // adding to the map after the fake is made.
+  series?: ReadonlyMap<number, FakeSeries>;
+  // What a book's detail reports about its likes, which live in another
+  // repository: the count, and the id of a signed-in viewer's own like.
+  likes?: { count: number; viewerLikeId: number | null };
+  // Spies. `viewers` collects who each read was made as, `reorders` each
+  // Series order handed over, `actors` who made each credit change or delete.
+  viewers?: Viewer[];
+  reorders?: { seriesId: number; bookIds: number[] }[];
+  actors?: [string, Actor][];
+}
+
+// An in-memory BookRepository for the route specs, held to the real one by
+// bookRepository.contract.testkit.ts on the parts the controllers rely on.
+//
+// The domain rules stay in the real repository and are covered against MySQL:
+// Draft books are readable by everyone here, credits are not checked against
+// the Author role, duplicates or the last Co-author, a reorder is not compared
+// with the series' books, and nobody is notified.
+export function createFakeBookRepository(
+  options: FakeBookRepositoryOptions = {}
+): BookRepository {
+  const {
+    accounts = new Map(),
+    series = new Map(),
+    likes = { count: 0, viewerLikeId: null },
+    viewers = [],
+    reorders = [],
+    actors = [],
+  } = options;
+  const rows = new Map<number, PublicBook>();
+  // bookId -> co-author ids, in credit order.
+  const credits = new Map<number, number[]>();
+  // bookId -> its place in the Series order, for a book filed in a series.
+  const positions = new Map<number, number>();
+  let nextId = 1;
+
+  const withCredits = (book: PublicBook): PublicBook => ({
+    ...book,
+    authors: (credits.get(book.id) ?? []).flatMap(
+      (id) => accounts.get(id) ?? []
+    ),
+  });
+
+  // Stands in for the series row's foreign key, which the real repository
+  // reports as this same NotFoundError before it writes.
+  const assertSeries = (seriesId: number | null | undefined): void => {
+    if (seriesId !== null && seriesId !== undefined && !series.has(seriesId)) {
+      throw new NotFoundError('Series', seriesId);
+    }
+  };
+
+  // After the last book in the series, as the real repository appends one.
+  const append = (bookId: number, seriesId: number): void => {
+    const last = Math.max(
+      0,
+      ...[...rows.values()]
+        .filter((row) => row.seriesId === seriesId && row.id !== bookId)
+        .map((row) => positions.get(row.id) ?? 0)
+    );
+    positions.set(bookId, last + 1);
+  };
+
+  const inSeriesOrder = (seriesId: number): PublicBook[] =>
+    [...rows.values()]
+      .filter((row) => row.seriesId === seriesId)
+      .sort(
+        (a, b) =>
+          (positions.get(a.id) ?? 0) - (positions.get(b.id) ?? 0) || a.id - b.id
+      );
+
+  return {
+    async create(input) {
+      assertSeries(input.seriesId);
+      if (!accounts.has(input.userId)) {
+        throw new NotFoundError('User', input.userId);
+      }
+
+      const now = new Date();
+      const book: PublicBook = {
+        id: nextId,
+        authors: [],
+        status: 'draft',
+        seriesId: input.seriesId,
+        title: input.title,
+        description: input.description,
+        tags: input.tags,
+        createdAt: now,
+        updatedAt: now,
+      };
+      nextId += 1;
+      rows.set(book.id, book);
+      credits.set(book.id, [input.userId]);
+      if (book.seriesId !== null) append(book.id, book.seriesId);
+      return withCredits(book);
+    },
+
+    async list(query, viewer): Promise<BookListResult> {
+      viewers.push(viewer);
+      const matching = (
+        query.seriesId === undefined
+          ? [...rows.values()]
+          : inSeriesOrder(query.seriesId)
+      ).filter(
+        (row) =>
+          (query.userId === undefined ||
+            (credits.get(row.id) ?? []).includes(query.userId)) &&
+          (!query.tag || row.tags.includes(query.tag)) &&
+          (!query.q || row.description.includes(query.q))
+      );
+      return {
+        items: matching
+          .slice(query.offset, query.offset + query.limit)
+          .map(withCredits),
+        total: matching.length,
+      };
+    },
+
+    async findById(id) {
+      const book = rows.get(id);
+      return book ? withCredits(book) : null;
+    },
+
+    async findDetailById(id, viewer): Promise<BookDetail | null> {
+      viewers.push(viewer);
+      const book = rows.get(id);
+      if (!book) return null;
+
+      const filedIn =
+        book.seriesId === null ? undefined : series.get(book.seriesId);
+      return {
+        ...withCredits(book),
+        series:
+          book.seriesId === null || filedIn === undefined
+            ? null
+            : { id: book.seriesId, title: filedIn.title },
+        likeCount: likes.count,
+        // Only a signed-in caller can have a like of their own to report.
+        viewerLikeId: viewer === null ? null : likes.viewerLikeId,
+      };
+    },
+
+    async update(id, input) {
+      const current = rows.get(id);
+      if (!current) return null;
+      assertSeries(input.seriesId);
+
+      const updated: PublicBook = {
+        ...current,
+        // `in` rather than `??`: an explicit null means "unlink", which a
+        // nullish fallback would silently turn into "leave it alone".
+        seriesId:
+          'seriesId' in input ? (input.seriesId ?? null) : current.seriesId,
+        title: input.title ?? current.title,
+        description: input.description ?? current.description,
+        tags: input.tags ?? current.tags,
+        status: input.status ?? current.status,
+        updatedAt: new Date(),
+      };
+      rows.set(id, updated);
+      // Leaving a series clears the place; a move appends; staying keeps it.
+      if (updated.seriesId === null) {
+        positions.delete(id);
+      } else if (updated.seriesId !== current.seriesId) {
+        append(id, updated.seriesId);
+      }
+      return withCredits(updated);
+    },
+
+    async remove(id, actor) {
+      actors.push(['remove', actor]);
+      credits.delete(id);
+      positions.delete(id);
+      return rows.delete(id);
+    },
+
+    async addCoAuthor(bookId, userId, actor) {
+      actors.push(['addCoAuthor', actor]);
+      const book = rows.get(bookId);
+      if (!book) return null;
+      if (!accounts.has(userId)) throw new NotFoundError('User', userId);
+      credits.set(bookId, [...(credits.get(bookId) ?? []), userId]);
+      return withCredits(book);
+    },
+
+    async removeCoAuthor(bookId, userId, actor) {
+      actors.push(['removeCoAuthor', actor]);
+      const book = rows.get(bookId);
+      if (!book) return null;
+      credits.set(
+        bookId,
+        (credits.get(bookId) ?? []).filter((id) => id !== userId)
+      );
+      return withCredits(book);
+    },
+
+    async findCoAuthorIds(id) {
+      const ids = credits.get(id);
+      return ids ? [...ids] : null;
+    },
+
+    async findSeriesCoAuthorIds(seriesId) {
+      const found = series.get(seriesId);
+      return found ? [...found.coAuthorIds] : null;
+    },
+
+    async listInSeries(seriesId) {
+      if (!series.has(seriesId)) return null;
+      return inSeriesOrder(seriesId).map((row) => {
+        const { id, title, status, authors } = withCredits(row);
+        return { id, title, status, authors };
+      });
+    },
+
+    async reorderInSeries(seriesId, bookIds) {
+      reorders.push({ seriesId, bookIds });
+      if (!series.has(seriesId)) return false;
+      bookIds.forEach((bookId, index) => {
+        if (rows.get(bookId)?.seriesId === seriesId) {
+          positions.set(bookId, index + 1);
+        }
+      });
+      return true;
+    },
+  };
+}

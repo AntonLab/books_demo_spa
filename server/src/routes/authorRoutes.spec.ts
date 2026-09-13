@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { UserRepository } from '../repositories/userRepository.ts';
+import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
 import type { AuthorSummary, ListAuthorsQuery } from '../types/user.ts';
 import {
   json,
@@ -9,24 +10,31 @@ import {
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
 
+// On the `author` and `otherAuthor` personas' ids, so a session for either
+// resolves to an author account.
 const AUTHORS: AuthorSummary[] = [
   { id: 2, login: 'mhale', firstName: 'Margaret', lastName: 'Hale' },
   { id: 5, login: 'ipetrov', firstName: 'Ivan', lastName: 'Petrov' },
 ];
 
-// Only the search is faked: which accounts count as authors, and the name
-// matching, are the real repository's, covered against MySQL. `queries`
-// records what the route handed it.
+// The name matching and the blocked accounts it leaves out are the real
+// repository's, covered against MySQL: the fake answers every author it holds.
+// `queries` records what the route handed it.
 function createFakeUsers(queries: ListAuthorsQuery[]): UserRepository {
-  return {
-    async listAuthors(query: ListAuthorsQuery) {
-      queries.push(query);
-      return AUTHORS;
-    },
-    async findById() {
-      return null;
-    },
-  } as unknown as UserRepository;
+  const now = new Date();
+  return createFakeUserRepository({
+    seed: AUTHORS.map((author) => ({
+      ...author,
+      email: `${author.login}@example.com`,
+      status: 'active',
+      role: 'author',
+      // Never verified: nothing here signs in with a password.
+      password: 'not-a-hash',
+      createdAt: now,
+      updatedAt: now,
+    })),
+    authorQueries: queries,
+  });
 }
 
 test('a signed-in caller searches authors and gets no email back', async () => {
