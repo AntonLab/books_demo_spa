@@ -38,6 +38,7 @@ beforeEach(() => {
     title: 'A Tale of Dragons',
     description: 'Long ago, in a kingdom of scales.',
     tags: [],
+    status: 'in_progress',
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
     series: null,

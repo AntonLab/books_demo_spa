@@ -108,6 +108,21 @@ describe('CommentSection', () => {
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
+  it('is read-only when closed, even for a signed-in visitor', async () => {
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, viewer);
+    renderWithProviders(<CommentSection bookId={1} closed />, { queryClient });
+
+    expect(await screen.findByText('A fine book')).toBeInTheDocument();
+    expect(
+      screen.getByText('Comments are closed while this book is a draft.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /like/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
   it('offers Reply only on the top-level comment', async () => {
     renderSignedIn();
 

@@ -237,7 +237,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     reach; `admin` and `superadmin` have no signup path and are never
     reachable from this checkbox), `ResetRequestModal` and
     `ResetConfirmModal`; `BookCard` (names every Co-author under the title,
-    from the `authors` the list response embeds) and the
+    from the `authors` the list response embeds, and tags the book's status)
+    and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
     `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
@@ -246,7 +247,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     like toggle, and the "who am I replying to / what am I editing" state —
     the two are mutually exclusive by construction, so only one composer is
     ever on screen, and it renders its heading in every state so the section
-    keeps its place while loading); and
+    keeps its place while loading; `closed` makes it read-only — no composer,
+    Reply, Edit or like — which `BookPage` sets on a Draft book, where the
+    server refuses new comments and likes for everyone); and
     `ErrorBoundary`, the client's only class component.
 
     `CommentSection` assembles the two-level tree itself: the server returns a
@@ -289,8 +292,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   not yet branch any rendering on it — and `AuthorSummary`, the email-free
   shape the public endpoints embed),
   `book.ts` (`PublicBook`, which carries `authors: AuthorSummary[]` — every
-  Co-author in credit order, with no `userId` — and `BookDetail`; `BookPage`
-  hides the like button from every one of them, mirroring the server's 403),
+  Co-author in credit order, with no `userId` — and a `status`; `BookDetail`;
+  `BookStatus` and `BOOK_STATUS_LABELS`, the one place the three statuses get
+  their words. `BookPage` hides the like button from every Co-author and from
+  everyone on a Draft book, mirroring the server's 403s),
   `chapter.ts`, `comment.ts`,
   `like.ts`, `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
   shapes) and `css.d.ts`. Dates cross the wire as ISO strings, not `Date`,

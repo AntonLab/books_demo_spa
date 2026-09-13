@@ -11,6 +11,7 @@ import { Book, Chapter, initModels, Series, User } from '../models/index.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { NotFoundError } from '../types/errors.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
+import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
 // in parallel processes, and two suites calling sync({ force: true }) on one
@@ -97,7 +98,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
       text: 'It was a dark night.',
     });
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, null);
 
     assert.equal(reloaded?.title, 'Chapter One');
     assert.equal(reloaded?.text, 'It was a dark night.');
@@ -115,7 +116,10 @@ describe('chapterRepository against real MySQL', { skip }, () => {
       text: long,
     });
 
-    assert.equal((await repository.findById(created.id))?.text.length, 100_000);
+    assert.equal(
+      (await repository.findById(created.id, null))?.text.length,
+      100_000
+    );
   });
 
   test('multi-byte text and titles survive, thanks to utf8mb4', async () => {
@@ -125,7 +129,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
       text: 'It was a dark night 🌙',
     });
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, null);
 
     assert.equal(reloaded?.title, 'Chapter 1 📖');
     assert.equal(reloaded?.text, 'It was a dark night 🌙');
@@ -134,7 +138,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('the list omits the body entirely, rather than fetching and dropping it', async () => {
     await repository.create({ bookId, title: 'One', text: 'x'.repeat(50_000) });
 
-    const { items } = await repository.list({ limit: 20, offset: 0 });
+    const { items } = await repository.list({ limit: 20, offset: 0 }, null);
 
     assert.equal(items.length, 1);
     assert.equal(items[0]?.title, 'One');
@@ -153,7 +157,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
       text: 'b',
     });
 
-    const mine = await repository.list({ limit: 20, offset: 0, bookId });
+    const mine = await repository.list({ limit: 20, offset: 0, bookId }, null);
 
     assert.equal(mine.total, 1);
     assert.equal(mine.items[0]?.title, 'Mine');
@@ -163,7 +167,10 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     await repository.create({ bookId, title: 'The Storm', text: 'calm seas' });
     await repository.create({ bookId, title: 'Calm', text: 'a storm broke' });
 
-    const found = await repository.list({ limit: 20, offset: 0, q: 'storm' });
+    const found = await repository.list(
+      { limit: 20, offset: 0, q: 'storm' },
+      null
+    );
 
     assert.equal(found.total, 2);
   });
@@ -171,7 +178,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('q treats LIKE metacharacters literally, so ?q=% matches nothing', async () => {
     await repository.create({ bookId, title: 'Plain', text: 'no wildcards' });
 
-    const found = await repository.list({ limit: 20, offset: 0, q: '%' });
+    const found = await repository.list({ limit: 20, offset: 0, q: '%' }, null);
 
     assert.equal(found.total, 0);
   });
@@ -214,7 +221,61 @@ describe('chapterRepository against real MySQL', { skip }, () => {
 
     await Book.destroy({ where: { id: bookId } });
 
-    assert.equal((await repository.list({ limit: 20, offset: 0 })).total, 0);
+    assert.equal(
+      (await repository.list({ limit: 20, offset: 0 }, null)).total,
+      0
+    );
+  });
+
+  test('the chapters of a draft are hidden from everyone but its co-authors and moderators', async () => {
+    const draftId = (
+      await createCreditedBook(
+        { title: 'Draft', description: 'Private', tags: [], status: 'draft' },
+        [ownerId]
+      )
+    ).id;
+    const hidden = await repository.create({
+      bookId: draftId,
+      title: 'Hidden',
+      text: 'Not yet',
+    });
+    await repository.create({ bookId, title: 'Shown', text: 'Out now' });
+    const stranger = ownerId + 1_000;
+
+    const titles = async (viewer: Viewer): Promise<string[]> =>
+      (await repository.list({ limit: 20, offset: 0 }, viewer)).items.map(
+        (chapter) => chapter.title
+      );
+
+    for (const viewer of [
+      null,
+      { id: stranger, role: 'user' },
+      { id: stranger, role: 'author' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Shown']);
+      assert.equal(await repository.findById(hidden.id, viewer), null);
+      assert.equal(
+        (
+          await repository.list(
+            { limit: 20, offset: 0, bookId: draftId },
+            viewer
+          )
+        ).total,
+        0
+      );
+    }
+
+    for (const viewer of [
+      { id: ownerId, role: 'author' },
+      { id: stranger, role: 'admin' },
+      { id: stranger, role: 'superadmin' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Hidden', 'Shown']);
+      assert.equal(
+        (await repository.findById(hidden.id, viewer))?.title,
+        'Hidden'
+      );
+    }
   });
 
   test('a chapter is owned by every co-author of its book', async () => {

@@ -24,6 +24,7 @@ import type {
   UpdateSeriesInput,
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
+import { visibleSeriesWhere, type Viewer } from './visibility.ts';
 
 export interface SeriesListResult {
   items: PublicSeries[];
@@ -36,8 +37,10 @@ export interface SeriesRepository {
   // it is supplied as a separate argument rather than a schema field a caller
   // could set.
   create(input: CreateSeriesInput & { userId: number }): Promise<PublicSeries>;
-  list(query: ListSeriesQuery): Promise<SeriesListResult>;
-  findById(id: number): Promise<PublicSeries | null>;
+  // Both leave out a series the viewer may not see: one with no Published book,
+  // unless the viewer co-authors it or is a Moderator.
+  list(query: ListSeriesQuery, viewer: Viewer): Promise<SeriesListResult>;
+  findById(id: number, viewer: Viewer): Promise<PublicSeries | null>;
   update(id: number, input: UpdateSeriesInput): Promise<PublicSeries | null>;
   remove(id: number): Promise<boolean>;
   // null when the series is not there, as update/remove report it.
@@ -184,7 +187,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       }
     },
 
-    async list(query) {
+    async list(query, viewer) {
       const creditedSeriesIds =
         query.userId === undefined
           ? undefined
@@ -196,7 +199,12 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
             ).map((credit) => credit.seriesId);
 
       const { rows, count } = await Series.findAndCountAll({
-        where: buildWhere(query, creditedSeriesIds),
+        where: {
+          [Op.and]: [
+            buildWhere(query, creditedSeriesIds),
+            await visibleSeriesWhere(viewer),
+          ],
+        },
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -211,8 +219,10 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       };
     },
 
-    async findById(id) {
-      const series = await Series.findByPk(id);
+    async findById(id, viewer) {
+      const series = await Series.findOne({
+        where: { [Op.and]: [{ id }, await visibleSeriesWhere(viewer)] },
+      });
       return series ? withAuthors(series) : null;
     },
 

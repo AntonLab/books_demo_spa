@@ -5,6 +5,7 @@ import type {
   BookListResult,
   BookRepository,
 } from '../repositories/bookRepository.ts';
+import type { Viewer } from '../repositories/visibility.ts';
 import type { BookDetail, PublicBook } from '../types/book.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import {
@@ -75,7 +76,10 @@ const SUMMARIES = new Map<number, AuthorSummary>([
   ],
 ]);
 
-function createFakeRepository(): BookRepository {
+// `viewers` collects who each read was made as. Whether a Draft book is
+// readable is the real repository's decision, covered against MySQL; what the
+// routes owe it is the right viewer, which is what a test can check here.
+function createFakeRepository(viewers: Viewer[] = []): BookRepository {
   const rows = new Map<number, PublicBook>();
   // bookId -> co-author ids, in credit order. The domain rules on credits (the
   // author role, duplicates, the last co-author) belong to the real repository
@@ -105,6 +109,7 @@ function createFakeRepository(): BookRepository {
       const book: PublicBook = {
         id: nextId,
         authors: [],
+        status: 'draft',
         seriesId: input.seriesId,
         title: input.title,
         description: input.description,
@@ -118,7 +123,8 @@ function createFakeRepository(): BookRepository {
       return withCredits(book);
     },
 
-    async list(query): Promise<BookListResult> {
+    async list(query, viewer): Promise<BookListResult> {
+      viewers.push(viewer);
       const all = [...rows.values()].filter(
         (row) =>
           (query.userId === undefined ||
@@ -140,7 +146,8 @@ function createFakeRepository(): BookRepository {
       return book ? withCredits(book) : null;
     },
 
-    async findDetailById(id, viewerId) {
+    async findDetailById(id, viewer) {
+      viewers.push(viewer);
       const book = rows.get(id);
       if (!book) return null;
 
@@ -150,7 +157,7 @@ function createFakeRepository(): BookRepository {
         likeCount: 4,
         // Stands in for the real repository's viewer lookup: only a signed-in
         // caller can have a like of their own to report.
-        viewerLikeId: viewerId === null ? null : VIEWER_LIKE_ID,
+        viewerLikeId: viewer === null ? null : VIEWER_LIKE_ID,
       };
     },
 
@@ -173,6 +180,7 @@ function createFakeRepository(): BookRepository {
           'seriesId' in input ? (input.seriesId ?? null) : current.seriesId,
         description: input.description ?? current.description,
         tags: input.tags ?? current.tags,
+        status: input.status ?? current.status,
         updatedAt: new Date(),
       };
       rows.set(id, updated);
@@ -1043,6 +1051,63 @@ test('any co-author of a series may file a book under it, not only its first', a
         (await json<PublicBook>(response)).seriesId,
         SHARED_SERIES_ID
       );
+    }
+  );
+});
+
+// --- Book status: every book starts as a draft (CONTEXT.md). ---
+
+test('POST ignores a status in the body — every book starts as a draft', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, { ...valid, status: 'complete' });
+
+      assert.equal(response.status, 201);
+      assert.equal((await json<PublicBook>(response)).status, 'draft');
+    }
+  );
+});
+
+test('PATCH moves a book to any status and rejects an unknown one', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+
+      for (const status of ['complete', 'in_progress', 'draft']) {
+        const response = await patch(base, id, { status });
+        assert.equal(response.status, 200);
+        assert.equal((await json<PublicBook>(response)).status, status);
+      }
+      assert.equal(
+        (await patch(base, id, { status: 'published' })).status,
+        400
+      );
+    }
+  );
+});
+
+test('reads are made as the signed-in caller, or as a guest', async () => {
+  const viewers: Viewer[] = [];
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository(viewers) },
+    async (base) => {
+      await post(base, valid);
+
+      await fetch(`${base}/api/books/1`);
+      await fetch(`${base}/api/books?userId=${KNOWN_USER_ID}`, {
+        headers: { cookie: ROLE_COOKIES.author },
+      });
+      await fetch(`${base}/api/books/1`, {
+        headers: { cookie: ROLE_COOKIES.admin },
+      });
+
+      assert.deepEqual(viewers, [
+        null,
+        { id: KNOWN_USER_ID, role: 'author' },
+        { id: USER_IDS.admin, role: 'admin' },
+      ]);
     }
   );
 });

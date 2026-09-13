@@ -23,9 +23,16 @@ import type { CommentWithAuthor } from '@/types/comment';
 
 interface CommentSectionProps {
   bookId: number;
+  // Read-only: the thread still shows, but nothing can be added to it or
+  // changed in it. Set on a Draft book, which the server closes to new
+  // comments and likes for everyone.
+  closed?: boolean;
 }
 
-export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
+export const CommentSection: FC<CommentSectionProps> = ({
+  bookId,
+  closed = false,
+}) => {
   const { token } = theme.useToken();
   const { data: session } = useSession();
   const { data, isPending, isError } = useComments(bookId);
@@ -117,16 +124,20 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
     });
   };
 
+  // A closed thread offers no action at all: every one of them either writes
+  // through the composer or reacts, and neither is open on a draft.
+  const canAct = Boolean(session) && !closed;
+
   const renderComment = (comment: CommentWithAuthor, canReply: boolean) => (
     <Comment
       key={comment.id}
       comment={comment}
-      canReply={canReply && Boolean(session)}
-      isOwn={session?.id === comment.userId}
+      canReply={canReply && canAct}
+      isOwn={canAct && session?.id === comment.userId}
       // Mirrors the server's rules: signed in, and not your own row. The server
       // refuses both cases with a 403 regardless — this only avoids offering
       // what would fail.
-      canLike={Boolean(session) && session?.id !== comment.userId}
+      canLike={canAct && session?.id !== comment.userId}
       onReply={startReply}
       onEdit={startEdit}
       onDelete={(id) => remove.mutate(id)}
@@ -158,7 +169,11 @@ export const CommentSection: FC<CommentSectionProps> = ({ bookId }) => {
         </div>
       ))}
 
-      {session ? (
+      {closed ? (
+        <Typography.Text type="secondary">
+          Comments are closed while this book is a draft.
+        </Typography.Text>
+      ) : session ? (
         <Space direction="vertical" style={{ width: '100%' }}>
           <Input.TextArea
             rows={3}
