@@ -85,3 +85,66 @@ describe('request', () => {
     expect((error as ApiError).status).toBe(502);
   });
 });
+
+describe('request and the XSRF token', () => {
+  // jsdom keeps cookies for the test's document; each test clears its own.
+  const setCookie = (value: string) => {
+    document.cookie = value;
+  };
+  afterEach(() => {
+    setCookie('xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  });
+
+  it('echoes the session token cookie into the header on every write', async () => {
+    setCookie('xsrfToken=tok-123');
+
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'] as const) {
+      const fetchMock = mockFetch(emptyResponse(204));
+      await request('/books/1', { method });
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(init.headers).toEqual({ 'X-XSRF-Token': 'tok-123' });
+    }
+  });
+
+  it('finds the token among other cookies', async () => {
+    setCookie('theme=dark');
+    setCookie('xsrfToken=tok-456');
+    const fetchMock = mockFetch(emptyResponse(204));
+
+    await request('/auth/logout', { method: 'POST' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toEqual({ 'X-XSRF-Token': 'tok-456' });
+    setCookie('theme=; expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  });
+
+  it('sends it beside the JSON content type', async () => {
+    setCookie('xsrfToken=tok-123');
+    const fetchMock = mockFetch(jsonResponse({ id: 1 }));
+
+    await request('/books', { method: 'POST', body: { title: 'x' } });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'X-XSRF-Token': 'tok-123',
+    });
+  });
+
+  it('never sends it on a read, and sends nothing when there is no token', async () => {
+    setCookie('xsrfToken=tok-123');
+    const read = mockFetch(jsonResponse({ id: 1 }));
+    await request('/books/1');
+    expect(
+      (read.mock.calls[0] as [string, RequestInit])[1].headers
+    ).toBeUndefined();
+
+    setCookie('xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT');
+    const write = mockFetch(emptyResponse(204));
+    await request('/auth/logout', { method: 'POST' });
+    expect(
+      (write.mock.calls[0] as [string, RequestInit])[1].headers
+    ).toBeUndefined();
+  });
+});

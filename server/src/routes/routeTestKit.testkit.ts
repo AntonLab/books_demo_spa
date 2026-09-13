@@ -1,6 +1,12 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
+import express, { type RequestHandler } from 'express';
 import { createApp, type AppDeps } from '../app.ts';
+import {
+  XSRF_COOKIE_NAME,
+  XSRF_HEADER_NAME,
+  xsrfTokenFor,
+} from '../middleware/csrfProtection.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
@@ -57,15 +63,35 @@ function defaultDeps(): AppDeps {
         throw new Error('reset delivery must not be used by these tests');
       },
     },
+    trustedOrigin: 'http://localhost:3000',
   };
 }
+
+// The route specs are about routes, so every request they send with a session
+// cookie is given that session's XSRF token, the way the client's request()
+// sends it. The refusals themselves are covered in
+// middleware/csrfProtection.spec.ts.
+const withXsrfToken: RequestHandler = (req, _res, next) => {
+  const cookie = req.headers.cookie ?? '';
+  const session = cookie.match(
+    new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`)
+  )?.[1];
+  if (session && req.headers[XSRF_HEADER_NAME] === undefined) {
+    const token = xsrfTokenFor(session);
+    req.headers.cookie = `${cookie}; ${XSRF_COOKIE_NAME}=${token}`;
+    req.headers[XSRF_HEADER_NAME] = token;
+  }
+  next();
+};
 
 // Binds an ephemeral port so suites can run in parallel without collisions.
 export async function withApp(
   overrides: Partial<AppDeps>,
   fn: (base: string) => Promise<void>
 ): Promise<void> {
-  const app = createApp({ ...defaultDeps(), ...overrides });
+  const app = express();
+  app.use(withXsrfToken);
+  app.use(createApp({ ...defaultDeps(), ...overrides }));
   const server = app.listen(0);
   await once(server, 'listening');
   const { port } = server.address() as AddressInfo;

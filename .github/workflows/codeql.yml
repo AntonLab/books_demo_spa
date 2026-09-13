@@ -41,6 +41,16 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-extended
+          # Test code is never deployed, and its throwaway Express apps — built to
+          # exercise one middleware at a time — would otherwise be held to the
+          # rules of the real one in server/src/app.ts.
+          config: |
+            paths-ignore:
+              - '**/*.spec.ts'
+              - '**/*.test.ts'
+              - '**/*.test.tsx'
+              - '**/*.testkit.ts'
+              - client/src/test/**
       - uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
         with:
           category: /language:${{ matrix.language }}

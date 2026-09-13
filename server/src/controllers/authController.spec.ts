@@ -191,7 +191,8 @@ test('a login whose account is unchanged since the verify opens its session', as
   );
 
   assert.equal(deps.opened.length, 1);
-  assert.deepEqual(cookies, ['sid']);
+  // The session and the XSRF token derived from it are handed out together.
+  assert.deepEqual(cookies, ['sid', 'xsrfToken']);
 });
 
 test('a password change that lands during the verify leaves the login without a session', async () => {
