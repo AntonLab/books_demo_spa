@@ -60,7 +60,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   page, a `/books/:id` book page (title, author, series, annotation, chapters,
   comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
   first authoring pages — `/my-books`, `/books/new`, `/books/:id/edit`
-  (fields, status, chapters, Co-authors, delete) and a chapter editor at
+  (fields, status, chapters in a drag-and-drop Reading order, Co-authors,
+  delete) and a chapter editor at
   `/books/:bookId/chapters/new` and `.../:chapterId/edit` (publish now,
   schedule, or save a draft) — built on antd
   6, react-router, TanStack Query and Redux
@@ -117,7 +118,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   comment on or like it. A chapter has a Publication time — `null` (Draft),
   future (Scheduled) or past (Published) — and a reader sees only chapters whose
   time has passed; a save carries the `updatedAt` it was based on and gets a
-  409 if a co-author saved first. Deleting a
+  409 if a co-author saved first. A book's chapters follow an explicit
+  Reading order (`chapters.position`), rewritten whole through
+  `PUT /api/books/:id/chapter-order`, which answers 409 if a chapter was added
+  or deleted since the list was loaded. Deleting a
   comment leaves a **tombstone** — `deleted` by its own owner (or when that
   owner's account is deleted) or `removed` by a moderator — rather than
   removing the row, so its replies stay and its text and author are withheld
@@ -137,8 +141,9 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 - A dev database created before the Co-authors change must be dropped and
-  rebuilt: `books.userId` and `series.userId` are gone, `books.status` and
-  `chapters.publishedAt` are new, and `sync()` never alters an existing table.
+  rebuilt: `books.userId` and `series.userId` are gone, `books.status`,
+  `chapters.publishedAt` and `chapters.position` are new, and `sync()` never
+  alters an existing table.
   See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the

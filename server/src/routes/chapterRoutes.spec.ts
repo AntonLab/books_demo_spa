@@ -105,6 +105,13 @@ function createFakeRepository(inputs: unknown[] = []): ChapterRepository {
       return rows.delete(id);
     },
 
+    // Stands in for the book row: the set comparison behind a 409 is the real
+    // repository's, covered against MySQL.
+    async reorder(bookId, chapterIds) {
+      inputs.push({ bookId, chapterIds });
+      return BOOK_CO_AUTHORS.has(bookId);
+    },
+
     // Mirrors the real repository, which resolves a chapter's Co-authors
     // through the book it is stored under.
     async findCoAuthorIds(id) {
@@ -600,6 +607,129 @@ test('a conflict from the repository reaches the caller as a 409', async () => {
       assert.match(
         (await json<{ error: string }>(response)).error,
         /changed since you loaded it/
+      );
+    }
+  );
+});
+
+// --- Reading order (CONTEXT.md). ---
+
+const putOrder = (
+  base: string,
+  bookId: number,
+  body: unknown,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/books/${bookId}/chapter-order`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+test('PUT chapter-order hands the repository the new Reading order and answers 204', async () => {
+  const inputs: unknown[] = [];
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository(inputs) },
+    async (base) => {
+      const response = await putOrder(base, KNOWN_BOOK_ID, {
+        chapterIds: [3, 1, 2],
+      });
+
+      assert.equal(response.status, 204);
+      assert.deepEqual(inputs.at(-1), {
+        bookId: KNOWN_BOOK_ID,
+        chapterIds: [3, 1, 2],
+      });
+    }
+  );
+});
+
+test('PUT chapter-order refuses an empty or repeating list with 400', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      for (const chapterIds of [[], [1, 1], ['x']]) {
+        assert.equal(
+          (await putOrder(base, KNOWN_BOOK_ID, { chapterIds })).status,
+          400
+        );
+      }
+    }
+  );
+});
+
+test('PUT chapter-order takes the permission to edit the book chapters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const body = { chapterIds: [1, 2] };
+
+      assert.equal(
+        (await putOrder(base, KNOWN_BOOK_ID, body, null)).status,
+        401
+      );
+      assert.equal(
+        (await putOrder(base, KNOWN_BOOK_ID, body, ROLE_COOKIES.user)).status,
+        403
+      );
+      assert.equal(
+        (await putOrder(base, KNOWN_BOOK_ID, body, ROLE_COOKIES.otherAuthor))
+          .status,
+        403
+      );
+      assert.equal(
+        (await putOrder(base, SHARED_BOOK_ID, body, ROLE_COOKIES.otherAuthor))
+          .status,
+        204
+      );
+      assert.equal(
+        (await putOrder(base, KNOWN_BOOK_ID, body, ROLE_COOKIES.admin)).status,
+        204
+      );
+    }
+  );
+});
+
+test('PUT chapter-order on an unknown book is a 404, for a co-author and a moderator alike', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const body = { chapterIds: [1] };
+
+      assert.equal((await putOrder(base, 999, body)).status, 404);
+      assert.equal(
+        (await putOrder(base, 999, body, ROLE_COOKIES.admin)).status,
+        404
+      );
+    }
+  );
+});
+
+test('a reorder conflict from the repository reaches the caller as a 409', async () => {
+  const repository = createFakeRepository();
+  await withAuthenticatedApp(
+    {
+      chapterRepository: {
+        ...repository,
+        async reorder() {
+          throw new StateConflictError(
+            'The chapters of this book changed since you loaded them'
+          );
+        },
+      },
+    },
+    async (base) => {
+      const response = await putOrder(base, KNOWN_BOOK_ID, {
+        chapterIds: [1, 2],
+      });
+
+      assert.equal(response.status, 409);
+      assert.match(
+        (await json<{ error: string }>(response)).error,
+        /changed since you loaded them/
       );
     }
   );

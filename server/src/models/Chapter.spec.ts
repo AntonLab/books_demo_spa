@@ -68,6 +68,10 @@ test('publishedAt is a nullable, millisecond-precise moment — null is a Draft 
   assert.doesNotMatch(createTableSql, /`publishedAt` DATETIME\(3\) NOT NULL/);
 });
 
+test('position is a required unsigned integer — every chapter has a place in its book', () => {
+  assert.match(createTableSql, /`position` INTEGER UNSIGNED NOT NULL/);
+});
+
 test('the table is InnoDB with the utf8mb4 default collation', () => {
   assert.match(
     createTableSql,
@@ -75,11 +79,14 @@ test('the table is InnoDB with the utf8mb4 default collation', () => {
   );
 });
 
-test('the owner filter is indexed alongside id, so it needs no filesort', () => {
+test('a book filter is indexed alongside position, so the Reading order needs no filesort', () => {
   assert.deepEqual(
     Chapter.options.indexes?.map((index) => index.fields),
-    [['bookId', 'id']]
+    [['bookId', 'position']]
   );
+  // Not unique: a reorder rewrites every position in one statement, and a
+  // unique index would refuse the intermediate state.
+  assert.equal(Chapter.options.indexes?.[0]?.unique, undefined);
 });
 
 test('Chapter belongs to Book, and Book has many chapters', () => {
@@ -95,8 +102,11 @@ test('toPublicChapter carries the body, since it serves GET /:id', () => {
     bookId: 2,
     title: 'Chapter One',
     text: 'It was a dark night.',
+    position: 3,
   });
 
+  // The position orders a list and is never shown, so it stays out of every
+  // response.
   assert.deepEqual(toPublicChapter(chapter), {
     id: 1,
     bookId: 2,
@@ -114,10 +124,12 @@ test('toChapterSummary drops the body but keeps the title', () => {
     bookId: 2,
     title: 'Chapter One',
     text: 'It was a dark night.',
+    position: 3,
   });
 
   const summary = toChapterSummary(chapter);
 
   assert.equal(summary.title, 'Chapter One');
   assert.ok(!('text' in summary));
+  assert.ok(!('position' in summary));
 });
