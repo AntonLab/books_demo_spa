@@ -138,6 +138,9 @@ describe('EditBookPage', () => {
     renderPage();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Leave' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, leave' })
+    );
 
     expect(await screen.findByText('My books list')).toBeInTheDocument();
   });

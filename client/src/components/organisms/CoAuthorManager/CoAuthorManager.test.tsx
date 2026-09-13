@@ -5,13 +5,16 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
 import * as booksApi from '@/api/books';
+import * as seriesApi from '@/api/series';
 import type { AuthorSummary } from '@/types/user';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/books');
+jest.mock('@/api/series');
 
 const mockedAuthors = jest.mocked(authorsApi);
 const mockedBooks = jest.mocked(booksApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const ann: AuthorSummary = {
   id: 3,
@@ -37,7 +40,7 @@ const renderManager = (
 ) =>
   renderWithProviders(
     <CoAuthorManager
-      bookId={1}
+      work={{ kind: 'book', id: 1 }}
       authors={[ann, cora]}
       viewerId={ann.id}
       canManage
@@ -100,15 +103,36 @@ describe('CoAuthorManager', () => {
     expect(mockedBooks.removeCoAuthor).toHaveBeenCalledWith(1, cora.id);
   });
 
-  it('leaves the book and hands off once the server agrees', async () => {
+  it('leaves the book only once asked, and hands off once the server agrees', async () => {
     mockedBooks.removeCoAuthor.mockResolvedValue({} as never);
     const onLeave = jest.fn();
     renderManager({ onLeave });
 
     await userEvent.click(screen.getByRole('button', { name: 'Leave' }));
+    expect(await screen.findByText('Leave this book?')).toBeInTheDocument();
+    expect(mockedBooks.removeCoAuthor).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, leave' }));
 
     expect(mockedBooks.removeCoAuthor).toHaveBeenCalledWith(1, ann.id);
     await waitFor(() => expect(onLeave).toHaveBeenCalled());
+  });
+
+  it("manages a series' byline through the series, not the books", async () => {
+    mockedSeries.addSeriesCoAuthor.mockResolvedValue({} as never);
+    mockedSeries.removeSeriesCoAuthor.mockResolvedValue({} as never);
+    renderManager({ work: { kind: 'series', id: 7 } });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(mockedSeries.removeSeriesCoAuthor).toHaveBeenCalledWith(7, cora.id);
+
+    await userEvent.type(screen.getByRole('combobox'), 'petrov');
+    await userEvent.click(await screen.findByTitle('Ivan Petrov (ipetrov)'));
+    expect(mockedSeries.addSeriesCoAuthor).toHaveBeenCalledWith(7, ivan.id);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }));
+    expect(await screen.findByText('Leave this series?')).toBeInTheDocument();
+    expect(mockedBooks.removeCoAuthor).not.toHaveBeenCalled();
   });
 
   it('shows the reason the server refused', async () => {

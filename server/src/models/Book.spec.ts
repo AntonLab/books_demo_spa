@@ -75,11 +75,28 @@ test('the table is InnoDB with the utf8mb4 default collation', () => {
   );
 });
 
-test('the series filter is indexed alongside id, so it needs no filesort', () => {
+test('seriesPosition is a nullable unsigned integer — a standalone book has no place in a series', () => {
+  assert.match(createTableSql, /`seriesPosition` INTEGER UNSIGNED,/);
+});
+
+test('the series filter is indexed alongside the Series order, so it needs no filesort', () => {
   assert.deepEqual(
     Book.options.indexes?.map((index) => index.fields),
-    [['seriesId', 'id']]
+    [['seriesId', 'seriesPosition']]
   );
+});
+
+test('toPublicBook leaves the Series order out — it orders a list and is never shown', () => {
+  const book = Book.build({
+    id: 1,
+    seriesId: 3,
+    seriesPosition: 2,
+    title: 'Test Book',
+    description: 'A novel',
+    tags: [],
+  });
+
+  assert.ok(!('seriesPosition' in toPublicBook(book, [])));
 });
 
 test('Book belongs to a Series and reaches its Co-authors through credits', () => {

@@ -235,8 +235,16 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async remove(id) {
-      const deleted = await Series.destroy({ where: { id } });
-      return deleted > 0;
+      return sequelizeOf().transaction(async (transaction) => {
+        // The foreign key unlinks the books; their place in the series goes
+        // with it here, so no book outside a series keeps a position.
+        await Book.update(
+          { seriesPosition: null },
+          { where: { seriesId: id }, transaction, silent: true }
+        );
+        const deleted = await Series.destroy({ where: { id }, transaction });
+        return deleted > 0;
+      });
     },
 
     async addCoAuthor(seriesId, userId) {
@@ -271,7 +279,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       // The series id is part of the WHERE, so a book filed elsewhere matches
       // nothing and is reported missing rather than silently unlinked.
       const [unlinked] = await Book.update(
-        { seriesId: null },
+        { seriesId: null, seriesPosition: null },
         { where: { id: bookId, seriesId } }
       );
       if (unlinked === 0) throw new NotFoundError('Book', bookId);

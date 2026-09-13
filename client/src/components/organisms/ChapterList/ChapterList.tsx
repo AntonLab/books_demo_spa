@@ -15,7 +15,7 @@ const formatDate = (iso: string): string => new Date(iso).toLocaleDateString();
 // Presentational, like BookList: the page owns the query and hands the states
 // down, so this renders in a test with no network layer at all. The reader's
 // list: its page passes only the chapters that are out, in Reading order. The
-// book editor's list, with badges and drag and drop, is SortableChapterList.
+// book editor's list, with badges and drag and drop, is a SortableList.
 export const ChapterList: FC<ChapterListProps> = ({
   bookId,
   items,
