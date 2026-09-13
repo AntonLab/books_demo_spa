@@ -2,7 +2,11 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import {
+  DatabaseError,
+  ForeignKeyConstraintError,
+  type Sequelize,
+} from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -23,6 +27,7 @@ import {
   NotFoundError,
 } from '../types/errors.ts';
 import { createSequelizeLikeRepository } from './likeRepository.ts';
+import { likeRepositoryContract } from './likeRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
@@ -305,6 +310,53 @@ describe('likeRepository against real MySQL', { skip }, () => {
     );
   });
 
+  // The lookup before the insert is not locked, so a target deleted in between
+  // is left to the foreign key — which must still blame the target, not the
+  // user. Each hook stands in for that concurrent delete.
+  test('a book deleted between the lookup and the insert is still a NotFoundError naming the book', async () => {
+    Like.addHook('beforeCreate', 'deleteTarget', async () => {
+      await Book.destroy({ where: { id: bookId } });
+    });
+    try {
+      await assert.rejects(
+        repository.create({ bookId, commentId: null, isLike: true }, likerId),
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          error.message === `Book ${bookId} not found`
+      );
+    } finally {
+      Like.removeHook('beforeCreate', 'deleteTarget');
+    }
+  });
+
+  test('a comment deleted between the lookup and the insert is still a NotFoundError naming the comment', async () => {
+    Like.addHook('beforeCreate', 'deleteTarget', async () => {
+      await Comment.destroy({ where: { id: commentId } });
+    });
+    try {
+      await assert.rejects(
+        repository.create({ bookId: null, commentId, isLike: true }, likerId),
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          error.message === `Comment ${commentId} not found`
+      );
+    } finally {
+      Like.removeHook('beforeCreate', 'deleteTarget');
+    }
+  });
+
+  // Only a rejected foreign key means a missing row; anything else the
+  // database refuses — here an id no INTEGER UNSIGNED column can hold — is
+  // passed on as it is.
+  test('a create the database refuses for another reason is not reported as a missing row', async () => {
+    await assert.rejects(
+      repository.create({ bookId, commentId: null, isLike: true }, -1),
+      (error: unknown) =>
+        error instanceof DatabaseError &&
+        !(error instanceof ForeignKeyConstraintError)
+    );
+  });
+
   test('the list filters by commentId and reports the unpaged total', async () => {
     await repository.create({ bookId, commentId: null, isLike: true }, likerId);
     await repository.create({ bookId: null, commentId, isLike: true }, likerId);
@@ -438,4 +490,35 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await Book.update({ status: 'in_progress' }, { where: { id: bookId } });
     assert.equal(await total(null), 2);
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  let contractAccounts = 0;
+  likeRepositoryContract(async () => ({
+    repository,
+    async anAccount() {
+      contractAccounts += 1;
+      const user = await User.create({
+        ...liker,
+        login: `ContractLiker${contractAccounts}`,
+        email: `contract-liker-${contractAccounts}@example.com`,
+      });
+      return user.id;
+    },
+    async aBook(coAuthorIds) {
+      const book = await createCreditedBook(
+        { title: 'Contract Book', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return book.id;
+    },
+    async aComment(onBookId, ownerId) {
+      const comment = await Comment.create({
+        userId: ownerId,
+        bookId: onBookId,
+        text: 'A comment',
+      });
+      return comment.id;
+    },
+  }));
 });

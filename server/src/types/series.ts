@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import type { AuthorSummary } from './user.ts';
+
+// The response shape is the client's contract too, so it lives in the shared
+// workspace (ADR-0006); the schemas stay here.
+export type { PublicSeries } from 'shared';
 
 export const SERIES_TAG_MAX_LENGTH = 32;
 export const SERIES_MAX_TAGS = 20;
@@ -97,15 +100,3 @@ export type CreateSeriesInput = z.infer<typeof createSeriesSchema>;
 export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateSeriesInput = z.infer<typeof updateSeriesSchema>;
 export type ListSeriesQuery = z.infer<typeof listSeriesQuerySchema>;
-
-// No userId: a series has no single owner (ADR-0005).
-export interface PublicSeries {
-  id: number;
-  // Every Co-author, in the order they were credited, as on a book.
-  authors: AuthorSummary[];
-  title: string;
-  description: string;
-  tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}

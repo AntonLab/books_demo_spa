@@ -1,19 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withApp, json } from './routeTestKit.testkit.ts';
-import { hashPassword } from '../password.ts';
 import { hashToken } from '../tokens.ts';
 import { xsrfTokenFor } from '../middleware/csrfProtection.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
-import { ConflictError } from '../types/errors.ts';
 import type {
   SessionRepository,
   SessionRecord,
 } from '../repositories/sessionRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
-import type { CreateUserInput, PublicUser, UserStatus } from '../types/user.ts';
-import type { UserRole } from '../types/permission.ts';
+import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
+import type { PublicUser } from '../types/user.ts';
 
 const registration = {
   login: 'Bob',
@@ -23,92 +21,7 @@ const registration = {
   lastName: 'Bobsson',
 };
 
-// A fake user store carrying the one thing PublicUser deliberately omits.
-function createFakeUsers(seed: { status?: UserStatus } = {}) {
-  const rows = new Map<number, PublicUser & { password: string }>();
-  let nextId = 1;
-
-  const repository = {
-    async create(input: CreateUserInput, role: UserRole = 'user') {
-      if ([...rows.values()].some((row) => row.login === input.login)) {
-        throw new ConflictError('login');
-      }
-      if ([...rows.values()].some((row) => row.email === input.email)) {
-        throw new ConflictError('email');
-      }
-      const now = new Date();
-      const row = {
-        id: nextId,
-        login: input.login,
-        email: input.email,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        status: input.status ?? 'pending',
-        role,
-        password: await hashPassword(input.password, 'test'),
-        createdAt: now,
-        updatedAt: now,
-      };
-      nextId += 1;
-      rows.set(row.id, row);
-      const { password: _password, ...publicUser } = row;
-      return publicUser;
-    },
-
-    async findById(id: number) {
-      const row = rows.get(id);
-      if (!row) return null;
-      const { password: _password, ...publicUser } = row;
-      return publicUser;
-    },
-
-    async findByLoginWithPassword(login: string) {
-      const row = [...rows.values()].find(
-        (candidate) => candidate.login === login
-      );
-      return row
-        ? {
-            id: row.id,
-            password: row.password,
-            status: seed.status ?? row.status,
-          }
-        : null;
-    },
-
-    async findByEmail(email: string) {
-      const row = [...rows.values()].find(
-        (candidate) => candidate.email === email
-      );
-      if (!row) return null;
-      const { password: _password, ...publicUser } = row;
-      return publicUser;
-    },
-  } as unknown as UserRepository;
-
-  async function setPassword(id: number, plaintext: string): Promise<void> {
-    const row = rows.get(id);
-    if (!row) return;
-    // 'test' pins the deliberately weak argon2 parameters from password.ts, so
-    // the suite does not spend seconds inside the KDF.
-    row.password = await hashPassword(plaintext, 'test');
-  }
-
-  // What the session fake re-reads when login opens a session, standing in
-  // for the real repository's locking read of the account row. The seeded
-  // status wins here too, so both reads agree about a blocked account.
-  function credentialOf(
-    id: number
-  ): { password: string; status: UserStatus } | null {
-    const row = rows.get(id);
-    return row
-      ? { password: row.password, status: seed.status ?? row.status }
-      : null;
-  }
-
-  return { repository, setPassword, credentialOf };
-}
-
-function createFakeSessions(users: ReturnType<typeof createFakeUsers>) {
+function createFakeSessions(users: UserRepository) {
   const rows = new Map<string, SessionRecord>();
   let nextId = 1;
 
@@ -127,19 +40,21 @@ function createFakeSessions(users: ReturnType<typeof createFakeUsers>) {
     async create(userId, tokenHash, expiresAt) {
       return insert(userId, tokenHash, expiresAt);
     },
-    // The real re-check happens under a row lock inside a transaction; here
-    // it is a plain comparison, which is enough for a single-threaded fake.
+    // The real re-check re-reads the account under a row lock inside a
+    // transaction; here it is two plain reads of the user fake, which is
+    // enough for a single-threaded fake.
     async createIfCredentialCurrent(
       userId,
       tokenHash,
       expiresAt,
       verifiedPasswordHash
     ) {
-      const current = users.credentialOf(userId);
-      if (!current || current.password !== verifiedPasswordHash) {
+      const password = await users.findPasswordHashById(userId);
+      const user = await users.findById(userId);
+      if (!user || password !== verifiedPasswordHash) {
         return 'credential-changed';
       }
-      if (current.status === 'blocked') return 'blocked';
+      if (user.status === 'blocked') return 'blocked';
       insert(userId, tokenHash, expiresAt);
       return 'created';
     },
@@ -168,7 +83,7 @@ function createFakeSessions(users: ReturnType<typeof createFakeUsers>) {
 // Takes the two collaborators explicitly rather than deriving them, so the
 // fake's reach matches the real repository's: password, token, sessions.
 function createFakeResets(
-  users: ReturnType<typeof createFakeUsers>,
+  users: UserRepository,
   sessions: ReturnType<typeof createFakeSessions>
 ) {
   const rows = new Map<
@@ -197,7 +112,7 @@ function createFakeResets(
       if (!row || row.usedAt !== null || row.expiresAt <= new Date())
         return false;
       row.usedAt = new Date();
-      await users.setPassword(row.userId, newPassword);
+      await users.update(row.userId, { password: newPassword });
       await sessions.repository.deleteAllForUser(row.userId);
       return true;
     },
@@ -206,15 +121,15 @@ function createFakeResets(
   return { repository, rows };
 }
 
-function authDeps(seed: { status?: UserStatus } = {}) {
-  const users = createFakeUsers(seed);
+function authDeps() {
+  const users = createFakeUserRepository();
   const sessions = createFakeSessions(users);
   const resets = createFakeResets(users, sessions);
   const delivered: { email: string; token: string }[] = [];
 
   return {
     deps: {
-      userRepository: users.repository,
+      userRepository: users,
       sessionRepository: sessions.repository,
       passwordResetRepository: resets.repository,
       resetDelivery: {
@@ -223,6 +138,7 @@ function authDeps(seed: { status?: UserStatus } = {}) {
         },
       },
     },
+    users,
     sessions,
     resets,
     delivered,
@@ -392,9 +308,12 @@ test('a wrong password and an unknown login are indistinguishable', async () => 
 });
 
 test('a blocked account is refused with 403', async () => {
-  const { deps } = authDeps({ status: 'blocked' });
+  const { deps, users } = authDeps();
   await withApp(deps, async (base) => {
-    await post(base, 'register', registration);
+    const { id } = await json<PublicUser>(
+      await post(base, 'register', registration)
+    );
+    await users.update(id, { status: 'blocked' });
     const response = await post(base, 'login', {
       login: 'Bob',
       password: 'hunter2hunter2',

@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// The response shapes are the client's contract too, so they live in the shared
+// workspace (ADR-0006); the schemas stay here.
+export type { ChapterSummary, PublicChapter } from 'shared';
+
 export const CHAPTER_TITLE_MAX_LENGTH = 255;
 // Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
 // were a 4-byte astral one, a million of them reach 4 MB.
@@ -94,20 +98,3 @@ export type PublishedAtInput = z.infer<typeof publishedAtSchema>;
 export type UpdateChapterInput = z.infer<typeof updateChapterSchema>;
 export type ReorderChaptersInput = z.infer<typeof reorderChaptersSchema>;
 export type ListChaptersQuery = z.infer<typeof listChaptersQuerySchema>;
-
-// The full record, returned by GET /api/chapters/:id.
-export interface PublicChapter {
-  id: number;
-  bookId: number;
-  title: string;
-  text: string;
-  // null for a Draft chapter; see publishedAtSchema above.
-  publishedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// What the list endpoint returns: the same record minus the body. Keeping the
-// omission in the type (rather than trusting each call site to strip it) is
-// what stops a MEDIUMTEXT column from being paged out twenty rows at a time.
-export type ChapterSummary = Omit<PublicChapter, 'text'>;

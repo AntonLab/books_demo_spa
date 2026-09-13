@@ -6,6 +6,12 @@ const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 // rather than this directory.
 const root = path.resolve(__dirname, '..');
 
+// The `shared` workspace ships TypeScript source, not a build (ADR-0006), so
+// swc-loader has to transpile it too. webpack follows the workspace link to
+// the real path before it matches a rule, which is what `require.resolve`
+// returns, so the include names the directory webpack will actually see.
+const sharedSrc = path.dirname(require.resolve('shared'));
+
 /**
  * Shared configuration. `webpack.dev.js` and `webpack.prod.js` merge their own
  * overrides on top of this; nothing here is environment specific except the
@@ -35,7 +41,7 @@ module.exports = (isDevelopment) => ({
     rules: [
       {
         test: /\.[jt]sx?$/,
-        include: path.resolve(root, 'src'),
+        include: [path.resolve(root, 'src'), sharedSrc],
         loader: 'swc-loader',
         options: {
           jsc: {

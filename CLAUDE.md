@@ -1,14 +1,26 @@
 # Claude Code — books_demo_spa
 
-Two npm workspaces under one root `package.json`: a webpack-bundled React
-(TypeScript) frontend and an Express + Sequelize backend. Early scaffold — most
-feature directories exist but are empty.
+Three npm workspaces under one root `package.json`: a webpack-bundled React
+(TypeScript) frontend, an Express + Sequelize backend, and the API types both
+of them read. Early scaffold — most feature directories exist but are empty.
 
 ## Layout
 
 - `client/` — React 19 + TypeScript SPA bundled with webpack 5. See `client/CLAUDE.md`.
 - `server/` — Express 5 + Sequelize/MySQL API. See `server/CLAUDE.md`.
-- `tsconfig.base.json` — compiler options shared by both packages; each
+- `shared/` — what the API returns and the string unions both packages use,
+  as TypeScript source with no build step (ADR-0006). Response types are
+  written in the server's shape (dates as `Date`); the client reads each
+  through `Wire<T>`, which turns every `Date` into the string it arrives as.
+  Each union is derived from an `as const` array (`BOOK_STATUSES`,
+  `USER_ROLES`, …) that the server's zod schemas also build from. No zod
+  schema lives here, so zod never reaches the client bundle.
+  `client/src/types` and `server/src/types` stay the modules each package
+  imports, re-exporting from it. Relative imports inside carry `.ts` and only
+  erasable syntax is allowed, because Node loads it too. It defines
+  `typecheck`, `lint` and `lint:fix` only; `wire.typetest.ts` pins `Wire<T>`
+  with type-level assertions that `typecheck` checks.
+- `tsconfig.base.json` — compiler options shared by every package; each
   `tsconfig.json` extends it with a relative path. Keep `include`, `exclude` and
   `paths` out of it: TypeScript resolves those against the file that declares
   them, so they would point at the repo root instead of the package.
@@ -17,25 +29,30 @@ feature directories exist but are empty.
   directories, so each package keeps its own `eslint.config.mjs` that calls
   this. It imports its own plugins: the root `package.json` declares them and
   npm hoists them into the root `node_modules`, so bare specifiers resolve.
-- `package.json` — the workspace root. It declares `client` and `server` as
-  workspaces, owns the seven devDependencies both packages need (eslint,
+- `package.json` — the workspace root. It declares `client`, `server` and
+  `shared` as workspaces, owns the seven devDependencies every package needs (eslint,
   @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
   typescript) plus `concurrently` and `skills`, and holds `engines.node`.
   `skills` is the CLI that materializes `skills-lock.json` into `.agents/`;
   it is pinned here rather than run through `npx` so a fresh clone rebuilds
   the same skill set. Run it with `npm run skills`.
 
-One `npm install` at the repo root installs both workspaces into a single
+One `npm install` at the repo root installs every workspace into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
 declared in the package that uses them — webpack and jest in `client`, nodemon
-in `server` — so each `package.json` still says what that package needs.
+in `server`, `shared` in both — so each `package.json` still says what that
+package needs. `node_modules/shared` is a link to `shared/`, not a copy, and
+that matters: Node strips types only from a file whose real path lies outside
+`node_modules`.
 
 ## Stack
 
 - Node.js >= 22.18, TypeScript. The floor is set by the server, which runs
   `.ts` files with no flag (type stripping is unflagged from 22.18) and loads
   `.env.local` through `--env-file-if-exists` (22.9). `.nvmrc` pins the
-  version CI runs, the current LTS line.
+  version CI runs, the current LTS line. The floor holds for the built server
+  too: `server/dist/` still imports `shared` as `.ts`, so a deployment needs
+  the workspace link and a type-stripping Node (ADR-0006).
 - Frontend: React 19
 - Backend: Express 5, Sequelize 6 (MySQL via `mysql2`)
 
@@ -43,12 +60,13 @@ in `server` — so each `package.json` still says what that package needs.
 
 The scaffold is incomplete — keep the docs honest as you fill it in:
 
-- Both packages now have TypeScript and ESLint (flat config) wired up, exposing
+- All three packages have TypeScript and ESLint (flat config) wired up, exposing
   `typecheck`, `lint` and `lint:fix`. Prettier is root-only — its config is
   repo-wide, so `format` and `format:check` live only in the root
   `package.json` and no package defines them. See each package's CLAUDE.md.
 - The root `package.json` fans `typecheck`, `lint`, `lint:fix`, `test` and
-  `build` out over both workspaces, and `npm run dev` starts the client dev
+  `build` out over every workspace — `test` and `build` with `--if-present`,
+  since `shared` has neither to run — and `npm run dev` starts the client dev
   server and the API together under `concurrently`. It defines no per-package
   aliases: one workspace is targeted with npm's own `-w` flag
   (`npm run dev -w client`, `npm test -w server`), uniformly for every script.
@@ -173,7 +191,7 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 
 ## Quality Gates
 
-Run these from the repo root before commit; each fans out over both workspaces.
+Run these from the repo root before commit; each fans out over every workspace.
 Target one with npm's `-w` flag (`npm test -w client`):
 
 - `npm run typecheck` — TypeScript, no emit
@@ -184,7 +202,7 @@ Target one with npm's `-w` flag (`npm test -w client`):
   including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
   exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
   why its script is not plain `jest`). A **green** server run then drops the
-  ten test schemas it created, through npm's `posttest`; a failed one leaves
+  twelve test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.
@@ -195,7 +213,7 @@ Target one with npm's `-w` flag (`npm test -w client`):
 staged files only, re-stages whatever they rewrote, and blocks the commit if an
 ESLint **error** survives the autofix. Warnings (`no-console`) print but pass.
 ESLint runs once per package, from inside it, because flat config does not
-cascade — a staged path is routed by its `client/` or `server/` prefix. Prettier
+cascade — a staged path is routed by its `client/`, `server/` or `shared/` prefix. Prettier
 runs once from the repo root over every staged file, including the root-level
 configs and markdown no package's ESLint config reaches. Both binaries come from
 the single hoisted `node_modules/.bin`; if it is missing the hook warns and lets
@@ -291,7 +309,8 @@ Do not:
 
 ## Workflow
 
-1. Work within the relevant package (`client/` or `server/`) and read its CLAUDE.md.
+1. Work within the relevant package (`client/` or `server/`) and read its
+   CLAUDE.md. A change to what the API returns starts in `shared/`.
 2. Verify any command in these docs actually exists before relying on it.
 3. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
    `ci:`).

@@ -47,7 +47,7 @@ if [ -s "$work/partial" ]; then
   exit 1
 fi
 
-# One root install covers both workspaces, so one probe covers both tools.
+# One root install covers every workspace, so one probe covers both tools.
 if [ ! -x "$bin/prettier" ]; then
   echo "pre-commit: node_modules is missing, so the staged files went"
   echo "            unchecked. Run \`npm install\` at the repo root."
@@ -98,9 +98,11 @@ lint_package() {
 
 grep '^client/' "$work/staged" | sed 's|^client/||' >"$work/client"
 grep '^server/' "$work/staged" | sed 's|^server/||' >"$work/server"
+grep '^shared/' "$work/staged" | sed 's|^shared/||' >"$work/shared"
 
 lint_package client "$work/client"
 lint_package server "$work/server"
+lint_package shared "$work/shared"
 
 # Prettier runs once over every staged file, from the repo root: one
 # .prettierrc.json and one .prettierignore cover the whole repo, including the

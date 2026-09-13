@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError, StateConflictError } from '../types/errors.ts';
-import type {
-  BookListResult,
-  BookRepository,
-} from '../repositories/bookRepository.ts';
+import { StateConflictError } from '../types/errors.ts';
+import type { BookRepository } from '../repositories/bookRepository.ts';
+import {
+  createFakeBookRepository,
+  type FakeBookRepositoryOptions,
+  type FakeSeries,
+} from '../repositories/bookRepository.fake.testkit.ts';
+import type { Actor } from '../repositories/notificationRepository.ts';
 import type { Viewer } from '../repositories/visibility.ts';
 import type { BookDetail, PublicBook } from '../types/book.ts';
 import type { AuthorSummary } from '../types/user.ts';
@@ -34,12 +37,17 @@ const UNOWNED_USER_ID = 999997;
 // book under it proves any Co-author of a series may, not only its first.
 const SHARED_SERIES_ID = 9;
 
-// Stands in for the series' credits: which series exist, and who co-authors
-// each.
-const SERIES_CO_AUTHORS = new Map<number, number[]>([
-  [KNOWN_SERIES_ID, [KNOWN_USER_ID]],
-  [OTHER_AUTHOR_SERIES_ID, [USER_IDS.otherAuthor]],
-  [SHARED_SERIES_ID, [USER_IDS.otherAuthor, KNOWN_USER_ID]],
+// The series that exist, and who co-authors each.
+const SERIES = new Map<number, FakeSeries>([
+  [KNOWN_SERIES_ID, { title: 'The Cycle', coAuthorIds: [KNOWN_USER_ID] }],
+  [
+    OTHER_AUTHOR_SERIES_ID,
+    { title: 'Not Yours', coAuthorIds: [USER_IDS.otherAuthor] },
+  ],
+  [
+    SHARED_SERIES_ID,
+    { title: 'Shared', coAuthorIds: [USER_IDS.otherAuthor, KNOWN_USER_ID] },
+  ],
 ]);
 
 // Deliberately spelled out rather than derived from a PublicUser: the point of
@@ -79,170 +87,15 @@ const SUMMARIES = new Map<number, AuthorSummary>([
 // `viewers` collects who each read was made as. Whether a Draft book is
 // readable is the real repository's decision, covered against MySQL; what the
 // routes owe it is the right viewer, which is what a test can check here.
-function createFakeRepository(
-  viewers: Viewer[] = [],
-  reorders: unknown[] = [],
-  actors: unknown[] = []
-): BookRepository {
-  const rows = new Map<number, PublicBook>();
-  // bookId -> co-author ids, in credit order. The domain rules on credits (the
-  // author role, duplicates, the last co-author) belong to the real repository
-  // and are covered against MySQL; this fake only keeps the list.
-  const credits = new Map<number, number[]>();
-  let nextId = 1;
-
-  const withCredits = (book: PublicBook): PublicBook => ({
-    ...book,
-    authors: (credits.get(book.id) ?? []).flatMap(
-      (id) => SUMMARIES.get(id) ?? []
-    ),
+const createFakeRepository = (
+  spies: Pick<FakeBookRepositoryOptions, 'viewers' | 'reorders' | 'actors'> = {}
+): BookRepository =>
+  createFakeBookRepository({
+    accounts: SUMMARIES,
+    series: SERIES,
+    likes: { count: 4, viewerLikeId: VIEWER_LIKE_ID },
+    ...spies,
   });
-
-  return {
-    async create(input) {
-      // Stands in for the foreign keys: the real repository maps MySQL's
-      // rejections to these same NotFoundErrors, blaming the column at fault.
-      if (input.userId !== KNOWN_USER_ID) {
-        throw new NotFoundError('User', input.userId);
-      }
-      if (input.seriesId !== null && !SERIES_CO_AUTHORS.has(input.seriesId)) {
-        throw new NotFoundError('Series', input.seriesId);
-      }
-
-      const now = new Date();
-      const book: PublicBook = {
-        id: nextId,
-        authors: [],
-        status: 'draft',
-        seriesId: input.seriesId,
-        title: input.title,
-        description: input.description,
-        tags: input.tags,
-        createdAt: now,
-        updatedAt: now,
-      };
-      nextId += 1;
-      rows.set(book.id, book);
-      credits.set(book.id, [input.userId]);
-      return withCredits(book);
-    },
-
-    async list(query, viewer): Promise<BookListResult> {
-      viewers.push(viewer);
-      const all = [...rows.values()].filter(
-        (row) =>
-          (query.userId === undefined ||
-            (credits.get(row.id) ?? []).includes(query.userId)) &&
-          (query.seriesId === undefined || row.seriesId === query.seriesId) &&
-          (!query.tag || row.tags.includes(query.tag)) &&
-          (!query.q || row.description.includes(query.q))
-      );
-      return {
-        items: all
-          .slice(query.offset, query.offset + query.limit)
-          .map(withCredits),
-        total: all.length,
-      };
-    },
-
-    async findById(id) {
-      const book = rows.get(id);
-      return book ? withCredits(book) : null;
-    },
-
-    async findDetailById(id, viewer) {
-      viewers.push(viewer);
-      const book = rows.get(id);
-      if (!book) return null;
-
-      return {
-        ...withCredits(book),
-        series: { id: KNOWN_SERIES_ID, title: 'The Cycle' },
-        likeCount: 4,
-        // Stands in for the real repository's viewer lookup: only a signed-in
-        // caller can have a like of their own to report.
-        viewerLikeId: viewer === null ? null : VIEWER_LIKE_ID,
-      };
-    },
-
-    async update(id, input) {
-      const current = rows.get(id);
-      if (!current) return null;
-      if (
-        input.seriesId !== null &&
-        input.seriesId !== undefined &&
-        !SERIES_CO_AUTHORS.has(input.seriesId)
-      ) {
-        throw new NotFoundError('Series', input.seriesId);
-      }
-
-      const updated: PublicBook = {
-        ...current,
-        // `in` rather than `??`: an explicit null means "unlink", which a
-        // nullish fallback would silently turn into "leave it alone".
-        seriesId:
-          'seriesId' in input ? (input.seriesId ?? null) : current.seriesId,
-        description: input.description ?? current.description,
-        tags: input.tags ?? current.tags,
-        status: input.status ?? current.status,
-        updatedAt: new Date(),
-      };
-      rows.set(id, updated);
-      return withCredits(updated);
-    },
-
-    async remove(id, actor) {
-      actors.push(['remove', actor]);
-      credits.delete(id);
-      return rows.delete(id);
-    },
-
-    async addCoAuthor(bookId, userId, actor) {
-      actors.push(['addCoAuthor', actor]);
-      const book = rows.get(bookId);
-      if (!book) return null;
-      credits.set(bookId, [...(credits.get(bookId) ?? []), userId]);
-      return withCredits(book);
-    },
-
-    async removeCoAuthor(bookId, userId, actor) {
-      actors.push(['removeCoAuthor', actor]);
-      const book = rows.get(bookId);
-      if (!book) return null;
-      credits.set(
-        bookId,
-        (credits.get(bookId) ?? []).filter((id) => id !== userId)
-      );
-      return withCredits(book);
-    },
-
-    async findCoAuthorIds(id) {
-      return credits.get(id) ?? null;
-    },
-
-    async findSeriesCoAuthorIds(seriesId) {
-      return SERIES_CO_AUTHORS.get(seriesId) ?? null;
-    },
-
-    // The books filed under each series, in Series order; the append and the
-    // set comparison behind a 409 are the real repository's, covered against
-    // MySQL.
-    async listInSeries(seriesId) {
-      if (!SERIES_CO_AUTHORS.has(seriesId)) return null;
-      return [...rows.values()]
-        .filter((row) => row.seriesId === seriesId)
-        .map((row) => {
-          const { id, title, status, authors } = withCredits(row);
-          return { id, title, status, authors };
-        });
-    },
-
-    async reorderInSeries(seriesId, bookIds) {
-      reorders.push({ seriesId, bookIds });
-      return SERIES_CO_AUTHORS.has(seriesId);
-    },
-  };
-}
 
 // No userId: the first Co-author comes from the session, never the body.
 const valid = {
@@ -1116,7 +969,7 @@ test('PATCH moves a book to any status and rejects an unknown one', async () => 
 test('reads are made as the signed-in caller, or as a guest', async () => {
   const viewers: Viewer[] = [];
   await withAuthenticatedApp(
-    { bookRepository: createFakeRepository(viewers) },
+    { bookRepository: createFakeRepository({ viewers }) },
     async (base) => {
       await post(base, valid);
 
@@ -1223,9 +1076,9 @@ test('the series editor list takes a co-author of the series, or a moderator', a
 });
 
 test('PUT book-order hands the repository the new Series order and answers 204', async () => {
-  const reorders: unknown[] = [];
+  const reorders: FakeBookRepositoryOptions['reorders'] = [];
   await withAuthenticatedApp(
-    { bookRepository: createFakeRepository([], reorders) },
+    { bookRepository: createFakeRepository({ reorders }) },
     async (base) => {
       const response = await putSeriesOrder(base, KNOWN_SERIES_ID, {
         bookIds: [3, 1, 2],
@@ -1307,9 +1160,9 @@ test('a series reorder conflict from the repository reaches the caller as a 409'
 // --- Notifications name who acted, so the routes must say who that was. ---
 
 test('credit changes and deletes are made as the signed-in caller, whom their notifications name', async () => {
-  const actors: unknown[] = [];
+  const actors: [string, Actor][] = [];
   await withAuthenticatedApp(
-    { bookRepository: createFakeRepository([], [], actors) },
+    { bookRepository: createFakeRepository({ actors }) },
     async (base) => {
       const { id } = await json<PublicBook>(await post(base, valid));
       await addCoAuthor(base, id, USER_IDS.otherAuthor);
