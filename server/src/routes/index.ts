@@ -11,6 +11,7 @@ import type { UserRepository } from '../repositories/userRepository.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
+import { createChapterOrderRoutes } from './chapterOrderRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
@@ -44,6 +45,9 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
+  // Like the role routes: `/:id` never matches `/:id/chapter-order`, so the
+  // order of these two is not load-bearing either.
+  router.use('/books', createChapterOrderRoutes(deps));
   router.use('/books', createBookRoutes(deps));
   router.use('/chapters', createChapterRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));

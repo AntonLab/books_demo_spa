@@ -5,6 +5,7 @@ import {
   CHAPTER_TITLE_MAX_LENGTH,
   createChapterSchema,
   listChaptersQuerySchema,
+  reorderChaptersSchema,
   updateChapterSchema,
 } from './chapter.ts';
 
@@ -137,4 +138,21 @@ test('the list query defaults limit and offset, and takes no text', () => {
 
 test('the list query coerces bookId from the query string', () => {
   assert.equal(listChaptersQuerySchema.parse({ bookId: '3' }).bookId, 3);
+});
+
+test('a reorder names every chapter id once, in the new Reading order', () => {
+  assert.deepEqual(
+    reorderChaptersSchema.parse({ chapterIds: [3, 1, 2] }).chapterIds,
+    [3, 1, 2]
+  );
+});
+
+test('a reorder refuses an empty list, a repeated id, or an id that is not one', () => {
+  for (const chapterIds of [[], [1, 1], [1, 0], [1, 2.5], ['a'], undefined]) {
+    assert.equal(
+      reorderChaptersSchema.safeParse({ chapterIds }).success,
+      false,
+      JSON.stringify(chapterIds)
+    );
+  }
 });

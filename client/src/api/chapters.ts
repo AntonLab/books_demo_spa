@@ -59,3 +59,16 @@ export const updateChapter = (
 export const deleteChapter = (id: number): Promise<void> => {
   return request<void>(`/chapters/${id}`, { method: 'DELETE' });
 };
+
+// The book's whole Reading order, first chapter first. The server answers 409
+// when the ids are not exactly the book's chapters — one was added or deleted
+// since the list was loaded.
+export const reorderChapters = (
+  bookId: number,
+  chapterIds: number[]
+): Promise<void> => {
+  return request<void>(`/books/${bookId}/chapter-order`, {
+    method: 'PUT',
+    body: { chapterIds },
+  });
+};
