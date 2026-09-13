@@ -8,6 +8,7 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { Book, Chapter, initModels, Series, User } from '../models/index.ts';
+import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { NotFoundError } from '../types/errors.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
 
@@ -82,12 +83,10 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
     bookId = (
-      await Book.create({
-        userId: ownerId,
-        title: 'Test Book',
-        description: 'A novel',
-        tags: [],
-      })
+      await createCreditedBook(
+        { title: 'Test Book', description: 'A novel', tags: [] },
+        [ownerId]
+      )
     ).id;
   });
 
@@ -143,12 +142,10 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('the list filters by bookId and reports the unpaged total', async () => {
-    const otherBook = await Book.create({
-      userId: (await User.findOne())!.id,
-      title: 'Test Book',
-      description: 'Another novel',
-      tags: [],
-    });
+    const otherBook = await createCreditedBook(
+      { title: 'Test Book', description: 'Another novel', tags: [] },
+      [ownerId]
+    );
     await repository.create({ bookId, title: 'Mine', text: 'a' });
     await repository.create({
       bookId: otherBook.id,
@@ -220,20 +217,42 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     assert.equal((await repository.list({ limit: 20, offset: 0 })).total, 0);
   });
 
-  test('findOwnerId resolves through the chapter book', async () => {
+  test('a chapter is owned by every co-author of its book', async () => {
+    const coAuthorId = (
+      await User.create({
+        ...owner,
+        login: 'ChapterCoAuthor',
+        email: 'chapter-coauthor@example.com',
+        role: 'author',
+      })
+    ).id;
+    const sharedBookId = (
+      await createCreditedBook(
+        { title: 'Shared Book', description: 'Co-written', tags: [] },
+        [ownerId, coAuthorId]
+      )
+    ).id;
     const chapter = await repository.create({
-      bookId,
+      bookId: sharedBookId,
       title: 'Chapter One',
       text: 'It was a dark night.',
     });
 
-    // There is no chapters.userId: the owner is the book's owner, and
-    // denormalising it here would create a second source of truth that diverges
-    // the moment a book changes hands.
-    assert.equal(await repository.findOwnerId(chapter.id), ownerId);
+    // There is no chapters.userId: the owners are the book's Co-authors, and
+    // denormalising them here would create a second source of truth that
+    // diverges the moment a Co-author is added or leaves.
+    assert.deepEqual(
+      [...((await repository.findCoAuthorIds(chapter.id)) ?? [])].sort(),
+      [ownerId, coAuthorId].sort()
+    );
+    assert.deepEqual(
+      [...((await repository.findBookCoAuthorIds(sharedBookId)) ?? [])].sort(),
+      [ownerId, coAuthorId].sort()
+    );
   });
 
-  test('findOwnerId is null for a chapter that is not there', async () => {
-    assert.equal(await repository.findOwnerId(999_999), null);
+  test('a missing chapter or book has no co-authors to report', async () => {
+    assert.equal(await repository.findCoAuthorIds(999_999), null);
+    assert.equal(await repository.findBookCoAuthorIds(999_999), null);
   });
 });

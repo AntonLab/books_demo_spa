@@ -15,6 +15,7 @@ import {
   Series,
   User,
 } from '../models/index.ts';
+import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeCommentRepository } from './commentRepository.ts';
 
@@ -101,12 +102,10 @@ describe('commentRepository against real MySQL', { skip }, () => {
     ownerId = (await User.create(owner)).id;
     readerId = (await User.create(reader)).id;
     bookId = (
-      await Book.create({
-        userId: ownerId,
-        title: 'A Novel',
-        description: 'A novel',
-        tags: [],
-      })
+      await createCreditedBook(
+        { title: 'A Novel', description: 'A novel', tags: [] },
+        [ownerId]
+      )
     ).id;
   });
 

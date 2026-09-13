@@ -1,5 +1,6 @@
 import type { Sequelize } from 'sequelize';
 import { initBookModel, Book } from './Book.ts';
+import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initLikeModel, Like } from './Like.ts';
@@ -16,6 +17,7 @@ export interface Models {
   User: typeof User;
   Series: typeof Series;
   Book: typeof Book;
+  BookAuthor: typeof BookAuthor;
   Chapter: typeof Chapter;
   Comment: typeof Comment;
   Like: typeof Like;
@@ -30,6 +32,7 @@ export function initModels(sequelize: Sequelize): Models {
   initPermissionModel(sequelize);
   initSeriesModel(sequelize);
   initBookModel(sequelize);
+  initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
   initCommentModel(sequelize);
   initLikeModel(sequelize);
@@ -48,27 +51,38 @@ export function initModels(sequelize: Sequelize): Models {
   });
   Series.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
-  User.hasMany(Book, {
-    as: 'books',
-    foreignKey: 'userId',
-    // Same reasoning as series: a book with no owner answers to nobody.
-    onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
-  });
-  Book.belongsTo(User, { as: 'user', foreignKey: 'userId' });
-
   Series.hasMany(Book, {
     as: 'books',
     // allowNull is restated here so Sequelize does not infer NOT NULL from the
     // association and quietly make SET NULL illegal.
     foreignKey: { name: 'seriesId', allowNull: true },
-    // Not CASCADE, unlike the two above: seriesId is optional, so a book can
+    // Not CASCADE, unlike the one above: seriesId is optional, so a book can
     // stand alone. Dropping the series unlinks its books rather than
     // destroying records the user never asked to delete.
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
   });
   Book.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
+  // A book's Co-authors (ADR-0005). Both sides cascade: a credit means nothing
+  // without its book or its account. Deleting an account therefore drops its
+  // credits — userRepository.remove deletes the books it was the last
+  // Co-author of first, so no book is ever left with nobody credited.
+  Book.hasMany(BookAuthor, {
+    as: 'credits',
+    foreignKey: 'bookId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  BookAuthor.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  User.hasMany(BookAuthor, {
+    as: 'bookCredits',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  BookAuthor.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
   Book.hasMany(Chapter, {
     as: 'chapters',
@@ -200,6 +214,7 @@ export function initModels(sequelize: Sequelize): Models {
     User,
     Series,
     Book,
+    BookAuthor,
     Chapter,
     Comment,
     Like,
@@ -212,6 +227,7 @@ export function initModels(sequelize: Sequelize): Models {
 export { User, toPublicUser } from './User.ts';
 export { Series, toPublicSeries } from './Series.ts';
 export { Book, toPublicBook } from './Book.ts';
+export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';

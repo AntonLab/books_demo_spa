@@ -45,9 +45,44 @@ const AUTHOR: AuthorSummary = {
   lastName: 'Author',
 };
 
+// Every persona a fake credit can name, so a response's `authors` carries real
+// summaries rather than ids.
+const SUMMARIES = new Map<number, AuthorSummary>([
+  [KNOWN_USER_ID, AUTHOR],
+  [
+    USER_IDS.otherAuthor,
+    {
+      id: USER_IDS.otherAuthor,
+      login: 'otherAuthor',
+      firstName: 'O',
+      lastName: 'A',
+    },
+  ],
+  [
+    USER_IDS.user,
+    {
+      id: USER_IDS.user,
+      login: 'TestUser',
+      firstName: 'Test',
+      lastName: 'User',
+    },
+  ],
+]);
+
 function createFakeRepository(): BookRepository {
   const rows = new Map<number, PublicBook>();
+  // bookId -> co-author ids, in credit order. The domain rules on credits (the
+  // author role, duplicates, the last co-author) belong to the real repository
+  // and are covered against MySQL; this fake only keeps the list.
+  const credits = new Map<number, number[]>();
   let nextId = 1;
+
+  const withCredits = (book: PublicBook): PublicBook => ({
+    ...book,
+    authors: (credits.get(book.id) ?? []).flatMap(
+      (id) => SUMMARIES.get(id) ?? []
+    ),
+  });
 
   return {
     async create(input) {
@@ -63,7 +98,7 @@ function createFakeRepository(): BookRepository {
       const now = new Date();
       const book: PublicBook = {
         id: nextId,
-        userId: input.userId,
+        authors: [],
         seriesId: input.seriesId,
         title: input.title,
         description: input.description,
@@ -73,25 +108,30 @@ function createFakeRepository(): BookRepository {
       };
       nextId += 1;
       rows.set(book.id, book);
-      return book;
+      credits.set(book.id, [input.userId]);
+      return withCredits(book);
     },
 
     async list(query): Promise<BookListResult> {
       const all = [...rows.values()].filter(
         (row) =>
-          (query.userId === undefined || row.userId === query.userId) &&
+          (query.userId === undefined ||
+            (credits.get(row.id) ?? []).includes(query.userId)) &&
           (query.seriesId === undefined || row.seriesId === query.seriesId) &&
           (!query.tag || row.tags.includes(query.tag)) &&
           (!query.q || row.description.includes(query.q))
       );
       return {
-        items: all.slice(query.offset, query.offset + query.limit),
+        items: all
+          .slice(query.offset, query.offset + query.limit)
+          .map(withCredits),
         total: all.length,
       };
     },
 
     async findById(id) {
-      return rows.get(id) ?? null;
+      const book = rows.get(id);
+      return book ? withCredits(book) : null;
     },
 
     async findDetailById(id, viewerId) {
@@ -99,8 +139,7 @@ function createFakeRepository(): BookRepository {
       if (!book) return null;
 
       return {
-        ...book,
-        author: AUTHOR,
+        ...withCredits(book),
         series: { id: KNOWN_SERIES_ID, title: 'The Cycle' },
         likeCount: 4,
         // Stands in for the real repository's viewer lookup: only a signed-in
@@ -131,15 +170,33 @@ function createFakeRepository(): BookRepository {
         updatedAt: new Date(),
       };
       rows.set(id, updated);
-      return updated;
+      return withCredits(updated);
     },
 
     async remove(id) {
+      credits.delete(id);
       return rows.delete(id);
     },
 
-    async findOwnerId(id) {
-      return rows.get(id)?.userId ?? null;
+    async addCoAuthor(bookId, userId) {
+      const book = rows.get(bookId);
+      if (!book) return null;
+      credits.set(bookId, [...(credits.get(bookId) ?? []), userId]);
+      return withCredits(book);
+    },
+
+    async removeCoAuthor(bookId, userId) {
+      const book = rows.get(bookId);
+      if (!book) return null;
+      credits.set(
+        bookId,
+        (credits.get(bookId) ?? []).filter((id) => id !== userId)
+      );
+      return withCredits(book);
+    },
+
+    async findCoAuthorIds(id) {
+      return credits.get(id) ?? null;
     },
 
     async findSeriesOwnerId(seriesId) {
@@ -148,7 +205,7 @@ function createFakeRepository(): BookRepository {
   };
 }
 
-// No userId: the owner comes from the session, never the body.
+// No userId: the first Co-author comes from the session, never the body.
 const valid = {
   seriesId: KNOWN_SERIES_ID,
   title: 'The First Book',
@@ -200,7 +257,7 @@ const remove = (
     },
   });
 
-test('POST creates a book and echoes its tags and series', async () => {
+test('POST creates a book credited to the caller and echoes its tags and series', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },
     async (base) => {
@@ -208,7 +265,10 @@ test('POST creates a book and echoes its tags and series', async () => {
       const body = await json<PublicBook>(response);
 
       assert.equal(response.status, 201);
-      assert.equal(body.userId, KNOWN_USER_ID);
+      assert.deepEqual(
+        body.authors.map((author) => author.id),
+        [KNOWN_USER_ID]
+      );
       assert.equal(body.seriesId, KNOWN_SERIES_ID);
       assert.deepEqual(body.tags, ['sci-fi', 'epic']);
     }
@@ -364,7 +424,7 @@ test('GET list filters by tag, owner and series', async () => {
   );
 });
 
-test('GET by id embeds the author and series, and never the email', async () => {
+test('GET by id embeds the co-authors and series, and never an email', async () => {
   // Seeded through the authenticated harness because POST is guarded, then read
   // back with no cookie at all: that is what proves the detail read stays
   // public and that an anonymous visitor gets an empty viewerLikeId.
@@ -377,8 +437,8 @@ test('GET by id embeds the author and series, and never the email', async () => 
       assert.equal(response.status, 200);
 
       const body = await json<BookDetail>(response);
-      assert.equal(body.author.login, 'Author');
-      assert.equal('email' in body.author, false);
+      assert.equal(body.authors[0]?.login, 'Author');
+      assert.equal('email' in (body.authors[0] ?? {}), false);
       assert.equal(body.series?.title, 'The Cycle');
       assert.equal(body.likeCount, 4);
       assert.equal(body.viewerLikeId, null);
@@ -753,6 +813,210 @@ test('an admin may file any book under any series', async () => {
       assert.equal(
         (await json<PublicBook>(response)).seriesId,
         OTHER_AUTHOR_SERIES_ID
+      );
+    }
+  );
+});
+
+// --- Co-authors: every one of them may touch the book (ADR-0005). ---
+
+const addCoAuthor = (
+  base: string,
+  bookId: number,
+  userId: number,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/books/${bookId}/co-authors`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+const removeCoAuthor = (
+  base: string,
+  bookId: number,
+  userId: number,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/books/${bookId}/co-authors/${userId}`, {
+    method: 'DELETE',
+    headers: { ...(cookie ? { cookie } : {}) },
+  });
+
+test('a co-author credited by the author may edit the book', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+
+      const added = await addCoAuthor(base, id, USER_IDS.otherAuthor);
+      assert.equal(added.status, 200);
+      assert.deepEqual(
+        (await json<PublicBook>(added)).authors.map((author) => author.id),
+        [KNOWN_USER_ID, USER_IDS.otherAuthor]
+      );
+
+      const response = await patch(
+        base,
+        id,
+        { description: 'Co-written' },
+        ROLE_COOKIES.otherAuthor
+      );
+      assert.equal(response.status, 200);
+    }
+  );
+});
+
+test('a co-author may remove another co-author', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.otherAuthor);
+
+      const response = await removeCoAuthor(
+        base,
+        id,
+        KNOWN_USER_ID,
+        ROLE_COOKIES.otherAuthor
+      );
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(
+        (await json<PublicBook>(response)).authors.map((author) => author.id),
+        [USER_IDS.otherAuthor]
+      );
+    }
+  );
+});
+
+test('a co-author who is no longer an author may still leave', async () => {
+  // The `user` persona stands in for an author who switched Role: the matrix
+  // gives it `none` on books, and leaving must not depend on that grant.
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.user);
+
+      const response = await removeCoAuthor(
+        base,
+        id,
+        USER_IDS.user,
+        ROLE_COOKIES.user
+      );
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(
+        (await json<PublicBook>(response)).authors.map((author) => author.id),
+        [KNOWN_USER_ID]
+      );
+    }
+  );
+});
+
+test('a moderator may not change who is credited on a book', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.otherAuthor);
+
+      for (const moderator of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        assert.equal(
+          (await addCoAuthor(base, id, USER_IDS.user, moderator)).status,
+          403
+        );
+        assert.equal(
+          (await removeCoAuthor(base, id, USER_IDS.otherAuthor, moderator))
+            .status,
+          403
+        );
+      }
+
+      const stored = await json<PublicBook>(
+        await fetch(`${base}/api/books/${id}`)
+      );
+      assert.deepEqual(
+        stored.authors.map((author) => author.id),
+        [KNOWN_USER_ID, USER_IDS.otherAuthor]
+      );
+    }
+  );
+});
+
+test('an author who is not credited may not change the co-authors', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+
+      assert.equal(
+        (
+          await addCoAuthor(
+            base,
+            id,
+            USER_IDS.otherAuthor,
+            ROLE_COOKIES.otherAuthor
+          )
+        ).status,
+        403
+      );
+      assert.equal(
+        (
+          await removeCoAuthor(
+            base,
+            id,
+            KNOWN_USER_ID,
+            ROLE_COOKIES.otherAuthor
+          )
+        ).status,
+        403
+      );
+    }
+  );
+});
+
+test('a co-author who is no longer an author may not remove anyone else', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.user);
+
+      const response = await removeCoAuthor(
+        base,
+        id,
+        KNOWN_USER_ID,
+        ROLE_COOKIES.user
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('changing co-authors without a session is 401', async () => {
+  await withApp({ bookRepository: createFakeRepository() }, async (base) => {
+    assert.equal((await addCoAuthor(base, 1, 2, null)).status, 401);
+    assert.equal((await removeCoAuthor(base, 1, 2, null)).status, 401);
+  });
+});
+
+test('crediting a co-author on a missing book is a 404', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await addCoAuthor(base, 999, USER_IDS.otherAuthor)).status,
+        404
+      );
+      assert.equal(
+        (await removeCoAuthor(base, 999, KNOWN_USER_ID, ROLE_COOKIES.author))
+          .status,
+        404
       );
     }
   );

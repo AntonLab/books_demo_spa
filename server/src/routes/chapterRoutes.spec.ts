@@ -15,11 +15,17 @@ import {
 } from './routeTestKit.testkit.ts';
 
 const KNOWN_BOOK_ID = 1;
+// Credited to both authors, so a spec can act as a co-author who did not
+// create the book.
+const SHARED_BOOK_ID = 2;
 
-// Stands in for the books table: which books exist, and who owns each. A
-// chapter has no owner of its own — it is owned through its book — so both
-// ownership lookups below read this rather than hard-coding a persona.
-const BOOK_OWNERS = new Map<number, number>([[KNOWN_BOOK_ID, USER_IDS.author]]);
+// Stands in for the books' credits: which books exist, and who co-authors
+// each. A chapter has no owner of its own — its book's Co-authors own it — so
+// both lookups below read this rather than hard-coding a persona.
+const BOOK_CO_AUTHORS = new Map<number, number[]>([
+  [KNOWN_BOOK_ID, [USER_IDS.author]],
+  [SHARED_BOOK_ID, [USER_IDS.author, USER_IDS.otherAuthor]],
+]);
 
 function createFakeRepository(): ChapterRepository {
   const rows = new Map<number, PublicChapter>();
@@ -29,7 +35,7 @@ function createFakeRepository(): ChapterRepository {
     async create(input) {
       // Stands in for the foreign key: the real repository maps MySQL's
       // rejection to this same NotFoundError.
-      if (input.bookId !== KNOWN_BOOK_ID) {
+      if (!BOOK_CO_AUTHORS.has(input.bookId)) {
         throw new NotFoundError('Book', input.bookId);
       }
 
@@ -88,15 +94,15 @@ function createFakeRepository(): ChapterRepository {
       return rows.delete(id);
     },
 
-    // Mirrors the real repository, which resolves a chapter's owner through
-    // the book it is stored under.
-    async findOwnerId(id) {
+    // Mirrors the real repository, which resolves a chapter's Co-authors
+    // through the book it is stored under.
+    async findCoAuthorIds(id) {
       const chapter = rows.get(id);
-      return chapter ? (BOOK_OWNERS.get(chapter.bookId) ?? null) : null;
+      return chapter ? (BOOK_CO_AUTHORS.get(chapter.bookId) ?? null) : null;
     },
 
-    async findBookOwnerId(bookId) {
-      return BOOK_OWNERS.get(bookId) ?? null;
+    async findBookCoAuthorIds(bookId) {
+      return BOOK_CO_AUTHORS.get(bookId) ?? null;
     },
   };
 }
@@ -452,6 +458,32 @@ test('an admin may delete a chapter in another author book', async () => {
         (await remove(base, created.id, ROLE_COOKIES.admin)).status,
         204
       );
+    }
+  );
+});
+
+// --- A book's chapters belong to every one of its Co-authors (ADR-0005). ---
+
+test('a co-author who did not create the book may add and edit its chapters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await post(
+        base,
+        { ...valid, bookId: SHARED_BOOK_ID },
+        ROLE_COOKIES.otherAuthor
+      );
+      assert.equal(created.status, 201);
+
+      const { id } = await json<PublicChapter>(created);
+      const edited = await patch(
+        base,
+        id,
+        { title: 'Renamed' },
+        ROLE_COOKIES.otherAuthor
+      );
+      assert.equal(edited.status, 200);
+      assert.equal((await remove(base, id, ROLE_COOKIES.author)).status, 204);
     }
   );
 });

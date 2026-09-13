@@ -68,17 +68,20 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   See `client/CLAUDE.md`.
 - `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
   `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
-  — associated by `User.hasMany(Series)`, `User.hasMany(Book)`,
-  `Series.hasMany(Book)`, `Book.hasMany(Chapter)` and `hasMany(Like)` from
-  each of `User`, `Book` and `Comment` — have a full CRUD API, though every
+  — associated by `User.hasMany(Series)`, `Series.hasMany(Book)`,
+  `Book.hasMany(Chapter)` and `hasMany(Like)` from each of `User`, `Book` and
+  `Comment`, with a book's **Co-authors** kept in `book_authors` rather than an
+  owner column (ADR-0005) — have a full CRUD API, though every
   write on them now goes through the role-permission matrix (see the auth
   bullet below). A like points at exactly one of a book or a comment; that
   XOR is enforced in zod and in a model validator, never by the database (see
   `server/CLAUDE.md`). `Comment` (owned by a user and a book, with
   self-referential replies) now has a full CRUD API too, at `/api/comments`.
   Books and series carry a `title` column alongside their description, and
-  `GET /api/books/:id` returns a `BookDetail` embedding the author, the
-  series name and the like state. `npm run build`
+  every book response embeds its Co-authors as `authors`, in credit order;
+  `GET /api/books/:id` returns a `BookDetail` adding the series name and the
+  like state. Co-authors are added and removed (or leave) through
+  `/api/books/:id/co-authors`. `npm run build`
   (`tsc -p tsconfig.build.json`) emits to `dist/`.
 - `server` has session-based auth at `/api/auth` — register, login, logout,
   me, and a two-step password reset — backed by `Session` and
@@ -94,8 +97,11 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   still renders its state for an anonymous visitor without it. Ownership is
   enforced on **books, series, chapters, comments and likes** — five
   resources, not four — with `admin` and `superadmin` bypassing it wherever
-  the matrix grants them `any` rather than `own`; chapters resolve ownership
-  through their book, since `chapters` carries no `userId`. Deleting a
+  the matrix grants them `any` rather than `own`. On a book `own` means any of
+  its Co-authors, and chapters resolve ownership through their book, since
+  `chapters` carries no `userId`. A Moderator never changes who is credited on
+  a book, a book always keeps at least one Co-author, and deleting an account
+  deletes only the books it was the last Co-author of. Deleting a
   comment leaves a **tombstone** — `deleted` by its own owner (or when that
   owner's account is deleted) or `removed` by a moderator — rather than
   removing the row, so its replies stay and its text and author are withheld
@@ -114,13 +120,16 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   SHA-256-not-argon2 choice for tokens, and the login timing defence.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
+- A dev database created before the Co-authors change must be dropped and
+  rebuilt: `books.userId` is gone and `sync()` never alters an existing table.
+  See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the
   password `Password123!`), each author's 1-2 series of 4-5 books plus 1-3
   standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
   with a scattering of tombstones, and likes on both books and comments. Run
   it with `npm run seed -w server -- --force`; **the flag is required because
-  it deletes every row in the six content tables first**, and without it the
+  it deletes every row in the seven content tables first**, and without it the
   script only reports what it found. Counts come from a fixed PRNG seed, so
   the shape is reproducible; the dates are anchored to the run, so the newest
   chapter is always a few days old. See `server/CLAUDE.md` for the personas,

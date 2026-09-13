@@ -1,6 +1,7 @@
 import { ForeignKeyConstraintError, Op } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
+import { BookAuthor } from '../models/BookAuthor.ts';
 import {
   Chapter,
   toChapterSummary,
@@ -32,8 +33,11 @@ export interface ChapterRepository {
   // Two lookups, not one: a create is checked against the *target book* before
   // the chapter exists, while an update or delete is checked against the
   // chapter that is already there.
-  findOwnerId(id: number): Promise<number | null>;
-  findBookOwnerId(bookId: number): Promise<number | null>;
+  //
+  // Both answer with the book's Co-author ids, or null when the chapter (or the
+  // book) is not there.
+  findCoAuthorIds(id: number): Promise<number[] | null>;
+  findBookCoAuthorIds(bookId: number): Promise<number[] | null>;
 }
 
 // A rejected FK on `chapters.bookId` means the referenced book does not exist.
@@ -72,6 +76,17 @@ function buildWhere(query: ListChaptersQuery): WhereOptions {
   }
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
+}
+
+async function findBookCoAuthorIds(bookId: number): Promise<number[] | null> {
+  const book = await Book.findByPk(bookId, { attributes: ['id'] });
+  if (!book) return null;
+
+  const credits = await BookAuthor.findAll({
+    where: { bookId },
+    attributes: ['userId'],
+  });
+  return credits.map((credit) => credit.userId);
 }
 
 export function createSequelizeChapterRepository(): ChapterRepository {
@@ -120,17 +135,11 @@ export function createSequelizeChapterRepository(): ChapterRepository {
       return deleted > 0;
     },
 
-    async findOwnerId(id) {
-      const chapter = await Chapter.findByPk(id, {
-        attributes: ['bookId'],
-        include: [{ model: Book, as: 'book', attributes: ['userId'] }],
-      });
-      return chapter?.book?.userId ?? null;
+    async findCoAuthorIds(id) {
+      const chapter = await Chapter.findByPk(id, { attributes: ['bookId'] });
+      return chapter ? findBookCoAuthorIds(chapter.bookId) : null;
     },
 
-    async findBookOwnerId(bookId) {
-      const book = await Book.findByPk(bookId, { attributes: ['userId'] });
-      return book?.userId ?? null;
-    },
+    findBookCoAuthorIds,
   };
 }

@@ -5,6 +5,8 @@ import {
   where as sequelizeWhere,
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
+import { Book } from '../models/Book.ts';
+import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
 import { Session } from '../models/Session.ts';
 import { toPublicUser, User } from '../models/User.ts';
@@ -161,7 +163,14 @@ export function createSequelizeUserRepository(): UserRepository {
     // replies other people wrote under them keep their thread. They are marked
     // in the same transaction as the delete: the foreign key then nulls their
     // owner, and a comment with no owner must never be live. Comments on the
-    // account's own books are the exception — they go with the books.
+    // books this account was the last Co-author of are the exception — they go
+    // with those books (ADR-0004).
+    //
+    // A book with other Co-authors stays: the account's credit cascades away
+    // with the account and the rest keep the book (ADR-0005). The books are
+    // locked before they are counted, the same lock bookRepository's
+    // removeCoAuthor takes, so a co-author leaving at the same moment cannot
+    // leave a book credited to nobody.
     async remove(id) {
       const sequelize = User.sequelize;
       if (!sequelize) {
@@ -169,6 +178,35 @@ export function createSequelizeUserRepository(): UserRepository {
       }
 
       return sequelize.transaction(async (transaction) => {
+        const creditedBookIds = (
+          await BookAuthor.findAll({
+            where: { userId: id },
+            attributes: ['bookId'],
+            transaction,
+          })
+        ).map((credit) => credit.bookId);
+
+        if (creditedBookIds.length > 0) {
+          await Book.findAll({
+            where: { id: creditedBookIds },
+            attributes: ['id'],
+            lock: transaction.LOCK.UPDATE,
+            transaction,
+          });
+          const credits = await BookAuthor.findAll({
+            where: { bookId: creditedBookIds },
+            attributes: ['bookId'],
+            transaction,
+          });
+          const soleBookIds = creditedBookIds.filter(
+            (bookId) =>
+              credits.filter((credit) => credit.bookId === bookId).length === 1
+          );
+          if (soleBookIds.length > 0) {
+            await Book.destroy({ where: { id: soleBookIds }, transaction });
+          }
+        }
+
         // silent, or every tombstone this leaves shares one updatedAt — a
         // stamp linking them to each other and to the moment of the delete.
         await Comment.update(
