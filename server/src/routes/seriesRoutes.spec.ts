@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
-import type {
-  SeriesListResult,
-  SeriesRepository,
-} from '../repositories/seriesRepository.ts';
+import type { Actor } from '../repositories/notificationRepository.ts';
+import type { SeriesRepository } from '../repositories/seriesRepository.ts';
+import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
 import type { PublicSeries } from '../types/series.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import {
@@ -21,8 +19,8 @@ import {
 // accepts is that persona's id, not an arbitrary constant.
 const KNOWN_USER_ID = USER_IDS.author;
 const UNOWNED_USER_ID = 999997;
-// A book the fake files under series 1 on creation, so the unlink route has
-// something to take out.
+// A book filed under the first series each fake creates, so the unlink route
+// has something to take out.
 const FILED_BOOK_ID = 40;
 
 // Every persona a fake credit can name, so a response's `authors` carries real
@@ -34,121 +32,14 @@ const SUMMARIES = new Map<number, AuthorSummary>(
   ])
 );
 
-function createFakeRepository(actors: unknown[] = []): SeriesRepository {
-  const rows = new Map<number, PublicSeries>();
-  // seriesId -> co-author ids, in credit order. The rules on credits (the
-  // author role, duplicates, the last co-author) belong to the real repository
-  // and are covered against MySQL; this fake only keeps the list.
-  const credits = new Map<number, number[]>();
-  // bookId -> seriesId, for the books filed under a series.
-  const filed = new Map<number, number>();
-  let nextId = 1;
-
-  const withCredits = (series: PublicSeries): PublicSeries => ({
-    ...series,
-    authors: (credits.get(series.id) ?? []).flatMap(
-      (id) => SUMMARIES.get(id) ?? []
-    ),
+const createFakeRepository = (
+  actors: [string, Actor][] = []
+): SeriesRepository =>
+  createFakeSeriesRepository({
+    accounts: SUMMARIES,
+    books: new Map([[FILED_BOOK_ID, 1]]),
+    actors,
   });
-
-  return {
-    async create(input) {
-      // Stands in for the foreign key: the real repository maps MySQL's
-      // rejection to this same NotFoundError.
-      if (input.userId !== KNOWN_USER_ID) {
-        throw new NotFoundError('User', input.userId);
-      }
-
-      const now = new Date();
-      const series: PublicSeries = {
-        id: nextId,
-        authors: [],
-        title: input.title,
-        description: input.description,
-        tags: input.tags,
-        createdAt: now,
-        updatedAt: now,
-      };
-      nextId += 1;
-      rows.set(series.id, series);
-      credits.set(series.id, [input.userId]);
-      if (series.id === 1) filed.set(FILED_BOOK_ID, series.id);
-      return withCredits(series);
-    },
-
-    async list(query): Promise<SeriesListResult> {
-      const all = [...rows.values()].filter(
-        (row) =>
-          (query.userId === undefined ||
-            (credits.get(row.id) ?? []).includes(query.userId)) &&
-          (!query.tag || row.tags.includes(query.tag)) &&
-          (!query.q || row.description.includes(query.q))
-      );
-      return {
-        items: all
-          .slice(query.offset, query.offset + query.limit)
-          .map(withCredits),
-        total: all.length,
-      };
-    },
-
-    async findById(id) {
-      const series = rows.get(id);
-      return series ? withCredits(series) : null;
-    },
-
-    async update(id, input) {
-      const current = rows.get(id);
-      if (!current) return null;
-      const updated: PublicSeries = {
-        ...current,
-        description: input.description ?? current.description,
-        tags: input.tags ?? current.tags,
-        updatedAt: new Date(),
-      };
-      rows.set(id, updated);
-      return withCredits(updated);
-    },
-
-    async remove(id, actor) {
-      actors.push(['remove', actor]);
-      credits.delete(id);
-      return rows.delete(id);
-    },
-
-    async removeBook(seriesId, bookId) {
-      if (!rows.has(seriesId)) return false;
-      if (filed.get(bookId) !== seriesId) {
-        throw new NotFoundError('Book', bookId);
-      }
-      filed.delete(bookId);
-      return true;
-    },
-
-    async addCoAuthor(seriesId, userId, actor) {
-      actors.push(['addCoAuthor', actor]);
-      const series = rows.get(seriesId);
-      if (!series) return null;
-      credits.set(seriesId, [...(credits.get(seriesId) ?? []), userId]);
-      return withCredits(series);
-    },
-
-    async removeCoAuthor(seriesId, userId, actor) {
-      actors.push(['removeCoAuthor', actor]);
-      const series = rows.get(seriesId);
-      if (!series) return null;
-      credits.set(
-        seriesId,
-        (credits.get(seriesId) ?? []).filter((id) => id !== userId)
-      );
-      return withCredits(series);
-    },
-
-    async findCoAuthorIds(id) {
-      return credits.get(id) ?? null;
-    },
-  };
-}
 
 // No userId: the first Co-author comes from the session, never the body.
 const valid = {
@@ -737,7 +628,7 @@ test('an author who is not credited on the series may not take a book out', asyn
 // --- Notifications name who acted, so the routes must say who that was. ---
 
 test('series credit changes and deletes are made as the signed-in caller', async () => {
-  const actors: unknown[] = [];
+  const actors: [string, Actor][] = [];
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository(actors) },
     async (base) => {

@@ -1,14 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  ConflictError,
-  ForbiddenError,
-  NotFoundError,
-} from '../types/errors.ts';
 import type {
   LikeListResult,
   LikeRepository,
 } from '../repositories/likeRepository.ts';
+import { createFakeLikeRepository } from '../repositories/likeRepository.fake.testkit.ts';
 import type { PublicLike } from '../types/like.ts';
 import {
   AUTH_COOKIE,
@@ -31,10 +27,10 @@ const FOREIGN_LIKE_ID = 500;
 // "foreign" row silently belong to a real persona instead.
 const FOREIGN_LIKE_OWNER_ID = 900;
 
-// Seeded rather than posted: the fake's create() below only accepts
-// actorId === KNOWN_USER_ID, so there is no way to create a like as a
-// second persona through the API — the same technique commentRoutes.spec.ts
-// uses for FOREIGN_COMMENT_ID.
+// Seeded rather than posted: the fake below knows KNOWN_USER_ID as its only
+// account, so there is no way to create a like as a second persona through
+// the API — the same technique commentRoutes.spec.ts uses for
+// FOREIGN_COMMENT_ID.
 const FOREIGN_LIKE: PublicLike = {
   id: FOREIGN_LIKE_ID,
   userId: FOREIGN_LIKE_OWNER_ID,
@@ -47,90 +43,22 @@ const FOREIGN_LIKE: PublicLike = {
 // `seed` defaults to empty: most tests count rows (`total`, a `bookId`
 // filter), so a row present in every repository would silently inflate
 // those counts. Only the ownership tests below opt into the foreign row.
-function createFakeRepository(seed: PublicLike[] = []): LikeRepository {
-  const rows = new Map<number, PublicLike>(seed.map((row) => [row.id, row]));
-  let nextId = 1;
-
-  return {
-    async create(input, actorId) {
-      // Stands in for the real repository's ownership lookup: these two rows
-      // belong to the acting user, so liking them is refused.
-      if (input.bookId === OWN_BOOK_ID) {
-        throw new ForbiddenError('You cannot like your own book');
-      }
-      if (input.commentId === OWN_COMMENT_ID) {
-        throw new ForbiddenError('You cannot like your own comment');
-      }
-
-      // Stands in for the three foreign keys: the real repository maps MySQL's
-      // rejection to these same NotFoundErrors, reading the constraint text to
-      // tell them apart.
-      if (actorId !== KNOWN_USER_ID) {
-        throw new NotFoundError('User', actorId);
-      }
-      if (input.bookId !== null && input.bookId !== KNOWN_BOOK_ID) {
-        throw new NotFoundError('Book', input.bookId);
-      }
-      if (input.commentId !== null && input.commentId !== KNOWN_COMMENT_ID) {
-        throw new NotFoundError('Comment', input.commentId);
-      }
-      // Stands in for the unique indexes on (userId, bookId) and
-      // (userId, commentId).
-      const taken = [...rows.values()].some(
-        (row) =>
-          row.userId === actorId &&
-          row.bookId === input.bookId &&
-          row.commentId === input.commentId
-      );
-      if (taken) throw new ConflictError('like');
-
-      const like: PublicLike = {
-        id: nextId,
-        userId: actorId,
-        bookId: input.bookId,
-        commentId: input.commentId,
-        isLike: input.isLike,
-        createdAt: new Date(),
-      };
-      nextId += 1;
-      rows.set(like.id, like);
-      return like;
-    },
-
-    async list(query): Promise<LikeListResult> {
-      const all = [...rows.values()].filter(
-        (row) =>
-          (query.userId === undefined || row.userId === query.userId) &&
-          (query.bookId === undefined || row.bookId === query.bookId) &&
-          (query.commentId === undefined ||
-            row.commentId === query.commentId) &&
-          (query.isLike === undefined || row.isLike === query.isLike)
-      );
-
-      return {
-        items: all.slice(query.offset, query.offset + query.limit),
-        total: all.length,
-      };
-    },
-
-    async findById(id) {
-      return rows.get(id) ?? null;
-    },
-
-    async update(id, input) {
-      const current = rows.get(id);
-      if (!current) return null;
-
-      const updated: PublicLike = { ...current, isLike: input.isLike };
-      rows.set(id, updated);
-      return updated;
-    },
-
-    async remove(id) {
-      return rows.delete(id);
-    },
-  };
-}
+//
+// The known book and comment belong to the foreign row's owner, so the acting
+// user may like them; the OWN_ rows belong to the acting user.
+const createFakeRepository = (seed: PublicLike[] = []): LikeRepository =>
+  createFakeLikeRepository({
+    accounts: new Set([KNOWN_USER_ID]),
+    books: new Map([
+      [KNOWN_BOOK_ID, [FOREIGN_LIKE_OWNER_ID]],
+      [OWN_BOOK_ID, [KNOWN_USER_ID]],
+    ]),
+    comments: new Map([
+      [KNOWN_COMMENT_ID, FOREIGN_LIKE_OWNER_ID],
+      [OWN_COMMENT_ID, KNOWN_USER_ID],
+    ]),
+    seed,
+  });
 
 const onBook = {
   bookId: KNOWN_BOOK_ID,

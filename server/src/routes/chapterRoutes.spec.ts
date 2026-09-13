@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError, StateConflictError } from '../types/errors.ts';
-import type {
-  ChapterListResult,
-  ChapterRepository,
-} from '../repositories/chapterRepository.ts';
+import { StateConflictError } from '../types/errors.ts';
+import type { ChapterRepository } from '../repositories/chapterRepository.ts';
+import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
 import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
 import {
   json,
@@ -21,7 +19,7 @@ const SHARED_BOOK_ID = 2;
 
 // Stands in for the books' credits: which books exist, and who co-authors
 // each. A chapter has no owner of its own — its book's Co-authors own it — so
-// both lookups below read this rather than hard-coding a persona.
+// the fake's ownership lookups read this rather than hard-coding a persona.
 const BOOK_CO_AUTHORS = new Map<number, number[]>([
   [KNOWN_BOOK_ID, [USER_IDS.author]],
   [SHARED_BOOK_ID, [USER_IDS.author, USER_IDS.otherAuthor]],
@@ -30,100 +28,8 @@ const BOOK_CO_AUTHORS = new Map<number, number[]>([
 // `inputs` records what the routes handed the repository. Publication rules and
 // the version check are the real repository's, covered against MySQL; what the
 // routes owe it is the validated body, which is what a test can check here.
-function createFakeRepository(inputs: unknown[] = []): ChapterRepository {
-  const rows = new Map<number, PublicChapter>();
-  let nextId = 1;
-
-  return {
-    async create(input) {
-      inputs.push(input);
-      // Stands in for the foreign key: the real repository maps MySQL's
-      // rejection to this same NotFoundError.
-      if (!BOOK_CO_AUTHORS.has(input.bookId)) {
-        throw new NotFoundError('Book', input.bookId);
-      }
-
-      const now = new Date();
-      const chapter: PublicChapter = {
-        id: nextId,
-        bookId: input.bookId,
-        title: input.title,
-        text: input.text,
-        publishedAt:
-          input.publishedAt === null
-            ? null
-            : input.publishedAt === 'now'
-              ? now
-              : new Date(input.publishedAt),
-        createdAt: now,
-        updatedAt: now,
-      };
-      nextId += 1;
-      rows.set(chapter.id, chapter);
-      return chapter;
-    },
-
-    async list(query): Promise<ChapterListResult> {
-      const all = [...rows.values()].filter(
-        (row) =>
-          (query.bookId === undefined || row.bookId === query.bookId) &&
-          (!query.q ||
-            row.title.includes(query.q) ||
-            row.text.includes(query.q))
-      );
-
-      return {
-        // Mirrors the real repository, which leaves the body out of the SELECT
-        // rather than stripping it after the fact.
-        items: all
-          .slice(query.offset, query.offset + query.limit)
-          .map(({ text: _text, ...summary }): ChapterSummary => summary),
-        total: all.length,
-      };
-    },
-
-    async findById(id) {
-      return rows.get(id) ?? null;
-    },
-
-    async update(id, input) {
-      inputs.push(input);
-      const current = rows.get(id);
-      if (!current) return null;
-
-      const updated: PublicChapter = {
-        ...current,
-        title: input.title ?? current.title,
-        text: input.text ?? current.text,
-        updatedAt: new Date(),
-      };
-      rows.set(id, updated);
-      return updated;
-    },
-
-    async remove(id) {
-      return rows.delete(id);
-    },
-
-    // Stands in for the book row: the set comparison behind a 409 is the real
-    // repository's, covered against MySQL.
-    async reorder(bookId, chapterIds) {
-      inputs.push({ bookId, chapterIds });
-      return BOOK_CO_AUTHORS.has(bookId);
-    },
-
-    // Mirrors the real repository, which resolves a chapter's Co-authors
-    // through the book it is stored under.
-    async findCoAuthorIds(id) {
-      const chapter = rows.get(id);
-      return chapter ? (BOOK_CO_AUTHORS.get(chapter.bookId) ?? null) : null;
-    },
-
-    async findBookCoAuthorIds(bookId) {
-      return BOOK_CO_AUTHORS.get(bookId) ?? null;
-    },
-  };
-}
+const createFakeRepository = (inputs: unknown[] = []): ChapterRepository =>
+  createFakeChapterRepository({ books: BOOK_CO_AUTHORS, inputs });
 
 const valid = {
   bookId: KNOWN_BOOK_ID,

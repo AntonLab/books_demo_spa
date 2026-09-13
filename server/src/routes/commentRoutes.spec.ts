@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
-import type {
-  CommentListResult,
-  CommentRepository,
-} from '../repositories/commentRepository.ts';
+import type { CommentRepository } from '../repositories/commentRepository.ts';
+import { createFakeCommentRepository } from '../repositories/commentRepository.fake.testkit.ts';
 import type { CommentWithAuthor, PublicComment } from '../types/comment.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import {
@@ -12,6 +9,7 @@ import {
   json,
   ROLE_COOKIES,
   TEST_USER,
+  USER_IDS,
   withApp,
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
@@ -33,116 +31,38 @@ const AUTHOR: AuthorSummary = {
   lastName: TEST_USER.lastName,
 };
 
-function createFakeRepository(): CommentRepository {
-  const rows = new Map<number, PublicComment>();
-  let nextId = 1;
+// Every persona a spec posts as, so a live comment's `author` is a real
+// summary: TEST_USER's own for the default cookie.
+const ACCOUNTS = new Map<number, AuthorSummary>(
+  Object.values(USER_IDS).map((id) => [
+    id,
+    id === TEST_USER.id
+      ? AUTHOR
+      : { id, login: `persona-${id}`, firstName: 'Persona', lastName: `${id}` },
+  ])
+);
 
-  const now = new Date();
-  // Seeded rather than posted, because the API offers no way to create a
-  // comment as somebody else — which is the property under test.
-  rows.set(FOREIGN_COMMENT_ID, {
-    id: FOREIGN_COMMENT_ID,
-    parentId: null,
-    userId: OTHER_USER_ID,
-    bookId: KNOWN_BOOK_ID,
-    text: 'Not yours',
-    tombstone: null,
-    createdAt: now,
-    updatedAt: now,
+// Seeded rather than posted, because the API offers no way to create a
+// comment as somebody else — which is the property under test. The fake never
+// mutates a seeded row, so one object serves every fake.
+const FOREIGN_COMMENT: PublicComment = {
+  id: FOREIGN_COMMENT_ID,
+  parentId: null,
+  userId: OTHER_USER_ID,
+  bookId: KNOWN_BOOK_ID,
+  text: 'Not yours',
+  tombstone: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
+const createFakeRepository = (): CommentRepository =>
+  createFakeCommentRepository({
+    accounts: ACCOUNTS,
+    books: new Set([KNOWN_BOOK_ID]),
+    seed: [FOREIGN_COMMENT],
+    viewerLikeId: 42,
   });
-
-  // Mirrors toPublicComment: a tombstone withholds its text and its owner.
-  const publicView = (row: PublicComment): PublicComment =>
-    row.tombstone === null ? row : { ...row, text: '', userId: null };
-
-  return {
-    async create(input, actorId) {
-      // Stands in for the foreign key: the real repository maps MySQL's
-      // rejection to this same NotFoundError.
-      if (input.bookId !== KNOWN_BOOK_ID) {
-        throw new NotFoundError('Book', input.bookId);
-      }
-
-      const created = new Date();
-      const comment: PublicComment = {
-        id: nextId,
-        parentId: input.parentId,
-        userId: actorId,
-        bookId: input.bookId,
-        text: input.text,
-        tombstone: null,
-        createdAt: created,
-        updatedAt: created,
-      };
-      nextId += 1;
-      rows.set(comment.id, comment);
-      return comment;
-    },
-
-    async list(query, viewerId): Promise<CommentListResult> {
-      const all = [...rows.values()].filter(
-        (row) =>
-          (query.bookId === undefined || row.bookId === query.bookId) &&
-          (query.userId === undefined ||
-            (row.tombstone === null && row.userId === query.userId)) &&
-          (query.parentId === undefined || row.parentId === query.parentId)
-      );
-
-      return {
-        items: all
-          .slice(query.offset, query.offset + query.limit)
-          .map((row): CommentWithAuthor => ({
-            ...publicView(row),
-            // Mirrors the real serialiser: a tombstone is anonymous.
-            author: row.tombstone === null ? AUTHOR : null,
-            likeCount: 0,
-            // Mirrors the real repository: only a signed-in caller can have a
-            // like of their own to report.
-            viewerLikeId: viewerId === null ? null : 42,
-          })),
-        total: all.length,
-      };
-    },
-
-    async findById(id) {
-      const row = rows.get(id);
-      return row ? publicView(row) : null;
-    },
-
-    async update(id, input) {
-      const current = rows.get(id);
-      if (!current) return null;
-
-      const updated: PublicComment = {
-        ...current,
-        text: input.text,
-        updatedAt: new Date(),
-      };
-      rows.set(id, updated);
-      return updated;
-    },
-
-    // A soft delete, like the real repository: scoped to live rows, so a
-    // second call reports false. The stored row keeps its text, as MySQL's
-    // does; publicView is what withholds it.
-    async remove(id, kind) {
-      const current = rows.get(id);
-      if (!current || current.tombstone !== null) return false;
-
-      rows.set(id, { ...current, tombstone: kind });
-      return true;
-    },
-
-    async restore(id) {
-      const current = rows.get(id);
-      if (!current || current.tombstone !== 'removed') return null;
-
-      const restored: PublicComment = { ...current, tombstone: null };
-      rows.set(id, restored);
-      return restored;
-    },
-  };
-}
 
 const post = (
   base: string,
