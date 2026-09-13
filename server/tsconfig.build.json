@@ -5,6 +5,7 @@
     "node_modules",
     "src/**/*.spec.ts",
     "src/**/*.testkit.ts",
-    "src/db/seed.ts"
+    "src/db/seed.ts",
+    "src/db/seedGuards.ts"
   ]
 }

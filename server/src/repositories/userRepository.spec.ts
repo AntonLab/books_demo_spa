@@ -2,7 +2,8 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import { isDeepStrictEqual } from 'node:util';
+import { DatabaseError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -26,6 +27,7 @@ import { verifyPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { hashToken } from '../tokens.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
+import { userRepositoryContract } from './userRepository.contract.testkit.ts';
 
 function testDbConfig() {
   const config = parseConfig({
@@ -268,6 +270,56 @@ describe('userRepository against real MySQL', { skip }, () => {
     await repository.update(created.id, { firstName: 'Renamed' });
 
     assert.equal(await sessionCount(created.id), 2);
+  });
+
+  test('an update onto a taken login or email is a conflict naming the field', async () => {
+    await repository.create({
+      ...base,
+      login: 'Taken',
+      email: 't@example.com',
+    });
+    const created = await repository.create({
+      ...base,
+      login: 'Mover',
+      email: 'm@example.com',
+    });
+
+    for (const [change, field] of [
+      [{ login: 'Taken' }, 'login'],
+      [{ email: 'T@example.com' }, 'email'],
+    ] as const) {
+      await assert.rejects(
+        repository.update(created.id, change),
+        (error: unknown) =>
+          error instanceof ConflictError &&
+          isDeepStrictEqual(error.details, { field })
+      );
+    }
+    assert.equal((await repository.findById(created.id))?.login, 'Mover');
+  });
+
+  // Only a unique violation is a conflict; anything else the database refuses
+  // is passed on as it is.
+  test('a create the database refuses for another reason is not reported as a conflict', async () => {
+    await assert.rejects(
+      repository.create({ ...base, login: 'x'.repeat(65) }),
+      DatabaseError
+    );
+  });
+
+  test('updateRole sets the role and answers with the public user', async () => {
+    const created = await repository.create({ ...base });
+
+    const updated = await repository.updateRole(created.id, 'author');
+
+    assert.equal(updated?.id, created.id);
+    assert.equal(updated?.role, 'author');
+    assert.equal('password' in (updated ?? {}), false);
+    assert.equal((await repository.findById(created.id))?.role, 'author');
+  });
+
+  test('updateRole reports a missing account as null', async () => {
+    assert.equal(await repository.updateRole(9999, 'admin'), null);
   });
 
   test('returns null for a missing record and false for a missing delete', async () => {
@@ -610,4 +662,8 @@ describe('userRepository against real MySQL', { skip }, () => {
       ['ipetrov']
     );
   });
+
+  // --- The contract the route specs' fake is held to, run here for real. ---
+
+  userRepositoryContract(async () => ({ repository }));
 });

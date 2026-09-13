@@ -1,6 +1,10 @@
 import type { FC } from 'react';
 import { Alert, Button, Form, Input, Radio, Select, theme } from 'antd';
-import { BOOK_STATUS_LABELS, type BookStatus } from '@/types/book';
+import {
+  BOOK_STATUS_LABELS,
+  BOOK_STATUSES,
+  type BookStatus,
+} from '@/types/book';
 
 export interface BookFormValues {
   title: string;
@@ -32,8 +36,6 @@ const NO_SERIES = 0;
 interface FieldValues extends Omit<BookFormValues, 'seriesId'> {
   seriesId: number;
 }
-
-const STATUSES: BookStatus[] = ['draft', 'in_progress', 'complete'];
 
 // Presentational: it neither fetches nor saves. The page that renders it owns
 // the series list, the mutation and the error, so creating and editing share
@@ -122,7 +124,7 @@ export const BookForm: FC<BookFormProps> = ({
           <Form.Item name="status" label="Status">
             <Radio.Group
               optionType="button"
-              options={STATUSES.map((status) => ({
+              options={BOOK_STATUSES.map((status) => ({
                 value: status,
                 label: BOOK_STATUS_LABELS[status],
               }))}

@@ -240,13 +240,13 @@ export async function withAuthenticatedApp(
     {
       ...stubs,
       ...overrides,
-      // Only userRoutes.spec overrides userRepository, and requirePermission
-      // shares it: resolving the session's user would otherwise go through that
-      // spec's own fake, which has never heard of these personas and answers
-      // null — a 401 on every guarded request before the fake is even
-      // reached. The override answers first, so that spec's GET /:id keeps
-      // its own rows, and the known personas are the fallback that lets the
-      // session resolve.
+      // The users and authors specs override userRepository, and
+      // requirePermission shares it: resolving the session's user would
+      // otherwise go through that spec's own fake, which has never heard of
+      // these personas and answers null — a 401 on every guarded request
+      // before the fake is even reached. The override answers first, so a
+      // spec's GET /:id keeps its own rows, and the known personas are the
+      // fallback that lets the session resolve.
       userRepository: overrideUsers
         ? {
             ...overrideUsers,

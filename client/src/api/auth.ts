@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { PublicUser } from '../types/user';
+import type { PublicUser, RegistrableRole } from '../types/user';
 
 export interface RegisterInput {
   login: string;
@@ -9,7 +9,7 @@ export interface RegisterInput {
   lastName: string;
   // The only role a public form may ask for. The server narrows it again, so
   // this is a convenience, not the guard.
-  role?: 'user' | 'author';
+  role?: RegistrableRole;
 }
 
 export interface LoginInput {

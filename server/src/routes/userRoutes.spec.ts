@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ConflictError } from '../types/errors.ts';
-import type {
-  UserRepository,
-  UserListResult,
-} from '../repositories/userRepository.ts';
+import type { UserRepository } from '../repositories/userRepository.ts';
+import {
+  createFakeUserRepository,
+  type FakeUserRow,
+} from '../repositories/userRepository.fake.testkit.ts';
 import { hashPassword } from '../password.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type { PublicUser } from '../types/user.ts';
@@ -31,9 +31,9 @@ const PASSWORD_HASH = await hashPassword(PASSWORD, 'test');
 // posted, because POST now requires a superadmin session (the matrix grants
 // `users × create` to superadmin alone) and would otherwise assign its own
 // ids instead of the fixed ones ROLE_COOKIES/USER_IDS depend on.
-function seedPersonaRows(): PublicUser[] {
+function seedPersonaRows(): FakeUserRow[] {
   const now = new Date();
-  const row = (id: number, role: PublicUser['role']): PublicUser => ({
+  const row = (id: number, role: PublicUser['role']): FakeUserRow => ({
     id,
     login: `persona-${id}`,
     email: `persona-${id}@example.com`,
@@ -41,6 +41,7 @@ function seedPersonaRows(): PublicUser[] {
     lastName: 'User',
     status: 'active',
     role,
+    password: PASSWORD_HASH,
     createdAt: now,
     updatedAt: now,
   });
@@ -55,101 +56,8 @@ function seedPersonaRows(): PublicUser[] {
   ];
 }
 
-function createFakeRepository(seed: PublicUser[] = []): UserRepository {
-  const rows = new Map<number, PublicUser>(seed.map((row) => [row.id, row]));
-  let nextId = 1;
-
-  const conflicts = (login: string, email: string, skipId?: number): void => {
-    for (const row of rows.values()) {
-      if (row.id === skipId) continue;
-      if (row.login === login) throw new ConflictError('login');
-      if (row.email.toLowerCase() === email.toLowerCase())
-        throw new ConflictError('email');
-    }
-  };
-
-  return {
-    async create(input) {
-      conflicts(input.login, input.email);
-      const now = new Date();
-      const user: PublicUser = {
-        id: nextId,
-        login: input.login,
-        email: input.email,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        status: input.status ?? 'pending',
-        role: 'user',
-        createdAt: now,
-        updatedAt: now,
-      };
-      nextId += 1;
-      rows.set(user.id, user);
-      return user;
-    },
-
-    async list(query): Promise<UserListResult> {
-      const all = [...rows.values()].filter(
-        (row) => !query.status || row.status === query.status
-      );
-      return {
-        items: all.slice(query.offset, query.offset + query.limit),
-        total: all.length,
-      };
-    },
-
-    // Not reached from /api/users; authorRoutes.spec.ts drives the search.
-    async listAuthors() {
-      return [];
-    },
-
-    async findById(id) {
-      return rows.get(id) ?? null;
-    },
-
-    async update(id, input) {
-      const current = rows.get(id);
-      if (!current) return null;
-      conflicts(input.login ?? current.login, input.email ?? current.email, id);
-      // Applies every key it is handed rather than copying a named few. That
-      // is what lets "a role in a PATCH body is ignored" fail: a fake that
-      // never read `role` would pass it even if the schema let one through.
-      const updated: PublicUser = {
-        ...current,
-        ...input,
-        updatedAt: new Date(),
-      };
-      rows.set(id, updated);
-      return updated;
-    },
-
-    async remove(id) {
-      return rows.delete(id);
-    },
-
-    async updateRole(id, role) {
-      const current = rows.get(id);
-      if (!current) return null;
-      const updated: PublicUser = { ...current, role, updatedAt: new Date() };
-      rows.set(id, updated);
-      return updated;
-    },
-
-    // No request in this file reaches auth lookups; the fake only needs to
-    // satisfy the interface.
-    async findByLoginWithPassword() {
-      return null;
-    },
-
-    async findByEmail() {
-      return null;
-    },
-
-    async findPasswordHashById(id) {
-      return rows.has(id) ? PASSWORD_HASH : null;
-    },
-  };
-}
+const createFakeRepository = (seed: FakeUserRow[] = []): UserRepository =>
+  createFakeUserRepository({ seed });
 
 const valid = {
   login: 'Bob',

@@ -1,3 +1,6 @@
+import type * as Shared from 'shared';
+import type { Wire } from 'shared';
+
 // No userId: the server takes the liker from the session cookie. `isLike`
 // separates a like from a dislike; this UI only ever sends true.
 export interface CreateLikePayload {
@@ -6,11 +9,4 @@ export interface CreateLikePayload {
   isLike: boolean;
 }
 
-export interface PublicLike {
-  id: number;
-  userId: number;
-  bookId: number | null;
-  commentId: number | null;
-  isLike: boolean;
-  createdAt: string;
-}
+export type PublicLike = Wire<Shared.PublicLike>;

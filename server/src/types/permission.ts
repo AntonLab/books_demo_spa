@@ -1,26 +1,23 @@
+import { USER_ROLES } from 'shared';
+
 // `as const` unions rather than enums, per the repository rules — the same
 // shape as USER_STATUSES in types/user.ts.
+
+// The roles an account can hold, and the two registration may set, are the
+// client's business too, so they come from the shared workspace (ADR-0006).
+export {
+  REGISTRABLE_ROLES,
+  USER_ROLES,
+  type RegistrableRole,
+  type UserRole,
+} from 'shared';
 
 // Every role the matrix has a row for. `guest` is not storable: it is what
 // requirePermission assumes when there is no session, and it exists so public
 // reads are described by the matrix rather than by the absence of a guard.
-export const ROLES = [
-  'guest',
-  'user',
-  'author',
-  'admin',
-  'superadmin',
-] as const;
+// Built on USER_ROLES, so a role added there gets its matrix row too.
+export const ROLES = ['guest', ...USER_ROLES] as const;
 export type Role = (typeof ROLES)[number];
-
-// What may actually sit in users.role. `guest` is deliberately absent.
-export const USER_ROLES = ['user', 'author', 'admin', 'superadmin'] as const;
-export type UserRole = (typeof USER_ROLES)[number];
-
-// What registration may set. admin and superadmin are unreachable from the
-// public form by construction rather than by a check.
-export const REGISTRABLE_ROLES = ['user', 'author'] as const;
-export type RegistrableRole = (typeof REGISTRABLE_ROLES)[number];
 
 export const MODULES = [
   'users',
