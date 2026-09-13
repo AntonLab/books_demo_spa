@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import {
   createUserSchema,
   idParamSchema,
+  listAuthorsQuerySchema,
   listUsersQuerySchema,
   updateUserSchema,
   USER_STATUSES,
@@ -76,6 +78,15 @@ test('list query applies defaults and coerces strings', () => {
   assert.equal(listUsersQuerySchema.parse({ limit: '50' }).limit, 50);
   assert.throws(() => listUsersQuerySchema.parse({ limit: '101' }));
   assert.throws(() => listUsersQuerySchema.parse({ offset: '-1' }));
+});
+
+// The client's Co-author picker stops typing at the same shared constant, so a
+// term it sends is never one this refuses.
+test('author search accepts a term up to the shared limit and no longer', () => {
+  const longest = 'a'.repeat(AUTHOR_SEARCH_MAX_LENGTH);
+
+  assert.equal(listAuthorsQuerySchema.parse({ q: longest }).q, longest);
+  assert.throws(() => listAuthorsQuerySchema.parse({ q: `${longest}a` }));
 });
 
 test('id param coerces a numeric string and rejects anything else', () => {
