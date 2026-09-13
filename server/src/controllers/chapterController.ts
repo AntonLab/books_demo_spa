@@ -5,6 +5,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
+import { viewerOf } from '../repositories/visibility.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type {
   CreateChapterInput,
@@ -82,13 +83,13 @@ export function createChapterController(
     // page of twenty chapters cannot drag twenty MEDIUMTEXT columns with it.
     list: async (req, res) => {
       const query = validatedQuery<ListChaptersQuery>(req);
-      const { items, total } = await repository.list(query);
+      const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const chapter = await repository.findById(id);
+      const chapter = await repository.findById(id, viewerOf(req.user));
       if (!chapter) throw new NotFoundError('Chapter', id);
       res.json(chapter);
     },

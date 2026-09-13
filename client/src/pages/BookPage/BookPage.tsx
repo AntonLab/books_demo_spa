@@ -9,6 +9,7 @@ import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
+import { BOOK_STATUS_LABELS } from '@/types/book';
 
 export const BookPage: FC = () => {
   const { token } = theme.useToken();
@@ -27,9 +28,12 @@ export const BookPage: FC = () => {
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
 
-  // Mirrors the server: signed in, and not one of the book's Co-authors. The
-  // server answers 403 either way — this only avoids offering what would fail.
+  // Mirrors the server: nobody likes or comments on a Draft book, and nobody
+  // likes a book they co-author. The server answers 403 either way — this only
+  // avoids offering what would fail.
+  const isDraft = book.status === 'draft';
   const canLike =
+    !isDraft &&
     session !== null &&
     session !== undefined &&
     !book.authors.some((author) => author.id === session.id);
@@ -44,6 +48,9 @@ export const BookPage: FC = () => {
             .map((author) => `${author.firstName} ${author.lastName}`)
             .join(', ')}
         </Typography.Text>
+        <Tag color={isDraft ? 'orange' : undefined}>
+          {BOOK_STATUS_LABELS[book.status]}
+        </Tag>
         {book.series && (
           <Link to={`/series?id=${book.series.id}`}>{book.series.title}</Link>
         )}
@@ -85,7 +92,7 @@ export const BookPage: FC = () => {
 
       <Divider />
 
-      <CommentSection bookId={bookId} />
+      <CommentSection bookId={bookId} closed={isDraft} />
     </article>
   );
 };

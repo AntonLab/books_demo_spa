@@ -11,6 +11,7 @@ import { Book, BookAuthor, initModels, Series, User } from '../models/index.ts';
 import { createCreditedSeries } from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
+import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the users' or series' suite: node:test runs
 // spec files in parallel processes, and two suites calling sync({ force: true })
@@ -70,6 +71,19 @@ describe('bookRepository against real MySQL', { skip }, () => {
   let seriesId: number;
   const repository = createSequelizeBookRepository();
 
+  // A book every list shows: the filter tests below are about their filters,
+  // not about Draft books, which get suites of their own.
+  const createPublished = async (
+    input: Parameters<typeof repository.create>[0]
+  ) => {
+    const created = await repository.create(input);
+    await repository.update(created.id, { status: 'in_progress' });
+    return created;
+  };
+
+  const listAsGuest = (query: Parameters<typeof repository.list>[0]) =>
+    repository.list(query, null);
+
   before(async () => {
     const db = testDbConfig();
     await ensureDatabase(db);
@@ -112,6 +126,95 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.deepEqual((await repository.findById(created.id))?.authors, [
       { id: ownerId, login: 'BookOwner', firstName: 'Ola', lastName: 'Owner' },
     ]);
+  });
+
+  test('a new book starts as a draft and moves through every status', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Status',
+      tags: [],
+    });
+    assert.equal(created.status, 'draft');
+
+    for (const status of ['complete', 'in_progress', 'draft'] as const) {
+      assert.equal(
+        (await repository.update(created.id, { status }))?.status,
+        status
+      );
+    }
+  });
+
+  test('no list shows a draft, except the caller listing their own books', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Draft',
+      description: 'Private',
+      tags: [],
+    });
+    await repository.addCoAuthor(draft.id, coAuthorId);
+    const published = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Published',
+      description: 'Public',
+      tags: [],
+    });
+    await repository.update(published.id, { status: 'in_progress' });
+
+    const titles = async (
+      query: { userId?: number },
+      viewer: Viewer
+    ): Promise<string[]> =>
+      (
+        await repository.list({ limit: 20, offset: 0, ...query }, viewer)
+      ).items.map((book) => book.title);
+
+    const owner: Viewer = { id: ownerId, role: 'author' };
+    const moderator: Viewer = { id: coAuthorId + 1_000, role: 'superadmin' };
+
+    assert.deepEqual(await titles({}, null), ['Published']);
+    assert.deepEqual(await titles({}, owner), ['Published']);
+    assert.deepEqual(await titles({}, moderator), ['Published']);
+    assert.deepEqual(await titles({ userId: ownerId }, moderator), [
+      'Published',
+    ]);
+    // Their own list, and a shared draft shows for either Co-author.
+    assert.deepEqual(await titles({ userId: ownerId }, owner), [
+      'Draft',
+      'Published',
+    ]);
+    assert.deepEqual(
+      await titles({ userId: coAuthorId }, { id: coAuthorId, role: 'author' }),
+      ['Draft']
+    );
+  });
+
+  test('a draft is readable by its co-authors and moderators, and nobody else', async () => {
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Draft',
+      description: 'Private',
+      tags: [],
+    });
+    const stranger = ownerId + 1_000;
+
+    const readable = async (viewer: Viewer): Promise<boolean> =>
+      (await repository.findDetailById(draft.id, viewer)) !== null;
+
+    assert.equal(await readable(null), false);
+    assert.equal(await readable({ id: stranger, role: 'user' }), false);
+    assert.equal(await readable({ id: stranger, role: 'author' }), false);
+    assert.equal(await readable({ id: ownerId, role: 'author' }), true);
+    assert.equal(await readable({ id: stranger, role: 'admin' }), true);
+    assert.equal(await readable({ id: stranger, role: 'superadmin' }), true);
+
+    await repository.update(draft.id, { status: 'complete' });
+    assert.equal(await readable(null), true);
   });
 
   test('a co-author is credited after the ones already there', async () => {
@@ -251,7 +354,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
 
   test('the userId filter matches a book through any of its co-authors', async () => {
     const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
-    const shared = await repository.create({
+    const shared = await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Shared Book',
@@ -259,7 +362,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
     await repository.addCoAuthor(shared.id, coAuthorId);
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Solo Book',
@@ -267,7 +370,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const page = await repository.list({
+    const page = await listAsGuest({
       limit: 20,
       offset: 0,
       userId: coAuthorId,
@@ -276,13 +379,13 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(page.total, 1);
     assert.equal(page.items[0]?.title, 'Shared Book');
     assert.equal(
-      (await repository.list({ limit: 20, offset: 0, userId: ownerId })).total,
+      (await listAsGuest({ limit: 20, offset: 0, userId: ownerId })).total,
       2
     );
   });
 
   test('round-trips tags through the JSON column as a real array', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       userId: ownerId,
       seriesId,
       title: 'Test Book',
@@ -298,7 +401,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('stores a standalone book with a null seriesId', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -311,7 +414,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('tags survive multi-byte characters, thanks to utf8mb4', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -359,7 +462,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('an update to an unknown series is a NotFoundError on the series', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -376,14 +479,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('the tag filter matches through JSON_CONTAINS, not a substring', async () => {
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
       description: 'Tagged epic',
       tags: ['epic'],
     });
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -391,7 +494,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: ['epic-fantasy'],
     });
 
-    const exact = await repository.list({ limit: 20, offset: 0, tag: 'epic' });
+    const exact = await listAsGuest({ limit: 20, offset: 0, tag: 'epic' });
 
     // A LIKE-based implementation would return both rows here.
     assert.equal(exact.total, 1);
@@ -399,7 +502,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('list finds a book by its title', async () => {
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'The Dragon Gate',
@@ -407,7 +510,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const { items } = await repository.list({
+    const { items } = await listAsGuest({
       limit: 20,
       offset: 0,
       q: 'Dragon Gate',
@@ -418,14 +521,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('the description search treats LIKE metacharacters literally', async () => {
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
       description: 'Contains a 100% real percent sign',
       tags: [],
     });
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -433,7 +536,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const matches = await repository.list({ limit: 20, offset: 0, q: '%' });
+    const matches = await listAsGuest({ limit: 20, offset: 0, q: '%' });
 
     assert.equal(matches.total, 1);
     assert.match(matches.items[0]?.description ?? '', /100% real/);
@@ -441,7 +544,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
 
   test('the series filter and paging envelope agree on the total', async () => {
     for (const description of ['One', 'Two', 'Three']) {
-      await repository.create({
+      await createPublished({
         userId: ownerId,
         title: description,
         seriesId,
@@ -449,7 +552,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
         tags: [],
       });
     }
-    await repository.create({
+    await createPublished({
       userId: ownerId,
       seriesId: null,
       title: 'Test Book',
@@ -457,7 +560,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const page = await repository.list({ limit: 2, offset: 0, seriesId });
+    const page = await listAsGuest({ limit: 2, offset: 0, seriesId });
 
     assert.equal(page.total, 3);
     assert.equal(page.items.length, 2);

@@ -6,6 +6,11 @@ export const BOOK_MAX_TAGS = 20;
 export const BOOK_DESCRIPTION_MAX_LENGTH = 5000;
 export const BOOK_TITLE_MAX_LENGTH = 255;
 
+// The Book status (CONTEXT.md): only `draft` keeps a book from readers;
+// `complete` is a label and restricts nothing.
+export const BOOK_STATUSES = ['draft', 'in_progress', 'complete'] as const;
+export type BookStatus = (typeof BOOK_STATUSES)[number];
+
 // Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
 // anyway — collapsing them here keeps what lands in the JSON column canonical.
 const tagListSchema = z
@@ -51,6 +56,9 @@ export const updateBookSchema = z
     title: titleSchema,
     description: descriptionSchema,
     tags: tagListSchema,
+    // Any status to any other. Not on the create schema: every book starts as a
+    // draft, whatever the body says.
+    status: z.enum(BOOK_STATUSES),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
@@ -98,6 +106,7 @@ export interface PublicBook {
   title: string;
   description: string;
   tags: string[];
+  status: BookStatus;
   createdAt: Date;
   updatedAt: Date;
 }

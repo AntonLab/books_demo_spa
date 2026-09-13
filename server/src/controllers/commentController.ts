@@ -5,6 +5,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
+import { viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -43,8 +44,11 @@ export function createCommentController(
 ): CommentController {
   // 404 before 403: reporting "forbidden" for a comment that does not exist
   // would leak which ids are real.
-  const findOrThrow = async (id: number): Promise<PublicComment> => {
-    const existing = await repository.findById(id);
+  const findOrThrow = async (
+    req: Request,
+    id: number
+  ): Promise<PublicComment> => {
+    const existing = await repository.findById(id, viewerOf(req.user));
     if (!existing) throw new NotFoundError('Comment', id);
     return existing;
   };
@@ -75,23 +79,20 @@ export function createCommentController(
       const query = validatedQuery<ListCommentsQuery>(req);
       // requirePermission sets req.user when a session resolves; null is what
       // makes viewerLikeId come back empty for an anonymous visitor.
-      const { items, total } = await repository.list(
-        query,
-        req.user?.id ?? null
-      );
+      const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const comment = await repository.findById(id);
+      const comment = await repository.findById(id, viewerOf(req.user));
       if (!comment) throw new NotFoundError('Comment', id);
       res.json(comment);
     },
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const existing = await findOrThrow(id);
+      const existing = await findOrThrow(req, id);
 
       // Before the owner check: nobody — moderators included — may put text
       // back under a tombstone.
@@ -110,7 +111,7 @@ export function createCommentController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const existing = await findOrThrow(id);
+      const existing = await findOrThrow(req, id);
 
       // Already a tombstone: there is nothing left to delete, for anyone.
       if (existing.tombstone !== null) throw new NotFoundError('Comment', id);

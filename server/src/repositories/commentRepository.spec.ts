@@ -18,6 +18,7 @@ import {
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeCommentRepository } from './commentRepository.ts';
+import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
 // in parallel processes, and two suites calling sync({ force: true }) on one
@@ -173,7 +174,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     assert.equal(row?.tombstone, 'removed');
     assert.equal(row?.text, 'Gone soon');
 
-    const served = await repository.findById(created.id);
+    const served = await repository.findById(created.id, null);
     assert.equal(served?.tombstone, 'removed');
     assert.equal(served?.text, '');
     assert.equal(served?.userId, null);
@@ -202,7 +203,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
 
     await repository.remove(root.id, 'deleted');
 
-    const reloaded = await repository.findById(child.id);
+    const reloaded = await repository.findById(child.id, null);
     assert.notEqual(reloaded, null);
     assert.equal(reloaded?.tombstone, null);
     assert.equal(reloaded?.parentId, root.id);
@@ -370,11 +371,11 @@ describe('commentRepository against real MySQL', { skip }, () => {
     );
     const asOwner = await repository.list(
       { limit: 20, offset: 0, bookId },
-      ownerId
+      { id: ownerId, role: 'author' }
     );
     const asReader = await repository.list(
       { limit: 20, offset: 0, bookId },
-      readerId
+      { id: readerId, role: 'user' }
     );
 
     assert.equal(anonymous.items[0]?.likeCount, 1);
@@ -445,5 +446,54 @@ describe('commentRepository against real MySQL', { skip }, () => {
 
     assert.equal(updated?.id, comment.id);
     assert.equal(updated?.text, 'Same words');
+  });
+
+  test('nobody may comment on a draft, its co-authors included', async () => {
+    const draftId = (
+      await createCreditedBook(
+        { title: 'Draft', description: 'Private', tags: [], status: 'draft' },
+        [ownerId]
+      )
+    ).id;
+
+    for (const actorId of [ownerId, readerId]) {
+      await assert.rejects(
+        repository.create(
+          { bookId: draftId, parentId: null, text: 'Too early' },
+          actorId
+        ),
+        (error: unknown) =>
+          error instanceof ForbiddenError &&
+          /draft/i.test((error as Error).message)
+      );
+    }
+  });
+
+  test('returning a book to draft hides its comments from readers and keeps them', async () => {
+    const comment = await repository.create(
+      { bookId, parentId: null, text: 'Said while it was out' },
+      readerId
+    );
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+
+    const owner: Viewer = { id: ownerId, role: 'author' };
+    const readerView: Viewer = { id: readerId, role: 'user' };
+    const moderator: Viewer = { id: readerId + 1_000, role: 'admin' };
+    const total = async (viewer: Viewer): Promise<number> =>
+      (await repository.list({ limit: 20, offset: 0 }, viewer)).total;
+
+    // Hidden from its own writer too: they are a reader of this book.
+    assert.equal(await total(null), 0);
+    assert.equal(await total(readerView), 0);
+    assert.equal(await repository.findById(comment.id, readerView), null);
+    assert.equal(await total(owner), 1);
+    assert.equal(await total(moderator), 1);
+    assert.equal(
+      (await repository.findById(comment.id, owner))?.text,
+      'Said while it was out'
+    );
+
+    await Book.update({ status: 'complete' }, { where: { id: bookId } });
+    assert.equal(await total(null), 1);
   });
 });

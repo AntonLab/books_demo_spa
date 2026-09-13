@@ -16,6 +16,7 @@ import type {
   UpdateChapterInput,
 } from '../types/chapter.ts';
 import { containsPattern } from './likePattern.ts';
+import { readableBookInclude, type Viewer } from './visibility.ts';
 
 export interface ChapterListResult {
   // Summaries, not full records: see list() for why the body stays out of the
@@ -26,8 +27,10 @@ export interface ChapterListResult {
 
 export interface ChapterRepository {
   create(input: CreateChapterInput): Promise<PublicChapter>;
-  list(query: ListChaptersQuery): Promise<ChapterListResult>;
-  findById(id: number): Promise<PublicChapter | null>;
+  // Both leave out the chapters of a Draft book the viewer may not read — a
+  // hidden chapter is reported exactly as a missing one.
+  list(query: ListChaptersQuery, viewer: Viewer): Promise<ChapterListResult>;
+  findById(id: number, viewer: Viewer): Promise<PublicChapter | null>;
   update(id: number, input: UpdateChapterInput): Promise<PublicChapter | null>;
   remove(id: number): Promise<boolean>;
   // Two lookups, not one: a create is checked against the *target book* before
@@ -100,13 +103,14 @@ export function createSequelizeChapterRepository(): ChapterRepository {
       }
     },
 
-    async list(query) {
+    async list(query, viewer) {
       const { rows, count } = await Chapter.findAndCountAll({
         // The body is left out of the SELECT rather than trimmed afterwards: a
         // page of twenty chapters would otherwise drag twenty MEDIUMTEXT
         // columns off disk and across the wire to be discarded.
         attributes: ['id', 'bookId', 'title', 'createdAt', 'updatedAt'],
         where: buildWhere(query),
+        include: [await readableBookInclude(viewer)],
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -115,8 +119,11 @@ export function createSequelizeChapterRepository(): ChapterRepository {
       return { items: rows.map(toChapterSummary), total: count };
     },
 
-    async findById(id) {
-      const chapter = await Chapter.findByPk(id);
+    async findById(id, viewer) {
+      const chapter = await Chapter.findOne({
+        where: { id },
+        include: [await readableBookInclude(viewer)],
+      });
       return chapter ? toPublicChapter(chapter) : null;
     },
 

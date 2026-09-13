@@ -17,6 +17,7 @@ import {
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
+import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the users suite's: node:test runs spec
 // files in parallel processes, and two suites calling sync({ force: true })
@@ -74,6 +75,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
   let ownerId: number;
   const repository = createSequelizeSeriesRepository();
+  // Most series here hold no book at all, which hides them from a reader. The
+  // tests that are not about visibility read as a Moderator, who sees every
+  // series.
+  const asModerator: Viewer = { id: 0, role: 'superadmin' };
 
   before(async () => {
     const db = testDbConfig();
@@ -114,7 +119,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     ];
     assert.deepEqual(created.authors, expected);
     assert.deepEqual(
-      (await repository.findById(created.id))?.authors,
+      (await repository.findById(created.id, asModerator))?.authors,
       expected
     );
   });
@@ -152,7 +157,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         error.statusCode === 400 &&
         /author role/i.test(error.message)
     );
-    assert.equal((await repository.findById(created.id))?.authors.length, 1);
+    assert.equal(
+      (await repository.findById(created.id, asModerator))?.authors.length,
+      1
+    );
   });
 
   test('crediting an account that does not exist blames the user', async () => {
@@ -220,7 +228,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         error.statusCode === 409 &&
         /last co-author/i.test(error.message)
     );
-    assert.equal((await repository.findById(created.id))?.authors.length, 1);
+    assert.equal(
+      (await repository.findById(created.id, asModerator))?.authors.length,
+      1
+    );
   });
 
   test('removing an account that is not credited is a 404, even on a solo series', async () => {
@@ -256,11 +267,14 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const page = await repository.list({
-      limit: 20,
-      offset: 0,
-      userId: coAuthorId,
-    });
+    const page = await repository.list(
+      {
+        limit: 20,
+        offset: 0,
+        userId: coAuthorId,
+      },
+      asModerator
+    );
 
     assert.equal(page.total, 1);
     assert.equal(page.items[0]?.title, 'Shared Series');
@@ -320,7 +334,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: ['sci-fi', 'epic'],
     });
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, asModerator);
 
     assert.ok(Array.isArray(reloaded?.tags));
     assert.deepEqual(reloaded?.tags, ['sci-fi', 'epic']);
@@ -334,7 +348,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    assert.deepEqual((await repository.findById(created.id))?.tags, []);
+    assert.deepEqual(
+      (await repository.findById(created.id, asModerator))?.tags,
+      []
+    );
   });
 
   test('tags survive multi-byte characters, thanks to utf8mb4', async () => {
@@ -345,7 +362,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: ['sci-fi', '📚'],
     });
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, asModerator);
 
     assert.equal(reloaded?.description, 'Epic 📚');
     assert.deepEqual(reloaded?.tags, ['sci-fi', '📚']);
@@ -379,7 +396,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: ['epic-fantasy'],
     });
 
-    const exact = await repository.list({ limit: 20, offset: 0, tag: 'epic' });
+    const exact = await repository.list(
+      { limit: 20, offset: 0, tag: 'epic' },
+      asModerator
+    );
 
     // A LIKE-based implementation would return both rows here.
     assert.equal(exact.total, 1);
@@ -400,7 +420,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const matches = await repository.list({ limit: 20, offset: 0, q: '%' });
+    const matches = await repository.list(
+      { limit: 20, offset: 0, q: '%' },
+      asModerator
+    );
 
     assert.equal(matches.total, 1);
     assert.match(matches.items[0]?.description ?? '', /100% real/);
@@ -430,11 +453,14 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const page = await repository.list({
-      limit: 2,
-      offset: 0,
-      userId: ownerId,
-    });
+    const page = await repository.list(
+      {
+        limit: 2,
+        offset: 0,
+        userId: ownerId,
+      },
+      asModerator
+    );
 
     assert.equal(page.total, 3);
     assert.equal(page.items.length, 2);
@@ -500,5 +526,71 @@ describe('seriesRepository against real MySQL', { skip }, () => {
 
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await SeriesAuthor.count(), 0);
+  });
+
+  test('a series with no published book is visible only to its co-authors and moderators', async () => {
+    const empty = await repository.create({
+      userId: ownerId,
+      title: 'Empty',
+      description: 'Nothing yet',
+      tags: [],
+    });
+    const drafted = await repository.create({
+      userId: ownerId,
+      title: 'Drafted',
+      description: 'Only drafts',
+      tags: [],
+    });
+    await createCreditedBook(
+      {
+        title: 'Draft',
+        description: 'Private',
+        tags: [],
+        seriesId: drafted.id,
+        status: 'draft',
+      },
+      [ownerId]
+    );
+    const out = await repository.create({
+      userId: ownerId,
+      title: 'Out',
+      description: 'Has a published book',
+      tags: [],
+    });
+    await createCreditedBook(
+      {
+        title: 'Published',
+        description: 'Public',
+        tags: [],
+        seriesId: out.id,
+        status: 'complete',
+      },
+      [ownerId]
+    );
+    const stranger = ownerId + 1_000;
+
+    const titles = async (viewer: Viewer): Promise<string[]> =>
+      (await repository.list({ limit: 20, offset: 0 }, viewer)).items.map(
+        (series) => series.title
+      );
+
+    for (const viewer of [
+      null,
+      { id: stranger, role: 'user' },
+      { id: stranger, role: 'author' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Out']);
+      assert.equal(await repository.findById(empty.id, viewer), null);
+      assert.equal(await repository.findById(drafted.id, viewer), null);
+    }
+
+    for (const viewer of [
+      { id: ownerId, role: 'author' },
+      { id: stranger, role: 'admin' },
+      { id: stranger, role: 'superadmin' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Empty', 'Drafted', 'Out']);
+      assert.equal((await repository.findById(empty.id, viewer))?.id, empty.id);
+    }
   });
 });

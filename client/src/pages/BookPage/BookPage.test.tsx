@@ -31,6 +31,7 @@ const book: BookDetail = {
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
+  status: 'in_progress',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: { id: 2, title: 'The Scale Cycle' },
@@ -174,5 +175,29 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('BookPage on a draft', () => {
+  it('labels the draft and closes it to likes and comments', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+
+    renderPage(reader);
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /like/i })).toBeNull();
+    expect(
+      await screen.findByText('Comments are closed while this book is a draft.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('labels a published book with its status', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+
+    renderPage();
+
+    expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
 });

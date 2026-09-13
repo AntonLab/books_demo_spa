@@ -5,6 +5,7 @@ import {
   toCommentWithAuthor,
   toPublicComment,
 } from '../models/Comment.ts';
+import { Book } from '../models/Book.ts';
 import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
@@ -16,6 +17,7 @@ import type {
   Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
+import { readableBookInclude, type Viewer } from './visibility.ts';
 
 export interface CommentListResult {
   items: CommentWithAuthor[];
@@ -26,11 +28,10 @@ export interface CommentRepository {
   // actorId is separate from the input rather than folded into it, so the type
   // itself says the author is not caller-supplied data. See types/comment.ts.
   create(input: CreateCommentInput, actorId: number): Promise<PublicComment>;
-  list(
-    query: ListCommentsQuery,
-    viewerId: number | null
-  ): Promise<CommentListResult>;
-  findById(id: number): Promise<PublicComment | null>;
+  // Both leave out the comments on a Draft book the viewer may not read, and
+  // the viewer is also who viewerLikeId is reported for.
+  list(query: ListCommentsQuery, viewer: Viewer): Promise<CommentListResult>;
+  findById(id: number, viewer: Viewer): Promise<PublicComment | null>;
   update(id: number, input: UpdateCommentInput): Promise<PublicComment | null>;
   // `kind` is decided by the caller, who knows whether the actor owns the
   // comment. Scoped to live rows, so a tombstone reports false.
@@ -83,6 +84,16 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
     async create(input, actorId) {
+      // Nobody comments on a Draft book — not even its Co-authors: a draft
+      // is not out yet, and there is nothing for a reader to answer. A missing
+      // book falls through to the foreign key, which reports it as before.
+      const book = await Book.findByPk(input.bookId, {
+        attributes: ['status'],
+      });
+      if (book?.status === 'draft') {
+        throw new ForbiddenError('You cannot comment on a draft book');
+      }
+
       // A reply needs a live parent. Checked before the insert because the
       // foreign key only knows the parent exists, not that it is a tombstone.
       // A parent tombstoned between this check and the insert leaves the
@@ -107,10 +118,14 @@ export function createSequelizeCommentRepository(): CommentRepository {
       }
     },
 
-    async list(query, viewerId) {
+    async list(query, viewer) {
+      const viewerId = viewer?.id ?? null;
       const { rows, count } = await Comment.findAndCountAll({
         where: buildWhere(query),
-        include: [{ model: User, as: 'user' }],
+        include: [
+          { model: User, as: 'user' },
+          await readableBookInclude(viewer),
+        ],
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -161,8 +176,11 @@ export function createSequelizeCommentRepository(): CommentRepository {
       };
     },
 
-    async findById(id) {
-      const comment = await Comment.findByPk(id);
+    async findById(id, viewer) {
+      const comment = await Comment.findOne({
+        where: { id },
+        include: [await readableBookInclude(viewer)],
+      });
       return comment ? toPublicComment(comment) : null;
     },
 

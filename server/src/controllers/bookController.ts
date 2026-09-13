@@ -6,6 +6,7 @@ import {
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
+import { viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -101,7 +102,7 @@ export function createBookController(
 
     list: async (req, res) => {
       const query = validatedQuery<ListBooksQuery>(req);
-      const { items, total } = await repository.list(query);
+      const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },
 
@@ -109,9 +110,10 @@ export function createBookController(
       const { id } = validatedParams<{ id: number }>(req);
       // requirePermission fills req.user when a session cookie resolves and
       // leaves it unset otherwise — `guest` has `read: any` on books, so an
-      // anonymous read still gets here. The repository takes null for
-      // "anonymous", which is what makes viewerLikeId come back empty.
-      const book = await repository.findDetailById(id, req.user?.id ?? null);
+      // anonymous read still gets here. The viewer decides whether a Draft
+      // book is readable at all — a hidden one is the same 404 as a missing
+      // one — and a Guest's null is what makes viewerLikeId come back empty.
+      const book = await repository.findDetailById(id, viewerOf(req.user));
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);
     },

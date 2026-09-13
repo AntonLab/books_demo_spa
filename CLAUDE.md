@@ -105,7 +105,12 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   of both, and chapters resolve ownership through their book, since
   `chapters` carries no `userId`. A Moderator never changes who is credited on
   a work, a work always keeps at least one Co-author, and deleting an account
-  deletes only the works it was the last Co-author of. Deleting a
+  deletes only the works it was the last Co-author of. A book has a status —
+  `draft` (every new book), `in_progress` or `complete` — and a **Draft book**
+  is readable only by its Co-authors and Moderators: every read of it or its
+  chapters, comments and likes is filtered through `repositories/visibility.ts`,
+  no list shows it except its own Co-author's `?userId=`, and nobody may
+  comment on or like it. Deleting a
   comment leaves a **tombstone** — `deleted` by its own owner (or when that
   owner's account is deleted) or `removed` by a moderator — rather than
   removing the row, so its replies stay and its text and author are withheld
@@ -125,8 +130,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 - A dev database created before the Co-authors change must be dropped and
-  rebuilt: `books.userId` and `series.userId` are gone and `sync()` never
-  alters an existing table.
+  rebuilt: `books.userId` and `series.userId` are gone, `books.status` is new,
+  and `sync()` never alters an existing table.
   See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the
