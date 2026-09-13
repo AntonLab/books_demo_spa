@@ -196,6 +196,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   itself, setting `Content-Type` off whether it is `undefined`. Passing a
   JSON string would double-encode it.
 
+  `request()` also sends the session's CSRF token on every write (any method
+  but `GET`): it reads the `xsrfToken` cookie the server sets beside the
+  session and echoes it in the `X-XSRF-Token` header, without which the server
+  refuses a write that carries a session with a 403. A call that bypasses
+  `request()` loses that as well as `credentials: 'include'`.
+
 - `src/queries/` — the TanStack Query layer, and the only thing that calls
   `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
   `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`

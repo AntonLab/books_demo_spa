@@ -1,6 +1,10 @@
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import type { ResetDelivery } from './delivery/resetDelivery.ts';
+import {
+  createCrossOriginProtection,
+  requireXsrfToken,
+} from './middleware/csrfProtection.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
 import type { BookRepository } from './repositories/bookRepository.ts';
@@ -25,6 +29,9 @@ export interface AppDeps {
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
   resetDelivery: ResetDelivery;
+  // The client's origin (APP_BASE_URL): the one foreign origin a write may
+  // come from. See middleware/csrfProtection.ts.
+  trustedOrigin: string;
 }
 
 // No listen() here: tests bind an ephemeral port themselves.
@@ -35,6 +42,10 @@ export function createApp(deps: AppDeps): Express {
   // Express 5 can set cookies but not read them; resolveSessionUser, behind
   // both requirePermission and requireAuth, needs req.cookies.
   app.use(cookieParser());
+  // Both ahead of every route: a forged write is refused before anything
+  // reads its body or its session.
+  app.use(createCrossOriginProtection(deps.trustedOrigin));
+  app.use(requireXsrfToken);
   app.use('/api', createApiRouter(deps));
   app.use(notFound);
   // Must stay last, after every route and middleware.

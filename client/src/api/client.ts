@@ -43,19 +43,33 @@ const errorFrom = (
   return new ApiError(status, fallback);
 };
 
+// The session's XSRF token, which the server sets in a cookie a script can read
+// whenever it opens a session. Every write echoes it in the X-XSRF-Token header:
+// a page on another site can make the browser send the cookie, but can neither
+// read it nor set the header, so the server refuses its forged writes. Reads
+// carry none, and a visitor with no session has no token to send.
+const xsrfToken = (): string | undefined => {
+  const match = document.cookie.match(/(?:^|;\s*)xsrfToken=([^;]*)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+};
+
 export const request = async <T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> => {
   const { method = 'GET', body, signal } = options;
+  const token = method === 'GET' ? undefined : xsrfToken();
+  const headers = {
+    ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    ...(token === undefined ? {} : { 'X-XSRF-Token': token }),
+  };
 
   const response = await fetch(`/api${path}`, {
     method,
     // Without this the browser withholds the httpOnly `sid` cookie and every
     // authenticated call silently fails as a 401.
     credentials: 'include',
-    headers:
-      body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: Object.keys(headers).length === 0 ? undefined : headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { withApp, json } from './routeTestKit.testkit.ts';
 import { hashPassword } from '../password.ts';
 import { hashToken } from '../tokens.ts';
+import { xsrfTokenFor } from '../middleware/csrfProtection.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
@@ -604,5 +605,21 @@ test('a reset password under 8 characters is rejected', async () => {
     });
 
     assert.equal(response.status, 400);
+  });
+});
+
+test('opening a session also hands the client its XSRF token, which a script can read', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const response = await post(base, 'register', registration);
+    const cookies = response.headers.getSetCookie();
+    const session = sessionCookie(response);
+    const xsrf = cookies.find((cookie) => cookie.startsWith('xsrfToken='));
+
+    assert.ok(session);
+    assert.ok(xsrf);
+    assert.match(xsrf, new RegExp(`^xsrfToken=${xsrfTokenFor(session)};`));
+    assert.doesNotMatch(xsrf, /HttpOnly/i);
+    assert.match(xsrf, /SameSite=Lax/i);
   });
 });

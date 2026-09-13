@@ -231,7 +231,11 @@ run the same automation from `.github/`:
 - `workflows/codeql.yml` — CodeQL with the `security-extended` queries over
   `javascript-typescript` and `actions`, on the same triggers plus a weekly
   schedule, as the jobs `Analyze (javascript-typescript)` and
-  `Analyze (actions)`.
+  `Analyze (actions)`. Test code (`*.spec.ts`, `*.test.ts(x)`, `*.testkit.ts`,
+  `client/src/test/`) is left out of the analysis: it is never deployed, and
+  its one-middleware Express apps would otherwise be held to the rules of the
+  real one. Its results also report as a check named `CodeQL`, which the
+  ruleset does not require.
 - `dependabot.yml` — weekly npm and GitHub Actions updates, minor and patch
   grouped into one PR per ecosystem, majors one PR each, no labels (the repo's
   labels are the triage roles).
@@ -276,6 +280,10 @@ Do not:
 
 - No hardcoded secrets — grep for `sk_live`, `AKIA`, `password=` before commit.
 - Keep DB credentials in environment variables (`.env.local` is git-ignored).
+- Every write is guarded against CSRF on the server — an Origin /
+  `Sec-Fetch-Site` check and a session-bound `X-XSRF-Token` — and the client's
+  `request()` sends the token. Route new writes through `request()`. See
+  **CSRF** in `server/CLAUDE.md`.
 
 ## Workflow
 

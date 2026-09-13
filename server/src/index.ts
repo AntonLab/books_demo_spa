@@ -63,6 +63,7 @@ async function main(): Promise<void> {
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
     resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
+    trustedOrigin: config.appBaseUrl,
   });
   app.listen(config.port, () => {
     logger.info(`server listening on http://127.0.0.1:${config.port}`);

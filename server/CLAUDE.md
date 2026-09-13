@@ -208,10 +208,11 @@ added.
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
 - `src/password.ts` — argon2id password hashing and verification
-- `src/tokens.ts` — `createToken()` (32 random bytes, base64url) and
-  `hashToken()` (SHA-256) for session and reset tokens
+- `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
+  `hashToken()` (SHA-256) for session and reset tokens, and `xsrfTokenFor()`,
+  a session's XSRF token
 - `src/sessionCookie.ts` — the `sid` cookie's name, TTL, and the shared
-  set/clear helpers
+  set/clear helpers, which set and clear the `xsrfToken` cookie beside it
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
@@ -260,7 +261,8 @@ added.
   and this is neither, so `tsconfig.build.json` names it in `exclude`
   directly rather than growing a second suffix convention for one file.
 - `src/middleware/` — auth, permissions, validation, error handling
-  (`requireAuth.ts`, `requirePermission.ts`, `optionalAuth.ts` (unmounted —
+  (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
+  `requirePermission.ts`, `optionalAuth.ts` (unmounted —
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
   three build on), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
@@ -669,6 +671,32 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     included, with no tombstone behind them. Deliberate, not an oversight;
     marking those rows first would change nothing, since the cascade destroys
     them either way.
+- **CSRF** is refused twice, ahead of every route in `app.ts`
+  (`middleware/csrfProtection.ts`), and neither layer leans on the `sid`
+  cookie's SameSite=Lax, which already keeps it off cross-site writes in
+  current browsers. Reads (`GET`, `HEAD`, `OPTIONS`) pass both.
+  - **`createCrossOriginProtection`** refuses a write the browser says came
+    from elsewhere, as Go 1.25's `http.CrossOriginProtection` does: an
+    `Origin` equal to `trustedOrigin` (`APP_BASE_URL`, the client — which
+    reaches the API through its dev proxy, so with another Host) passes;
+    otherwise `Sec-Fetch-Site` decides, where only `same-origin` and `none`
+    pass; with no `Sec-Fetch-Site` an `Origin` must name the request's own
+    host; and a request with neither header is not a browser and passes. A
+    refusal is 403 `Cross-origin request refused`.
+  - **`requireXsrfToken`** is a double-submit token bound to the session.
+    `setSessionCookie` sets an `xsrfToken` cookie beside `sid` — not
+    httpOnly, so the client can read it — holding
+    `HMAC-SHA256(key: the session token, "xsrf")`. A write carrying a `sid`
+    cookie must send that value in `X-XSRF-Token`, equal to the cookie; one
+    without is 403 `Missing or invalid CSRF token`. A token planted by a
+    sibling subdomain names another session and fails. A request with no
+    session has no ambient authority and needs no token (login and
+    registration rely on the first layer), and any request whose token cookie
+    is missing or stale is handed the right one.
+  - The route specs do not repeat either: `routeTestKit.testkit.ts` adds the
+    session's token to every request that carries a session cookie, the way
+    the client does, and `csrfProtection.spec.ts` covers the refusals — the
+    layers on their own, and `createApp` refusing before any route runs.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
