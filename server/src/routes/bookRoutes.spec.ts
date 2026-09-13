@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
+import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import type {
   BookListResult,
   BookRepository,
@@ -79,7 +79,10 @@ const SUMMARIES = new Map<number, AuthorSummary>([
 // `viewers` collects who each read was made as. Whether a Draft book is
 // readable is the real repository's decision, covered against MySQL; what the
 // routes owe it is the right viewer, which is what a test can check here.
-function createFakeRepository(viewers: Viewer[] = []): BookRepository {
+function createFakeRepository(
+  viewers: Viewer[] = [],
+  reorders: unknown[] = []
+): BookRepository {
   const rows = new Map<number, PublicBook>();
   // bookId -> co-author ids, in credit order. The domain rules on credits (the
   // author role, duplicates, the last co-author) belong to the real repository
@@ -215,6 +218,24 @@ function createFakeRepository(viewers: Viewer[] = []): BookRepository {
 
     async findSeriesCoAuthorIds(seriesId) {
       return SERIES_CO_AUTHORS.get(seriesId) ?? null;
+    },
+
+    // The books filed under each series, in Series order; the append and the
+    // set comparison behind a 409 are the real repository's, covered against
+    // MySQL.
+    async listInSeries(seriesId) {
+      if (!SERIES_CO_AUTHORS.has(seriesId)) return null;
+      return [...rows.values()]
+        .filter((row) => row.seriesId === seriesId)
+        .map((row) => {
+          const { id, title, status, authors } = withCredits(row);
+          return { id, title, status, authors };
+        });
+    },
+
+    async reorderInSeries(seriesId, bookIds) {
+      reorders.push({ seriesId, bookIds });
+      return SERIES_CO_AUTHORS.has(seriesId);
     },
   };
 }
@@ -1108,6 +1129,173 @@ test('reads are made as the signed-in caller, or as a guest', async () => {
         { id: KNOWN_USER_ID, role: 'author' },
         { id: USER_IDS.admin, role: 'admin' },
       ]);
+    }
+  );
+});
+
+// --- The series editor's book list and its Series order (CONTEXT.md). ---
+
+const seriesBooks = (
+  base: string,
+  seriesId: number,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/series/${seriesId}/books`, {
+    ...(cookie ? { headers: { cookie } } : {}),
+  });
+
+const putSeriesOrder = (
+  base: string,
+  seriesId: number,
+  body: unknown,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/series/${seriesId}/book-order`, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/json',
+      ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+test('the series editor lists every book filed in the series, drafts included, as summaries', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(await post(base, valid));
+      assert.equal(created.status, 'draft');
+
+      const response = await seriesBooks(base, KNOWN_SERIES_ID);
+      const body = await json<{ items: unknown[] }>(response);
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(body.items, [
+        {
+          id: created.id,
+          title: created.title,
+          status: 'draft',
+          authors: [AUTHOR],
+        },
+      ]);
+    }
+  );
+});
+
+test('the series editor list takes a co-author of the series, or a moderator', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await seriesBooks(base, KNOWN_SERIES_ID, null)).status,
+        401
+      );
+      assert.equal(
+        (await seriesBooks(base, KNOWN_SERIES_ID, ROLE_COOKIES.user)).status,
+        403
+      );
+      assert.equal(
+        (await seriesBooks(base, KNOWN_SERIES_ID, ROLE_COOKIES.otherAuthor))
+          .status,
+        403
+      );
+      assert.equal(
+        (await seriesBooks(base, SHARED_SERIES_ID, ROLE_COOKIES.otherAuthor))
+          .status,
+        200
+      );
+      assert.equal(
+        (await seriesBooks(base, OTHER_AUTHOR_SERIES_ID, ROLE_COOKIES.admin))
+          .status,
+        200
+      );
+      assert.equal((await seriesBooks(base, 999)).status, 404);
+      assert.equal(
+        (await seriesBooks(base, 999, ROLE_COOKIES.admin)).status,
+        404
+      );
+    }
+  );
+});
+
+test('PUT book-order hands the repository the new Series order and answers 204', async () => {
+  const reorders: unknown[] = [];
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository([], reorders) },
+    async (base) => {
+      const response = await putSeriesOrder(base, KNOWN_SERIES_ID, {
+        bookIds: [3, 1, 2],
+      });
+
+      assert.equal(response.status, 204);
+      assert.deepEqual(reorders, [
+        { seriesId: KNOWN_SERIES_ID, bookIds: [3, 1, 2] },
+      ]);
+    }
+  );
+});
+
+test('PUT book-order refuses a bad list with 400 and a stranger with 403', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      for (const bookIds of [[], [1, 1]]) {
+        assert.equal(
+          (await putSeriesOrder(base, KNOWN_SERIES_ID, { bookIds })).status,
+          400
+        );
+      }
+      const body = { bookIds: [1, 2] };
+      assert.equal(
+        (await putSeriesOrder(base, KNOWN_SERIES_ID, body, null)).status,
+        401
+      );
+      assert.equal(
+        (
+          await putSeriesOrder(
+            base,
+            KNOWN_SERIES_ID,
+            body,
+            ROLE_COOKIES.otherAuthor
+          )
+        ).status,
+        403
+      );
+      assert.equal(
+        (
+          await putSeriesOrder(
+            base,
+            OTHER_AUTHOR_SERIES_ID,
+            body,
+            ROLE_COOKIES.admin
+          )
+        ).status,
+        204
+      );
+      assert.equal((await putSeriesOrder(base, 999, body)).status, 404);
+    }
+  );
+});
+
+test('a series reorder conflict from the repository reaches the caller as a 409', async () => {
+  const repository = createFakeRepository();
+  await withAuthenticatedApp(
+    {
+      bookRepository: {
+        ...repository,
+        async reorderInSeries() {
+          throw new StateConflictError(
+            'The books of this series changed since you loaded them'
+          );
+        },
+      },
+    },
+    async (base) => {
+      const response = await putSeriesOrder(base, KNOWN_SERIES_ID, {
+        bookIds: [1, 2],
+      });
+
+      assert.equal(response.status, 409);
     }
   );
 });

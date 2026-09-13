@@ -2,7 +2,7 @@ import { act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // The attribute a sortable list puts on each row it lets dnd-kit measure
-// (SortableChapterList). Named here rather than imported, so no component
+// (SortableList). Named here rather than imported, so no component
 // depends on a test helper.
 const SORTABLE_ROW_ATTRIBUTE = 'data-sortable-row';
 

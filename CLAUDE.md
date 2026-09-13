@@ -61,7 +61,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
   first authoring pages — `/my-books`, `/books/new`, `/books/:id/edit`
   (fields, status, chapters in a drag-and-drop Reading order, Co-authors,
-  delete) and a chapter editor at
+  delete), `/series/new` and `/series/:id/edit` (fields, books in a
+  drag-and-drop Series order, Co-authors, delete) and a chapter editor at
   `/books/:bookId/chapters/new` and `.../:chapterId/edit` (publish now,
   schedule, or save a draft) — built on antd
   6, react-router, TanStack Query and Redux
@@ -121,7 +122,11 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   409 if a co-author saved first. A book's chapters follow an explicit
   Reading order (`chapters.position`), rewritten whole through
   `PUT /api/books/:id/chapter-order`, which answers 409 if a chapter was added
-  or deleted since the list was loaded. Deleting a
+  or deleted since the list was loaded. A series' books follow a Series
+  order (`books.seriesPosition`) the same way, through
+  `PUT /api/series/:id/book-order`, and its Co-authors see every book filed
+  in it — drafts by title and status only — through
+  `GET /api/series/:id/books`. Deleting a
   comment leaves a **tombstone** — `deleted` by its own owner (or when that
   owner's account is deleted) or `removed` by a moderator — rather than
   removing the row, so its replies stay and its text and author are withheld
@@ -142,7 +147,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 - A dev database created before the Co-authors change must be dropped and
   rebuilt: `books.userId` and `series.userId` are gone, `books.status`,
-  `chapters.publishedAt` and `chapters.position` are new, and `sync()` never
+  `chapters.publishedAt`, `chapters.position` and `books.seriesPosition` are
+  new, and `sync()` never
   alters an existing table.
   See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts

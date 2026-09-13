@@ -78,7 +78,9 @@ Where a Book stands: Draft, In progress or Complete. Every Book has exactly one.
 _Avoid_: State (for a Book)
 
 **Draft book**:
-A Book kept from readers; only its Co-authors and Moderators can see it.
+A Book kept from readers; only its Co-authors and Moderators can see it. When
+it is filed in a Series, that Series's Co-authors also see its title and
+status among the Series' Books, so they can order them — never its contents.
 
 **In progress**:
 The Book status of a Published Book whose Chapters are still coming out.

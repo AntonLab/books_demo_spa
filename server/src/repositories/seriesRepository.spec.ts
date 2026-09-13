@@ -299,7 +299,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
 
     assert.equal(await repository.removeBook(created.id, filed.id), true);
 
-    assert.equal((await Book.findByPk(filed.id))?.seriesId, null);
+    const reloaded = await Book.findByPk(filed.id);
+    assert.equal(reloaded?.seriesId, null);
+    // Out of the series, out of its order: filing it again appends it afresh.
+    assert.equal(reloaded?.seriesPosition, null);
   });
 
   test('removing a book that is not in the series is a 404 on the book', async () => {

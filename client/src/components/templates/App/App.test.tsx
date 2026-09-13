@@ -5,17 +5,20 @@ import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
+import * as seriesApi from '@/api/series';
 import { ApiError } from '@/api/client';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
+jest.mock('@/api/series');
 
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
@@ -47,6 +50,15 @@ beforeEach(() => {
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);
   mockedComments.listComments.mockResolvedValue(emptyEnvelope);
+  mockedSeries.getSeries.mockResolvedValue({
+    id: 12,
+    authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
+    title: 'The Scale Cycle',
+    description: 'Dragons.',
+    tags: [],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  });
 });
 
 describe('AppShell routing', () => {
@@ -130,6 +142,24 @@ describe('AppShell routing', () => {
 
     expect(
       await screen.findByText('Only its co-authors can edit this chapter.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders NewSeriesPage at /series/new', async () => {
+    renderWithProviders(<AppShell />, { route: '/series/new' });
+
+    expect(
+      await screen.findByText(
+        'Only an account holding the author role can create series.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('renders EditSeriesPage at /series/:id/edit', async () => {
+    renderWithProviders(<AppShell />, { route: '/series/12/edit' });
+
+    expect(
+      await screen.findByText('Only its co-authors can edit this series.')
     ).toBeInTheDocument();
   });
 

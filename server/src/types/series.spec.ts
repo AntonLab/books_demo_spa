@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createSeriesSchema,
   listSeriesQuerySchema,
+  reorderSeriesBooksSchema,
   updateSeriesSchema,
 } from './series.ts';
 
@@ -88,4 +89,21 @@ test('the list query coerces strings and applies paging defaults', () => {
 
 test('the list query caps the page size at 100', () => {
   assert.throws(() => listSeriesQuerySchema.parse({ limit: '101' }));
+});
+
+test('a series reorder names every book id once, in the new Series order', () => {
+  assert.deepEqual(
+    reorderSeriesBooksSchema.parse({ bookIds: [3, 1, 2] }).bookIds,
+    [3, 1, 2]
+  );
+});
+
+test('a series reorder refuses an empty list, a repeated id, or an id that is not one', () => {
+  for (const bookIds of [[], [1, 1], [0], [1.5], ['x'], undefined]) {
+    assert.equal(
+      reorderSeriesBooksSchema.safeParse({ bookIds }).success,
+      false,
+      JSON.stringify(bookIds)
+    );
+  }
 });

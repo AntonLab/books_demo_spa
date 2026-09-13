@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  addCoAuthor,
   createBook,
   deleteBook,
   getBook,
   listBooks,
-  removeCoAuthor,
   updateBook,
   type CreateBookPayload,
   type UpdateBookPayload,
@@ -63,7 +61,9 @@ export const MY_BOOKS_LIMIT = 100;
 
 // Every book write invalidates the whole `books` prefix: a change to one book
 // can move it into or out of any list (a status change hides it from the main
-// page), and the detail key sits under the same prefix.
+// page), and the detail key sits under the same prefix. The `series` prefix
+// goes too, because filing a book into a series, or taking it out, changes that
+// series' book list.
 const useBookMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>
 ) => {
@@ -73,7 +73,11 @@ const useBookMutation = <TVariables, TResult>(
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['books'] }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+        queryClient.invalidateQueries({ queryKey: ['series'] }),
+      ]),
   });
 };
 
@@ -85,9 +89,3 @@ export const useUpdateBook = (id: number) =>
 
 export const useDeleteBook = (id: number) =>
   useBookMutation(() => deleteBook(id));
-
-export const useAddCoAuthor = (bookId: number) =>
-  useBookMutation((userId: number) => addCoAuthor(bookId, userId));
-
-export const useRemoveCoAuthor = (bookId: number) =>
-  useBookMutation((userId: number) => removeCoAuthor(bookId, userId));

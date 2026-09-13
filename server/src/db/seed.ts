@@ -1172,6 +1172,9 @@ async function writeContent(
       }
     }
 
+    // Each series' books take their places in the order the plan lists them,
+    // as bookRepository would append them one by one.
+    const filedSoFar = new Map<number, number>();
     for (const book of author.books) {
       const fields = createBookSchema.parse({
         ...book,
@@ -1184,6 +1187,7 @@ async function writeContent(
           // Attached after the parse, like the Co-authors: createBookSchema
           // has no status, because every book the API creates is a draft.
           status: book.status,
+          seriesPosition: seriesPositionOf(book.seriesIndex, filedSoFar),
           createdAt: book.createdAt,
           updatedAt: book.createdAt,
         },
@@ -1234,6 +1238,18 @@ async function writeContent(
   );
 
   return { bookIds, chapters: chapterRows.length, series: seriesCount };
+}
+
+// The next place in the author's series at `seriesIndex`, or null for a
+// standalone book.
+function seriesPositionOf(
+  seriesIndex: number | null,
+  filedSoFar: Map<number, number>
+): number | null {
+  if (seriesIndex === null) return null;
+  const position = (filedSoFar.get(seriesIndex) ?? 0) + 1;
+  filedSoFar.set(seriesIndex, position);
+  return position;
 }
 
 async function writeThreads(

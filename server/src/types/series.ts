@@ -79,6 +79,20 @@ export const seriesBookParamSchema = z.object({
   bookId: z.coerce.number().int().positive(),
 });
 
+// A series' whole Series order, first book first. The whole list rather than
+// a single move, so the repository can tell when it was drawn from a set of
+// books that has since changed — the same contract as a book's chapter order.
+export const reorderSeriesBooksSchema = z.object({
+  bookIds: z
+    .array(z.coerce.number().int().positive())
+    .min(1)
+    .max(1_000)
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: 'Each book may appear only once',
+    }),
+});
+
+export type ReorderSeriesBooksInput = z.infer<typeof reorderSeriesBooksSchema>;
 export type CreateSeriesInput = z.infer<typeof createSeriesSchema>;
 export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateSeriesInput = z.infer<typeof updateSeriesSchema>;

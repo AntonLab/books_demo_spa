@@ -6,6 +6,7 @@ import {
   Popconfirm,
   Skeleton,
   Space,
+  Tag,
   theme,
   Typography,
 } from 'antd';
@@ -13,12 +14,36 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
-import { SortableChapterList } from '@/components/organisms/SortableChapterList';
+import { SortableList } from '@/components/organisms/SortableList';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { useMySeries } from '@/queries/series';
+import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
+
+// One row of the book's chapter list: a link to the chapter's editor, a badge
+// for what is not out yet, and the date it came out or will.
+const chapterRow = (bookId: number, chapter: ChapterSummary) => {
+  const state = chapterStateOf(chapter);
+
+  return (
+    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+      <Space>
+        <Link to={`/books/${bookId}/chapters/${chapter.id}/edit`}>
+          {chapter.title}
+        </Link>
+        {state === 'draft' && <Tag>Draft</Tag>}
+        {state === 'scheduled' && <Tag color="blue">Scheduled</Tag>}
+      </Space>
+      {chapter.publishedAt !== null && (
+        <Typography.Text type="secondary">
+          {new Date(chapter.publishedAt).toLocaleDateString()}
+        </Typography.Text>
+      )}
+    </Space>
+  );
+};
 
 export const EditBookPage: FC = () => {
   const { token } = theme.useToken();
@@ -141,18 +166,23 @@ export const EditBookPage: FC = () => {
       {/* Every chapter, drafts and scheduled ones included: the server returns
           them all to a Co-author or a Moderator, and this is where they are
           worked on and put in Reading order. */}
-      <SortableChapterList
-        bookId={book.id}
-        items={chapters.data?.items ?? []}
+      <SortableList
+        items={(chapters.data?.items ?? []).map((chapter) => ({
+          id: chapter.id,
+          label: chapter.title,
+          content: chapterRow(book.id, chapter),
+        }))}
         isPending={chapters.isPending}
         isError={chapters.isError}
+        errorText="Could not load the chapters."
+        emptyText="No chapters yet."
         onReorder={(chapterIds) => reorder.mutate(chapterIds)}
       />
 
       <Divider />
 
       <CoAuthorManager
-        bookId={book.id}
+        work={{ kind: 'book', id: book.id }}
         authors={book.authors}
         viewerId={session.id}
         canManage={isCoAuthor}

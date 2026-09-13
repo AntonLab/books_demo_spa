@@ -27,6 +27,10 @@ export class Book extends Model<
   //
   // Nullable and creation-optional: a book can stand alone, outside any series.
   declare seriesId: CreationOptional<ForeignKey<Series['id']> | null>;
+  // The book's place in its series' Series order (CONTEXT.md): 1-based,
+  // gapped after a book leaves, and null outside a series. It orders a
+  // series' book lists and is never sent to a client.
+  declare seriesPosition: CreationOptional<number | null>;
   declare title: string;
   declare description: string;
   declare tags: string[];
@@ -54,6 +58,12 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       // what makes the association's ON DELETE SET NULL legal: MySQL rejects
       // SET NULL on a NOT NULL column.
       seriesId: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+      },
+      // Set by bookRepository whenever a book is filed into a series, which
+      // appends it; cleared when it leaves.
+      seriesPosition: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
       },
@@ -94,12 +104,17 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       charset: 'utf8mb4',
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
-        // Serves the `?seriesId=` filter together with the list endpoint's
-        // `ORDER BY id`, so it needs no filesort. It is also a leftmost prefix
-        // of the foreign key's column, so InnoDB reuses it instead of creating
-        // a second index for the constraint. `?userId=` goes through
-        // book_authors_user_id instead.
-        { name: 'books_series_id_id', fields: ['seriesId', 'id'] },
+        // Serves the `?seriesId=` filter together with its
+        // `ORDER BY seriesPosition, id` — InnoDB appends the primary key to
+        // every secondary index — so it needs no filesort. It is also a
+        // leftmost prefix of the foreign key's column, so InnoDB reuses it
+        // instead of creating a second index for the constraint. Not unique,
+        // for the reason chapters_book_id_position gives. `?userId=` goes
+        // through book_authors_user_id instead.
+        {
+          name: 'books_series_id_series_position',
+          fields: ['seriesId', 'seriesPosition'],
+        },
       ],
     }
   );
