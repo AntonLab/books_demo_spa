@@ -2,7 +2,11 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import {
+  DatabaseError,
+  ForeignKeyConstraintError,
+  type Sequelize,
+} from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -239,6 +243,78 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       (error: unknown) =>
         error instanceof NotFoundError &&
         /Co-author \d+ not found/.test(error.message)
+    );
+  });
+
+  // What every `own` check on a series asks (seriesController.assertCoAuthor).
+  test('findCoAuthorIds lists the co-authors in credit order, and null for a missing series', async () => {
+    const earlierId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const laterId = (
+      await User.create({
+        ...coAuthor,
+        login: 'LaterSeriesAuthor',
+        email: 'later-series@example.com',
+        role: 'author',
+      })
+    ).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+    // Credited against the order the accounts were made in, so a list sorted
+    // by user id would come back the other way round.
+    await repository.addCoAuthor(created.id, laterId, asOwner());
+    await repository.addCoAuthor(created.id, earlierId, asOwner());
+
+    assert.deepEqual(await repository.findCoAuthorIds(created.id), [
+      ownerId,
+      laterId,
+      earlierId,
+    ]);
+    assert.equal(await repository.findCoAuthorIds(created.id + 10_000), null);
+  });
+
+  // As on a book: only the unique index's rejection is a 409. An account
+  // deleted between the lookup and the insert fails the foreign key, and that
+  // reaches the caller unmapped.
+  test('a credit that fails for any reason but a duplicate is not reported as a conflict', async () => {
+    const doomedId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+
+    SeriesAuthor.addHook('beforeCreate', 'deleteAccount', async () => {
+      await User.destroy({ where: { id: doomedId } });
+    });
+    try {
+      await assert.rejects(
+        repository.addCoAuthor(created.id, doomedId, asOwner()),
+        ForeignKeyConstraintError
+      );
+    } finally {
+      SeriesAuthor.removeHook('beforeCreate', 'deleteAccount');
+    }
+    assert.deepEqual(await repository.findCoAuthorIds(created.id), [ownerId]);
+  });
+
+  // Only a rejected foreign key means a missing user; anything else the
+  // database refuses is passed on as it is.
+  test('a create the database refuses for another reason is not blamed on the user', async () => {
+    await assert.rejects(
+      repository.create({
+        userId: ownerId,
+        title: 'x'.repeat(256),
+        description: 'Too long a title for its column',
+        tags: [],
+      }),
+      (error: unknown) =>
+        error instanceof DatabaseError &&
+        !(error instanceof ForeignKeyConstraintError)
     );
   });
 

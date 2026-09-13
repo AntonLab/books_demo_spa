@@ -2,7 +2,7 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import { ForeignKeyConstraintError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -345,6 +345,82 @@ describe('bookRepository against real MySQL', { skip }, () => {
         error instanceof NotFoundError &&
         /Co-author \d+ not found/.test(error.message)
     );
+  });
+
+  // What every `own` check on a book asks (bookController.assertCoAuthor).
+  test('findCoAuthorIds lists the co-authors in credit order, and null for a missing book', async () => {
+    const earlierId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const laterId = (
+      await User.create({
+        ...coAuthor,
+        login: 'LaterAuthor',
+        email: 'later@example.com',
+        role: 'author',
+      })
+    ).id;
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Shared',
+      tags: [],
+    });
+    // Credited against the order the accounts were made in, so a list sorted
+    // by user id would come back the other way round.
+    await repository.addCoAuthor(created.id, laterId, asOwner());
+    await repository.addCoAuthor(created.id, earlierId, asOwner());
+
+    assert.deepEqual(await repository.findCoAuthorIds(created.id), [
+      ownerId,
+      laterId,
+      earlierId,
+    ]);
+    assert.equal(await repository.findCoAuthorIds(created.id + 10_000), null);
+  });
+
+  // What filing a book into a series asks (bookController.assertMayAddToSeries).
+  test('findSeriesCoAuthorIds lists the series co-authors in credit order, and null for a missing series', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const shared = await createCreditedSeries(
+      { title: 'Shared Series', description: 'x', tags: [] },
+      [coAuthorId, ownerId]
+    );
+
+    assert.deepEqual(await repository.findSeriesCoAuthorIds(shared.id), [
+      coAuthorId,
+      ownerId,
+    ]);
+    assert.equal(
+      await repository.findSeriesCoAuthorIds(shared.id + 10_000),
+      null
+    );
+  });
+
+  // Only the unique index's rejection means "already credited". An account
+  // deleted between the lookup and the insert fails the foreign key instead,
+  // which reaches the caller unmapped rather than as a misleading 409.
+  test('a credit that fails for any reason but a duplicate is not reported as a conflict', async () => {
+    const doomedId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Shared',
+      tags: [],
+    });
+
+    BookAuthor.addHook('beforeCreate', 'deleteAccount', async () => {
+      await User.destroy({ where: { id: doomedId } });
+    });
+    try {
+      await assert.rejects(
+        repository.addCoAuthor(created.id, doomedId, asOwner()),
+        ForeignKeyConstraintError
+      );
+    } finally {
+      BookAuthor.removeHook('beforeCreate', 'deleteAccount');
+    }
+    assert.deepEqual(await repository.findCoAuthorIds(created.id), [ownerId]);
   });
 
   test('the userId filter matches a book through any of its co-authors', async () => {

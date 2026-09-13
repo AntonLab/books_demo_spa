@@ -2,7 +2,11 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import {
+  DatabaseError,
+  ForeignKeyConstraintError,
+  type Sequelize,
+} from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -302,6 +306,53 @@ describe('likeRepository against real MySQL', { skip }, () => {
       (error: unknown) =>
         error instanceof NotFoundError &&
         /User \d+ not found/.test(error.message)
+    );
+  });
+
+  // The lookup before the insert is not locked, so a target deleted in between
+  // is left to the foreign key — which must still blame the target, not the
+  // user. Each hook stands in for that concurrent delete.
+  test('a book deleted between the lookup and the insert is still a NotFoundError naming the book', async () => {
+    Like.addHook('beforeCreate', 'deleteTarget', async () => {
+      await Book.destroy({ where: { id: bookId } });
+    });
+    try {
+      await assert.rejects(
+        repository.create({ bookId, commentId: null, isLike: true }, likerId),
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          error.message === `Book ${bookId} not found`
+      );
+    } finally {
+      Like.removeHook('beforeCreate', 'deleteTarget');
+    }
+  });
+
+  test('a comment deleted between the lookup and the insert is still a NotFoundError naming the comment', async () => {
+    Like.addHook('beforeCreate', 'deleteTarget', async () => {
+      await Comment.destroy({ where: { id: commentId } });
+    });
+    try {
+      await assert.rejects(
+        repository.create({ bookId: null, commentId, isLike: true }, likerId),
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          error.message === `Comment ${commentId} not found`
+      );
+    } finally {
+      Like.removeHook('beforeCreate', 'deleteTarget');
+    }
+  });
+
+  // Only a rejected foreign key means a missing row; anything else the
+  // database refuses — here an id no INTEGER UNSIGNED column can hold — is
+  // passed on as it is.
+  test('a create the database refuses for another reason is not reported as a missing row', async () => {
+    await assert.rejects(
+      repository.create({ bookId, commentId: null, isLike: true }, -1),
+      (error: unknown) =>
+        error instanceof DatabaseError &&
+        !(error instanceof ForeignKeyConstraintError)
     );
   });
 
