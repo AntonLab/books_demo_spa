@@ -3,11 +3,20 @@ import {
   fn,
   ForeignKeyConstraintError,
   Op,
+  UniqueConstraintError,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { WhereOptions } from 'sequelize';
+import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
+import { Book } from '../models/Book.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { toAuthorSummary, User } from '../models/User.ts';
+import {
+  BadRequestError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
+import type { AuthorSummary } from '../types/user.ts';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -22,22 +31,35 @@ export interface SeriesListResult {
 }
 
 export interface SeriesRepository {
-  // userId is not part of CreateSeriesInput: it comes from the session, never
-  // the request body, so it is supplied as a separate argument rather than a
-  // schema field a caller could set.
+  // userId is the series' first Co-author. It is not part of
+  // CreateSeriesInput: it comes from the session, never the request body, so
+  // it is supplied as a separate argument rather than a schema field a caller
+  // could set.
   create(input: CreateSeriesInput & { userId: number }): Promise<PublicSeries>;
   list(query: ListSeriesQuery): Promise<SeriesListResult>;
   findById(id: number): Promise<PublicSeries | null>;
   update(id: number, input: UpdateSeriesInput): Promise<PublicSeries | null>;
   remove(id: number): Promise<boolean>;
-  // The cheapest question the ownership check can ask: one indexed column, no
-  // eager loads, no serialisation.
-  findOwnerId(id: number): Promise<number | null>;
+  // null when the series is not there, as update/remove report it.
+  addCoAuthor(seriesId: number, userId: number): Promise<PublicSeries | null>;
+  // Takes a book out of the series from the series' side. false when the
+  // series is not there; a NotFoundError on the book when it is not in this
+  // series, so a caller cannot unlink a book filed somewhere else.
+  removeBook(seriesId: number, bookId: number): Promise<boolean>;
+  // Covers both removing someone else and leaving, as on a book.
+  removeCoAuthor(
+    seriesId: number,
+    userId: number
+  ): Promise<PublicSeries | null>;
+  // The cheapest question the ownership check can ask: one indexed lookup, no
+  // eager loads, no serialisation. null when the series is not there.
+  findCoAuthorIds(id: number): Promise<number[] | null>;
 }
 
-// A rejected FK on `series.userId` means the referenced user does not exist.
-// Reporting that as a 404 on the user is more useful than the generic 500 an
-// unmapped SequelizeForeignKeyConstraintError would produce.
+// A rejected FK on `series_authors.userId` — the first credit — means the
+// referenced user does not exist. Reporting that as a 404 on the user is more
+// useful than the generic 500 an unmapped SequelizeForeignKeyConstraintError
+// would produce.
 function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
     throw new NotFoundError('User', userId);
@@ -45,11 +67,72 @@ function asMissingUser(error: unknown, userId: number): never {
   throw error;
 }
 
-function buildWhere(query: ListSeriesQuery): WhereOptions {
+function sequelizeOf(): Sequelize {
+  const sequelize = Series.sequelize;
+  if (!sequelize) throw new Error('Series model is not initialised');
+  return sequelize;
+}
+
+// Every Co-author of every series named, in credit order, in one query — the
+// series' copy of bookRepository's loadAuthors.
+async function loadAuthors(
+  seriesIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, AuthorSummary[]>> {
+  const authors = new Map<number, AuthorSummary[]>(
+    seriesIds.map((id) => [id, []])
+  );
+  if (seriesIds.length === 0) return authors;
+
+  const credits = await SeriesAuthor.findAll({
+    where: { seriesId: seriesIds },
+    include: [{ model: User, as: 'user' }],
+    order: [['id', 'ASC']],
+    transaction,
+  });
+  for (const credit of credits) {
+    if (credit.user) {
+      authors.get(credit.seriesId)?.push(toAuthorSummary(credit.user));
+    }
+  }
+  return authors;
+}
+
+async function withAuthors(
+  series: Series,
+  transaction?: Transaction
+): Promise<PublicSeries> {
+  const authors = await loadAuthors([series.id], transaction);
+  return toPublicSeries(series, authors.get(series.id) ?? []);
+}
+
+// Exported for bookRepository, which asks the same question about the series a
+// book is being filed under.
+export async function findSeriesCoAuthorIds(
+  seriesId: number
+): Promise<number[] | null> {
+  const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+  if (!series) return null;
+
+  const credits = await SeriesAuthor.findAll({
+    where: { seriesId },
+    attributes: ['userId'],
+    order: [['id', 'ASC']],
+  });
+  return credits.map((credit) => credit.userId);
+}
+
+// creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
+// LIMIT keeps paging over series rather than credit rows.
+function buildWhere(
+  query: ListSeriesQuery,
+  creditedSeriesIds: number[] | undefined
+): WhereOptions {
   const clauses: WhereOptions[] = [];
 
-  if (query.userId !== undefined) {
-    clauses.push({ userId: query.userId });
+  if (creditedSeriesIds !== undefined) {
+    // An empty list becomes `IN (NULL)`, which matches nothing, as it should.
+    clauses.push({ id: creditedSeriesIds });
   }
 
   if (query.tag) {
@@ -86,27 +169,51 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
   return {
     async create(input) {
       try {
-        const series = await Series.create(input);
-        return toPublicSeries(series);
+        // One transaction, so a series never exists without its first credit.
+        return await sequelizeOf().transaction(async (transaction) => {
+          const { userId, ...attributes } = input;
+          const series = await Series.create(attributes, { transaction });
+          await SeriesAuthor.create(
+            { seriesId: series.id, userId },
+            { transaction }
+          );
+          return withAuthors(series, transaction);
+        });
       } catch (error) {
         asMissingUser(error, input.userId);
       }
     },
 
     async list(query) {
+      const creditedSeriesIds =
+        query.userId === undefined
+          ? undefined
+          : (
+              await SeriesAuthor.findAll({
+                where: { userId: query.userId },
+                attributes: ['seriesId'],
+              })
+            ).map((credit) => credit.seriesId);
+
       const { rows, count } = await Series.findAndCountAll({
-        where: buildWhere(query),
+        where: buildWhere(query, creditedSeriesIds),
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
       });
 
-      return { items: rows.map(toPublicSeries), total: count };
+      const authors = await loadAuthors(rows.map((row) => row.id));
+      return {
+        items: rows.map((row) =>
+          toPublicSeries(row, authors.get(row.id) ?? [])
+        ),
+        total: count,
+      };
     },
 
     async findById(id) {
       const series = await Series.findByPk(id);
-      return series ? toPublicSeries(series) : null;
+      return series ? withAuthors(series) : null;
     },
 
     async update(id, input) {
@@ -114,7 +221,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       if (!series) return null;
 
       await series.update(input);
-      return toPublicSeries(series);
+      return withAuthors(series);
     },
 
     async remove(id) {
@@ -122,9 +229,82 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       return deleted > 0;
     },
 
-    async findOwnerId(id) {
-      const series = await Series.findByPk(id, { attributes: ['userId'] });
-      return series?.userId ?? null;
+    async addCoAuthor(seriesId, userId) {
+      const series = await Series.findByPk(seriesId);
+      if (!series) return null;
+
+      const user = await User.findByPk(userId, { attributes: ['role'] });
+      if (!user) throw new NotFoundError('User', userId);
+      if (user.role !== 'author') {
+        throw new BadRequestError(
+          'Only an account holding the author role can be a co-author'
+        );
+      }
+
+      try {
+        await SeriesAuthor.create({ seriesId, userId });
+      } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+          throw new StateConflictError(
+            'That account is already a co-author of this series'
+          );
+        }
+        throw error;
+      }
+      return withAuthors(series);
+    },
+
+    async removeBook(seriesId, bookId) {
+      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+      if (!series) return false;
+
+      // The series id is part of the WHERE, so a book filed elsewhere matches
+      // nothing and is reported missing rather than silently unlinked.
+      const [unlinked] = await Book.update(
+        { seriesId: null },
+        { where: { id: bookId, seriesId } }
+      );
+      if (unlinked === 0) throw new NotFoundError('Book', bookId);
+      return true;
+    },
+
+    // Under a lock on the series row, for the reason bookRepository's
+    // removeCoAuthor gives: two co-authors leaving at once would otherwise
+    // each count two and leave the series credited to nobody.
+    async removeCoAuthor(seriesId, userId) {
+      return sequelizeOf().transaction(async (transaction) => {
+        const series = await Series.findByPk(seriesId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!series) return null;
+
+        const credits = await SeriesAuthor.findAll({
+          where: { seriesId },
+          attributes: ['userId'],
+          transaction,
+        });
+        // Not credited comes first, so a stranger on a solo series is not told
+        // its real co-author cannot leave.
+        if (!credits.some((credit) => credit.userId === userId)) {
+          throw new NotFoundError('Co-author', userId);
+        }
+        if (credits.length <= 1) {
+          throw new StateConflictError(
+            'The last co-author cannot leave; delete the series instead'
+          );
+        }
+
+        await SeriesAuthor.destroy({
+          where: { seriesId, userId },
+          transaction,
+        });
+        return withAuthors(series, transaction);
+      });
+    },
+
+    async findCoAuthorIds(id) {
+      return findSeriesCoAuthorIds(id);
     },
   };
 }

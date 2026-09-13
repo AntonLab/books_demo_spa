@@ -1,5 +1,7 @@
 import { Book } from './Book.ts';
 import { BookAuthor } from './BookAuthor.ts';
+import { Series } from './Series.ts';
+import { SeriesAuthor } from './SeriesAuthor.ts';
 
 interface BookFixture {
   title: string;
@@ -21,4 +23,22 @@ export async function createCreditedBook(
     await BookAuthor.create({ bookId: book.id, userId });
   }
   return book;
+}
+
+interface SeriesFixture {
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+// The same for a series, whose Co-authors live in series_authors.
+export async function createCreditedSeries(
+  fixture: SeriesFixture,
+  coAuthorIds: [number, ...number[]]
+): Promise<Series> {
+  const series = await Series.create(fixture);
+  for (const userId of coAuthorIds) {
+    await SeriesAuthor.create({ seriesId: series.id, userId });
+  }
+  return series;
 }
