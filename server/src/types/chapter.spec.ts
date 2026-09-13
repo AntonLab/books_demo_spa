@@ -68,17 +68,64 @@ test('an update with no fields at all is rejected', () => {
   assert.throws(() => updateChapterSchema.parse({}));
 });
 
+const seen = '2026-09-13T08:15:30.123Z';
+
 test('an update may carry a title alone, leaving text absent rather than blank', () => {
-  const parsed = updateChapterSchema.parse({ title: 'Renamed' });
+  const parsed = updateChapterSchema.parse({
+    title: 'Renamed',
+    expectedUpdatedAt: seen,
+  });
 
   assert.equal(parsed.title, 'Renamed');
   assert.ok(!('text' in parsed));
 });
 
 test('an update drops bookId — re-parenting a chapter is not a field edit', () => {
-  const parsed = updateChapterSchema.parse({ bookId: 9, title: 'Renamed' });
+  const parsed = updateChapterSchema.parse({
+    bookId: 9,
+    title: 'Renamed',
+    expectedUpdatedAt: seen,
+  });
 
   assert.ok(!('bookId' in parsed));
+});
+
+test('an update must say which version it was based on', () => {
+  assert.equal(
+    updateChapterSchema.safeParse({ title: 'Renamed' }).success,
+    false
+  );
+});
+
+test('an update needs a change beyond the version it was based on', () => {
+  assert.equal(
+    updateChapterSchema.safeParse({ expectedUpdatedAt: seen }).success,
+    false
+  );
+});
+
+test('an update may leave publishedAt out, or set it to now, a moment or null', () => {
+  assert.ok(
+    !(
+      'publishedAt' in
+      updateChapterSchema.parse({ text: 'x', expectedUpdatedAt: seen })
+    )
+  );
+  for (const publishedAt of ['now', '2030-01-01T10:00:00.000Z', null]) {
+    assert.equal(
+      updateChapterSchema.parse({ publishedAt, expectedUpdatedAt: seen })
+        .publishedAt,
+      publishedAt
+    );
+  }
+});
+
+test('a create is a draft unless it says otherwise', () => {
+  assert.equal(
+    createChapterSchema.parse({ bookId: 1, title: 'One', text: 'a' })
+      .publishedAt,
+    null
+  );
 });
 
 test('the list query defaults limit and offset, and takes no text', () => {

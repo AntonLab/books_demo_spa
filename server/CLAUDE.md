@@ -24,8 +24,22 @@ A book carries a **Book status** — `books.status`, an ENUM of `draft`,
 `in_progress` and `complete` that defaults to `draft` (`BOOK_STATUSES` in
 `types/book.ts`). `POST /api/books` takes no status, so every book starts as a
 draft; `PATCH` moves it to any other. Only `draft` changes what anyone may do —
-see **Draft books** under **Auth**. A chapter has no state of its own yet: it is
-readable exactly when its book is.
+see **Draft books** under **Auth**.
+
+A chapter carries a **Publication time** — `chapters.publishedAt`, a nullable
+`DATETIME(3)`. `null` is a Draft chapter, a future moment a Scheduled one, a
+past moment a Published one; nothing flips a flag when the moment passes,
+because every read compares it with this process's clock. A save sends
+`publishedAt` as `'now'` (the server stamps its own clock), an ISO instant
+(refused with 400 if it is not in the future) or `null`; a create that leaves
+it out is a draft. A Scheduled chapter may be rescheduled, published now or
+returned to Draft; a Published one may only return to Draft — any other value
+is a 400 — and its text is edited by leaving `publishedAt` out. Every
+`PATCH /api/chapters/:id` also carries `expectedUpdatedAt`, the version the
+save was based on: `chapterRepository.update` compares it under a row lock
+and answers 409 without writing if the chapter changed since.
+`chapters.updatedAt` is `DATETIME(3)` for exactly that reason — two
+Co-authors saving within one second would otherwise read as one version.
 
 `books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
 alongside their `description`, which now unambiguously means the annotation.
@@ -244,7 +258,11 @@ stay credited to `nquinn` alone. Book likes are drawn only from accounts not
 credited on the book, because no Co-author may like their own book.
 Each author's newest book is a Draft, with no comments or likes; the one before
 it, and every book of the series that draft belongs to, is In progress; every
-older book is Complete (`statusOf` in `planAuthor`).
+older book is Complete (`statusOf` in `planAuthor`). A Draft book's last two
+chapters are Draft chapters; every In progress book's next chapter is Scheduled
+over the coming days, and the author's newest In progress book has its next two
+scheduled (`publicationOf`); every other chapter was published when it was
+written.
 
 Three things about it are worth knowing before changing it:
 
@@ -473,6 +491,11 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     chapters and comments, join through it; a hidden row is the same 404 (or
     absence from a list) as a missing one, so a refusal never confirms a draft
     exists.
+  - **Chapters** add their Publication time (`readableChapterScope`): a
+    reader sees a chapter only when its book is readable and its
+    `publishedAt` has passed. A Co-author of the book sees every chapter in
+    it, drafts and scheduled ones included, and a Moderator sees every chapter
+    of every book.
   - **Likes** point at a book or at a comment on one, so they exclude instead
     (`hiddenBookIds`): the likes on a hidden draft and on the comments under it
     drop out. Drafts are few, so the exclusion lists stay short.
@@ -938,7 +961,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `series_authors` are new, and a surviving `NOT NULL` owner column makes every
   book or series insert fail, so a database created before them needs the drop
   too. So does `books.status`: a database without the column fails every read
-  that filters on it.
+  that filters on it. And `chapters.publishedAt` is new while
+  `chapters.updatedAt` gained millisecond precision, neither of which
+  `sync()` applies to an existing table.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of

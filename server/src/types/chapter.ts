@@ -17,12 +17,25 @@ const titleSchema = z.string().trim().min(1).max(CHAPTER_TITLE_MAX_LENGTH);
 // chapter's body, not an input artefact.
 const textSchema = z.string().min(1).max(CHAPTER_TEXT_MAX_LENGTH);
 
+// How a save sets the Publication time: `'now'` publishes at the server's
+// clock, an ISO instant schedules (the repository refuses one in the past), and
+// null keeps or returns the chapter to Draft. 'now' is its own value rather
+// than a client-supplied timestamp, so a skewed client clock cannot backdate or
+// postdate what "immediately" means.
+const publishedAtSchema = z.union([
+  z.literal('now'),
+  z.iso.datetime({ offset: true }),
+  z.null(),
+]);
+
 export const createChapterSchema = z.object({
   // Required and non-nullable, unlike books.seriesId: a chapter outside a book
   // is meaningless, which is also why the association cascades.
   bookId: idSchema,
   title: titleSchema,
   text: textSchema,
+  // Omitted means Draft: a chapter is only ever out on purpose.
+  publishedAt: publishedAtSchema.default(null),
 });
 
 // Spelled out rather than derived from createChapterSchema, for the reason
@@ -33,13 +46,20 @@ export const createChapterSchema = z.object({
 // nullable-unlink case to support here.
 export const updateChapterSchema = z
   .object({
-    title: titleSchema,
-    text: textSchema,
+    title: titleSchema.optional(),
+    text: textSchema.optional(),
+    // Omitted leaves the Publication time alone, which is how a Published
+    // chapter's text is edited: sending any value but null for one is a 400.
+    publishedAt: publishedAtSchema.optional(),
+    // The updatedAt this save was based on. Required, not optional: a save
+    // that skipped it would overwrite a co-author's work without ever being
+    // told, which is the one thing this field exists to prevent.
+    expectedUpdatedAt: z.iso.datetime({ offset: true }),
   })
-  .partial()
-  .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field must be provided',
-  });
+  .refine(
+    (value) => Object.keys(value).some((key) => key !== 'expectedUpdatedAt'),
+    { message: 'At least one field must be provided' }
+  );
 
 export const listChaptersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -56,6 +76,7 @@ export const idParamSchema = z.object({
 });
 
 export type CreateChapterInput = z.infer<typeof createChapterSchema>;
+export type PublishedAtInput = z.infer<typeof publishedAtSchema>;
 export type UpdateChapterInput = z.infer<typeof updateChapterSchema>;
 export type ListChaptersQuery = z.infer<typeof listChaptersQuerySchema>;
 
@@ -65,6 +86,8 @@ export interface PublicChapter {
   bookId: number;
   title: string;
   text: string;
+  // null for a Draft chapter; see publishedAtSchema above.
+  publishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
