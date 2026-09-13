@@ -7,12 +7,6 @@ export interface ListResponse<T> {
   offset: number;
 }
 
-// The envelope of a list that is never paged — the Co-author picker's search
-// and a series' books — so it carries no total, limit or offset.
-export interface ItemsResponse<T> {
-  items: T[];
-}
-
 // The shape every error response from the server shares. `details` is
 // deliberately `unknown`: it is a zod issue array on a 400 and
 // `{ field: 'login' | 'email' }` on a 409, so callers must narrow it.
