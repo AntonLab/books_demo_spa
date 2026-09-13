@@ -12,6 +12,7 @@ jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
+jest.mock('@/api/notifications');
 jest.mock('@/api/series');
 
 const mockedAuth = jest.mocked(authApi);

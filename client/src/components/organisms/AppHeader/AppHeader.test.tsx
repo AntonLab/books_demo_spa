@@ -5,11 +5,14 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
+import * as notificationsApi from '@/api/notifications';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
+jest.mock('@/api/notifications');
 
 const mockedAuth = jest.mocked(authApi);
+const mockedNotifications = jest.mocked(notificationsApi);
 
 const user: PublicUser = {
   id: 1,
@@ -33,6 +36,13 @@ const withSession = (session: PublicUser | null) => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedNotifications.listNotifications.mockResolvedValue({
+    items: [],
+    total: 0,
+    unread: 0,
+    limit: 20,
+    offset: 0,
+  });
 });
 
 describe('AppHeader while the session is loading', () => {
@@ -63,6 +73,13 @@ describe('AppHeader when logged out', () => {
     expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
+  it('has no notifications to show and asks for none', () => {
+    renderWithProviders(<AppHeader />, withSession(null));
+
+    expect(screen.queryByRole('button', { name: /^Notifications/ })).toBeNull();
+    expect(mockedNotifications.listNotifications).not.toHaveBeenCalled();
+  });
+
   it('opens the login modal in the store when Log in is clicked', async () => {
     const { store } = renderWithProviders(<AppHeader />, withSession(null));
 
@@ -81,6 +98,21 @@ describe('AppHeader when logged out', () => {
 });
 
 describe('AppHeader when logged in', () => {
+  it('shows the notification bell, with the unread count', async () => {
+    mockedNotifications.listNotifications.mockResolvedValue({
+      items: [],
+      total: 4,
+      unread: 4,
+      limit: 20,
+      offset: 0,
+    });
+    renderWithProviders(<AppHeader />, withSession(user));
+
+    expect(
+      await screen.findByRole('button', { name: 'Notifications, 4 unread' })
+    ).toBeInTheDocument();
+  });
+
   it('shows the login name instead of the auth buttons', () => {
     renderWithProviders(<AppHeader />, withSession(user));
 

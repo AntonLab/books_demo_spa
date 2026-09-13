@@ -16,11 +16,14 @@ declare module 'antd/es/theme/interface' {
   interface AliasToken {
     /** Widest the header's search field is allowed to grow. */
     appSearchBarMaxWidth: number;
+    /** Width of the notification bell's panel. */
+    appNotificationPanelWidth: number;
   }
 }
 
 export const appTheme: ThemeConfig = {
   token: {
     appSearchBarMaxWidth: 400,
+    appNotificationPanelWidth: 360,
   },
 };

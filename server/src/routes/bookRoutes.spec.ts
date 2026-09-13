@@ -81,7 +81,8 @@ const SUMMARIES = new Map<number, AuthorSummary>([
 // routes owe it is the right viewer, which is what a test can check here.
 function createFakeRepository(
   viewers: Viewer[] = [],
-  reorders: unknown[] = []
+  reorders: unknown[] = [],
+  actors: unknown[] = []
 ): BookRepository {
   const rows = new Map<number, PublicBook>();
   // bookId -> co-author ids, in credit order. The domain rules on credits (the
@@ -190,19 +191,22 @@ function createFakeRepository(
       return withCredits(updated);
     },
 
-    async remove(id) {
+    async remove(id, actor) {
+      actors.push(['remove', actor]);
       credits.delete(id);
       return rows.delete(id);
     },
 
-    async addCoAuthor(bookId, userId) {
+    async addCoAuthor(bookId, userId, actor) {
+      actors.push(['addCoAuthor', actor]);
       const book = rows.get(bookId);
       if (!book) return null;
       credits.set(bookId, [...(credits.get(bookId) ?? []), userId]);
       return withCredits(book);
     },
 
-    async removeCoAuthor(bookId, userId) {
+    async removeCoAuthor(bookId, userId, actor) {
+      actors.push(['removeCoAuthor', actor]);
       const book = rows.get(bookId);
       if (!book) return null;
       credits.set(
@@ -1296,6 +1300,32 @@ test('a series reorder conflict from the repository reaches the caller as a 409'
       });
 
       assert.equal(response.status, 409);
+    }
+  );
+});
+
+// --- Notifications name who acted, so the routes must say who that was. ---
+
+test('credit changes and deletes are made as the signed-in caller, whom their notifications name', async () => {
+  const actors: unknown[] = [];
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository([], [], actors) },
+    async (base) => {
+      const { id } = await json<PublicBook>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.otherAuthor);
+      await removeCoAuthor(
+        base,
+        id,
+        USER_IDS.otherAuthor,
+        ROLE_COOKIES.otherAuthor
+      );
+      await remove(base, id, ROLE_COOKIES.admin);
+
+      assert.deepEqual(actors, [
+        ['addCoAuthor', { id: USER_IDS.author, role: 'author' }],
+        ['removeCoAuthor', { id: USER_IDS.otherAuthor, role: 'author' }],
+        ['remove', { id: USER_IDS.admin, role: 'admin' }],
+      ]);
     }
   );
 });

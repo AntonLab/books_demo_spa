@@ -4,6 +4,7 @@ import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initLikeModel, Like } from './Like.ts';
+import { initNotificationModel, Notification } from './Notification.ts';
 import {
   initPasswordResetTokenModel,
   PasswordResetToken,
@@ -23,6 +24,7 @@ export interface Models {
   Chapter: typeof Chapter;
   Comment: typeof Comment;
   Like: typeof Like;
+  Notification: typeof Notification;
   Session: typeof Session;
   PasswordResetToken: typeof PasswordResetToken;
   Permission: typeof Permission;
@@ -39,6 +41,7 @@ export function initModels(sequelize: Sequelize): Models {
   initChapterModel(sequelize);
   initCommentModel(sequelize);
   initLikeModel(sequelize);
+  initNotificationModel(sequelize);
   initSessionModel(sequelize);
   initPasswordResetTokenModel(sequelize);
 
@@ -222,6 +225,34 @@ export function initModels(sequelize: Sequelize): Models {
   });
   PasswordResetToken.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
+  // A notification belongs to its recipient and goes with them. Its links to a
+  // book or a series only unlink when the work is deleted, like books.seriesId:
+  // the snapshot beside them — title, actor — is the point of keeping the row,
+  // and the "work deleted" notification itself names a work that is gone.
+  User.hasMany(Notification, {
+    as: 'notifications',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Notification.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  Book.hasMany(Notification, {
+    as: 'notifications',
+    foreignKey: { name: 'bookId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Notification.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  Series.hasMany(Notification, {
+    as: 'notifications',
+    foreignKey: { name: 'seriesId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Notification.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
   return {
     User,
     Series,
@@ -231,6 +262,7 @@ export function initModels(sequelize: Sequelize): Models {
     Chapter,
     Comment,
     Like,
+    Notification,
     Session,
     PasswordResetToken,
     Permission,
@@ -245,6 +277,7 @@ export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';
+export { Notification, toPublicNotification } from './Notification.ts';
 export { Session } from './Session.ts';
 export { PasswordResetToken } from './PasswordResetToken.ts';
 export { Permission, toPublicPermission } from './Permission.ts';

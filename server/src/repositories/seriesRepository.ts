@@ -24,6 +24,12 @@ import type {
   UpdateSeriesInput,
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
+import {
+  deleterOf,
+  displayNameOf,
+  notify,
+  type Actor,
+} from './notificationRepository.ts';
 import { visibleSeriesWhere, type Viewer } from './visibility.ts';
 
 export interface SeriesListResult {
@@ -42,9 +48,15 @@ export interface SeriesRepository {
   list(query: ListSeriesQuery, viewer: Viewer): Promise<SeriesListResult>;
   findById(id: number, viewer: Viewer): Promise<PublicSeries | null>;
   update(id: number, input: UpdateSeriesInput): Promise<PublicSeries | null>;
-  remove(id: number): Promise<boolean>;
+  // Like a book's, the writes that change who is credited or end the series
+  // take the actor and tell the other Co-authors in the same transaction.
+  remove(id: number, actor: Actor): Promise<boolean>;
   // null when the series is not there, as update/remove report it.
-  addCoAuthor(seriesId: number, userId: number): Promise<PublicSeries | null>;
+  addCoAuthor(
+    seriesId: number,
+    userId: number,
+    actor: Actor
+  ): Promise<PublicSeries | null>;
   // Takes a book out of the series from the series' side. false when the
   // series is not there; a NotFoundError on the book when it is not in this
   // series, so a caller cannot unlink a book filed somewhere else.
@@ -52,7 +64,8 @@ export interface SeriesRepository {
   // Covers both removing someone else and leaving, as on a book.
   removeCoAuthor(
     seriesId: number,
-    userId: number
+    userId: number,
+    actor: Actor
   ): Promise<PublicSeries | null>;
   // The cheapest question the ownership check can ask: one indexed lookup, no
   // eager loads, no serialisation. null when the series is not there.
@@ -234,8 +247,35 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       return withAuthors(series);
     },
 
-    async remove(id) {
+    async remove(id, actor) {
       return sequelizeOf().transaction(async (transaction) => {
+        const series = await Series.findByPk(id, {
+          attributes: ['id', 'title'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!series) return false;
+
+        const coAuthorIds = (
+          await SeriesAuthor.findAll({
+            where: { seriesId: id },
+            attributes: ['userId'],
+            transaction,
+          })
+        ).map((credit) => credit.userId);
+        await notify(
+          [
+            {
+              recipientIds: coAuthorIds,
+              kind: 'work_deleted',
+              work: { type: 'series', id: null, title: series.title },
+              ...(await deleterOf(actor, coAuthorIds, transaction)),
+            },
+          ],
+          actor.id,
+          transaction
+        );
+
         // The foreign key unlinks the books; their place in the series goes
         // with it here, so no book outside a series keeps a position.
         await Book.update(
@@ -247,7 +287,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       });
     },
 
-    async addCoAuthor(seriesId, userId) {
+    async addCoAuthor(seriesId, userId, actor) {
       const series = await Series.findByPk(seriesId);
       if (!series) return null;
 
@@ -260,7 +300,22 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       }
 
       try {
-        await SeriesAuthor.create({ seriesId, userId });
+        await sequelizeOf().transaction(async (transaction) => {
+          await SeriesAuthor.create({ seriesId, userId }, { transaction });
+          await notify(
+            [
+              {
+                recipientIds: [userId],
+                kind: 'co_author_added',
+                work: { type: 'series', id: seriesId, title: series.title },
+                actorKind: 'co_author',
+                actorName: await displayNameOf(actor.id, transaction),
+              },
+            ],
+            actor.id,
+            transaction
+          );
+        });
       } catch (error) {
         if (error instanceof UniqueConstraintError) {
           throw new StateConflictError(
@@ -289,7 +344,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     // Under a lock on the series row, for the reason bookRepository's
     // removeCoAuthor gives: two co-authors leaving at once would otherwise
     // each count two and leave the series credited to nobody.
-    async removeCoAuthor(seriesId, userId) {
+    async removeCoAuthor(seriesId, userId, actor) {
       return sequelizeOf().transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {
           transaction,
@@ -317,6 +372,23 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
           where: { seriesId, userId },
           transaction,
         });
+        // As on a book: a leave tells those who remain, a removal the removed.
+        const leaving = userId === actor.id;
+        await notify(
+          [
+            {
+              recipientIds: leaving
+                ? credits.map((credit) => credit.userId)
+                : [userId],
+              kind: leaving ? 'co_author_left' : 'co_author_removed',
+              work: { type: 'series', id: seriesId, title: series.title },
+              actorKind: 'co_author',
+              actorName: await displayNameOf(actor.id, transaction),
+            },
+          ],
+          actor.id,
+          transaction
+        );
         return withAuthors(series, transaction);
       });
     },

@@ -6,7 +6,7 @@ import {
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
-import { viewerOf } from '../repositories/visibility.ts';
+import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -151,7 +151,7 @@ export function createBookController(
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayTouch(req, id);
 
-      const deleted = await repository.remove(id);
+      const deleted = await repository.remove(id, actorOf(req));
       if (!deleted) throw new NotFoundError('Book', id);
       res.status(204).end();
     },
@@ -161,7 +161,7 @@ export function createBookController(
       const { userId } = validatedBody<AddCoAuthorInput>(req);
       await assertCoAuthor(req, id);
 
-      const book = await repository.addCoAuthor(id, userId);
+      const book = await repository.addCoAuthor(id, userId, actorOf(req));
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);
     },
@@ -184,7 +184,7 @@ export function createBookController(
         await assertCoAuthor(req, id);
       }
 
-      const book = await repository.removeCoAuthor(id, userId);
+      const book = await repository.removeCoAuthor(id, userId, actorOf(req));
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);
     },

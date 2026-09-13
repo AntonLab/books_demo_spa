@@ -54,6 +54,9 @@ const coAuthor = {
 describe('seriesRepository against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
   let ownerId: number;
+  // Who acts in the calls below. The rules on who may act are the
+  // controllers'; this suite is about what each change does.
+  const asOwner = () => ({ id: ownerId, role: 'author' as const });
   const repository = createSequelizeSeriesRepository();
   // Most series here hold no book at all, which hides them from a reader. The
   // tests that are not about visibility read as a Moderator, who sees every
@@ -113,7 +116,11 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const updated = await repository.addCoAuthor(created.id, coAuthorId);
+    const updated = await repository.addCoAuthor(
+      created.id,
+      coAuthorId,
+      asOwner()
+    );
 
     assert.deepEqual(
       updated?.authors.map((author) => author.login),
@@ -131,7 +138,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     });
 
     await assert.rejects(
-      repository.addCoAuthor(created.id, readerId),
+      repository.addCoAuthor(created.id, readerId, asOwner()),
       (error: unknown) =>
         error instanceof AppError &&
         error.statusCode === 400 &&
@@ -152,7 +159,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     });
 
     await assert.rejects(
-      repository.addCoAuthor(created.id, ownerId + 10_000),
+      repository.addCoAuthor(created.id, ownerId + 10_000, asOwner()),
       (error: unknown) =>
         error instanceof NotFoundError &&
         /User \d+ not found/.test(error.message)
@@ -167,10 +174,10 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       description: 'Shared',
       tags: [],
     });
-    await repository.addCoAuthor(created.id, coAuthorId);
+    await repository.addCoAuthor(created.id, coAuthorId, asOwner());
 
     await assert.rejects(
-      repository.addCoAuthor(created.id, coAuthorId),
+      repository.addCoAuthor(created.id, coAuthorId, asOwner()),
       (error: unknown) => error instanceof AppError && error.statusCode === 409
     );
   });
@@ -183,9 +190,13 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       description: 'Shared',
       tags: [],
     });
-    await repository.addCoAuthor(created.id, coAuthorId);
+    await repository.addCoAuthor(created.id, coAuthorId, asOwner());
 
-    const updated = await repository.removeCoAuthor(created.id, ownerId);
+    const updated = await repository.removeCoAuthor(
+      created.id,
+      ownerId,
+      asOwner()
+    );
 
     assert.deepEqual(
       updated?.authors.map((author) => author.id),
@@ -202,7 +213,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     });
 
     await assert.rejects(
-      repository.removeCoAuthor(created.id, ownerId),
+      repository.removeCoAuthor(created.id, ownerId, asOwner()),
       (error: unknown) =>
         error instanceof AppError &&
         error.statusCode === 409 &&
@@ -224,7 +235,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     });
 
     await assert.rejects(
-      repository.removeCoAuthor(created.id, strangerId),
+      repository.removeCoAuthor(created.id, strangerId, asOwner()),
       (error: unknown) =>
         error instanceof NotFoundError &&
         /Co-author \d+ not found/.test(error.message)
@@ -239,7 +250,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       description: 'Shared',
       tags: [],
     });
-    await repository.addCoAuthor(shared.id, coAuthorId);
+    await repository.addCoAuthor(shared.id, coAuthorId, asOwner());
     await repository.create({
       userId: ownerId,
       title: 'Solo Series',
@@ -507,7 +518,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    assert.equal(await repository.remove(created.id), true);
+    assert.equal(await repository.remove(created.id, asOwner()), true);
     assert.equal(await SeriesAuthor.count(), 0);
   });
 
