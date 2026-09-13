@@ -201,3 +201,21 @@ describe('BookPage on a draft', () => {
     expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
 });
+
+describe('BookPage edit link', () => {
+  it('offers Edit to every co-author', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    expect(await screen.findByRole('link', { name: 'Edit' })).toHaveAttribute(
+      'href',
+      '/books/1/edit'
+    );
+  });
+
+  it('offers Edit to nobody else', async () => {
+    renderPage(reader);
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+  });
+});

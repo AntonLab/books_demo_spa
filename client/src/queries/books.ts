@@ -1,5 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { getBook, listBooks } from '../api/books';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  addCoAuthor,
+  createBook,
+  deleteBook,
+  getBook,
+  listBooks,
+  removeCoAuthor,
+  updateBook,
+  type CreateBookPayload,
+  type UpdateBookPayload,
+} from '../api/books';
 import { queryKeys } from './keys';
 
 // The first page only. Paging is a documented non-goal; `total` is kept so the
@@ -35,3 +45,49 @@ export const useBook = (id: number) => {
     queryFn: () => getBook(id),
   });
 };
+
+// A Co-author's own books, drafts included: the server widens a list to drafts
+// only when `?userId=` names the caller. `enabled` waits for the session, so
+// the page never asks for a list with no id in it.
+export const useMyBooks = (userId: number | undefined) => {
+  return useQuery({
+    queryKey: queryKeys.books({ userId, limit: MY_BOOKS_LIMIT }),
+    queryFn: () => listBooks({ userId, limit: MY_BOOKS_LIMIT }),
+    enabled: userId !== undefined,
+  });
+};
+
+// The server's list cap. "My books" is one author's catalogue, not a feed, so a
+// single full page stands in for paging.
+export const MY_BOOKS_LIMIT = 100;
+
+// Every book write invalidates the whole `books` prefix: a change to one book
+// can move it into or out of any list (a status change hides it from the main
+// page), and the detail key sits under the same prefix.
+const useBookMutation = <TVariables, TResult>(
+  mutationFn: (variables: TVariables) => Promise<TResult>
+) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // Wrapped rather than passed straight through: TanStack calls a mutationFn
+    // with a second context argument an API function never declared.
+    mutationFn: (variables: TVariables) => mutationFn(variables),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['books'] }),
+  });
+};
+
+export const useCreateBook = () =>
+  useBookMutation((payload: CreateBookPayload) => createBook(payload));
+
+export const useUpdateBook = (id: number) =>
+  useBookMutation((payload: UpdateBookPayload) => updateBook(id, payload));
+
+export const useDeleteBook = (id: number) =>
+  useBookMutation(() => deleteBook(id));
+
+export const useAddCoAuthor = (bookId: number) =>
+  useBookMutation((userId: number) => addCoAuthor(bookId, userId));
+
+export const useRemoveCoAuthor = (bookId: number) =>
+  useBookMutation((userId: number) => removeCoAuthor(bookId, userId));

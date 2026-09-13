@@ -83,6 +83,26 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders NewBookPage at /books/new, not BookPage', async () => {
+    renderWithProviders(<AppShell />, { route: '/books/new' });
+
+    // An anonymous visitor: the page explains itself instead of a form.
+    expect(
+      await screen.findByText(
+        'Only an account holding the author role can create books.'
+      )
+    ).toBeInTheDocument();
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
+  });
+
+  it('renders EditBookPage at /books/:id/edit', async () => {
+    renderWithProviders(<AppShell />, { route: '/books/1/edit' });
+
+    expect(
+      await screen.findByText('Only its co-authors can edit this book.')
+    ).toBeInTheDocument();
+  });
+
   it('renders the series stub at /series', async () => {
     renderWithProviders(<AppShell />, { route: '/series' });
 

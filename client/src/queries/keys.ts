@@ -1,4 +1,5 @@
 import type { ListBooksParams } from '../api/books';
+import type { ListSeriesParams } from '../api/series';
 
 // One place where every cache key is spelled, so no two call sites can
 // disagree about what identifies a query.
@@ -17,4 +18,6 @@ export const queryKeys = {
   chapters: (bookId: number) => ['chapters', { bookId }] as const,
   chapter: (id: number) => ['chapters', id] as const,
   comments: (bookId: number) => ['comments', { bookId }] as const,
+  series: (params: ListSeriesParams) => ['series', params] as const,
+  authors: (q: string) => ['authors', { q }] as const,
 };

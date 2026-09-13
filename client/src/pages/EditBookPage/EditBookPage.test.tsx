@@ -1,0 +1,160 @@
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
+import { EditBookPage } from './EditBookPage';
+import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
+import * as authorsApi from '@/api/authors';
+import * as booksApi from '@/api/books';
+import * as seriesApi from '@/api/series';
+import type { BookDetail } from '@/types/book';
+import type { PublicUser } from '@/types/user';
+
+jest.mock('@/api/authors');
+jest.mock('@/api/books');
+jest.mock('@/api/series');
+
+const mockedAuthors = jest.mocked(authorsApi);
+const mockedBooks = jest.mocked(booksApi);
+const mockedSeries = jest.mocked(seriesApi);
+
+const ann = { id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' };
+const cora = { id: 4, login: 'cora', firstName: 'Cora', lastName: 'Writer' };
+
+const book: BookDetail = {
+  id: 1,
+  authors: [ann, cora],
+  seriesId: null,
+  title: 'A Tale of Dragons',
+  description: 'Long ago.',
+  tags: ['epic'],
+  status: 'draft',
+  createdAt: '2026-09-01T00:00:00.000Z',
+  updatedAt: '2026-09-01T00:00:00.000Z',
+  series: null,
+  likeCount: 0,
+  viewerLikeId: null,
+};
+
+const account = (overrides: Partial<PublicUser>): PublicUser => ({
+  id: ann.id,
+  login: 'ann',
+  email: 'ann@example.com',
+  firstName: 'Ann',
+  lastName: 'Author',
+  status: 'active',
+  role: 'author',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const renderPage = (session: PublicUser | null = account({})) => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, session);
+
+  return renderWithProviders(
+    <Routes>
+      <Route path="/books/:id/edit" element={<EditBookPage />} />
+      <Route path="/my-books" element={<p>My books list</p>} />
+    </Routes>,
+    { route: '/books/1/edit', queryClient }
+  );
+};
+
+beforeEach(() => {
+  jest.resetAllMocks();
+  mockedBooks.getBook.mockResolvedValue(book);
+  mockedSeries.listSeries.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
+  mockedAuthors.searchAuthors.mockResolvedValue([]);
+});
+
+describe('EditBookPage', () => {
+  it('loads the book and saves its fields and status', async () => {
+    mockedBooks.updateBook.mockResolvedValue(book);
+    renderPage();
+
+    const title = await screen.findByLabelText('Title');
+    expect(title).toHaveValue('A Tale of Dragons');
+
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Dragons, Revised');
+    await userEvent.click(screen.getByText('In progress'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedBooks.updateBook).toHaveBeenCalledWith(1, {
+      title: 'Dragons, Revised',
+      description: 'Long ago.',
+      tags: ['epic'],
+      seriesId: null,
+      status: 'in_progress',
+    });
+    expect(await screen.findByText('Saved.')).toBeInTheDocument();
+  });
+
+  it('manages the co-authors from the same page', async () => {
+    renderPage();
+
+    expect(await screen.findByText('Cora Writer')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+  });
+
+  it('deletes the book only once the deletion is confirmed', async () => {
+    mockedBooks.deleteBook.mockResolvedValue(undefined);
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    expect(mockedBooks.deleteBook).not.toHaveBeenCalled();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    await waitFor(() => expect(mockedBooks.deleteBook).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('My books list')).toBeInTheDocument();
+  });
+
+  it('leaving the book returns to My books', async () => {
+    mockedBooks.removeCoAuthor.mockResolvedValue(book);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }));
+
+    expect(await screen.findByText('My books list')).toBeInTheDocument();
+  });
+
+  it('turns away an account that does not co-author the book', async () => {
+    renderPage(account({ id: 99, login: 'reader', role: 'user' }));
+
+    expect(
+      await screen.findByText('Only its co-authors can edit this book.')
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('lets a moderator edit the book but not its byline', async () => {
+    renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
+  });
+
+  it('reports a book that will not load', async () => {
+    mockedBooks.getBook.mockRejectedValue(new Error('nope'));
+    renderPage();
+
+    expect(
+      await screen.findByText('Could not load this book.')
+    ).toBeInTheDocument();
+  });
+});
