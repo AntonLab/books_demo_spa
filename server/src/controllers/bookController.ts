@@ -60,9 +60,10 @@ export function createBookController(
   };
 
   // Filing a book under a series changes that series too — it starts listing
-  // the book — so the target series' owner has to answer as well as the
-  // book's Co-authors. Without this an author could put their book into a stranger's
-  // series, and the series' owner could only undo it by deleting the series.
+  // the book — so the caller must co-author the series as well as the book.
+  // The two Co-author lists are independent: a book credited to A and B may sit
+  // in a series credited to A and C, and only A may file it there. Without
+  // this an author could put their book into a stranger's series.
   // chapterController.assertMayAddTo closes the same hole one level down.
   //
   // null (unlinking) and an absent key (leaving the link alone) touch no
@@ -75,10 +76,12 @@ export function createBookController(
     if (seriesId === null || seriesId === undefined) return;
     if (req.permissionScope === 'any') return;
 
-    const ownerId = await repository.findSeriesOwnerId(seriesId);
-    if (ownerId === null) throw new NotFoundError('Series', seriesId);
-    if (ownerId !== req.user?.id) {
-      throw new ForbiddenError('You may only add books to your own series');
+    const coAuthorIds = await repository.findSeriesCoAuthorIds(seriesId);
+    if (coAuthorIds === null) throw new NotFoundError('Series', seriesId);
+    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
+      throw new ForbiddenError(
+        'You may only add books to series you co-author'
+      );
     }
   };
 

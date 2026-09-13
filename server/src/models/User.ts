@@ -4,11 +4,9 @@ import {
   type CreationOptional,
   type InferAttributes,
   type InferCreationAttributes,
-  type NonAttribute,
   type Sequelize,
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
-import type { Series } from './Series.ts';
 import {
   USER_STATUSES,
   type AuthorSummary,
@@ -31,13 +29,8 @@ export class User extends Model<
   declare role: CreationOptional<UserRole>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
-
-  // Set by User.hasMany(Series) and populated only by an eager `include`.
-  // NonAttribute keeps it out of the inferred attribute set so it is never
-  // mistaken for a column; the import above is type-only, so the cycle with
-  // Series.ts is erased at runtime. There is no `books`: an account reaches its
-  // books through book_authors, not a column on books.
-  declare series?: NonAttribute<Series[]>;
+  // No `books` or `series`: an account reaches its works through book_authors
+  // and series_authors, not an owner column on either.
 }
 
 export function initUserModel(sequelize: Sequelize): typeof User {

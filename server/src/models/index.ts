@@ -10,12 +10,14 @@ import {
 } from './PasswordResetToken.ts';
 import { initPermissionModel, Permission } from './Permission.ts';
 import { initSeriesModel, Series } from './Series.ts';
+import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
 
 export interface Models {
   User: typeof User;
   Series: typeof Series;
+  SeriesAuthor: typeof SeriesAuthor;
   Book: typeof Book;
   BookAuthor: typeof BookAuthor;
   Chapter: typeof Chapter;
@@ -31,6 +33,7 @@ export function initModels(sequelize: Sequelize): Models {
   // Reference data, unrelated to any row — no association block follows it.
   initPermissionModel(sequelize);
   initSeriesModel(sequelize);
+  initSeriesAuthorModel(sequelize);
   initBookModel(sequelize);
   initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
@@ -41,22 +44,31 @@ export function initModels(sequelize: Sequelize): Models {
 
   // Associations are declared after every model is initialised, so the target
   // is always a registered model no matter what order the files load in.
-  User.hasMany(Series, {
-    as: 'series',
-    foreignKey: 'userId',
-    // Deleting a user takes their series with them; nothing else references
-    // them, and an orphaned series has no owner to answer for it.
+  // A series' Co-authors, the same shape as a book's below (ADR-0005). Both
+  // sides cascade; userRepository.remove deletes the series an account was the
+  // last Co-author of before its credits go.
+  Series.hasMany(SeriesAuthor, {
+    as: 'credits',
+    foreignKey: 'seriesId',
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
   });
-  Series.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+  SeriesAuthor.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
+  User.hasMany(SeriesAuthor, {
+    as: 'seriesCredits',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  SeriesAuthor.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
   Series.hasMany(Book, {
     as: 'books',
     // allowNull is restated here so Sequelize does not infer NOT NULL from the
     // association and quietly make SET NULL illegal.
     foreignKey: { name: 'seriesId', allowNull: true },
-    // Not CASCADE, unlike the one above: seriesId is optional, so a book can
+    // Not CASCADE, unlike the credits above: seriesId is optional, so a book can
     // stand alone. Dropping the series unlinks its books rather than
     // destroying records the user never asked to delete.
     onDelete: 'SET NULL',
@@ -213,6 +225,7 @@ export function initModels(sequelize: Sequelize): Models {
   return {
     User,
     Series,
+    SeriesAuthor,
     Book,
     BookAuthor,
     Chapter,
@@ -226,6 +239,7 @@ export function initModels(sequelize: Sequelize): Models {
 
 export { User, toPublicUser } from './User.ts';
 export { Series, toPublicSeries } from './Series.ts';
+export { SeriesAuthor } from './SeriesAuthor.ts';
 export { Book, toPublicBook } from './Book.ts';
 export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';

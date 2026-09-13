@@ -45,16 +45,9 @@ test('tags carries no DDL default — MySQL forbids one on a JSON column', () =>
   assert.doesNotMatch(createTableSql, /`tags` JSON[^,]*DEFAULT/);
 });
 
-test('userId matches users.id exactly, or MySQL rejects the foreign key', () => {
-  assert.match(createTableSql, /`userId` INTEGER UNSIGNED NOT NULL/);
+test('series carries no owner column — its Co-authors live in series_authors', () => {
+  assert.doesNotMatch(createTableSql, /`userId`/);
   assert.match(createTableSql, /`id` INTEGER UNSIGNED auto_increment/);
-});
-
-test('the hasMany association emits a cascading foreign key to users', () => {
-  assert.match(
-    createTableSql,
-    /FOREIGN KEY \(`userId`\) REFERENCES `users` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
-  );
 });
 
 test('description is TEXT and the timestamps are NOT NULL', () => {
@@ -70,30 +63,21 @@ test('the table is InnoDB with the utf8mb4 default collation', () => {
   );
 });
 
-test('(userId, id) is indexed so the list filter and ordering share one index', () => {
-  assert.deepEqual(
-    Series.options.indexes?.map((index) => index.fields),
-    [['userId', 'id']]
-  );
-});
-
-test('User.hasMany(Series) is registered under the `series` alias', () => {
-  const association = Series.associations.user;
-
-  assert.equal(association.associationType, 'BelongsTo');
-  assert.equal(association.target.name, 'User');
+test('Series reaches its Co-authors through credits, not a user association', () => {
+  assert.equal(Series.associations.credits?.associationType, 'HasMany');
+  assert.equal(Series.associations.credits?.target.name, 'SeriesAuthor');
+  assert.equal(Series.associations.user, undefined);
 });
 
 test('toPublicSeries copies the tag array rather than aliasing the model', () => {
   const series = Series.build({
     id: 1,
-    userId: 2,
     title: 'Test Series',
     description: 'A trilogy',
     tags: ['sci-fi'],
   });
 
-  const output = toPublicSeries(series);
+  const output = toPublicSeries(series, []);
   output.tags.push('mutated');
 
   assert.deepEqual(series.tags, ['sci-fi']);
@@ -102,7 +86,6 @@ test('toPublicSeries copies the tag array rather than aliasing the model', () =>
 test('toPublicSeries parses a JSON string, should a driver return one raw', () => {
   const series = Series.build({
     id: 1,
-    userId: 2,
     title: 'Test Series',
     description: 'A trilogy',
     tags: ['sci-fi'],
@@ -111,5 +94,5 @@ test('toPublicSeries parses a JSON string, should a driver return one raw', () =
   // normalisation it would be spread character by character.
   series.setDataValue('tags', '["sci-fi","epic"]' as unknown as string[]);
 
-  assert.deepEqual(toPublicSeries(series).tags, ['sci-fi', 'epic']);
+  assert.deepEqual(toPublicSeries(series, []).tags, ['sci-fi', 'epic']);
 });
