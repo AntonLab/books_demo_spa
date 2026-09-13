@@ -7,8 +7,11 @@ for persistence.
 
 The `User`, `Series`, `Book`, `Chapter`, `Comment` and `Like` models and their
 CRUD APIs are implemented end to end, associated by `User.hasMany(Series)`,
-`User.hasMany(Book)`, `Series.hasMany(Book)`, `Book.hasMany(Chapter)`, and
-`hasMany(Like)` from each of `User`, `Book` and `Comment`.
+`Series.hasMany(Book)`, `Book.hasMany(Chapter)`, and `hasMany(Like)` from each
+of `User`, `Book` and `Comment`. A book has no owner column: its **Co-authors**
+are rows in `book_authors` (`BookAuthor`, hung off both `Book` and `User` as
+`credits` / `bookCredits`), and every one of them holds the same rights over
+the book (ADR-0005). A series still has a single owner (`series.userId`).
 Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
 `src/index.ts` ensures the schema exists, authenticates, and mounts the
 Express app under `/api`. Routes, controllers, repositories, models, and
@@ -24,11 +27,22 @@ to save a chapter privately before showing it to readers.
 alongside their `description`, which now unambiguously means the annotation.
 The `?q=` filter on both matches either column.
 
+Every `PublicBook` — list and detail alike — carries `authors`, the book's
+Co-authors in credit order as `AuthorSummary` (`PublicUser` minus the email,
+which is the omission that makes it safe in a public response). There is no
+`userId` on a book any more, and `?userId=` matches a book through any of its
+Co-authors. A page of books loads its credits in one extra query
+(`loadAuthors` in `bookRepository.ts`) rather than an include, which would
+make the `LIMIT` page over credit rows instead of books.
+
 `GET /api/books/:id` returns a `BookDetail` rather than a `PublicBook`: the
-record plus an `author` (`AuthorSummary` — `PublicUser` minus the email, which
-is the omission that makes it safe in a public response), the series `id` and
-`title`, a `likeCount` and the caller's own `viewerLikeId`. The list endpoint
-is untouched and stays cheap.
+record plus the series `id` and `title`, a `likeCount` and the caller's own
+`viewerLikeId`.
+
+Co-authors change through `POST /api/books/:id/co-authors` (`{ userId }`) and
+`DELETE /api/books/:id/co-authors/:userId`, which covers both removing someone
+else and leaving; both answer 200 with the updated `PublicBook`. See
+**Co-authors** under **Auth**.
 
 `Session` and `PasswordResetToken` back a full session-based auth API at
 `/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
@@ -74,7 +88,7 @@ scripts below still run from this directory, or from the root with `-w server`.
   are never emitted
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
-  **It deletes every row in the six content tables**, so it does nothing
+  **It deletes every row in the seven content tables**, so it does nothing
   without `--force`: `npm run seed -w server -- --force` from the repo root,
   or `npm run seed -- --force` from here. Without the flag it prints the row
   counts it found and exits
@@ -136,9 +150,11 @@ added.
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `Book.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `Session.ts`,
-  `PasswordResetToken.ts`, `Permission.ts`, `index.ts`; `tagArray.ts`
-  holds the JSON tag-column normalisation `Series` and `Book` share)
+  `Book.ts`, `BookAuthor.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`,
+  `Session.ts`, `PasswordResetToken.ts`, `Permission.ts`, `index.ts`;
+  `tagArray.ts` holds the JSON tag-column normalisation `Series` and `Book`
+  share; `creditedBook.testkit.ts` is the suites' way to create a book with
+  its Co-authors)
 - `src/permissions/` — `matrix.ts` (the role/module/action → scope
   definition and `buildMatrixRows()`) and `permissionStore.ts` (the
   in-memory cache `scopeFor()` reads and `syncPermissions()` writes); see
@@ -203,6 +219,11 @@ where "User Two" answers "User Four" reads as a test run, not a demo.
 books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Tags come
 from a per-genre pool, with `mystery` and `slow-burn` deliberately shared
 across two authors each, so `?tag=` returns more than one author's work.
+Two standalone books are co-authored (`shareBooks`, `SHARED_BOOK_COUNT`): each
+of the first two authors' last standalone book also credits the next author in
+`AUTHORS`, so `mhale` and `ipetrov` share one and `ipetrov` and `nquinn` another.
+Book likes are drawn only from accounts not credited on the book, because no
+Co-author may like their own book.
 
 Three things about it are worth knowing before changing it:
 
@@ -211,7 +232,7 @@ Three things about it are worth knowing before changing it:
   anyway. The payloads are still parsed by the same zod schemas the routes use
   (`createUserSchema`, `createBookSchema`, …), so nothing lands that the API
   would refuse; only the fields those schemas deliberately withhold — the
-  owner, and the role — are attached afterwards.
+  owner or the book's Co-authors, and the role — are attached afterwards.
 - **Accounts go through `create()`, everything else through `bulkCreate()`.**
   `bulkCreate` defaults to `individualHooks: false`, which would skip
   `User.beforeSave` and store the password in clear text. The reverse also
@@ -226,7 +247,8 @@ Three things about it are worth knowing before changing it:
   is passed explicitly and `{ silent: true }` is what stops `save()` from
   overwriting the backdated `updatedAt`.
 
-It deletes `likes` → `comments` → `chapters` → `books` → `series` → `users` by
+It deletes `likes` → `comments` → `chapters` → `book_authors` → `books` →
+`series` → `users` by
 explicit enumeration rather than leaning on the cascades, which would work
 today and start leaving rows behind the day an `onDelete` changes.
 `permissions` is untouched: it is reference data `syncPermissions()` derives
@@ -335,18 +357,23 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
   `admin` and `superadmin` bypass it — the matrix grants them `any` rather
   than `own` on the module in question, so the check in the controller is
   skipped outright. For the roles that only get `own` (`user` and `author` on
-  their own resources), only the row's owner may `PATCH` or `DELETE` it, and
-  nobody may like their own book or their own comment; every refusal is 403.
+  their own resources), only the row's owner may `PATCH` or `DELETE` it — for a
+  book or a chapter, any of the book's Co-authors — and nobody may like their
+  own book (any book they co-author) or their own comment; every refusal is 403.
   - The book, series, chapter, comment and like checks each live in their own
     controller (`assertMayTouch` / `assertOwned`), not a middleware, because
     they need the repository to load the row before an owner can be compared
     — `requirePermission` only knows the scope, not the row. Every one reports
     404 before 403, so a refusal cannot be used to probe which ids exist.
+  - **A book's `own` means "one of its Co-authors."** `books` has no owner
+    column; `bookController.assertCoAuthor` asks
+    `bookRepository.findCoAuthorIds` and refuses anyone not on the list.
   - **Chapters resolve ownership through their book**, because `chapters` has
     no `userId` column: `chapterController.assertMayTouch` looks up the
-    chapter's `bookId` and then the book's owner, and `assertMayAddTo` does
-    the same for a `POST` that has no chapter yet to own — the target book
-    answers instead.
+    chapter's `bookId` and then the book's Co-authors
+    (`chapterRepository.findCoAuthorIds`), and `assertMayAddTo` does the same
+    for a `POST` that has no chapter yet to own — the target book answers
+    instead (`findBookCoAuthorIds`).
   - **Creating into another resource checks that resource's owner too.**
     `bookController.assertMayAddToSeries` checks the caller may touch the
     target series before a book is filed into it, because filing a book into
@@ -363,12 +390,43 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     `DELETE` with 404, since there is nothing left to delete a second time —
     before `assertOwner` ever runs.
   - The self-like check lives in `likeRepository.create`, which loads the
-    target to compare owners. It is the one check-then-write in that file, and
-    it is safe where the uniqueness check would not be: a row's owner never
-    changes, so the answer cannot go stale before the insert. Uniqueness stays
-    with the indexes for exactly that reason. This is a domain invariant, not
-    a matrix rule — no scope value spells out "not yourself," so do not go
-    looking for it in the permission table.
+    target to compare owners — for a book, whether the actor is credited on
+    it at all. It is the one check-then-write in that file, and it is safe
+    where the uniqueness check would not be: a comment's owner never changes,
+    and a Co-author credited between the check and the insert leaves at worst
+    one like that predates the credit. Uniqueness stays with the indexes for
+    exactly that reason. This is a domain invariant, not a matrix rule — no
+    scope value spells out "not yourself," so do not go looking for it in the
+    permission table.
+- **Co-authors** (ADR-0005). `POST /api/books/:id/co-authors` and
+  `DELETE /api/books/:id/co-authors/:userId` change who is credited on a book.
+  - **Adding** rides on `books × update` and then requires the caller to be one
+    of the book's Co-authors, which a Moderator never is: `admin` and
+    `superadmin` may edit or delete any book but never change its byline.
+    `bookRepository.addCoAuthor` refuses an account not holding the `author`
+    Role (400), a missing account (404) and one already credited (409, from the
+    `(bookId, userId)` unique index rather than a lookup first).
+  - **Removing** is mounted behind `requireAuth`, not `requirePermission`,
+    because leaving must not depend on a books grant: a Co-author who switched
+    Role to `user` holds `none` on books and would otherwise be stuck on the
+    byline. So anyone signed in reaches the controller, which lets a caller
+    remove themselves at any Role and lets them remove someone else only when
+    `scopeFor(role, 'books', 'update')` is exactly `own` and they are credited —
+    `none` (no longer an author) and `any` (a Moderator) are both 403.
+  - **A book always keeps one Co-author.** `bookRepository.removeCoAuthor`
+    answers 404 for an account that is not credited — checked first, so a
+    stranger on a solo book is not told its real Co-author cannot leave — and
+    409 for the last one, who must delete the book instead. The count and the
+    delete run under `SELECT … FOR UPDATE` on the book row, or two Co-authors
+    of a two-author book leaving at once would each count two and leave it
+    credited to nobody.
+  - **Deleting an account deletes only the books it was the last Co-author
+    of.** `userRepository.remove` locks the account's credited books with the
+    same row lock, deletes those with a single credit, and lets the
+    `book_authors.userId` cascade drop its credit from the rest. ADR-0004's
+    hard-deleted comments therefore follow only the books that actually go.
+  - **Switching Role from `author` to `user` keeps every credit.** Nothing
+    strips it; the matrix alone takes away the write access.
 - **Deleting a comment leaves a tombstone, not a hole** (ADR-0003).
   `DELETE /api/comments/:id` sets `tombstone` on that one row and touches
   nothing else; the replies stay, so the thread reads around the gap rather
@@ -445,12 +503,13 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
   they wrote" from "an `admin` may update anyone's book" — that distinction
   would fall back into every controller instead of living in one table. On
   `create` specifically, `own` and `any` mean the same thing: a created row
-  is the caller's by construction (its owner column is always the session's
-  user id), so `own` is simply the spelling a role that may create uses — but
-  the create path is not scope-only. Creating a book into a series checks
-  that the caller may touch that series (`assertMayAddToSeries` in
-  `controllers/bookController.ts`), and creating a chapter checks the owner
-  of its book (`assertMayAddTo` in `controllers/chapterController.ts`); both
+  is the caller's by construction (its owner column, or a new book's first
+  Co-author, is always the session's user id), so `own` is simply the spelling
+  a role that may create uses — but the create path is not scope-only.
+  Creating a book into a series checks that the caller may touch that series
+  (`assertMayAddToSeries` in `controllers/bookController.ts`), and creating a
+  chapter checks that the caller co-authors its book (`assertMayAddTo` in
+  `controllers/chapterController.ts`); both
   run after the matrix has already let the request through.
   `PERMISSION_DEFINITION` in `matrix.ts` only spells out what is granted;
   everything else expands to `none` when `buildMatrixRows()` produces one
@@ -662,17 +721,26 @@ snippets — still get wrong. Verified against the 5.x router and request source
   needs `JSON_CONTAINS`, not `LIKE` — a substring match would let `?tag=epic`
   also return rows tagged `epic-fantasy`. Pass the tag as an argument to `fn()`
   so Sequelize escapes it instead of concatenating it into the SQL.
-- **Foreign key column types must match exactly**: `series.userId` and
-  `books.userId` / `books.seriesId` are `INTEGER UNSIGNED` because `users.id`
-  and `series.id` are; a plain `INTEGER` makes MySQL reject the constraint with
-  errno 3780.
+- **Foreign key column types must match exactly**: `series.userId`,
+  `books.seriesId` and `book_authors.bookId` / `book_authors.userId` are
+  `INTEGER UNSIGNED` because `users.id`, `series.id` and `books.id` are; a plain
+  `INTEGER` makes MySQL reject the constraint with errno 3780.
+- **`book_authors` replaces `books.userId`**: one row per Co-author credit,
+  unique on `(bookId, userId)`, both foreign keys `CASCADE`. The byline is
+  ordered by the row's surrogate `id`, not `createdAt` — `DATETIME` stores
+  whole seconds, so two Co-authors added in the same second would tie.
+  Deleting a user row drops only its credits; whether a book goes too is
+  `userRepository.remove`'s decision (see **Co-authors** under Auth). The
+  MySQL-backed suites create books through `createCreditedBook` in
+  `models/creditedBook.testkit.ts`, the one place that knows a book needs its
+  credits written beside it.
 - **`books.seriesId` is optional, and that drives its `ON DELETE`**: a book can
   stand alone, so the column is nullable and `Series.hasMany(Book)` uses
   `ON DELETE SET NULL` — dropping a series unlinks its books instead of
   deleting records nobody asked to delete. MySQL rejects `SET NULL` on a
   `NOT NULL` column, so the association passes `allowNull: true` in its
   `foreignKey` object rather than letting Sequelize infer NOT NULL.
-  `books.userId` stays `CASCADE`, like `series.userId`.
+  `series.userId` stays `CASCADE`.
 - **`chapters.bookId` is the mirror image**: required, so it is `NOT NULL` and
   `Book.hasMany(Chapter)` cascades. A chapter outside a book is not a state
   worth representing, and `SET NULL` would be illegal on the column anyway.
@@ -771,7 +839,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
   Clear children before parents:
-  `Like` → `Comment` → `Chapter` → `Book` → `Series` → `User`; `Like` is the
+  `Like` → `Comment` → `Chapter` → `Book` → `Series` → `User` (`BookAuthor`
+  goes with either of its parents by cascade); `Like` is the
   leaf of every chain, and `Comment` must precede both `Book` (its
   still-cascading foreign key) and `User` (its no-longer-cascading one).
   A suite that syncs must call `initModels`, not a single `init*Model`, or
@@ -794,15 +863,19 @@ snippets — still get wrong. Verified against the 5.x router and request source
   next boot. The `title` columns on `books` and `series` landed this way, and
   so did this branch's `comments` table: `tombstone` is a new column and
   `userId` changed from `NOT NULL` to nullable, so a database created before
-  this branch needs the same drop-and-rebuild.
+  this branch needs the same drop-and-rebuild. Co-authors did it again:
+  `books.userId` is gone and `book_authors` is new, and a surviving `NOT NULL`
+  `books.userId` makes every book insert fail, so a database created before
+  them needs the drop too.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of
   the account's comments `deleted` in the same transaction as the account
   delete, so by the time the foreign key nulls their `userId` the row is
   already a tombstone, and an owner-less comment is therefore never live.
-  Comments on the account's own books are the exception —
-  `Book.hasMany(Comment)` still cascades, so those go with the books, other
+  Comments on the books this account was the last Co-author of are the
+  exception — `Book.hasMany(Comment)` still cascades, so those go with the
+  books, other
   people's threads included; see **The tombstone promise ends where the book
   does** under Auth, and ADR-0004, for why that is deliberate.
 - **`DELETE /api/comments/:id` no longer deletes anything.**

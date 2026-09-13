@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
+import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
+  addCoAuthorSchema,
+  coAuthorParamSchema,
   createBookSchema,
   idParamSchema,
   listBooksQuerySchema,
@@ -13,6 +16,7 @@ import type { RouteDeps } from './index.ts';
 export function createBookRoutes(deps: RouteDeps): Router {
   const controller = createBookController(deps.bookRepository);
   const requirePermission = createRequirePermission(deps);
+  const requireAuth = createRequireAuth(deps);
   const router = Router();
 
   // Every route runs through the matrix, reads included: `guest` has `read:
@@ -52,6 +56,26 @@ export function createBookRoutes(deps: RouteDeps): Router {
     requirePermission('books', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
+  );
+
+  // Crediting a co-author changes the book, so it rides on `books × update`;
+  // the controller then refuses a Moderator, whose `any` reaches every book
+  // but not its byline.
+  router.post(
+    '/:id/co-authors',
+    requirePermission('books', 'update'),
+    validate({ params: idParamSchema, body: addCoAuthorSchema }),
+    controller.addCoAuthor
+  );
+  // Not requirePermission: leaving a book must not depend on a books grant,
+  // because a Co-author who switched Role to `user` holds `none` there and
+  // would otherwise be stuck on the byline. Any session gets through; the
+  // controller decides who may remove whom.
+  router.delete(
+    '/:id/co-authors/:userId',
+    requireAuth,
+    validate({ params: coAuthorParamSchema }),
+    controller.removeCoAuthor
   );
 
   return router;

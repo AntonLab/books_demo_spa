@@ -21,9 +21,9 @@ const descriptionSchema = z.string().min(1).max(BOOK_DESCRIPTION_MAX_LENGTH);
 // whitespace-only title fails min(1) rather than landing as an empty string.
 const titleSchema = z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH);
 
-// No userId: the owner comes from the session, never the body. Without that,
-// an author could create a book owned by someone else, and "you may only edit
-// your own books" would mean nothing.
+// No userId: the first Co-author is whoever is signed in, never someone the
+// body names. Without that, an author could create a book credited to someone
+// else, and "you may only edit books you co-author" would mean nothing.
 export const createBookSchema = z.object({
   title: titleSchema,
   // Optional by design: a book need not belong to a series. Both an omitted
@@ -37,14 +37,14 @@ export const createBookSchema = z.object({
 });
 
 // Spelled out rather than derived from createBookSchema with
-// `.omit().partial()`, for two reasons. userId is absent by construction:
-// ownership is decided at creation, and moving a book between users is a
-// re-parenting operation, not a field edit. And `.partial()` does not undo a
-// `.default()` — a PATCH body without `tags` would still parse as `tags: []`
-// and wipe the stored tags, and one without `seriesId` would unlink the book.
+// `.omit().partial()`, because `.partial()` does not undo a `.default()` — a
+// PATCH body without `tags` would still parse as `tags: []` and wipe the
+// stored tags, and one without `seriesId` would unlink the book. Who is
+// credited is not a field here either: Co-authors change through
+// /api/books/:id/co-authors.
 //
-// seriesId *is* editable here, unlike userId: a book moving into or out of a
-// series is an ordinary edit, and an explicit `"seriesId": null` unlinks it.
+// seriesId *is* editable here: a book moving into or out of a series is an
+// ordinary edit, and an explicit `"seriesId": null` unlinks it.
 export const updateBookSchema = z
   .object({
     seriesId: idSchema.nullable(),
@@ -73,13 +73,27 @@ export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
 
+export const addCoAuthorSchema = z.object({
+  userId: idSchema,
+});
+
+export const coAuthorParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  userId: z.coerce.number().int().positive(),
+});
+
 export type CreateBookInput = z.infer<typeof createBookSchema>;
+export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookSchema>;
 export type ListBooksQuery = z.infer<typeof listBooksQuerySchema>;
 
+// No userId: a book has no single owner (ADR-0005).
 export interface PublicBook {
   id: number;
-  userId: number;
+  // Every Co-author, in the order they were credited. Embedded in the list as
+  // well as the detail, so a book card can name them without a second request
+  // to /api/users, which is guarded.
+  authors: AuthorSummary[];
   seriesId: number | null;
   title: string;
   description: string;
@@ -88,14 +102,11 @@ export interface PublicBook {
   updatedAt: Date;
 }
 
-// What GET /api/books/:id returns: the record plus the two names a book page
+// What GET /api/books/:id returns: the record plus the series name a book page
 // has to show and the like state it renders. Additive over PublicBook, so the
-// endpoint's existing readers are unaffected.
-//
-// The author is embedded rather than looked up by the client because
-// /api/users is guarded — an anonymous visitor could not resolve a name at all.
+// endpoint's existing readers are unaffected. The Co-authors come with
+// PublicBook itself.
 export interface BookDetail extends PublicBook {
-  author: AuthorSummary;
   series: { id: number; title: string } | null;
   likeCount: number;
   // null both for an anonymous visitor and for a signed-in one who has not

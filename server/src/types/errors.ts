@@ -28,6 +28,23 @@ export class ValidationError extends AppError {
   }
 }
 
+// A well-formed request that breaks a domain rule the schema cannot express,
+// such as crediting an account that does not hold the author role.
+export class BadRequestError extends AppError {
+  constructor(message: string) {
+    super(message, 400);
+  }
+}
+
+// The request is valid but the resource's current state refuses it, such as
+// removing a book's last Co-author. ConflictError is the narrower "this value
+// is already taken" and keeps its field-shaped message.
+export class StateConflictError extends AppError {
+  constructor(message: string) {
+    super(message, 409);
+  }
+}
+
 export class UnauthorizedError extends AppError {
   constructor(message = 'Authentication required') {
     super(message, 401);

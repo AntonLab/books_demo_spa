@@ -4,6 +4,7 @@ import {
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
+import { scopeFor } from '../permissions/permissionStore.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import {
   ForbiddenError,
@@ -11,6 +12,7 @@ import {
   UnauthorizedError,
 } from '../types/errors.ts';
 import type {
+  AddCoAuthorInput,
   CreateBookInput,
   ListBooksQuery,
   UpdateBookInput,
@@ -22,6 +24,8 @@ export interface BookController {
   getById: RequestHandler;
   update: RequestHandler;
   remove: RequestHandler;
+  addCoAuthor: RequestHandler;
+  removeCoAuthor: RequestHandler;
 }
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -39,19 +43,25 @@ export function createBookController(
   // requirePermission fails closed rather than acting as `any`.
   //
   // 404 before 403, so a refusal cannot be used to probe which ids exist.
+  //
+  // `own` means "one of the book's Co-authors": a book has no single owner, and
+  // every Co-author holds the same rights over it (ADR-0005).
+  const assertCoAuthor = async (req: Request, id: number): Promise<void> => {
+    const coAuthorIds = await repository.findCoAuthorIds(id);
+    if (coAuthorIds === null) throw new NotFoundError('Book', id);
+    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
+      throw new ForbiddenError('You may only change books you co-author');
+    }
+  };
+
   const assertMayTouch = async (req: Request, id: number): Promise<void> => {
     if (req.permissionScope === 'any') return;
-
-    const ownerId = await repository.findOwnerId(id);
-    if (ownerId === null) throw new NotFoundError('Book', id);
-    if (ownerId !== req.user?.id) {
-      throw new ForbiddenError('You may only change your own books');
-    }
+    await assertCoAuthor(req, id);
   };
 
   // Filing a book under a series changes that series too — it starts listing
   // the book — so the target series' owner has to answer as well as the
-  // book's. Without this an author could put their book into a stranger's
+  // book's Co-authors. Without this an author could put their book into a stranger's
   // series, and the series' owner could only undo it by deleting the series.
   // chapterController.assertMayAddTo closes the same hole one level down.
   //
@@ -79,9 +89,9 @@ export function createBookController(
       const input = validatedBody<CreateBookInput>(req);
       await assertMayAddToSeries(req, input.seriesId);
 
-      // The owner comes from the session, never the body — otherwise an author
-      // could create a book owned by someone else and the ownership rule above
-      // would mean nothing.
+      // The first Co-author comes from the session, never the body — otherwise
+      // an author could create a book credited to someone else and the
+      // co-author rule above would mean nothing.
       const book = await repository.create({ ...input, userId: req.user.id });
       res.status(201).json(book);
     },
@@ -123,6 +133,39 @@ export function createBookController(
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('Book', id);
       res.status(204).end();
+    },
+
+    addCoAuthor: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const { userId } = validatedBody<AddCoAuthorInput>(req);
+      await assertCoAuthor(req, id);
+
+      const book = await repository.addCoAuthor(id, userId);
+      if (!book) throw new NotFoundError('Book', id);
+      res.json(book);
+    },
+
+    // Mounted behind requireAuth alone, so the matrix is consulted here. Leaving
+    // is always allowed to a credited account, whatever its Role. Removing
+    // someone else takes a Co-author holding `own` on books: `none` is an
+    // account that is no longer an author, and `any` is a Moderator, who may
+    // edit or delete a book but never change who is credited on it.
+    removeCoAuthor: async (req, res) => {
+      if (!req.user) throw new UnauthorizedError();
+      const { id, userId } = validatedParams<{ id: number; userId: number }>(
+        req
+      );
+
+      if (userId !== req.user.id) {
+        if (scopeFor(req.user.role, 'books', 'update') !== 'own') {
+          throw new ForbiddenError('Only a co-author may remove a co-author');
+        }
+        await assertCoAuthor(req, id);
+      }
+
+      const book = await repository.removeCoAuthor(id, userId);
+      if (!book) throw new NotFoundError('Book', id);
+      res.json(book);
     },
   };
 }

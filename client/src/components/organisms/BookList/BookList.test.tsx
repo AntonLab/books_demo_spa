@@ -5,7 +5,7 @@ import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
   id: 1,
-  userId: 3,
+  authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
   seriesId: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',

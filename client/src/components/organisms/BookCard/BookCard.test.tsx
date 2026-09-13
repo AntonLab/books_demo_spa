@@ -5,7 +5,10 @@ import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
   id: 1,
-  userId: 3,
+  authors: [
+    { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
+    { id: 4, login: 'Cowriter', firstName: 'Cora', lastName: 'Writer' },
+  ],
   seriesId: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
@@ -21,6 +24,12 @@ describe('BookCard', () => {
     expect(
       screen.getByRole('link', { name: 'A Tale of Dragons' })
     ).toHaveAttribute('href', '/books/1');
+  });
+
+  it('names every co-author, in credit order', () => {
+    renderWithProviders(<BookCard book={book} />);
+
+    expect(screen.getByText('Ann Author, Cora Writer')).toBeInTheDocument();
   });
 
   it('renders the description and every tag', () => {
