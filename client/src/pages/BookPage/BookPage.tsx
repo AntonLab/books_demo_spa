@@ -32,11 +32,12 @@ export const BookPage: FC = () => {
   // likes a book they co-author. The server answers 403 either way — this only
   // avoids offering what would fail.
   const isDraft = book.status === 'draft';
-  const canLike =
-    !isDraft &&
+  const isCoAuthor =
     session !== null &&
     session !== undefined &&
-    !book.authors.some((author) => author.id === session.id);
+    book.authors.some((author) => author.id === session.id);
+  const canLike =
+    !isDraft && session !== null && session !== undefined && !isCoAuthor;
 
   return (
     <article>
@@ -51,6 +52,9 @@ export const BookPage: FC = () => {
         <Tag color={isDraft ? 'orange' : undefined}>
           {BOOK_STATUS_LABELS[book.status]}
         </Tag>
+        {/* Only for a Co-author: a Moderator reaches the edit page by its
+            address, the way they reach a draft. */}
+        {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
         {book.series && (
           <Link to={`/series?id=${book.series.id}`}>{book.series.title}</Link>
         )}

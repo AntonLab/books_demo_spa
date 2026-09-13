@@ -88,12 +88,21 @@ describe('AppHeader when logged in', () => {
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
   });
 
-  it('shows My Books', () => {
-    renderWithProviders(<AppHeader />, withSession(user));
+  it('shows My Books to an author', () => {
+    renderWithProviders(
+      <AppHeader />,
+      withSession({ ...user, role: 'author' })
+    );
 
     expect(
       screen.getByRole('menuitem', { name: 'My Books' })
     ).toBeInTheDocument();
+  });
+
+  it('hides My Books from a reader, who has no books to keep', () => {
+    renderWithProviders(<AppHeader />, withSession(user));
+
+    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
   it('logs out through the dropdown', async () => {

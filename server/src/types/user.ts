@@ -39,6 +39,13 @@ export const listUsersQuerySchema = z.object({
   q: z.string().min(1).max(64).optional(),
 });
 
+// The Co-author picker's search. No offset: a picker narrows by typing, not by
+// paging, and a short cap keeps each keystroke's answer small.
+export const listAuthorsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  q: z.string().min(1).max(64).optional(),
+});
+
 export const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
@@ -53,6 +60,7 @@ export const updateRoleSchema = z.object({
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+export type ListAuthorsQuery = z.infer<typeof listAuthorsQuerySchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 
 // What the repository applies: the body minus the proof that gated it.

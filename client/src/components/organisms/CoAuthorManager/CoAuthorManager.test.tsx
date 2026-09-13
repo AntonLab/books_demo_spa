@@ -1,0 +1,126 @@
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { CoAuthorManager } from './CoAuthorManager';
+import { renderWithProviders } from '@/test/renderWithProviders';
+import { ApiError } from '@/api/client';
+import * as authorsApi from '@/api/authors';
+import * as booksApi from '@/api/books';
+import type { AuthorSummary } from '@/types/user';
+
+jest.mock('@/api/authors');
+jest.mock('@/api/books');
+
+const mockedAuthors = jest.mocked(authorsApi);
+const mockedBooks = jest.mocked(booksApi);
+
+const ann: AuthorSummary = {
+  id: 3,
+  login: 'ann',
+  firstName: 'Ann',
+  lastName: 'Author',
+};
+const cora: AuthorSummary = {
+  id: 4,
+  login: 'cora',
+  firstName: 'Cora',
+  lastName: 'Writer',
+};
+const ivan: AuthorSummary = {
+  id: 5,
+  login: 'ipetrov',
+  firstName: 'Ivan',
+  lastName: 'Petrov',
+};
+
+const renderManager = (
+  props: Partial<Parameters<typeof CoAuthorManager>[0]> = {}
+) =>
+  renderWithProviders(
+    <CoAuthorManager
+      bookId={1}
+      authors={[ann, cora]}
+      viewerId={ann.id}
+      canManage
+      onLeave={jest.fn()}
+      {...props}
+    />
+  );
+
+beforeEach(() => {
+  jest.resetAllMocks();
+  mockedAuthors.searchAuthors.mockResolvedValue([ann, cora, ivan]);
+});
+
+describe('CoAuthorManager', () => {
+  it('names every co-author, offering Remove for others and Leave for yourself', () => {
+    renderManager();
+
+    expect(screen.getByText('Ann Author')).toBeInTheDocument();
+    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Leave' })).toBeInTheDocument();
+  });
+
+  it('offers the last co-author no way to leave', () => {
+    renderManager({ authors: [ann] });
+
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
+  });
+
+  it('is read-only for someone who may not manage the byline', () => {
+    renderManager({ canManage: false, viewerId: 99 });
+
+    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('credits an author found by searching, leaving out those already credited', async () => {
+    mockedBooks.addCoAuthor.mockResolvedValue({} as never);
+    renderManager();
+
+    await userEvent.type(screen.getByRole('combobox'), 'petrov');
+    await waitFor(() =>
+      expect(mockedAuthors.searchAuthors).toHaveBeenCalledWith('petrov')
+    );
+
+    const option = await screen.findByTitle('Ivan Petrov (ipetrov)');
+    expect(screen.queryByTitle('Cora Writer (cora)')).toBeNull();
+    await userEvent.click(option);
+
+    expect(mockedBooks.addCoAuthor).toHaveBeenCalledWith(1, ivan.id);
+  });
+
+  it('removes another co-author', async () => {
+    mockedBooks.removeCoAuthor.mockResolvedValue({} as never);
+    renderManager();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(mockedBooks.removeCoAuthor).toHaveBeenCalledWith(1, cora.id);
+  });
+
+  it('leaves the book and hands off once the server agrees', async () => {
+    mockedBooks.removeCoAuthor.mockResolvedValue({} as never);
+    const onLeave = jest.fn();
+    renderManager({ onLeave });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }));
+
+    expect(mockedBooks.removeCoAuthor).toHaveBeenCalledWith(1, ann.id);
+    await waitFor(() => expect(onLeave).toHaveBeenCalled());
+  });
+
+  it('shows the reason the server refused', async () => {
+    mockedBooks.removeCoAuthor.mockRejectedValue(
+      new ApiError(403, 'Only a co-author may remove a co-author')
+    );
+    renderManager();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(
+      await screen.findByText('Only a co-author may remove a co-author')
+    ).toBeInTheDocument();
+  });
+});
