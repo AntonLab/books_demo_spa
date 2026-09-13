@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Alert, Skeleton, Space, theme, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
 import { useChapter, useChapters } from '@/queries/chapters';
+import { publishedChapters } from '@/types/chapter';
 
 export const ChapterPage: FC = () => {
   const { token } = theme.useToken();
@@ -21,7 +22,9 @@ export const ChapterPage: FC = () => {
 
   // Navigation is derived from the chapter's position in the list rather than
   // from an id arithmetic: chapter ids are not contiguous once one is deleted.
-  const items = list?.items ?? [];
+  // Only chapters that are out count — a Co-author's list also carries drafts
+  // and scheduled ones, and a reader's previous/next must not lead to either.
+  const items = publishedChapters(list?.items ?? []);
   const index = items.findIndex((item) => item.id === id);
   const previous = index > 0 ? items[index - 1] : undefined;
   const next =

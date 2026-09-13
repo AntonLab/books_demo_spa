@@ -72,6 +72,7 @@ describe('AppShell routing', () => {
       bookId: 1,
       title: 'Chapter One',
       text: 'It was a dark night.',
+      publishedAt: '2026-09-01T00:00:00.000Z',
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     });
@@ -100,6 +101,35 @@ describe('AppShell routing', () => {
 
     expect(
       await screen.findByText('Only its co-authors can edit this book.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {
+    renderWithProviders(<AppShell />, { route: '/books/1/chapters/new' });
+
+    expect(
+      await screen.findByText(
+        'Only its co-authors can add chapters to this book.'
+      )
+    ).toBeInTheDocument();
+    expect(mockedChapters.getChapter).not.toHaveBeenCalled();
+  });
+
+  it('renders EditChapterPage at /books/:bookId/chapters/:chapterId/edit', async () => {
+    mockedChapters.getChapter.mockResolvedValue({
+      id: 9,
+      bookId: 1,
+      title: 'Chapter One',
+      text: 'It was a dark night.',
+      publishedAt: null,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    });
+
+    renderWithProviders(<AppShell />, { route: '/books/1/chapters/9/edit' });
+
+    expect(
+      await screen.findByText('Only its co-authors can edit this chapter.')
     ).toBeInTheDocument();
   });
 

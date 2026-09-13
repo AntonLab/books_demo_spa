@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
+import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import type {
   ChapterListResult,
   ChapterRepository,
@@ -27,12 +27,16 @@ const BOOK_CO_AUTHORS = new Map<number, number[]>([
   [SHARED_BOOK_ID, [USER_IDS.author, USER_IDS.otherAuthor]],
 ]);
 
-function createFakeRepository(): ChapterRepository {
+// `inputs` records what the routes handed the repository. Publication rules and
+// the version check are the real repository's, covered against MySQL; what the
+// routes owe it is the validated body, which is what a test can check here.
+function createFakeRepository(inputs: unknown[] = []): ChapterRepository {
   const rows = new Map<number, PublicChapter>();
   let nextId = 1;
 
   return {
     async create(input) {
+      inputs.push(input);
       // Stands in for the foreign key: the real repository maps MySQL's
       // rejection to this same NotFoundError.
       if (!BOOK_CO_AUTHORS.has(input.bookId)) {
@@ -45,6 +49,12 @@ function createFakeRepository(): ChapterRepository {
         bookId: input.bookId,
         title: input.title,
         text: input.text,
+        publishedAt:
+          input.publishedAt === null
+            ? null
+            : input.publishedAt === 'now'
+              ? now
+              : new Date(input.publishedAt),
         createdAt: now,
         updatedAt: now,
       };
@@ -77,6 +87,7 @@ function createFakeRepository(): ChapterRepository {
     },
 
     async update(id, input) {
+      inputs.push(input);
       const current = rows.get(id);
       if (!current) return null;
 
@@ -130,10 +141,13 @@ const post = (
     body: JSON.stringify(body),
   });
 
+// Sends an expectedUpdatedAt unless the body names one: the fake repository
+// does not compare versions, and a test about renaming should not have to
+// spell one out. The requirement itself is pinned by its own test below.
 const patch = (
   base: string,
   id: number,
-  body: unknown,
+  body: object,
   cookie: string | null = ROLE_COOKIES.author
 ) =>
   fetch(`${base}/api/chapters/${id}`, {
@@ -142,7 +156,10 @@ const patch = (
       'content-type': 'application/json',
       ...(cookie ? { cookie } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      expectedUpdatedAt: new Date().toISOString(),
+      ...body,
+    }),
   });
 
 const remove = (
@@ -484,6 +501,106 @@ test('a co-author who did not create the book may add and edit its chapters', as
       );
       assert.equal(edited.status, 200);
       assert.equal((await remove(base, id, ROLE_COOKIES.author)).status, 204);
+    }
+  );
+});
+
+// --- Publication time and the version check (CONTEXT.md). ---
+
+test('POST passes the publication time through, a draft when omitted', async () => {
+  const inputs: unknown[] = [];
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository(inputs) },
+    async (base) => {
+      const later = new Date(Date.now() + 86_400_000).toISOString();
+
+      for (const publishedAt of ['now', later, null]) {
+        assert.equal((await post(base, { ...valid, publishedAt })).status, 201);
+      }
+      assert.equal((await post(base, valid)).status, 201);
+
+      assert.deepEqual(
+        inputs.map((input) => (input as { publishedAt: unknown }).publishedAt),
+        ['now', later, null, null]
+      );
+    }
+  );
+});
+
+test('POST refuses a publication time that is neither now, a moment, nor null', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      for (const publishedAt of ['tomorrow', 12, '2026-13-01']) {
+        assert.equal((await post(base, { ...valid, publishedAt })).status, 400);
+      }
+    }
+  );
+});
+
+test('PATCH without the updatedAt it was based on is a 400', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const { id } = await json<PublicChapter>(await post(base, valid));
+
+      const response = await fetch(`${base}/api/chapters/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: ROLE_COOKIES.author,
+        },
+        body: JSON.stringify({ title: 'Renamed' }),
+      });
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('PATCH hands the repository the version and the publication time it was sent', async () => {
+  const inputs: unknown[] = [];
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository(inputs) },
+    async (base) => {
+      const { id, updatedAt } = await json<PublicChapter>(
+        await post(base, valid)
+      );
+
+      const response = await patch(base, id, {
+        publishedAt: null,
+        expectedUpdatedAt: updatedAt,
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual(inputs.at(-1), {
+        publishedAt: null,
+        expectedUpdatedAt: updatedAt,
+      });
+    }
+  );
+});
+
+test('a conflict from the repository reaches the caller as a 409', async () => {
+  const repository = createFakeRepository();
+  await withAuthenticatedApp(
+    {
+      chapterRepository: {
+        ...repository,
+        async update() {
+          throw new StateConflictError(
+            'This chapter was changed since you loaded it'
+          );
+        },
+      },
+    },
+    async (base) => {
+      const { id } = await json<PublicChapter>(await post(base, valid));
+
+      const response = await patch(base, id, { text: 'Mine' });
+      assert.equal(response.status, 409);
+      assert.match(
+        (await json<{ error: string }>(response)).error,
+        /changed since you loaded it/
+      );
     }
   );
 });

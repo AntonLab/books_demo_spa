@@ -615,6 +615,9 @@ interface PlannedChapter {
   title: string;
   text: string;
   createdAt: Date;
+  // The Publication time: null for a Draft chapter, a future moment for a
+  // Scheduled one. Set by publicationOf in planAuthor.
+  publishedAt: Date | null;
 }
 
 interface PlannedBook {
@@ -764,6 +767,33 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
     return 'complete';
   };
 
+  // Which chapters are not out yet, counted from the end of the book. A draft
+  // keeps its last two as Draft chapters. Every In progress book has its next
+  // chapter Scheduled over the coming days, and the author's newest one out has
+  // its next two — the "coming soon" a front page wants. Everything else was
+  // published when it was written.
+  const now = Date.now();
+  const publicationOf = (
+    index: number,
+    chapterIndex: number,
+    count: number,
+    createdAt: Date
+  ): Date | null => {
+    const fromEnd = count - 1 - chapterIndex;
+    const status = statusOf(index);
+    if (status === 'draft') return fromEnd < 2 ? null : createdAt;
+    if (status === 'in_progress') {
+      const scheduled = index === last - 1 ? 2 : 1;
+      if (fromEnd < scheduled) {
+        // The later chapter comes out later: day 1-2 for the first, 3-4 for
+        // the one after it.
+        const day = (scheduled - fromEnd) * 2 - 1 + rng.int(0, 1);
+        return new Date(now + day * DAY_MS + rng.int(8, 20) * 60 * 60 * 1000);
+      }
+    }
+    return createdAt;
+  };
+
   const books: PlannedBook[] = slots.map((seriesIndex, index) => {
     const dates = timeline[index];
     const chapters = chapterTitles(rng, genre, dates.length).map(
@@ -771,6 +801,12 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
         title,
         text: chapterText(rng, genre),
         createdAt: dates[chapterIndex],
+        publishedAt: publicationOf(
+          index,
+          chapterIndex,
+          dates.length,
+          dates[chapterIndex]
+        ),
       })
     );
 
@@ -1110,6 +1146,7 @@ async function writeContent(
     bookId: number;
     title: string;
     text: string;
+    publishedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
   }[] = [];
@@ -1169,7 +1206,12 @@ async function writeContent(
           text: chapter.text,
         });
         chapterRows.push({
-          ...parsed,
+          bookId: parsed.bookId,
+          title: parsed.title,
+          text: parsed.text,
+          // Attached after the parse, like a book's status: the schema's
+          // publishedAt is 'now' or a future moment, and the seed backdates.
+          publishedAt: chapter.publishedAt,
           createdAt: chapter.createdAt,
           updatedAt: chapter.createdAt,
         });

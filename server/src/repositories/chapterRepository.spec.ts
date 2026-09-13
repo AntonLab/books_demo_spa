@@ -9,7 +9,7 @@ import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { Book, Chapter, initModels, Series, User } from '../models/index.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
 import type { Viewer } from './visibility.ts';
 
@@ -49,6 +49,8 @@ async function probe(): Promise<true | string> {
 const reachable = await probe();
 const skip = reachable === true ? false : reachable;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const owner = {
   login: 'ChapterOwner',
   email: 'chapters@example.com',
@@ -62,6 +64,13 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   let ownerId: number;
   let bookId: number;
   const repository = createSequelizeChapterRepository();
+  // Reads the tests below make when visibility is not what they are about: a
+  // Moderator sees every chapter, drafts included.
+  const asModerator: Viewer = { id: 0, role: 'superadmin' };
+  // The tests that are not about publication work with chapters already out.
+  const createPublished = (
+    input: Omit<Parameters<typeof repository.create>[0], 'publishedAt'>
+  ) => repository.create({ ...input, publishedAt: 'now' });
 
   before(async () => {
     const db = testDbConfig();
@@ -92,7 +101,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('round-trips a chapter and returns its body from findById', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       bookId,
       title: 'Chapter One',
       text: 'It was a dark night.',
@@ -110,7 +119,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('a body larger than TEXT could hold survives intact', async () => {
     const long = 'a'.repeat(100_000);
 
-    const created = await repository.create({
+    const created = await createPublished({
       bookId,
       title: 'Long',
       text: long,
@@ -123,7 +132,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('multi-byte text and titles survive, thanks to utf8mb4', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       bookId,
       title: 'Chapter 1 📖',
       text: 'It was a dark night 🌙',
@@ -136,7 +145,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('the list omits the body entirely, rather than fetching and dropping it', async () => {
-    await repository.create({ bookId, title: 'One', text: 'x'.repeat(50_000) });
+    await createPublished({ bookId, title: 'One', text: 'x'.repeat(50_000) });
 
     const { items } = await repository.list({ limit: 20, offset: 0 }, null);
 
@@ -150,8 +159,8 @@ describe('chapterRepository against real MySQL', { skip }, () => {
       { title: 'Test Book', description: 'Another novel', tags: [] },
       [ownerId]
     );
-    await repository.create({ bookId, title: 'Mine', text: 'a' });
-    await repository.create({
+    await createPublished({ bookId, title: 'Mine', text: 'a' });
+    await createPublished({
       bookId: otherBook.id,
       title: 'Theirs',
       text: 'b',
@@ -164,8 +173,8 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('q matches the title as well as the body', async () => {
-    await repository.create({ bookId, title: 'The Storm', text: 'calm seas' });
-    await repository.create({ bookId, title: 'Calm', text: 'a storm broke' });
+    await createPublished({ bookId, title: 'The Storm', text: 'calm seas' });
+    await createPublished({ bookId, title: 'Calm', text: 'a storm broke' });
 
     const found = await repository.list(
       { limit: 20, offset: 0, q: 'storm' },
@@ -176,7 +185,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('q treats LIKE metacharacters literally, so ?q=% matches nothing', async () => {
-    await repository.create({ bookId, title: 'Plain', text: 'no wildcards' });
+    await createPublished({ bookId, title: 'Plain', text: 'no wildcards' });
 
     const found = await repository.list({ limit: 20, offset: 0, q: '%' }, null);
 
@@ -185,7 +194,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
 
   test('a create against an unknown book is a NotFoundError, not a raw FK error', async () => {
     await assert.rejects(
-      repository.create({
+      createPublished({
         bookId: bookId + 10_000,
         title: 'Orphan',
         text: 'No book',
@@ -197,27 +206,36 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   });
 
   test('an update renames a chapter without disturbing its body', async () => {
-    const created = await repository.create({
+    const created = await createPublished({
       bookId,
       title: 'Draft title',
       text: 'The body',
     });
 
-    const updated = await repository.update(created.id, { title: 'Final' });
+    const updated = await repository.update(created.id, {
+      title: 'Final',
+      expectedUpdatedAt: created.updatedAt.toISOString(),
+    });
 
     assert.equal(updated?.title, 'Final');
     assert.equal(updated?.text, 'The body');
   });
 
   test('update and remove report a missing chapter rather than throwing', async () => {
-    assert.equal(await repository.update(999_999, { title: 'x' }), null);
+    assert.equal(
+      await repository.update(999_999, {
+        title: 'x',
+        expectedUpdatedAt: new Date().toISOString(),
+      }),
+      null
+    );
     assert.equal(await repository.remove(999_999), false);
   });
 
   // The association's whole purpose: chapters have no life of their own.
   test('deleting a book takes its chapters with it', async () => {
-    await repository.create({ bookId, title: 'One', text: 'a' });
-    await repository.create({ bookId, title: 'Two', text: 'b' });
+    await createPublished({ bookId, title: 'One', text: 'a' });
+    await createPublished({ bookId, title: 'Two', text: 'b' });
 
     await Book.destroy({ where: { id: bookId } });
 
@@ -234,12 +252,12 @@ describe('chapterRepository against real MySQL', { skip }, () => {
         [ownerId]
       )
     ).id;
-    const hidden = await repository.create({
+    const hidden = await createPublished({
       bookId: draftId,
       title: 'Hidden',
       text: 'Not yet',
     });
-    await repository.create({ bookId, title: 'Shown', text: 'Out now' });
+    await createPublished({ bookId, title: 'Shown', text: 'Out now' });
     const stranger = ownerId + 1_000;
 
     const titles = async (viewer: Viewer): Promise<string[]> =>
@@ -293,7 +311,7 @@ describe('chapterRepository against real MySQL', { skip }, () => {
         [ownerId, coAuthorId]
       )
     ).id;
-    const chapter = await repository.create({
+    const chapter = await createPublished({
       bookId: sharedBookId,
       title: 'Chapter One',
       text: 'It was a dark night.',
@@ -315,5 +333,200 @@ describe('chapterRepository against real MySQL', { skip }, () => {
   test('a missing chapter or book has no co-authors to report', async () => {
     assert.equal(await repository.findCoAuthorIds(999_999), null);
     assert.equal(await repository.findBookCoAuthorIds(999_999), null);
+  });
+
+  test('a chapter is saved as a draft, published now, or scheduled for later', async () => {
+    const draft = await repository.create({
+      bookId,
+      title: 'Draft',
+      text: 'a',
+      publishedAt: null,
+    });
+    assert.equal(draft.publishedAt, null);
+
+    const before = Date.now();
+    const now = await repository.create({
+      bookId,
+      title: 'Now',
+      text: 'b',
+      publishedAt: 'now',
+    });
+    const stamped = now.publishedAt?.getTime() ?? 0;
+    assert.ok(stamped >= before - 1_000 && stamped <= Date.now() + 1_000);
+
+    const later = new Date(Date.now() + 2 * DAY_MS);
+    const scheduled = await repository.create({
+      bookId,
+      title: 'Later',
+      text: 'c',
+      publishedAt: later.toISOString(),
+    });
+    assert.equal(scheduled.publishedAt?.getTime(), later.getTime());
+  });
+
+  test('a publication time in the past is refused', async () => {
+    await assert.rejects(
+      repository.create({
+        bookId,
+        title: 'Backdated',
+        text: 'a',
+        publishedAt: new Date(Date.now() - DAY_MS).toISOString(),
+      }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 400 &&
+        /past/i.test(error.message)
+    );
+  });
+
+  test('a chapter moves between draft, scheduled and published, but a published time is fixed', async () => {
+    let chapter = await repository.create({
+      bookId,
+      title: 'Moving',
+      text: 'a',
+      publishedAt: null,
+    });
+    const save = async (publishedAt: string | null) => {
+      const saved = await repository.update(chapter.id, {
+        publishedAt,
+        expectedUpdatedAt: chapter.updatedAt.toISOString(),
+      });
+      assert.ok(saved);
+      chapter = saved;
+      return saved;
+    };
+
+    const tomorrow = new Date(Date.now() + DAY_MS);
+    assert.equal(
+      (await save(tomorrow.toISOString())).publishedAt?.getTime(),
+      tomorrow.getTime()
+    );
+
+    const nextWeek = new Date(Date.now() + 7 * DAY_MS);
+    assert.equal(
+      (await save(nextWeek.toISOString())).publishedAt?.getTime(),
+      nextWeek.getTime()
+    );
+
+    assert.equal((await save(null)).publishedAt, null);
+    const published = await save('now');
+    assert.ok((published.publishedAt?.getTime() ?? Infinity) <= Date.now());
+
+    for (const value of ['now', nextWeek.toISOString()]) {
+      await assert.rejects(
+        repository.update(chapter.id, {
+          publishedAt: value,
+          expectedUpdatedAt: chapter.updatedAt.toISOString(),
+        }),
+        (error: unknown) =>
+          error instanceof AppError && error.statusCode === 400
+      );
+    }
+
+    // Its text can still change, and it can go back to being a draft.
+    assert.equal(
+      (
+        await repository.update(chapter.id, {
+          text: 'Revised',
+          expectedUpdatedAt: chapter.updatedAt.toISOString(),
+        })
+      )?.publishedAt?.getTime(),
+      published.publishedAt?.getTime()
+    );
+    chapter = (await repository.findById(chapter.id, asModerator)) ?? chapter;
+    assert.equal((await save(null)).publishedAt, null);
+  });
+
+  test('a save based on a stale updatedAt is a conflict and writes nothing', async () => {
+    const created = await repository.create({
+      bookId,
+      title: 'Shared',
+      text: 'Original',
+      publishedAt: null,
+    });
+    const seenByBoth = created.updatedAt.toISOString();
+
+    await repository.update(created.id, {
+      text: 'First co-author',
+      expectedUpdatedAt: seenByBoth,
+    });
+
+    await assert.rejects(
+      repository.update(created.id, {
+        text: 'Second co-author',
+        expectedUpdatedAt: seenByBoth,
+      }),
+      (error: unknown) =>
+        error instanceof AppError &&
+        error.statusCode === 409 &&
+        /changed/i.test(error.message)
+    );
+    assert.equal(
+      (await repository.findById(created.id, asModerator))?.text,
+      'First co-author'
+    );
+  });
+
+  test('a reader sees only chapters whose publication time has passed; co-authors and moderators see all', async () => {
+    await repository.create({
+      bookId,
+      title: 'Out',
+      text: 'a',
+      publishedAt: 'now',
+    });
+    const draft = await repository.create({
+      bookId,
+      title: 'Draft',
+      text: 'b',
+      publishedAt: null,
+    });
+    const scheduled = await repository.create({
+      bookId,
+      title: 'Scheduled',
+      text: 'c',
+      publishedAt: new Date(Date.now() + DAY_MS).toISOString(),
+    });
+    const stranger = ownerId + 1_000;
+
+    const titles = async (viewer: Viewer): Promise<string[]> =>
+      (
+        await repository.list({ limit: 20, offset: 0, bookId }, viewer)
+      ).items.map((chapter) => chapter.title);
+
+    for (const viewer of [
+      null,
+      { id: stranger, role: 'user' },
+      { id: stranger, role: 'author' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Out']);
+      assert.equal(await repository.findById(draft.id, viewer), null);
+      assert.equal(await repository.findById(scheduled.id, viewer), null);
+    }
+
+    for (const viewer of [
+      { id: ownerId, role: 'author' },
+      { id: stranger, role: 'admin' },
+      { id: stranger, role: 'superadmin' },
+    ] as const) {
+      assert.deepEqual(await titles(viewer), ['Out', 'Draft', 'Scheduled']);
+      assert.equal(
+        (await repository.findById(scheduled.id, viewer))?.title,
+        'Scheduled'
+      );
+    }
+  });
+
+  test('a scheduled chapter comes out on its own once its time passes', async () => {
+    const soon = await repository.create({
+      bookId,
+      title: 'Soon',
+      text: 'a',
+      publishedAt: new Date(Date.now() + 1_500).toISOString(),
+    });
+    assert.equal(await repository.findById(soon.id, null), null);
+
+    await new Promise((resolve) => setTimeout(resolve, 1_600));
+
+    assert.equal((await repository.findById(soon.id, null))?.title, 'Soon');
   });
 });
