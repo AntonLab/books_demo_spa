@@ -210,6 +210,40 @@ would pull the unstaged hunks into the commit as well.
 It is not a substitute for the gates above: it never runs `typecheck` or the
 test suites.
 
+### GitHub Actions
+
+`dev` is the integration branch every feature PR targets, `main` the release
+branch `dev` is merged into, and `dev` is the repository's default branch. Both
+run the same automation from `.github/`:
+
+- `workflows/ci.yml` — on every PR into and push to `dev` or `main`, plus a
+  manual `workflow_dispatch`, five parallel jobs on `ubuntu-latest` with the
+  Node version from `.nvmrc`: `lint` (`npm run lint` and
+  `npm run format:check`), `typecheck`, `test-client`, `test-server` and
+  `build`. `test-server` runs against a `mysql:8.4` service container and sets
+  `REQUIRE_MYSQL=1`, which makes a missing or unreachable database fail the
+  MySQL-backed suites instead of skipping them — without it a broken container
+  would leave the job green having run none of them (see `server/CLAUDE.md`).
+- `workflows/codeql.yml` — CodeQL with the `security-extended` queries over
+  `javascript-typescript` and `actions`, on the same triggers plus a weekly
+  schedule, as the jobs `Analyze (javascript-typescript)` and
+  `Analyze (actions)`.
+- `dependabot.yml` — weekly npm and GitHub Actions updates, minor and patch
+  grouped into one PR per ecosystem, majors one PR each, no labels (the repo's
+  labels are the triage roles).
+
+Every action is pinned to a full commit SHA with its version in a trailing
+comment; Dependabot moves both. Keep that form when adding a step — a tag can
+be re-pointed, a SHA cannot.
+
+A ruleset on each of `dev` and `main` requires a PR to merge (no approvals,
+since the repo has one maintainer), blocks force-pushes and deletion, and
+requires all seven checks above to pass; the admin role may bypass it. The
+branch need not be up to date with its base before merging. The required
+checks are matched **by name**: renaming a job, or the CodeQL matrix, leaves
+the ruleset waiting on a check that never reports, so update the rulesets in
+the same change.
+
 ## Anti-Patterns
 
 Do not:
@@ -243,7 +277,9 @@ Do not:
 
 1. Work within the relevant package (`client/` or `server/`) and read its CLAUDE.md.
 2. Verify any command in these docs actually exists before relying on it.
-3. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`).
+3. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
+   `ci:`).
+4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
 
 ## Agent skills
 
