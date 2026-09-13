@@ -15,18 +15,18 @@
     "posttest": "node --env-file-if-exists=.env.local ./src/db/dropTestDatabases.testkit.ts"
   },
   "dependencies": {
-    "@node-rs/argon2": "2.2.0",
+    "@node-rs/argon2": "2.2.1",
     "body-parser": "2.3.0",
     "cookie-parser": "1.4.7",
     "express": "5.2.1",
-    "mysql2": "3.24.2",
+    "mysql2": "3.24.4",
     "sequelize": "6.37.8",
-    "zod": "4.5.4"
+    "zod": "4.6.4"
   },
   "devDependencies": {
-    "@types/cookie-parser": "1.4.9",
+    "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.6",
-    "@types/node": "26.4.0",
+    "@types/node": "26.5.1",
     "nodemon": "3.1.14"
   }
 }
