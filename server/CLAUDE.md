@@ -160,7 +160,14 @@ scripts below still run from this directory, or from the root with `-w server`.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
-  silently skip that suite instead of failing loudly)
+  silently skip that suite instead of failing loudly). Each of those nine
+  specs asks `skipWithoutMysql()` (`src/db/mysqlProbe.testkit.ts`) whether to
+  run: with `DB_USER` unset or MySQL unreachable it skips the suite, and the
+  run still exits 0. Set `REQUIRE_MYSQL=1` and the same two conditions throw
+  instead, failing the spec file. CI sets it; locally it stays unset, so a
+  machine with no database can still run the rest. A new MySQL-backed spec
+  must take its `skip` from `skipWithoutMysql()` rather than probing on its
+  own, or CI cannot tell it skipped
 - `posttest` — `node --env-file-if-exists=.env.local ./src/db/dropTestDatabases.testkit.ts`,
   which drops every schema the MySQL-backed suites created. Never run it by
   hand: npm runs it automatically after `npm test`, and **only when `npm test`
@@ -230,6 +237,9 @@ added.
   of `ensureDatabase` — the `posttest` entry point, carrying the `.testkit.ts`
   suffix so `tsconfig.build.json` keeps it out of `dist/` like every other
   test-support file. It is a script, not a module: nothing imports it.
+  `mysqlProbe.testkit.ts` is the other test-support file here, and a module:
+  `skipWithoutMysql()`, the one place a MySQL-backed spec learns whether to
+  skip, and where `REQUIRE_MYSQL=1` turns that skip into a failure.
   `seed.ts` is the demo seed (see **Demo seed**), also a script nothing
   imports — it carries no suffix, because `.testkit.ts` means _test support_
   and this is neither, so `tsconfig.build.json` names it in `exclude`
@@ -257,6 +267,11 @@ value.
 | `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                  |
 | `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not. |
 | `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
+
+Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
+(default `books_demo_spa_test`, the prefix of the nine test schemas) and
+`REQUIRE_MYSQL`, which CI sets to `1` so the MySQL-backed suites fail rather
+than skip without a database (see `npm test` above).
 
 ## Demo seed
 
