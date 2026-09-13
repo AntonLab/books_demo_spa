@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, createHmac } from 'node:crypto';
 
 // 32 bytes = 256 bits. Base64url so the value is safe in a cookie and in a
 // reset URL's query string without escaping.
@@ -16,4 +16,12 @@ export function createToken(): string {
 // a leaked database dump must not hand over usable sessions.
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+// A session's XSRF token: an HMAC keyed by the session token itself, so no
+// second secret is needed and nobody without the httpOnly session cookie can
+// compute it. A token planted by a sibling subdomain names some other session
+// and is refused (middleware/csrfProtection.ts).
+export function xsrfTokenFor(sessionToken: string): string {
+  return createHmac('sha256', sessionToken).update('xsrf').digest('base64url');
 }

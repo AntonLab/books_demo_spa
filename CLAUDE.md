@@ -58,7 +58,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   Jest test runner (`npm test`, jsdom + `@swc/jest`; see `client/CLAUDE.md`
   for why the script is not plain `jest`). See `client/CLAUDE.md`.
 - `client` now has a working UI on top of that toolchain: a `MainPage`
-  listing books, a header with nav, search and auth state, four auth modals
+  listing books, a header with nav, search, auth state and a notification
+  bell, four auth modals
   against `/api/auth` (login, register, forgot/reset password), a `/search`
   page, a `/books/:id` book page (title, author, series, annotation, chapters,
   comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
@@ -119,7 +120,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   is readable only by its Co-authors and Moderators: every read of it or its
   chapters, comments and likes is filtered through `repositories/visibility.ts`,
   no list shows it except its own Co-author's `?userId=`, and nobody may
-  comment on or like it. A chapter has a Publication time — `null` (Draft),
+  comment on or like it. Every change to who is credited on a shared book or
+  series, and every deletion of one, writes a **Notification** to the other
+  Co-authors in the same transaction — a snapshot of the work's title and the
+  actor's name, listed and marked read through `/api/notifications`. A chapter has a Publication time — `null` (Draft),
   future (Scheduled) or past (Published) — and a reader sees only chapters whose
   time has passed; a save carries the `updatedAt` it was based on and gets a
   409 if a co-author saved first. A book's chapters follow an explicit
@@ -160,7 +164,7 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
   with a scattering of tombstones, and likes on both books and comments. Run
   it with `npm run seed -w server -- --force`; **the flag is required because
-  it deletes every row in the eight content tables first**, and without it the
+  it deletes every row in the nine content tables first**, and without it the
   script only reports what it found. Counts come from a fixed PRNG seed, so
   the shape is reproducible; the dates are anchored to the run, so the newest
   chapter is always a few days old. See `server/CLAUDE.md` for the personas,
@@ -180,7 +184,7 @@ Target one with npm's `-w` flag (`npm test -w client`):
   including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
   exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
   why its script is not plain `jest`). A **green** server run then drops the
-  nine test schemas it created, through npm's `posttest`; a failed one leaves
+  ten test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.
@@ -227,7 +231,11 @@ run the same automation from `.github/`:
 - `workflows/codeql.yml` — CodeQL with the `security-extended` queries over
   `javascript-typescript` and `actions`, on the same triggers plus a weekly
   schedule, as the jobs `Analyze (javascript-typescript)` and
-  `Analyze (actions)`.
+  `Analyze (actions)`. Test code (`*.spec.ts`, `*.test.ts(x)`, `*.testkit.ts`,
+  `client/src/test/`) is left out of the analysis: it is never deployed, and
+  its one-middleware Express apps would otherwise be held to the rules of the
+  real one. Its results also report as a check named `CodeQL`, which the
+  ruleset does not require.
 - `dependabot.yml` — weekly npm and GitHub Actions updates, minor and patch
   grouped into one PR per ecosystem, majors one PR each, no labels (the repo's
   labels are the triage roles).
@@ -272,6 +280,10 @@ Do not:
 
 - No hardcoded secrets — grep for `sk_live`, `AKIA`, `password=` before commit.
 - Keep DB credentials in environment variables (`.env.local` is git-ignored).
+- Every write is guarded against CSRF on the server — an Origin /
+  `Sec-Fetch-Site` check and a session-bound `X-XSRF-Token` — and the client's
+  `request()` sends the token. Route new writes through `request()`. See
+  **CSRF** in `server/CLAUDE.md`.
 
 ## Workflow
 

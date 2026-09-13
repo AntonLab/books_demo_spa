@@ -4,6 +4,7 @@ import type { BookRepository } from '../repositories/bookRepository.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
+import type { NotificationRepository } from '../repositories/notificationRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
@@ -15,6 +16,7 @@ import { createChapterOrderRoutes } from './chapterOrderRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
+import { createNotificationRoutes } from './notificationRoutes.ts';
 import { createSeriesBookRoutes } from './seriesBookRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoleRoutes } from './userRoleRoutes.ts';
@@ -27,6 +29,7 @@ export interface RouteDeps {
   chapterRepository: ChapterRepository;
   commentRepository: CommentRepository;
   likeRepository: LikeRepository;
+  notificationRepository: NotificationRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
   resetDelivery: ResetDelivery;
@@ -56,5 +59,6 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/chapters', createChapterRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
+  router.use('/notifications', createNotificationRoutes(deps));
   return router;
 }

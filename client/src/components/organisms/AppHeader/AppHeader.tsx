@@ -15,6 +15,7 @@ import { useAppDispatch } from '@/store/hooks';
 import { openModal } from '@/store/authSlice';
 import { useLogout, useSession } from '@/queries/auth';
 import { SearchBar } from '@/components/molecules/SearchBar';
+import { NotificationBell } from '@/components/organisms/NotificationBell';
 
 export const AppHeader: FC = () => {
   const { token } = theme.useToken();
@@ -69,25 +70,30 @@ export const AppHeader: FC = () => {
         // logged-in user on every reload while GET /me is in flight.
         <Skeleton.Button active />
       ) : user ? (
-        <Dropdown
-          menu={{ items: accountItems, onClick: handleAccountClick }}
-          trigger={['click']}
-        >
-          {/* A native <button> (via antd's `type="text"`) rather than a
+        <Space>
+          <NotificationBell userId={user.id} />
+          <Dropdown
+            menu={{ items: accountItems, onClick: handleAccountClick }}
+            trigger={['click']}
+          >
+            {/* A native <button> (via antd's `type="text"`) rather than a
               bare <Space>/<div>: antd's Dropdown only grafts mouse/focus
               handlers onto its trigger child, never tabIndex or a role, so
               a non-interactive element here is invisible to keyboard
               navigation. A <Button> is focusable and Enter/Space-activated
               for free. */}
-          <Button type="text" style={{ color: token.colorTextLightSolid }}>
-            <Space>
-              {/* An initial rather than an icon, so `@ant-design/icons`
+            <Button type="text" style={{ color: token.colorTextLightSolid }}>
+              <Space>
+                {/* An initial rather than an icon, so `@ant-design/icons`
                   stays out of the dependency list. */}
-              <Avatar size="small">{user.login.charAt(0).toUpperCase()}</Avatar>
-              {user.login}
-            </Space>
-          </Button>
-        </Dropdown>
+                <Avatar size="small">
+                  {user.login.charAt(0).toUpperCase()}
+                </Avatar>
+                {user.login}
+              </Space>
+            </Button>
+          </Dropdown>
+        </Space>
       ) : (
         <Space>
           <Button onClick={() => dispatch(openModal('login'))}>Log in</Button>
