@@ -59,8 +59,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   against `/api/auth` (login, register, forgot/reset password), a `/search`
   page, a `/books/:id` book page (title, author, series, annotation, chapters,
   comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
-  first authoring pages — `/my-books`, `/books/new` and `/books/:id/edit`
-  (fields, status, Co-authors, delete) — built on antd
+  first authoring pages — `/my-books`, `/books/new`, `/books/:id/edit`
+  (fields, status, chapters, Co-authors, delete) and a chapter editor at
+  `/books/:bookId/chapters/new` and `.../:chapterId/edit` (publish now,
+  schedule, or save a draft) — built on antd
   6, react-router, TanStack Query and Redux
   Toolkit. The split between the last two is deliberate: **TanStack Query
   owns everything fetched** (the session, the book list, each search term,
@@ -112,7 +114,10 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   is readable only by its Co-authors and Moderators: every read of it or its
   chapters, comments and likes is filtered through `repositories/visibility.ts`,
   no list shows it except its own Co-author's `?userId=`, and nobody may
-  comment on or like it. Deleting a
+  comment on or like it. A chapter has a Publication time — `null` (Draft),
+  future (Scheduled) or past (Published) — and a reader sees only chapters whose
+  time has passed; a save carries the `updatedAt` it was based on and gets a
+  409 if a co-author saved first. Deleting a
   comment leaves a **tombstone** — `deleted` by its own owner (or when that
   owner's account is deleted) or `removed` by a moderator — rather than
   removing the row, so its replies stay and its text and author are withheld
@@ -132,8 +137,8 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 - A dev database created before the Co-authors change must be dropped and
-  rebuilt: `books.userId` and `series.userId` are gone, `books.status` is new,
-  and `sync()` never alters an existing table.
+  rebuilt: `books.userId` and `series.userId` are gone, `books.status` and
+  `chapters.publishedAt` are new, and `sync()` never alters an existing table.
   See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the

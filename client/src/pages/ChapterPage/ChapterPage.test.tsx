@@ -12,6 +12,7 @@ const summary = (id: number, title: string): ChapterSummary => ({
   id,
   bookId: 1,
   title,
+  publishedAt: '2026-09-01T00:00:00.000Z',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 });
@@ -36,6 +37,7 @@ beforeEach(() => {
       bookId: 1,
       title: id === 9 ? 'One' : id === 10 ? 'Two' : 'Three',
       text: 'It was a dark night.',
+      publishedAt: '2026-09-01T00:00:00.000Z',
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     })
@@ -107,5 +109,31 @@ describe('ChapterPage', () => {
     expect(
       await screen.findByText('Could not load this chapter.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('ChapterPage navigation around chapters not yet out', () => {
+  it('skips a draft and a scheduled chapter a co-author gets back in the list', async () => {
+    mocked.listChapters.mockResolvedValue({
+      items: [
+        summary(9, 'One'),
+        { ...summary(20, 'Unwritten'), publishedAt: null },
+        {
+          ...summary(21, 'Coming'),
+          publishedAt: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+        summary(11, 'Three'),
+      ],
+      total: 4,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderAt(9);
+
+    expect(await screen.findByRole('link', { name: 'Next' })).toHaveAttribute(
+      'href',
+      '/books/1/chapters/11'
+    );
   });
 });

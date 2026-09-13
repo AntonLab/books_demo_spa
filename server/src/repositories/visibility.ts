@@ -119,3 +119,37 @@ export async function visibleSeriesWhere(
 export function viewerOf(user: { id: number; role: Role } | undefined): Viewer {
   return user ? { id: user.id, role: user.role } : null;
 }
+
+// The chapters a viewer may read, as a WHERE on `chapters` and an inner join on
+// the chapter's book. A reader needs both halves: a Published book, and a
+// Publication time that has passed. A Co-author of the book reads every chapter
+// in it — drafts and scheduled ones are theirs to work on — and a Moderator
+// reads everything.
+//
+// "Now" is this process's clock, the same one that stamps `publishedAt: 'now'`,
+// so a chapter published immediately is readable on the very next request and
+// a scheduled one comes out without anything having to flip it.
+export async function readableChapterScope(
+  viewer: Viewer
+): Promise<{ where: WhereOptions; include: IncludeOptions }> {
+  const include = await readableBookInclude(viewer);
+  if (isModerator(viewer)) return { where: {}, include };
+
+  const published: WhereOptions = { publishedAt: { [Op.lte]: new Date() } };
+  const credited = await creditedBookIds(viewer);
+  if (credited.length === 0) return { where: published, include };
+
+  return {
+    where: { [Op.or]: [published, { bookId: credited }] },
+    include,
+  };
+}
+
+async function creditedBookIds(viewer: Viewer): Promise<number[]> {
+  if (viewer === null) return [];
+  const credits = await BookAuthor.findAll({
+    where: { userId: viewer.id },
+    attributes: ['bookId'],
+  });
+  return credits.map((credit) => credit.bookId);
+}

@@ -10,6 +10,7 @@ import { useChapters } from '@/queries/chapters';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_LABELS } from '@/types/book';
+import { publishedChapters } from '@/types/chapter';
 
 export const BookPage: FC = () => {
   const { token } = theme.useToken();
@@ -89,7 +90,9 @@ export const BookPage: FC = () => {
       <Typography.Title level={3}>Chapters</Typography.Title>
       <ChapterList
         bookId={bookId}
-        items={chapters.data?.items ?? []}
+        // The public list: only what is out, even for a Co-author, who
+        // manages the rest from the edit page.
+        items={publishedChapters(chapters.data?.items ?? [])}
         isPending={chapters.isPending}
         isError={chapters.isError}
       />
