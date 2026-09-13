@@ -23,14 +23,16 @@ const mockedLikes = jest.mocked(likesApi);
 
 const book: BookDetail = {
   id: 1,
-  userId: 3,
+  authors: [
+    { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
+    { id: 4, login: 'Cowriter', firstName: 'Cora', lastName: 'Writer' },
+  ],
   seriesId: 2,
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  author: { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
   series: { id: 2, title: 'The Scale Cycle' },
   likeCount: 4,
   viewerLikeId: null,
@@ -85,13 +87,13 @@ describe('BookPage', () => {
     expect(mockedBooks.getBook).toHaveBeenCalledWith(1);
   });
 
-  it('renders the title, author and annotation', async () => {
+  it('renders the title, every co-author and the annotation', async () => {
     renderPage();
 
     expect(
       await screen.findByRole('heading', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Ann Author')).toBeInTheDocument();
+    expect(screen.getByText('Ann Author, Cora Writer')).toBeInTheDocument();
     expect(
       screen.getByText('Long ago, in a kingdom of scales.')
     ).toBeInTheDocument();
@@ -131,9 +133,10 @@ describe('BookPage', () => {
     expect(screen.queryByRole('button', { name: /like/i })).toBeNull();
   });
 
-  it('hides the like button from the author', async () => {
-    // The server refuses a self-like with 403, so it is never offered.
-    renderPage({ ...reader, id: book.author.id });
+  it('hides the like button from every co-author, not only the first', async () => {
+    // The server refuses a like from any Co-author with 403, so it is never
+    // offered. The second credit is the one a first-author check would miss.
+    renderPage({ ...reader, id: 4 });
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.queryByRole('button', { name: /like/i })).toBeNull();

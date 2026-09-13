@@ -236,7 +236,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     register call — the two roles `REGISTRABLE_ROLES` lets the public form
     reach; `admin` and `superadmin` have no signup path and are never
     reachable from this checkbox), `ResetRequestModal` and
-    `ResetConfirmModal`; `BookCard` and the
+    `ResetConfirmModal`; `BookCard` (names every Co-author under the title,
+    from the `authors` the list response embeds) and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
     `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
@@ -287,7 +288,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   it at registration (see `RegisterModal` under `organisms/` above) but does
   not yet branch any rendering on it — and `AuthorSummary`, the email-free
   shape the public endpoints embed),
-  `book.ts` (`PublicBook` and `BookDetail`), `chapter.ts`, `comment.ts`,
+  `book.ts` (`PublicBook`, which carries `authors: AuthorSummary[]` — every
+  Co-author in credit order, with no `userId` — and `BookDetail`; `BookPage`
+  hides the like button from every one of them, mirroring the server's 403),
+  `chapter.ts`, `comment.ts`,
   `like.ts`, `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
   shapes) and `css.d.ts`. Dates cross the wire as ISO strings, not `Date`,
   throughout — the server types them as `Date` in process but they arrive as

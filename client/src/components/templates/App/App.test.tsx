@@ -33,14 +33,13 @@ beforeEach(() => {
   });
   mockedBooks.getBook.mockResolvedValue({
     id: 1,
-    userId: 3,
+    authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
     seriesId: null,
     title: 'A Tale of Dragons',
     description: 'Long ago, in a kingdom of scales.',
     tags: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
-    author: { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
     series: null,
     likeCount: 0,
     viewerLikeId: null,

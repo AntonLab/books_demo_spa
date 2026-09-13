@@ -5,6 +5,7 @@ import {
 } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
+import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
 import { Like, toPublicLike } from '../models/Like.ts';
 import {
@@ -70,17 +71,23 @@ function asMissingReference(
 // extra query on every like. Changing one's mind is a PATCH, not a second POST.
 // Nobody may like their own book or their own comment, and nobody may like a
 // tombstoned comment. This is the one check-then-write in this repository,
-// and it is safe where the uniqueness check would not be: a row's owner never
-// changes, so there is no window for the answer to go stale between the
-// SELECT and the INSERT.
+// and it is safe where the uniqueness check would not be: a comment's owner
+// never changes, and a book's credits changing mid-request is covered below.
 async function assertLikeable(
   input: CreateLikeInput,
   actorId: number
 ): Promise<void> {
   if (input.bookId !== null) {
-    const book = await Book.findByPk(input.bookId, { attributes: ['userId'] });
+    const book = await Book.findByPk(input.bookId, { attributes: ['id'] });
     if (!book) throw new NotFoundError('Book', input.bookId);
-    if (book.userId === actorId) {
+    // Every Co-author counts as the book's own, not just whoever created it.
+    // Unlike a comment's owner, credits do change — but a co-author added
+    // between this check and the insert could at worst leave one like that
+    // predates their credit, which is no worse than liking before being added.
+    const credited = await BookAuthor.count({
+      where: { bookId: input.bookId, userId: actorId },
+    });
+    if (credited > 0) {
       throw new ForbiddenError('You cannot like your own book');
     }
     return;

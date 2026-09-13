@@ -13,10 +13,8 @@ interface BookCardProps {
   book: PublicBook;
 }
 
-// Title-led and linked to the book page. It used to be description-led because
-// the books table had no title column; it has one now. Still no author: the
-// list response carries `userId` but no name, and only the detail endpoint
-// embeds one.
+// Title-led and linked to the book page, with every Co-author named under the
+// title: the list response embeds them, so no second request is needed.
 export const BookCard: FC<BookCardProps> = ({ book }) => {
   const { token } = theme.useToken();
 
@@ -25,6 +23,15 @@ export const BookCard: FC<BookCardProps> = ({ book }) => {
       <Typography.Title level={4} style={{ marginTop: 0 }}>
         <Link to={`/books/${book.id}`}>{book.title}</Link>
       </Typography.Title>
+
+      <Typography.Text
+        type="secondary"
+        style={{ display: 'block', marginBottom: token.marginXS }}
+      >
+        {book.authors
+          .map((author) => `${author.firstName} ${author.lastName}`)
+          .join(', ')}
+      </Typography.Text>
 
       <Typography.Paragraph
         ellipsis={{ rows: 3 }}

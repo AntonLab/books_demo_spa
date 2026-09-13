@@ -36,14 +36,19 @@ export function createChapterController(
   // as `any`.
   //
   // 404 before 403, so a refusal cannot be used to probe which ids exist.
+  //
+  // `own` means "one of the book's Co-authors" (ADR-0005).
+  const isCredited = (req: Request, coAuthorIds: number[]): boolean =>
+    req.user !== undefined && coAuthorIds.includes(req.user.id);
+
   const assertMayTouch = async (req: Request, id: number): Promise<void> => {
     if (req.permissionScope === 'any') return;
 
-    const ownerId = await repository.findOwnerId(id);
-    if (ownerId === null) throw new NotFoundError('Chapter', id);
-    if (ownerId !== req.user?.id) {
+    const coAuthorIds = await repository.findCoAuthorIds(id);
+    if (coAuthorIds === null) throw new NotFoundError('Chapter', id);
+    if (!isCredited(req, coAuthorIds)) {
       throw new ForbiddenError(
-        'You may only change chapters in your own books'
+        'You may only change chapters in books you co-author'
       );
     }
   };
@@ -55,10 +60,12 @@ export function createChapterController(
   ): Promise<void> => {
     if (req.permissionScope === 'any') return;
 
-    const ownerId = await repository.findBookOwnerId(bookId);
-    if (ownerId === null) throw new NotFoundError('Book', bookId);
-    if (ownerId !== req.user?.id) {
-      throw new ForbiddenError('You may only add chapters to your own books');
+    const coAuthorIds = await repository.findBookCoAuthorIds(bookId);
+    if (coAuthorIds === null) throw new NotFoundError('Book', bookId);
+    if (!isCredited(req, coAuthorIds)) {
+      throw new ForbiddenError(
+        'You may only add chapters to books you co-author'
+      );
     }
   };
 

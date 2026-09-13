@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the six content
+// Destructive by design: with --force it deletes every row in the seven content
 // tables before inserting. Without --force it reports what it found and exits
 // without writing.
 
@@ -25,6 +25,7 @@ import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger } from '../logger.ts';
 import {
   Book,
+  BookAuthor,
   Chapter,
   Comment,
   Like,
@@ -66,6 +67,9 @@ const PUBLICATION_WINDOW_DAYS = 430;
 // rows of ~2 KB is ~400 KB, comfortably inside the 64 MB default and well
 // inside a conservative 4 MB one.
 const INSERT_BATCH = 200;
+
+// How many books are credited to two authors rather than one (see shareBooks).
+const SHARED_BOOK_COUNT = 2;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -616,6 +620,8 @@ interface PlannedBook {
   title: string;
   description: string;
   tags: string[];
+  // Every Co-author in credit order, the author it was planned under first.
+  coAuthorLogins: string[];
   // An index into the author's own series list, or null for a standalone book.
   seriesIndex: number | null;
   createdAt: Date;
@@ -754,6 +760,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
       title: titles[index],
       description: description(rng, genre, rng.int(3, 4)),
       tags: rng.sample(genre.tags, rng.int(3, 5)),
+      coAuthorLogins: [spec.login],
       seriesIndex,
       // The record exists a few days before chapter one does.
       createdAt: new Date(dates[0].getTime() - rng.int(1, 5) * DAY_MS),
@@ -788,15 +795,37 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   };
 }
 
+// Two standalone books gain a second Co-author: each author's last standalone
+// book is shared with the next author in AUTHORS. Standalone, so neither book
+// sits in a series only one of its Co-authors owns.
+function shareBooks(authors: readonly PlannedAuthor[]): PlannedAuthor[] {
+  return authors.map((author, index) => {
+    if (index >= SHARED_BOOK_COUNT) return author;
+
+    const partner = authors[(index + 1) % authors.length].spec.login;
+    const shared = author.books
+      .filter((book) => book.seriesIndex === null)
+      .at(-1);
+    return {
+      ...author,
+      books: author.books.map((book) =>
+        book === shared
+          ? { ...book, coAuthorLogins: [...book.coAuthorLogins, partner] }
+          : book
+      ),
+    };
+  });
+}
+
 function planThreads(
   rng: Rng,
   books: readonly PlannedBook[],
-  accountCount: number
+  accounts: Plan['accounts']
 ): Pick<Plan, 'comments' | 'tombstones' | 'likes'> {
   const comments: PlannedComment[] = [];
   const likes: PlannedLike[] = [];
   const now = Date.now();
-  const accountIndexes = Array.from({ length: accountCount }, (_, i) => i);
+  const accountIndexes = accounts.map((_, i) => i);
 
   for (const book of books) {
     // Readers arrive once there is something to read; the third chapter is a
@@ -849,9 +878,14 @@ function planThreads(
       comments.push(comment);
     }
 
-    // 30-70% of the ten accounts like each book, distinct by construction so
-    // the unique index on (userId, bookId) is never tested by a duplicate.
-    for (const accountIndex of rng.sample(accountIndexes, rng.int(3, 7))) {
+    // 3-7 of the accounts not credited on the book like it, distinct by
+    // construction so the unique index on (userId, bookId) is never tested by
+    // a duplicate. No Co-author may like their own book, and the API would
+    // refuse it, so the seed does not write one either.
+    const likers = accountIndexes.filter(
+      (index) => !book.coAuthorLogins.includes(accounts[index].spec.login)
+    );
+    for (const accountIndex of rng.sample(likers, rng.int(3, 7))) {
       likes.push({
         book,
         comment: null,
@@ -900,7 +934,7 @@ function planThreads(
 }
 
 function buildPlan(rng: Rng): Plan {
-  const authors = AUTHORS.map((spec) => planAuthor(rng, spec));
+  const authors = shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)));
   const earliest = Math.min(
     ...authors.map((author) => author.createdAt.getTime())
   );
@@ -925,7 +959,7 @@ function buildPlan(rng: Rng): Plan {
   const threads = planThreads(
     rng,
     authors.flatMap((author) => author.books),
-    accounts.length
+    accounts
   );
 
   return { accounts, authors, ...threads };
@@ -945,6 +979,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Like,
   Comment,
   Chapter,
+  BookAuthor,
   Book,
   Series,
   User,
@@ -1009,7 +1044,16 @@ async function writeContent(
     ])
   );
 
+  const idOf = (login: string): number => {
+    const id = idByLogin.get(login);
+    if (id === undefined) {
+      throw new Error(`No account was created for ${login}`);
+    }
+    return id;
+  };
+
   const bookIds = new Map<PlannedBook, number>();
+  const creditRows: { bookId: number; userId: number; createdAt: Date }[] = [];
   const chapterRows: {
     bookId: number;
     title: string;
@@ -1020,10 +1064,8 @@ async function writeContent(
   let seriesCount = 0;
 
   for (const author of plan.authors) {
-    const userId = idByLogin.get(author.spec.login);
-    if (userId === undefined) {
-      throw new Error(`No account was created for ${author.spec.login}`);
-    }
+    // A series still has a single owner; only books take Co-authors so far.
+    const userId = idOf(author.spec.login);
 
     const seriesIds: number[] = [];
     for (const entry of author.series) {
@@ -1048,15 +1090,19 @@ async function writeContent(
           book.seriesIndex === null ? null : seriesIds[book.seriesIndex],
       });
       const row = await Book.create(
-        {
-          ...fields,
-          userId,
-          createdAt: book.createdAt,
-          updatedAt: book.createdAt,
-        },
+        { ...fields, createdAt: book.createdAt, updatedAt: book.createdAt },
         { transaction, silent: true }
       );
       bookIds.set(book, row.id);
+      // In credit order: bulkCreate inserts the rows in one statement, in
+      // input order, and the byline is ordered by the credits' ids.
+      for (const login of book.coAuthorLogins) {
+        creditRows.push({
+          bookId: row.id,
+          userId: idOf(login),
+          createdAt: book.createdAt,
+        });
+      }
 
       for (const chapter of book.chapters) {
         const parsed = createChapterSchema.parse({
@@ -1073,6 +1119,9 @@ async function writeContent(
     }
   }
 
+  await insertInBatches(creditRows, (batch) =>
+    BookAuthor.bulkCreate(batch, { transaction })
+  );
   await insertInBatches(chapterRows, (batch) =>
     Chapter.bulkCreate(batch, { transaction })
   );
