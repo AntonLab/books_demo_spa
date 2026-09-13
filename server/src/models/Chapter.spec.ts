@@ -57,9 +57,15 @@ test('Book.hasMany(Chapter) cascades — a chapter outside a book is meaningless
   );
 });
 
-test('the timestamps are NOT NULL', () => {
+test('the timestamps are NOT NULL, and updatedAt keeps milliseconds for the version check', () => {
   assert.match(createTableSql, /`createdAt` DATETIME NOT NULL/);
-  assert.match(createTableSql, /`updatedAt` DATETIME NOT NULL/);
+  // Two co-authors saving within one second must still read as two versions.
+  assert.match(createTableSql, /`updatedAt` DATETIME\(3\) NOT NULL/);
+});
+
+test('publishedAt is a nullable, millisecond-precise moment — null is a Draft chapter', () => {
+  assert.match(createTableSql, /`publishedAt` DATETIME\(3\)(?! NOT NULL)/);
+  assert.doesNotMatch(createTableSql, /`publishedAt` DATETIME\(3\) NOT NULL/);
 });
 
 test('the table is InnoDB with the utf8mb4 default collation', () => {
@@ -96,6 +102,7 @@ test('toPublicChapter carries the body, since it serves GET /:id', () => {
     bookId: 2,
     title: 'Chapter One',
     text: 'It was a dark night.',
+    publishedAt: null,
     createdAt: undefined,
     updatedAt: undefined,
   });

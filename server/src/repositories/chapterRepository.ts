@@ -7,16 +7,21 @@ import {
   toChapterSummary,
   toPublicChapter,
 } from '../models/Chapter.ts';
-import { NotFoundError } from '../types/errors.ts';
+import {
+  BadRequestError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import type {
   ChapterSummary,
   CreateChapterInput,
   ListChaptersQuery,
   PublicChapter,
+  PublishedAtInput,
   UpdateChapterInput,
 } from '../types/chapter.ts';
 import { containsPattern } from './likePattern.ts';
-import { readableBookInclude, type Viewer } from './visibility.ts';
+import { readableChapterScope, type Viewer } from './visibility.ts';
 
 export interface ChapterListResult {
   // Summaries, not full records: see list() for why the body stays out of the
@@ -27,8 +32,10 @@ export interface ChapterListResult {
 
 export interface ChapterRepository {
   create(input: CreateChapterInput): Promise<PublicChapter>;
-  // Both leave out the chapters of a Draft book the viewer may not read — a
-  // hidden chapter is reported exactly as a missing one.
+  // Both leave out what the viewer may not read: the chapters of a Draft book,
+  // and — for anyone but the book's Co-authors and Moderators — every chapter
+  // whose Publication time has not passed. A hidden chapter is reported
+  // exactly as a missing one.
   list(query: ListChaptersQuery, viewer: Viewer): Promise<ChapterListResult>;
   findById(id: number, viewer: Viewer): Promise<PublicChapter | null>;
   update(id: number, input: UpdateChapterInput): Promise<PublicChapter | null>;
@@ -92,11 +99,33 @@ async function findBookCoAuthorIds(bookId: number): Promise<number[] | null> {
   return credits.map((credit) => credit.userId);
 }
 
+// Turns a save's publishedAt into the moment to store. `now` is the server's
+// clock — the same clock every read compares against — so "publish
+// immediately" means readable on the very next request. A moment at or before
+// now is refused rather than stored: it would publish a chapter under a date
+// it was never out on.
+function resolvePublishedAt(value: PublishedAtInput, now: Date): Date | null {
+  if (value === null) return null;
+  if (value === 'now') return now;
+
+  const at = new Date(value);
+  if (at.getTime() <= now.getTime()) {
+    throw new BadRequestError('A publication time cannot be in the past');
+  }
+  return at;
+}
+
 export function createSequelizeChapterRepository(): ChapterRepository {
   return {
     async create(input) {
+      const { publishedAt, ...attributes } = input;
+      const at = resolvePublishedAt(publishedAt, new Date());
+
       try {
-        const chapter = await Chapter.create(input);
+        const chapter = await Chapter.create({
+          ...attributes,
+          publishedAt: at,
+        });
         return toPublicChapter(chapter);
       } catch (error) {
         asMissingBook(error, input.bookId);
@@ -104,13 +133,21 @@ export function createSequelizeChapterRepository(): ChapterRepository {
     },
 
     async list(query, viewer) {
+      const scope = await readableChapterScope(viewer);
       const { rows, count } = await Chapter.findAndCountAll({
         // The body is left out of the SELECT rather than trimmed afterwards: a
         // page of twenty chapters would otherwise drag twenty MEDIUMTEXT
         // columns off disk and across the wire to be discarded.
-        attributes: ['id', 'bookId', 'title', 'createdAt', 'updatedAt'],
-        where: buildWhere(query),
-        include: [await readableBookInclude(viewer)],
+        attributes: [
+          'id',
+          'bookId',
+          'title',
+          'publishedAt',
+          'createdAt',
+          'updatedAt',
+        ],
+        where: { [Op.and]: [buildWhere(query), scope.where] },
+        include: [scope.include],
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -120,21 +157,65 @@ export function createSequelizeChapterRepository(): ChapterRepository {
     },
 
     async findById(id, viewer) {
+      const scope = await readableChapterScope(viewer);
       const chapter = await Chapter.findOne({
-        where: { id },
-        include: [await readableBookInclude(viewer)],
+        where: { [Op.and]: [{ id }, scope.where] },
+        include: [scope.include],
       });
       return chapter ? toPublicChapter(chapter) : null;
     },
 
+    // Under a lock on the row, so the version check and the write cannot be
+    // split by another save: without it two co-authors holding the same
+    // updatedAt could both pass the comparison and the second would still
+    // overwrite the first.
     async update(id, input) {
-      const chapter = await Chapter.findByPk(id);
-      if (!chapter) return null;
+      const sequelize = Chapter.sequelize;
+      if (!sequelize) throw new Error('Chapter model is not initialised');
 
-      // No FK mapping here, unlike books: bookId is absent from
-      // updateChapterSchema, so an update cannot violate the constraint.
-      await chapter.update(input);
-      return toPublicChapter(chapter);
+      return sequelize.transaction(async (transaction) => {
+        const chapter = await Chapter.findByPk(id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!chapter) return null;
+
+        const { expectedUpdatedAt, publishedAt, ...fields } = input;
+        if (
+          chapter.updatedAt.getTime() !== new Date(expectedUpdatedAt).getTime()
+        ) {
+          throw new StateConflictError(
+            'This chapter was changed since you loaded it'
+          );
+        }
+
+        const changes: Partial<{
+          title: string;
+          text: string;
+          publishedAt: Date | null;
+        }> = { ...fields };
+
+        if (publishedAt !== undefined) {
+          const now = new Date();
+          const isPublished =
+            chapter.publishedAt !== null &&
+            chapter.publishedAt.getTime() <= now.getTime();
+          // A Published chapter's moment is history: it may only go back to
+          // Draft, and publishing it again then sets a fresh one. Moving it
+          // directly would re-date a chapter readers have already seen.
+          if (isPublished && publishedAt !== null) {
+            throw new BadRequestError(
+              'A published chapter cannot be rescheduled; return it to draft first'
+            );
+          }
+          changes.publishedAt = resolvePublishedAt(publishedAt, now);
+        }
+
+        // No FK mapping here, unlike books: bookId is absent from
+        // updateChapterSchema, so an update cannot violate the constraint.
+        await chapter.update(changes, { transaction });
+        return toPublicChapter(chapter);
+      });
     },
 
     async remove(id) {

@@ -12,9 +12,11 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
+import { ChapterList } from '@/components/organisms/ChapterList';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
 import { useSession } from '@/queries/auth';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
+import { useChapters } from '@/queries/chapters';
 import { useMySeries } from '@/queries/series';
 
 export const EditBookPage: FC = () => {
@@ -29,6 +31,7 @@ export const EditBookPage: FC = () => {
   );
   const update = useUpdateBook(bookId);
   const remove = useDeleteBook(bookId);
+  const chapters = useChapters(bookId);
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -103,6 +106,30 @@ export const EditBookPage: FC = () => {
           onSubmit={handleSubmit}
         />
       </div>
+
+      <Divider />
+
+      <Space
+        align="center"
+        style={{ width: '100%', justifyContent: 'space-between' }}
+      >
+        <Typography.Title level={4}>Chapters</Typography.Title>
+        {/* Only a Co-author: a Moderator may edit and delete chapters but has
+            no create on them. */}
+        {isCoAuthor && (
+          <Link to={`/books/${book.id}/chapters/new`}>Add chapter</Link>
+        )}
+      </Space>
+      {/* Every chapter, drafts and scheduled ones included: the server returns
+          them all to a Co-author or a Moderator, and this is where they are
+          worked on. */}
+      <ChapterList
+        bookId={book.id}
+        items={chapters.data?.items ?? []}
+        isPending={chapters.isPending}
+        isError={chapters.isError}
+        editable
+      />
 
       <Divider />
 

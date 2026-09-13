@@ -7,16 +7,19 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authorsApi from '@/api/authors';
 import * as booksApi from '@/api/books';
+import * as chaptersApi from '@/api/chapters';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/books');
+jest.mock('@/api/chapters');
 jest.mock('@/api/series');
 
 const mockedAuthors = jest.mocked(authorsApi);
 const mockedBooks = jest.mocked(booksApi);
+const mockedChapters = jest.mocked(chaptersApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const ann = { id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' };
@@ -73,6 +76,12 @@ beforeEach(() => {
     offset: 0,
   });
   mockedAuthors.searchAuthors.mockResolvedValue([]);
+  mockedChapters.listChapters.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
 });
 
 describe('EditBookPage', () => {
@@ -156,5 +165,55 @@ describe('EditBookPage', () => {
     expect(
       await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('EditBookPage chapters', () => {
+  it('lists every chapter with its state, and offers to add one', async () => {
+    const chapter = {
+      bookId: 1,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    mockedChapters.listChapters.mockResolvedValue({
+      items: [
+        {
+          ...chapter,
+          id: 9,
+          title: 'Out',
+          publishedAt: '2026-09-02T00:00:00.000Z',
+        },
+        { ...chapter, id: 10, title: 'Unwritten', publishedAt: null },
+        {
+          ...chapter,
+          id: 11,
+          title: 'Coming',
+          publishedAt: new Date(Date.now() + 86_400_000).toISOString(),
+        },
+      ],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Unwritten' })
+    ).toHaveAttribute('href', '/books/1/chapters/10/edit');
+    expect(
+      screen.getByText('Draft', { selector: '.ant-tag' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Add chapter' })).toHaveAttribute(
+      'href',
+      '/books/1/chapters/new'
+    );
+  });
+
+  it('offers no new chapter to a moderator, who may not create one', async () => {
+    renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
+
+    await screen.findByLabelText('Title');
+    expect(screen.queryByRole('link', { name: 'Add chapter' })).toBeNull();
   });
 });

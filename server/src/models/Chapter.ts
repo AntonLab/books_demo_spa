@@ -21,6 +21,10 @@ export class Chapter extends Model<
   declare bookId: ForeignKey<Book['id']>;
   declare title: string;
   declare text: string;
+  // The Publication time (CONTEXT.md): null for a Draft chapter, a future
+  // moment for a Scheduled one, a past one once it is Published. Nothing flips
+  // a flag when the moment passes — every read compares it with the clock.
+  declare publishedAt: CreationOptional<Date | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -57,8 +61,15 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
+      // Millisecond precision, like updatedAt below: a chapter scheduled for
+      // 18:00:00.500 is not out at 18:00:00.
+      publishedAt: { type: DataTypes.DATE(3), allowNull: true },
       createdAt: { type: DataTypes.DATE, allowNull: false },
-      updatedAt: { type: DataTypes.DATE, allowNull: false },
+      // Millisecond precision rather than the whole seconds every other table
+      // keeps: a save carries the updatedAt it last saw (chapterRepository
+      // update), and two Co-authors saving within one second would otherwise
+      // read as the same version and silently overwrite each other.
+      updatedAt: { type: DataTypes.DATE(3), allowNull: false },
     },
     {
       sequelize,
@@ -85,6 +96,7 @@ export function toPublicChapter(chapter: Chapter): PublicChapter {
     bookId: chapter.bookId,
     title: chapter.title,
     text: chapter.text,
+    publishedAt: chapter.publishedAt ?? null,
     createdAt: chapter.createdAt,
     updatedAt: chapter.updatedAt,
   };
@@ -99,6 +111,7 @@ export function toChapterSummary(chapter: Chapter): ChapterSummary {
     id: chapter.id,
     bookId: chapter.bookId,
     title: chapter.title,
+    publishedAt: chapter.publishedAt ?? null,
     createdAt: chapter.createdAt,
     updatedAt: chapter.updatedAt,
   };

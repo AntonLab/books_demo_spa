@@ -21,6 +21,11 @@ const BookPage = lazy(() =>
 const ChapterPage = lazy(() =>
   import('@/pages/ChapterPage').then((m) => ({ default: m.ChapterPage }))
 );
+const EditChapterPage = lazy(() =>
+  import('@/pages/EditChapterPage').then((m) => ({
+    default: m.EditChapterPage,
+  }))
+);
 const EditBookPage = lazy(() =>
   import('@/pages/EditBookPage').then((m) => ({ default: m.EditBookPage }))
 );
@@ -32,6 +37,9 @@ const MyBooksPage = lazy(() =>
 );
 const NewBookPage = lazy(() =>
   import('@/pages/NewBookPage').then((m) => ({ default: m.NewBookPage }))
+);
+const NewChapterPage = lazy(() =>
+  import('@/pages/NewChapterPage').then((m) => ({ default: m.NewChapterPage }))
 );
 const NotFoundPage = lazy(() =>
   import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
@@ -86,6 +94,16 @@ export const AppShell: FC = () => {
               <Route
                 path="/books/:bookId/chapters/:chapterId"
                 element={<ChapterPage />}
+              />
+              {/* The static `new` segment outranks `:chapterId`, as
+                  /books/new does `:id` above. */}
+              <Route
+                path="/books/:bookId/chapters/new"
+                element={<NewChapterPage />}
+              />
+              <Route
+                path="/books/:bookId/chapters/:chapterId/edit"
+                element={<EditChapterPage />}
               />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/series" element={<SeriesPage />} />
