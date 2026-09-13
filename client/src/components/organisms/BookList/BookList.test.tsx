@@ -10,6 +10,7 @@ const book: PublicBook = {
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
+  status: 'in_progress',
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };

@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Card, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
-import type { PublicBook } from '@/types/book';
+import { BOOK_STATUS_LABELS, type PublicBook } from '@/types/book';
 
 // `createdAt` is an ISO string on the wire, so it is parsed here rather than
 // assumed to be a Date.
@@ -52,9 +52,14 @@ export const BookCard: FC<BookCardProps> = ({ book }) => {
         </Space>
       )}
 
-      <Typography.Text type="secondary">
-        {formatDate(book.createdAt)}
-      </Typography.Text>
+      <Space size={token.marginXS}>
+        <Tag color={book.status === 'draft' ? 'orange' : undefined}>
+          {BOOK_STATUS_LABELS[book.status]}
+        </Tag>
+        <Typography.Text type="secondary">
+          {formatDate(book.createdAt)}
+        </Typography.Text>
+      </Space>
     </Card>
   );
 };

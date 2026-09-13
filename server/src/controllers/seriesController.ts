@@ -6,6 +6,7 @@ import {
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
+import { viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -75,13 +76,13 @@ export function createSeriesController(
 
     list: async (req, res) => {
       const query = validatedQuery<ListSeriesQuery>(req);
-      const { items, total } = await repository.list(query);
+      const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const series = await repository.findById(id);
+      const series = await repository.findById(id, viewerOf(req.user));
       if (!series) throw new NotFoundError('Series', id);
       res.json(series);
     },
