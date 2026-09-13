@@ -238,7 +238,11 @@ run the same automation from `.github/`:
   ruleset does not require.
 - `dependabot.yml` — weekly npm and GitHub Actions updates, minor and patch
   grouped into one PR per ecosystem, majors one PR each, no labels (the repo's
-  labels are the triage roles).
+  labels are the triage roles). It ignores the majors the toolchain cannot take yet —
+  TypeScript 7 (a native compiler without the JavaScript API typescript-eslint
+  and fork-ts-checker-webpack-plugin load) and ESLint and `@eslint/js` 10 (past
+  what eslint-plugin-react and eslint-plugin-jsx-a11y support). Drop an entry
+  once those packages catch up, then take the major by hand.
 
 Every action is pinned to a full commit SHA with its version in a trailing
 comment; Dependabot moves both. Keep that form when adding a step — a tag can
