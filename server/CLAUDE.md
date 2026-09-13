@@ -154,13 +154,16 @@ scripts below still run from this directory, or from the root with `-w server`.
 
 - `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.18)
 - `npm run dev` — run under nodemon, which restarts on changes to
-  `src/**/*.{ts,json}`. The script is bare `nodemon`: `nodemon.json` supplies
+  `src/**/*.{ts,json}` and to `../shared/src`, the API types this package
+  loads as source. The script is bare `nodemon`: `nodemon.json` supplies
   both the watch settings and `exec: node ./src/index.ts`, so the entry point
   is named once rather than in both places
 - `npm run build` — compile with `tsc -p tsconfig.build.json` to `dist/`; that
   config extends `tsconfig.json` (which in turn extends the repo-root
   `tsconfig.base.json`) but excludes `src/**/*.spec.ts`, so test files
-  are never emitted
+  are never emitted. `shared` is not emitted either: `dist/` imports it as
+  `.ts` at runtime, through the workspace link, so `node dist/index.js` needs
+  that link and a type-stripping Node like `npm start` does (ADR-0006)
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
   **It deletes every row in the nine content tables**, so it does nothing
@@ -319,7 +322,11 @@ Each layer answers a question the others cannot:
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
   `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
-  `errors.ts`, `express.d.ts`)
+  `errors.ts`, `express.d.ts`). The response types (`Public*`, `BookDetail`,
+  …) and the unions the client also uses (`BOOK_STATUSES`, `USER_ROLES`,
+  `USER_STATUSES`, `REGISTRABLE_ROLES`, …) are re-exported from the `shared`
+  workspace, so a change to what the API returns starts there; the zod
+  schemas and the input types inferred from them stay here
 
 ## Environment
 
@@ -770,7 +777,8 @@ reaches.
 - **Five roles, and one place they stop accumulating.** `ROLES` in
   `types/permission.ts` is `guest`, `user`, `author`, `admin`, `superadmin`.
   `guest` is not a storable value — `USER_ROLES` (what actually sits in
-  `users.role`) omits it — it is what `requirePermission` assumes when a
+  `users.role`, from `shared`) omits it, and `ROLES` is built as
+  `['guest', ...USER_ROLES]`, so a new role gets its matrix row — it is what `requirePermission` assumes when a
   request carries no session, so a public read is described by a row in the
   matrix rather than by the absence of a guard. Each role after `user`
   layers more grants on top of the last, with one deliberate exception:

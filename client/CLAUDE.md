@@ -386,9 +386,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   list from the server carries the rest), `comment.ts`,
   `like.ts`, `notification.ts` (`PublicNotification` and `NotificationList`),
   `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
-  shapes) and `css.d.ts`. Dates cross the wire as ISO strings, not `Date`,
-  throughout — the server types them as `Date` in process but they arrive as
-  JSON strings.
+  shapes) and `css.d.ts`. None of these shapes is written here any more: each
+  is `Wire<…>` over the type of the same name in the `shared` workspace
+  (ADR-0006), and the unions (`BOOK_STATUSES`, `USER_ROLES`, `USER_STATUSES`,
+  `TOMBSTONES`, `REGISTRABLE_ROLES`, …) are re-exported from it — `BookForm`
+  lists its radios from `BOOK_STATUSES`. What stays local is client-only:
+  labels, `chapterStateOf` and the other helpers, and the request payloads
+  beside each API call. Dates cross the wire as ISO strings, not `Date`,
+  throughout — `shared` types them as `Date`, the way the server holds them,
+  and `Wire<T>` turns each into the string it arrives as.
 - `src/test/` — `setup.ts` (jsdom polyfills, see Testing below),
   `renderWithProviders.tsx` (wraps a component in a `QueryClientProvider`
   — the outermost provider — then the Redux `Provider`, antd's
@@ -405,7 +411,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 - `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
   `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
   `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,
-  and the `@/*` → `./src/*` path mapping
+  and the `@/*` → `./src/*` path mapping. `allowImportingTsExtensions` is on
+  for `shared`, not for this package: `shared` is type-checked as part of this
+  program, and its relative imports end in `.ts` because Node loads it too.
+  This package's own imports stay extensionless
 - `eslint.config.mjs` — calls `createConfig` from the repo-root
   `eslint.config.base.mjs`, which supplies the recommended sets, the repo-wide
   rules and the Prettier tail. This file adds only the
@@ -421,8 +430,12 @@ so they behave the same wherever webpack is invoked from.
 
 Entry is `src/index.tsx`; output goes to `build/` (cleaned on each build).
 
-- **Transpile** — `swc-loader` (`@swc/core`) over `src/`, `jsc.target: es2020`,
-  automatic JSX runtime. swc **strips types without checking them**, so
+- **Transpile** — `swc-loader` (`@swc/core`) over `src/` and the `shared`
+  workspace's source, `jsc.target: es2020`, automatic JSX runtime. `shared`
+  ships TypeScript, not a build, and webpack follows its workspace link to the
+  real path before matching a rule, so the `include` names that path through
+  `require.resolve('shared')`; without it the build cannot parse
+  `../shared/src/*.ts`. swc **strips types without checking them**, so
   `fork-ts-checker-webpack-plugin` type-checks in a parallel process against
   `tsconfig.json`; type errors fail the build and surface in the dev overlay.
 - **Dev** (`config/webpack.dev.js`) — port 3000, `historyApiFallback` for client-side
@@ -486,6 +499,8 @@ error.
   is carved out of that ignore list so it gets transformed like first-party
   code, because it ships ESM only. Removing this line breaks every test that
   touches routing. `antd` needs no such exception — it still ships CJS.
+  Neither does `shared`: Jest resolves its workspace link to `shared/src`,
+  a path outside `node_modules`, so it is transformed like first-party code.
 - **`src/test/setup.ts` polyfills four things jsdom does not implement,**
   each confirmed necessary by removing it and watching tests fail:
   - `matchMedia` and `ResizeObserver` — antd's `Modal`, `Menu` and other
