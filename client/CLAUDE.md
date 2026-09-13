@@ -510,7 +510,12 @@ error.
 - **The API is mocked per test, not the network.** Component and query
   tests `jest.mock('@/api/auth')` or `'@/api/books')` and drive the mock;
   only `src/api/*.test.ts` stubs `window.fetch` directly, against the
-  `Response`-shaped fixtures in `httpFixtures.ts`. There is no MSW.
+  `Response`-shaped fixtures in `httpFixtures.ts`. There is no MSW. Because
+  every other test mocks it, each module in `src/api/` has its own test
+  pinning the request contract — method, exact URL and query encoding, JSON
+  body (none on a GET), the `X-XSRF-Token` header on every write and none on a
+  read, and how a success and a typical error come back. A new API function
+  gets a case there, or nothing checks what it sends.
   `src/test/renderWithProviders.tsx` wraps a component in a
   `QueryClientProvider`, the Redux `Provider`, antd's `ConfigProvider` and
   a `MemoryRouter`, and returns both the store and the query client so a
@@ -520,6 +525,18 @@ user)`) or a UI action (`store.dispatch(openResetConfirm(token))`).
   render** — a shared one leaks cached data between tests — with
   `staleTime: Infinity` so seeded data is never refetched behind a test's
   back, and `gcTime: Infinity` so no timer outlives the test.
+- **Tests render without antd's runtime styles.** `renderWithProviders` passes
+  `zeroRuntime: true` to `ConfigProvider` on top of `appTheme`: the DOM, class
+  names and tokens are unchanged, but no CSS-in-JS rules are injected. With
+  them, jsdom's `getComputedStyle` — called by every `*ByRole({ name })`
+  query, user-event's pointer-events check and antd's popup alignment —
+  matched each element against ~1,400 rules, cold after every render and
+  piling up across a file's tests; single tests reached Jest's 5 s timeout
+  under a coverage run, and the full run took ~27 s against ~18 s now. The
+  price is that a role query no longer treats an element hidden only by
+  antd's stylesheet as hidden. A test that renders without the helper pays
+  the old cost. Waiting on cheap text first and calling `getByRole` once is
+  also faster than a `findByRole` polling through a loading phase.
 
 ### What a component test must cover
 

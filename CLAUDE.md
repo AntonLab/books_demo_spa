@@ -184,7 +184,7 @@ Target one with npm's `-w` flag (`npm test -w client`):
   including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
   exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
   why its script is not plain `jest`). A **green** server run then drops the
-  ten test schemas it created, through npm's `posttest`; a failed one leaves
+  twelve test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.
