@@ -98,34 +98,19 @@ export interface BookRepository {
   reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
 }
 
-// A rejected FK while creating a book means a referenced row does not exist.
-// Reporting that as a 404 is more useful than the generic 500 an unmapped
-// SequelizeForeignKeyConstraintError would produce.
+// A rejected FK while creating a book means its first credit names an account
+// that is gone. Reporting that as a 404 is more useful than the generic 500 an
+// unmapped SequelizeForeignKeyConstraintError would produce.
 //
-// Two foreign keys can fail — books.seriesId, and book_authors.userId for the
-// first credit — so the error has to say which: a "User not found" for a bad
-// seriesId would send the caller hunting for a user that is sitting right
-// there. MySQL names the offending column in the constraint text, which is the
-// only place the two are distinguishable; seriesId can only be at fault when
-// one was supplied, so userId is the safe fallback.
-function asMissingReference(
-  error: unknown,
-  userId: number | undefined,
-  seriesId: number | null | undefined
-): never {
+// book_authors.userId is the only foreign key that can fail here.
+// books.seriesId cannot: every write that sets it to a new series goes through
+// nextSeriesPosition first, which holds that series row under a lock for the
+// rest of the transaction and answers a missing one with NotFoundError itself,
+// and a write that keeps the series holds a lock on a book row already
+// pointing at it, which deleting the series would have to change.
+function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
-
-    if (
-      seriesId !== null &&
-      seriesId !== undefined &&
-      detail.includes('seriesId')
-    ) {
-      throw new NotFoundError('Series', seriesId);
-    }
-    if (userId !== undefined) {
-      throw new NotFoundError('User', userId);
-    }
+    throw new NotFoundError('User', userId);
   }
   throw error;
 }
@@ -263,7 +248,7 @@ export function createSequelizeBookRepository(): BookRepository {
           return withAuthors(book, transaction);
         });
       } catch (error) {
-        asMissingReference(error, input.userId, input.seriesId);
+        asMissingUser(error, input.userId);
       }
     },
 
@@ -336,39 +321,38 @@ export function createSequelizeBookRepository(): BookRepository {
       };
     },
 
+    // No foreign-key mapping, unlike create: seriesId is the only reference an
+    // update can write, and asMissingUser explains why it cannot be rejected.
     async update(id, input) {
-      try {
-        return await sequelizeOf().transaction(async (transaction) => {
-          const book = await Book.findByPk(id, {
-            transaction,
-            lock: transaction.LOCK.UPDATE,
-          });
-          if (!book) return null;
-
-          // `update` writes only the keys present, so an omitted seriesId
-          // leaves the link — and the book's place — alone, while an explicit
-          // null clears both. Saving a book into the series it is already in
-          // keeps its place; only a move appends it.
-          const changes: UpdateBookInput & { seriesPosition?: number | null } =
-            { ...input };
-          if (input.seriesId === null) {
-            changes.seriesPosition = null;
-          } else if (
-            input.seriesId !== undefined &&
-            input.seriesId !== book.seriesId
-          ) {
-            changes.seriesPosition = await nextSeriesPosition(
-              input.seriesId,
-              transaction
-            );
-          }
-
-          await book.update(changes, { transaction });
-          return withAuthors(book, transaction);
+      return sequelizeOf().transaction(async (transaction) => {
+        const book = await Book.findByPk(id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
         });
-      } catch (error) {
-        asMissingReference(error, undefined, input.seriesId);
-      }
+        if (!book) return null;
+
+        // `update` writes only the keys present, so an omitted seriesId
+        // leaves the link — and the book's place — alone, while an explicit
+        // null clears both. Saving a book into the series it is already in
+        // keeps its place; only a move appends it.
+        const changes: UpdateBookInput & { seriesPosition?: number | null } = {
+          ...input,
+        };
+        if (input.seriesId === null) {
+          changes.seriesPosition = null;
+        } else if (
+          input.seriesId !== undefined &&
+          input.seriesId !== book.seriesId
+        ) {
+          changes.seriesPosition = await nextSeriesPosition(
+            input.seriesId,
+            transaction
+          );
+        }
+
+        await book.update(changes, { transaction });
+        return withAuthors(book, transaction);
+      });
     },
 
     // Under a lock on the book row, so the Co-authors told are exactly the ones
