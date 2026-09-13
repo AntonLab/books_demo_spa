@@ -142,7 +142,7 @@ reverses a moderator's `removed` tombstone. See **Auth**.
 This package is an npm workspace. Install from the repo root, not here; the
 scripts below still run from this directory, or from the root with `-w server`.
 
-- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.5)
+- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.18)
 - `npm run dev` — run under nodemon, which restarts on changes to
   `src/**/*.{ts,json}`. The script is bare `nodemon`: `nodemon.json` supplies
   both the watch settings and `exec: node ./src/index.ts`, so the entry point
@@ -763,7 +763,8 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
 
 ## Runtime notes
 
-- ESM package (`"type": "module"`), Node >= 22.5. `tsconfig.json` uses
+- ESM package (`"type": "module"`), Node >= 22.18 — the first release that
+  strips types without `--experimental-strip-types`. `tsconfig.json` uses
   `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `dev` run the `.ts` entry directly via Node (native TS
   type-stripping); nodemon only adds watch/restart on top.
