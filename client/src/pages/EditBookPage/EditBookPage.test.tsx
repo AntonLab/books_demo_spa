@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
 import { Route, Routes } from 'react-router';
 import { EditBookPage } from './EditBookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -55,15 +56,24 @@ const account = (overrides: Partial<PublicUser>): PublicUser => ({
   ...overrides,
 });
 
+// `zeroRuntime` stops antd injecting its CSS-in-JS rules into the document.
+// With them, every getComputedStyle — which role queries, user-event's
+// pointer-events check and Popconfirm's alignment all call — matches each
+// element against well over a thousand rules, cold again after every render,
+// and the rules pile up across the file's tests. That took each test here
+// past a second and past Jest's timeout under a loaded coverage run. The
+// class names, tokens and DOM are unchanged; only the stylesheets are gone.
 const renderPage = (session: PublicUser | null = account({})) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
 
   return renderWithProviders(
-    <Routes>
-      <Route path="/books/:id/edit" element={<EditBookPage />} />
-      <Route path="/my-books" element={<p>My books list</p>} />
-    </Routes>,
+    <ConfigProvider theme={{ zeroRuntime: true }}>
+      <Routes>
+        <Route path="/books/:id/edit" element={<EditBookPage />} />
+        <Route path="/my-books" element={<p>My books list</p>} />
+      </Routes>
+    </ConfigProvider>,
     { route: '/books/1/edit', queryClient }
   );
 };
