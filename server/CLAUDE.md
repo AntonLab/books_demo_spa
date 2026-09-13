@@ -59,6 +59,24 @@ open is not handed a 409 for text nobody touched. It rides on
 `chapters × update`, and `own` means a Co-author of the book, exactly as for
 adding a chapter.
 
+A series' books follow its **Series order** the same way — `books.seriesPosition`,
+a nullable `INTEGER UNSIGNED`, null outside a series and never sent to a
+client. `GET /api/books?seriesId=` is ordered by it (`ORDER BY seriesPosition,
+id`; every other book list stays by id). `bookRepository` appends a book
+whenever it is filed into a series — a create with a `seriesId`, or an update
+that moves it to a different one — under a lock on the series row; saving a
+book into the series it is already in keeps its place, and leaving
+(`seriesId: null`, `DELETE /api/series/:id/books/:bookId`, or the series'
+deletion) clears it. `routes/seriesBookRoutes.ts` adds the series editor's
+two routes, handled by `bookController` because both read and write books,
+and both riding on `series × update` plus a Co-author of the series (a
+Moderator's `any` passes): `GET /api/series/:id/books` answers
+`{ items: SeriesBookSummary[] }` — every book filed in the series, drafts
+included, as `id`, `title`, `status` and `authors` only — and
+`PUT /api/series/:id/book-order` takes `{ bookIds }` and answers 204, or 409
+changing nothing when the ids are not exactly the series' books, exactly as
+the chapter order does.
+
 `books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
 alongside their `description`, which now unambiguously means the annotation.
 The `?q=` filter on both matches either column.
@@ -180,7 +198,7 @@ added.
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
-  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`,
+  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`, `seriesBookRoutes.ts`,
   `commentRoutes.ts`, `likeRoutes.ts`, mounted under `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
@@ -281,7 +299,9 @@ chapters are Draft chapters; every In progress book's next chapter is Scheduled
 over the coming days, and the author's newest In progress book has its next two
 scheduled (`publicationOf`); every other chapter was published when it was
 written. Each book's chapters take positions 1…N in the order the plan wrote
-them, so the Reading order starts out as the order of writing.
+them, so the Reading order starts out as the order of writing, and each
+series' books take positions 1…N in the order the plan files them
+(`seriesPositionOf`).
 
 Three things about it are worth knowing before changing it:
 
@@ -449,7 +469,8 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     sends `PATCH /api/books/:id` with `seriesId: null`; a Co-author of the
     series (or a Moderator) sends `DELETE /api/series/:id/books/:bookId`,
     which rides on `series × update` and answers 404 when the book is not in
-    that series, so it cannot unlink a book filed elsewhere.
+    that series, so it cannot unlink a book filed elsewhere. Either way the
+    book loses its place in the Series order; filing it again appends it.
   - **A comment resolves its tombstone before any owner comparison.** A
     tombstone's `userId` is `null`, so comparing it against `req.user.id`
     would refuse everyone, owner included. `commentController.update` and
@@ -528,6 +549,15 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     non-draft book, or the viewer co-authors it, or is a Moderator
     (`visibleSeriesWhere`). The published side is a fixed subquery with no
     caller-supplied value, because an id list would grow with the catalogue.
+  - **A series' Co-authors see the drafts filed in it, by name only.** A
+    series and its books keep independent Co-author lists, so a Co-author of
+    the series need not co-author a Draft book filed there — yet reordering
+    needs the whole list. `GET /api/series/:id/books` therefore names every
+    book in the series, drafts included, to the series' Co-authors and
+    Moderators, as a `SeriesBookSummary` with no description, tags or
+    chapters. The draft itself stays unreadable to them: its detail,
+    chapters and comments still go through `readableBookWhere`, and a draft
+    only enters a series through someone who co-authors both.
   - **Nobody writes to a draft's conversation.** `commentRepository.create`
     refuses a comment on a Draft book, and `likeRepository.create` a like on
     one or on a comment under one — 403 for everyone, Co-authors and
@@ -985,7 +1015,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `chapters.updatedAt` gained millisecond precision, neither of which
   `sync()` applies to an existing table. Nor does it add
   `chapters.position`, a `NOT NULL` column every chapter insert and list
-  needs, or swap the `(bookId, id)` index for `(bookId, position)`.
+  needs, or swap the `(bookId, id)` index for `(bookId, position)` — nor
+  add `books.seriesPosition` or swap `(seriesId, id)` for
+  `(seriesId, seriesPosition)`.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of

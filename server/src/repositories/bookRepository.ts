@@ -24,6 +24,7 @@ import type {
   CreateBookInput,
   ListBooksQuery,
   PublicBook,
+  SeriesBookSummary,
   UpdateBookInput,
 } from '../types/book.ts';
 import type { AuthorSummary } from '../types/user.ts';
@@ -68,6 +69,15 @@ export interface BookRepository {
   // before the write — mirrors chapterRepository.findBookCoAuthorIds one level
   // up. null when the series is not there.
   findSeriesCoAuthorIds(seriesId: number): Promise<number[] | null>;
+  // The series editor's list: every book filed in the series, drafts included,
+  // in Series order. Kept here rather than in seriesRepository because it reads
+  // and writes books, as chapterRepository owns a book's chapter order. null
+  // when the series is not there.
+  listInSeries(seriesId: number): Promise<SeriesBookSummary[] | null>;
+  // Rewrites the Series order to `bookIds`, which must name every book in the
+  // series exactly once; anything else is a StateConflictError that changes
+  // nothing. False when the series is not there.
+  reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
 }
 
 // A rejected FK while creating a book means a referenced row does not exist.
@@ -100,6 +110,28 @@ function asMissingReference(
     }
   }
   throw error;
+}
+
+// The place a book filed into `seriesId` takes: after the last one. Under a
+// lock on the series row, which a reorder takes too, so two books filed at
+// once cannot share a place and one filed mid-reorder cannot land inside it.
+// The lock also settles whether the series exists.
+async function nextSeriesPosition(
+  seriesId: number,
+  transaction: Transaction
+): Promise<number> {
+  const series = await Series.findByPk(seriesId, {
+    attributes: ['id'],
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!series) throw new NotFoundError('Series', seriesId);
+
+  const last = await Book.max<number | null, Book>('seriesPosition', {
+    where: { seriesId },
+    transaction,
+  });
+  return (last ?? 0) + 1;
 }
 
 // Every Co-author of every book named, in credit order, in one query. Books
@@ -201,7 +233,14 @@ export function createSequelizeBookRepository(): BookRepository {
         // One transaction, so a book never exists without its first credit.
         return await sequelizeOf().transaction(async (transaction) => {
           const { userId, ...attributes } = input;
-          const book = await Book.create(attributes, { transaction });
+          const seriesPosition =
+            attributes.seriesId === null
+              ? null
+              : await nextSeriesPosition(attributes.seriesId, transaction);
+          const book = await Book.create(
+            { ...attributes, seriesPosition },
+            { transaction }
+          );
           await BookAuthor.create({ bookId: book.id, userId }, { transaction });
           return withAuthors(book, transaction);
         });
@@ -225,7 +264,14 @@ export function createSequelizeBookRepository(): BookRepository {
         where: buildWhere(query, creditedBookIds, viewer),
         limit: query.limit,
         offset: query.offset,
-        order: [['id', 'ASC']],
+        // A series' books come in Series order; every other list by id.
+        order:
+          query.seriesId === undefined
+            ? [['id', 'ASC']]
+            : [
+                ['seriesPosition', 'ASC'],
+                ['id', 'ASC'],
+              ],
       });
 
       const authors = await loadAuthors(rows.map((row) => row.id));
@@ -273,17 +319,38 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async update(id, input) {
-      const book = await Book.findByPk(id);
-      if (!book) return null;
-
       try {
-        // `update` writes only the keys present, so an omitted seriesId leaves
-        // the link alone while an explicit null clears it.
-        await book.update(input);
+        return await sequelizeOf().transaction(async (transaction) => {
+          const book = await Book.findByPk(id, {
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!book) return null;
+
+          // `update` writes only the keys present, so an omitted seriesId
+          // leaves the link — and the book's place — alone, while an explicit
+          // null clears both. Saving a book into the series it is already in
+          // keeps its place; only a move appends it.
+          const changes: UpdateBookInput & { seriesPosition?: number | null } =
+            { ...input };
+          if (input.seriesId === null) {
+            changes.seriesPosition = null;
+          } else if (
+            input.seriesId !== undefined &&
+            input.seriesId !== book.seriesId
+          ) {
+            changes.seriesPosition = await nextSeriesPosition(
+              input.seriesId,
+              transaction
+            );
+          }
+
+          await book.update(changes, { transaction });
+          return withAuthors(book, transaction);
+        });
       } catch (error) {
         asMissingReference(error, undefined, input.seriesId);
       }
-      return withAuthors(book);
     },
 
     async remove(id) {
@@ -362,5 +429,63 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     findSeriesCoAuthorIds,
+
+    async listInSeries(seriesId) {
+      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+      if (!series) return null;
+
+      const books = await Book.findAll({
+        where: { seriesId },
+        attributes: ['id', 'title', 'status'],
+        order: [
+          ['seriesPosition', 'ASC'],
+          ['id', 'ASC'],
+        ],
+      });
+      const authors = await loadAuthors(books.map((book) => book.id));
+      return books.map((book) => ({
+        id: book.id,
+        title: book.title,
+        status: book.status,
+        authors: authors.get(book.id) ?? [],
+      }));
+    },
+
+    async reorderInSeries(seriesId, bookIds) {
+      return sequelizeOf().transaction(async (transaction) => {
+        const series = await Series.findByPk(seriesId, {
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!series) return false;
+
+        const current = await Book.findAll({
+          where: { seriesId },
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        const currentIds = new Set(current.map((book) => book.id));
+        const sameSet =
+          new Set(bookIds).size === bookIds.length &&
+          bookIds.length === currentIds.size &&
+          bookIds.every((bookId) => currentIds.has(bookId));
+        if (!sameSet) {
+          throw new StateConflictError(
+            'The books of this series changed since you loaded them'
+          );
+        }
+
+        // One statement, and silent, for the reasons chapterRepository.reorder
+        // gives: FIELD(id, …) is each id's 1-based place, and a reorder is not
+        // an edit to any book.
+        await Book.update(
+          { seriesPosition: fn('FIELD', col('id'), ...bookIds) },
+          { where: { seriesId }, transaction, silent: true }
+        );
+        return true;
+      });
+    },
   };
 }

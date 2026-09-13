@@ -18,6 +18,7 @@ import type {
   ListBooksQuery,
   UpdateBookInput,
 } from '../types/book.ts';
+import type { ReorderSeriesBooksInput } from '../types/series.ts';
 
 export interface BookController {
   create: RequestHandler;
@@ -27,6 +28,8 @@ export interface BookController {
   remove: RequestHandler;
   addCoAuthor: RequestHandler;
   removeCoAuthor: RequestHandler;
+  listInSeries: RequestHandler;
+  reorderInSeries: RequestHandler;
 }
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -60,12 +63,29 @@ export function createBookController(
     await assertCoAuthor(req, id);
   };
 
+  // A series' Co-authors — or a Moderator under `any` — are the ones who may
+  // change which books it holds and in what order.
+  async function assertMayChangeSeries(
+    req: Request,
+    seriesId: number,
+    refusal: string
+  ): Promise<void> {
+    if (req.permissionScope === 'any') return;
+
+    const coAuthorIds = await repository.findSeriesCoAuthorIds(seriesId);
+    if (coAuthorIds === null) throw new NotFoundError('Series', seriesId);
+    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
+      throw new ForbiddenError(refusal);
+    }
+  }
+
   // Filing a book under a series changes that series too — it starts listing
   // the book — so the caller must co-author the series as well as the book.
   // The two Co-author lists are independent: a book credited to A and B may sit
   // in a series credited to A and C, and only A may file it there. Without
   // this an author could put their book into a stranger's series.
-  // chapterController.assertMayAddTo closes the same hole one level down.
+  // chapterController.assertMayChangeChaptersOf closes the same hole one level
+  // down.
   //
   // null (unlinking) and an absent key (leaving the link alone) touch no
   // series, so neither needs a check. An absent series is still a 404 that
@@ -75,15 +95,11 @@ export function createBookController(
     seriesId: number | null | undefined
   ): Promise<void> => {
     if (seriesId === null || seriesId === undefined) return;
-    if (req.permissionScope === 'any') return;
-
-    const coAuthorIds = await repository.findSeriesCoAuthorIds(seriesId);
-    if (coAuthorIds === null) throw new NotFoundError('Series', seriesId);
-    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
-      throw new ForbiddenError(
-        'You may only add books to series you co-author'
-      );
-    }
+    await assertMayChangeSeries(
+      req,
+      seriesId,
+      'You may only add books to series you co-author'
+    );
   };
 
   return {
@@ -171,6 +187,36 @@ export function createBookController(
       const book = await repository.removeCoAuthor(id, userId);
       if (!book) throw new NotFoundError('Book', id);
       res.json(book);
+    },
+
+    // The series editor's list, mounted behind `series × update`: it names the
+    // Draft books filed in the series, which only the people who may reorder
+    // them need to see.
+    listInSeries: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChangeSeries(
+        req,
+        id,
+        'You may only see the books of series you co-author'
+      );
+
+      const items = await repository.listInSeries(id);
+      if (!items) throw new NotFoundError('Series', id);
+      res.json({ items });
+    },
+
+    reorderInSeries: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChangeSeries(
+        req,
+        id,
+        'You may only reorder the books of series you co-author'
+      );
+
+      const { bookIds } = validatedBody<ReorderSeriesBooksInput>(req);
+      const found = await repository.reorderInSeries(id, bookIds);
+      if (!found) throw new NotFoundError('Series', id);
+      res.status(204).end();
     },
   };
 }

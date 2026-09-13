@@ -111,6 +111,15 @@ export interface PublicBook {
   updatedAt: Date;
 }
 
+// One row of GET /api/series/:id/books, the series editor's list. A summary
+// rather than a PublicBook, because that list reaches a series' Co-authors who
+// may not co-author a Draft book filed in it: they see what the book is called
+// and where it stands, never its annotation or text.
+export type SeriesBookSummary = Pick<
+  PublicBook,
+  'id' | 'title' | 'status' | 'authors'
+>;
+
 // What GET /api/books/:id returns: the record plus the series name a book page
 // has to show and the like state it renders. Additive over PublicBook, so the
 // endpoint's existing readers are unaffected. The Co-authors come with
