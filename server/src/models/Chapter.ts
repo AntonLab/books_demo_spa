@@ -25,6 +25,9 @@ export class Chapter extends Model<
   // moment for a Scheduled one, a past one once it is Published. Nothing flips
   // a flag when the moment passes — every read compares it with the clock.
   declare publishedAt: CreationOptional<Date | null>;
+  // The chapter's place in its book's Reading order (CONTEXT.md), 1-based and
+  // gapped after a delete. It orders every list and is never sent to a client.
+  declare position: number;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -64,6 +67,9 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       // Millisecond precision, like updatedAt below: a chapter scheduled for
       // 18:00:00.500 is not out at 18:00:00.
       publishedAt: { type: DataTypes.DATE(3), allowNull: true },
+      // No default: chapterRepository.create appends, and a row inserted any
+      // other way should fail loudly rather than land at an arbitrary place.
+      position: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       createdAt: { type: DataTypes.DATE, allowNull: false },
       // Millisecond precision rather than the whole seconds every other table
       // keeps: a save carries the updatedAt it last saw (chapterRepository
@@ -79,10 +85,13 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
         // Serves the `?bookId=` filter together with the list endpoint's
-        // `ORDER BY id`, so neither needs a filesort. It is also a leftmost
-        // prefix of the foreign key's column, so InnoDB reuses it instead of
-        // creating a second index for the constraint.
-        { name: 'chapters_book_id_id', fields: ['bookId', 'id'] },
+        // `ORDER BY position, id` — InnoDB appends the primary key to every
+        // secondary index, so the id tie-break is covered too — and neither
+        // needs a filesort. It is also a leftmost prefix of the foreign key's
+        // column, so InnoDB reuses it instead of creating a second index for
+        // the constraint. Not unique: a reorder rewrites every position in one
+        // UPDATE, and a unique index would refuse the rows it passes through.
+        { name: 'chapters_book_id_position', fields: ['bookId', 'position'] },
       ],
     }
   );

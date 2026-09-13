@@ -9,7 +9,11 @@ import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { Book, Chapter, initModels, Series, User } from '../models/index.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
-import { AppError, NotFoundError } from '../types/errors.ts';
+import {
+  AppError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
 import type { Viewer } from './visibility.ts';
 
@@ -528,5 +532,96 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     await new Promise((resolve) => setTimeout(resolve, 1_600));
 
     assert.equal((await repository.findById(soon.id, null))?.title, 'Soon');
+  });
+
+  // --- Reading order (CONTEXT.md). ---
+
+  const titlesFor = async (viewer: Viewer = asModerator): Promise<string[]> =>
+    (await repository.list({ limit: 20, offset: 0, bookId }, viewer)).items.map(
+      (chapter) => chapter.title
+    );
+
+  test('a new chapter is appended at the end of the Reading order', async () => {
+    const one = await createPublished({ bookId, title: 'One', text: 'a' });
+    const two = await createPublished({ bookId, title: 'Two', text: 'b' });
+    await repository.reorder(bookId, [two.id, one.id]);
+
+    await createPublished({ bookId, title: 'Three', text: 'c' });
+
+    assert.deepEqual(await titlesFor(), ['Two', 'One', 'Three']);
+  });
+
+  test('chapters created at the same moment still get a place each', async () => {
+    await Promise.all(
+      ['A', 'B', 'C', 'D', 'E'].map((title) =>
+        createPublished({ bookId, title, text: 'x' })
+      )
+    );
+
+    const positions = (
+      await Chapter.findAll({ where: { bookId }, attributes: ['position'] })
+    ).map((chapter) => chapter.position);
+    assert.equal(new Set(positions).size, 5);
+  });
+
+  test('a reorder rewrites the Reading order every list follows, readers included', async () => {
+    const one = await createPublished({ bookId, title: 'One', text: 'a' });
+    const draft = await repository.create({
+      bookId,
+      title: 'Draft',
+      text: 'b',
+      publishedAt: null,
+    });
+    const three = await createPublished({ bookId, title: 'Three', text: 'c' });
+
+    assert.equal(
+      await repository.reorder(bookId, [three.id, draft.id, one.id]),
+      true
+    );
+
+    assert.deepEqual(await titlesFor(), ['Three', 'Draft', 'One']);
+    assert.deepEqual(await titlesFor(null), ['Three', 'One']);
+  });
+
+  test('a reorder leaves every chapter version alone, so an open editor is not told it is stale', async () => {
+    const one = await createPublished({ bookId, title: 'One', text: 'a' });
+    const two = await createPublished({ bookId, title: 'Two', text: 'b' });
+
+    await repository.reorder(bookId, [two.id, one.id]);
+
+    const reloaded = await repository.findById(one.id, asModerator);
+    assert.equal(reloaded?.updatedAt.getTime(), one.updatedAt.getTime());
+  });
+
+  test('a reorder that does not name exactly the chapters the book has now is a conflict and changes nothing', async () => {
+    const one = await createPublished({ bookId, title: 'One', text: 'a' });
+    const two = await createPublished({ bookId, title: 'Two', text: 'b' });
+    const otherBook = await createCreditedBook(
+      { title: 'Other', description: 'x', tags: [] },
+      [ownerId]
+    );
+    const elsewhere = await createPublished({
+      bookId: otherBook.id,
+      title: 'Elsewhere',
+      text: 'c',
+    });
+
+    for (const chapterIds of [
+      [two.id], // one was added meanwhile
+      [two.id, one.id, one.id + 10_000], // one was deleted meanwhile
+      [two.id, elsewhere.id], // a chapter from another book
+    ]) {
+      await assert.rejects(
+        repository.reorder(bookId, chapterIds),
+        (error: unknown) => error instanceof StateConflictError,
+        JSON.stringify(chapterIds)
+      );
+    }
+
+    assert.deepEqual(await titlesFor(), ['One', 'Two']);
+  });
+
+  test('a reorder of a missing book reports it rather than throwing', async () => {
+    assert.equal(await repository.reorder(bookId + 10_000, [1]), false);
   });
 });

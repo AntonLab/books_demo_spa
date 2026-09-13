@@ -12,14 +12,14 @@ UI components follow Brad Frost's Atomic Design levels, extended with
 `organisms/`. A level with nothing in it has no directory — create one when
 the first component needs it rather than leaving empty folders around.
 
-| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                        |
-| --------- | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`             |
-| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                           |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                                         |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `BookForm`, `ChapterForm`, `ChapterList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
-| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                  |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The thirteen routed pages                                                                                                                                    |
+| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                               |
+| --------- | --------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                                    |
+| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                  |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                                                                |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `BookForm`, `ChapterForm`, `ChapterList`, `SortableChapterList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
+| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                         |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The thirteen routed pages                                                                                                                                                           |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 31 (18 components, 13 pages) follow this layout, and the `@/` alias is
+All 32 (19 components, 13 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -180,8 +180,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   responses into a typed `ApiError`), plus `auth.ts`, `authors.ts` (`searchAuthors`, the Co-author picker's
   search), `books.ts` (reads, plus `createBook`, `updateBook`, `deleteBook`,
   `addCoAuthor` and `removeCoAuthor`), `chapters.ts` (reads, plus
-  `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` — and
-  `deleteChapter`), `comments.ts`,
+  `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` —
+  `deleteChapter` and `reorderChapters`, a `PUT` of the book's whole Reading
+  order), `comments.ts`,
   `likes.ts` and `series.ts` (`listSeries`), the per-resource typed calls
   built on it. Since the TanStack Query migration
   these are the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`,
@@ -200,8 +201,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   list that includes their drafts — and five book mutations that all
   invalidate the whole `books` prefix, since one write can move a book in or
   out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
-  term), `series.ts` (`useMySeries`), `chapters.ts` (`useChapters`, `useChapter`, and three
-  chapter mutations that invalidate every `chapters` key),
+  term), `series.ts` (`useMySeries`), `chapters.ts` (`useChapters`, `useChapter`, three
+  chapter mutations that invalidate every `chapters` key, and
+  `useReorderChapters`, which rewrites the book's cached list in the new order
+  before the request leaves, puts the old one back if it fails, and refetches
+  either way — after a 409 that refetch is what brings in the chapter a
+  Co-author added or deleted),
   `comments.ts` (`useComments` plus the three comment mutations) and
   `likes.ts` (`useToggleLike`). Flat files, like `src/api/` and `src/store/`,
   and outside the Atomic Design levels for the same reason.
@@ -258,8 +263,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
     `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
-    `src/queries/books.ts` hook); the presentational `ChapterList` (dated by `publishedAt`; `editable` links
-    to the chapter editor and badges Draft and Scheduled chapters);
+    `src/queries/books.ts` hook); the presentational `ChapterList` (the reader's list, dated by
+    `publishedAt`, in the order it is given); `SortableChapterList` (the book
+    editor's list: every chapter linked to its editor and badged Draft or
+    Scheduled, sortable with `@dnd-kit/core` + `@dnd-kit/sortable` through a
+    drag handle named "Reorder {title}" — `PointerSensor` for the mouse,
+    `KeyboardSensor` for Space, the arrow keys and Space again — and calling
+    `onReorder` with the whole new order only when a drop moved something. It
+    is an `<ol>` with its markers hidden: the Reading order is shown by place,
+    never by number. Its announcements name chapters by title, not id);
     `ChapterForm` (title, text, and a "Publish immediately" checkbox that
     reveals a `DatePicker` and `TimePicker` only while it is off, with past
     days and today's past hours disabled; "Publish" sends `'now'` or the
@@ -297,7 +309,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   author's own books, drafts included, and "Create book"), `NewBookPage`
   (`/books/new`: the book's fields only, then on to editing it),
   `EditBookPage` (`/books/:id/edit`: fields and status, every chapter through
-  an `editable` `ChapterList` with Draft / Scheduled badges and "Add chapter",
+  a `SortableChapterList` that saves the Reading order on drop — with an
+  error Alert when a save fails and a warning when a 409 reloaded the list —
+  and "Add chapter",
   `CoAuthorManager`, and delete behind a `Popconfirm`; a Moderator gets the
   form but a read-only byline and no "Add chapter"), `NewChapterPage`
   (`/books/:bookId/chapters/new`) and `EditChapterPage`
@@ -345,7 +359,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `useParams()` returns an empty object and the page queries `NaN`),
   `queryClient.ts` (`createTestQueryClient`, the fresh-per-render
   client `renderWithProviders` defaults to), `httpFixtures.ts` (minimal
-  `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`) and
+  `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`),
+  `sortable.ts` (`layOutSortableRows` and `moveWithKeyboard`, see Testing) and
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
 - `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays, merged via `webpack-merge`
@@ -444,6 +459,14 @@ error.
     registration/watch mechanism) constructs one unconditionally on every
     `Form.Item` mount to schedule a macrotask, so no antd `Form` — none of
     the four auth modals included — can mount in a test without it.
+- **Drag and drop is tested from the keyboard, over a faked layout.** jsdom
+  lays nothing out, so every element measures as a zero rect and dnd-kit's
+  keyboard coordinates find no row to move past. `layOutSortableRows()` in
+  `src/test/sortable.ts` spies on `getBoundingClientRect` to stack the
+  elements marked `data-sortable-row` in document order (call the function it
+  returns to restore), and `moveWithKeyboard` performs what a keyboard user
+  does — focus the handle, Space, arrows, Space. A pointer drag is not tested:
+  the keyboard path runs through the same `onDragEnd`.
 - **The API is mocked per test, not the network.** Component and query
   tests `jest.mock('@/api/auth')` or `'@/api/books')` and drive the mock;
   only `src/api/*.test.ts` stubs `window.fetch` directly, against the

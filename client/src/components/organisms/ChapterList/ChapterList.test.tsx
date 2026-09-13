@@ -67,26 +67,19 @@ describe('ChapterList dates and states', () => {
     ).toBeNull();
   });
 
-  it('in edit mode links to the editor and badges what is not out yet', () => {
-    const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
+  it('lists the chapters in the order it is given, the Reading order', () => {
     renderWithProviders(
       <ChapterList
         {...baseProps}
-        editable
         items={[
+          { ...chapter, id: 12, title: 'Written last, read first' },
           chapter,
-          { ...chapter, id: 10, title: 'Unwritten', publishedAt: null },
-          { ...chapter, id: 11, title: 'Coming', publishedAt: tomorrow },
         ]}
       />
     );
 
-    expect(screen.getByRole('link', { name: 'Chapter One' })).toHaveAttribute(
-      'href',
-      '/books/1/chapters/9/edit'
+    expect(screen.getAllByRole('link').map((link) => link.textContent)).toEqual(
+      ['Written last, read first', 'Chapter One']
     );
-    expect(screen.getByText('Draft')).toBeInTheDocument();
-    expect(screen.getByText('Scheduled')).toBeInTheDocument();
-    expect(screen.getAllByText(/Draft|Scheduled/)).toHaveLength(2);
   });
 });
