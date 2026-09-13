@@ -29,10 +29,16 @@ const OTHER_AUTHOR_SERIES_ID = 8;
 const VIEWER_LIKE_ID = 99;
 const UNOWNED_USER_ID = 999997;
 
-// Stands in for the series table: which series exist, and who owns each.
-const SERIES_OWNERS = new Map<number, number>([
-  [KNOWN_SERIES_ID, KNOWN_USER_ID],
-  [OTHER_AUTHOR_SERIES_ID, USER_IDS.otherAuthor],
+// Credited to otherAuthor first and the `author` persona second, so filing a
+// book under it proves any Co-author of a series may, not only its first.
+const SHARED_SERIES_ID = 9;
+
+// Stands in for the series' credits: which series exist, and who co-authors
+// each.
+const SERIES_CO_AUTHORS = new Map<number, number[]>([
+  [KNOWN_SERIES_ID, [KNOWN_USER_ID]],
+  [OTHER_AUTHOR_SERIES_ID, [USER_IDS.otherAuthor]],
+  [SHARED_SERIES_ID, [USER_IDS.otherAuthor, KNOWN_USER_ID]],
 ]);
 
 // Deliberately spelled out rather than derived from a PublicUser: the point of
@@ -91,7 +97,7 @@ function createFakeRepository(): BookRepository {
       if (input.userId !== KNOWN_USER_ID) {
         throw new NotFoundError('User', input.userId);
       }
-      if (input.seriesId !== null && !SERIES_OWNERS.has(input.seriesId)) {
+      if (input.seriesId !== null && !SERIES_CO_AUTHORS.has(input.seriesId)) {
         throw new NotFoundError('Series', input.seriesId);
       }
 
@@ -154,7 +160,7 @@ function createFakeRepository(): BookRepository {
       if (
         input.seriesId !== null &&
         input.seriesId !== undefined &&
-        !SERIES_OWNERS.has(input.seriesId)
+        !SERIES_CO_AUTHORS.has(input.seriesId)
       ) {
         throw new NotFoundError('Series', input.seriesId);
       }
@@ -199,8 +205,8 @@ function createFakeRepository(): BookRepository {
       return credits.get(id) ?? null;
     },
 
-    async findSeriesOwnerId(seriesId) {
-      return SERIES_OWNERS.get(seriesId) ?? null;
+    async findSeriesCoAuthorIds(seriesId) {
+      return SERIES_CO_AUTHORS.get(seriesId) ?? null;
     },
   };
 }
@@ -1017,6 +1023,25 @@ test('crediting a co-author on a missing book is a 404', async () => {
         (await removeCoAuthor(base, 999, KNOWN_USER_ID, ROLE_COOKIES.author))
           .status,
         404
+      );
+    }
+  );
+});
+
+test('any co-author of a series may file a book under it, not only its first', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(
+        base,
+        { ...valid, seriesId: SHARED_SERIES_ID },
+        ROLE_COOKIES.author
+      );
+
+      assert.equal(response.status, 201);
+      assert.equal(
+        (await json<PublicBook>(response)).seriesId,
+        SHARED_SERIES_ID
       );
     }
   );
