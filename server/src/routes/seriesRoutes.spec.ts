@@ -34,7 +34,7 @@ const SUMMARIES = new Map<number, AuthorSummary>(
   ])
 );
 
-function createFakeRepository(): SeriesRepository {
+function createFakeRepository(actors: unknown[] = []): SeriesRepository {
   const rows = new Map<number, PublicSeries>();
   // seriesId -> co-author ids, in credit order. The rules on credits (the
   // author role, duplicates, the last co-author) belong to the real repository
@@ -110,7 +110,8 @@ function createFakeRepository(): SeriesRepository {
       return withCredits(updated);
     },
 
-    async remove(id) {
+    async remove(id, actor) {
+      actors.push(['remove', actor]);
       credits.delete(id);
       return rows.delete(id);
     },
@@ -124,14 +125,16 @@ function createFakeRepository(): SeriesRepository {
       return true;
     },
 
-    async addCoAuthor(seriesId, userId) {
+    async addCoAuthor(seriesId, userId, actor) {
+      actors.push(['addCoAuthor', actor]);
       const series = rows.get(seriesId);
       if (!series) return null;
       credits.set(seriesId, [...(credits.get(seriesId) ?? []), userId]);
       return withCredits(series);
     },
 
-    async removeCoAuthor(seriesId, userId) {
+    async removeCoAuthor(seriesId, userId, actor) {
+      actors.push(['removeCoAuthor', actor]);
       const series = rows.get(seriesId);
       if (!series) return null;
       credits.set(
@@ -727,6 +730,32 @@ test('an author who is not credited on the series may not take a book out', asyn
         (await removeBook(base, id, FILED_BOOK_ID, null)).status,
         401
       );
+    }
+  );
+});
+
+// --- Notifications name who acted, so the routes must say who that was. ---
+
+test('series credit changes and deletes are made as the signed-in caller', async () => {
+  const actors: unknown[] = [];
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository(actors) },
+    async (base) => {
+      const { id } = await json<PublicSeries>(await post(base, valid));
+      await addCoAuthor(base, id, USER_IDS.otherAuthor);
+      await removeCoAuthor(
+        base,
+        id,
+        USER_IDS.otherAuthor,
+        ROLE_COOKIES.otherAuthor
+      );
+      await remove(base, id, ROLE_COOKIES.admin);
+
+      assert.deepEqual(actors, [
+        ['addCoAuthor', { id: USER_IDS.author, role: 'author' }],
+        ['removeCoAuthor', { id: USER_IDS.otherAuthor, role: 'author' }],
+        ['remove', { id: USER_IDS.admin, role: 'admin' }],
+      ]);
     }
   );
 });

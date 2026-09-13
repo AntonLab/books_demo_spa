@@ -1,13 +1,23 @@
+import type { Request } from 'express';
 import { literal, Op, type IncludeOptions, type WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { UnauthorizedError } from '../types/errors.ts';
 import type { Role } from '../types/permission.ts';
 
 // Who is reading, as far as Draft books are concerned: the signed-in account's
 // id and Role, or null for a Guest. Passed to every repository read that can
 // reach a book, so the rule lives in the query rather than in each controller.
 export type Viewer = { id: number; role: Role } | null;
+
+// The account behind a write, for the notifications it raises. Every route
+// that calls this is guarded, so an unset req.user here is a wiring mistake
+// and is refused as one.
+export function actorOf(req: Request): { id: number; role: Role } {
+  if (!req.user) throw new UnauthorizedError();
+  return { id: req.user.id, role: req.user.role };
+}
 
 // A Moderator reads every Draft book, but only by direct link: no list is
 // widened for one.

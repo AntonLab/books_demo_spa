@@ -12,14 +12,14 @@ UI components follow Brad Frost's Atomic Design levels, extended with
 `organisms/`. A level with nothing in it has no directory — create one when
 the first component needs it rather than leaving empty folders around.
 
-| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                      |
-| --------- | --------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus one custom quark — `appSearchBarMaxWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                                           |
-| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                         |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                                                                       |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `BookList`, `BookCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
-| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                   |
+| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                                          |
+| --------- | --------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus two custom quarks — `appSearchBarMaxWidth` and `appNotificationPanelWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                              |
+| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                                             |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                                                                                           |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
+| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                    |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                                       |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 35 (20 components, 15 pages) follow this layout, and the `@/` alias is
+All 36 (21 components, 15 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -183,7 +183,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` —
   `deleteChapter` and `reorderChapters`, a `PUT` of the book's whole Reading
   order), `comments.ts`,
-  `likes.ts` and `series.ts` (`listSeries`, `getSeries`, the create /
+  `likes.ts`, `notifications.ts` (`listNotifications`, the newest page, and
+  `markNotificationsRead`) and `series.ts` (`listSeries`, `getSeries`, the create /
   update / delete trio, `addSeriesCoAuthor` and `removeSeriesCoAuthor`, and the
   series editor's `listSeriesBooks`, `reorderSeriesBooks` and
   `removeBookFromSeries`), the per-resource typed calls
@@ -194,6 +195,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   One trap: `request()` takes `body` as an **object** and stringifies it
   itself, setting `Content-Type` off whether it is `undefined`. Passing a
   JSON string would double-encode it.
+
+  `request()` also sends the session's CSRF token on every write (any method
+  but `GET`): it reads the `xsrfToken` cookie the server sets beside the
+  session and echoes it in the `X-XSRF-Token` header, without which the server
+  refuses a write that carries a session with a 403. A call that bypasses
+  `request()` loses that as well as `credentials: 'include'`.
 
 - `src/queries/` — the TanStack Query layer, and the only thing that calls
   `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
@@ -218,7 +225,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   chapter mutations that invalidate every `chapters` key, and
   `useReorderChapters`, built on `useOptimisticReorder`),
   `comments.ts` (`useComments` plus the three comment mutations) and
-  `likes.ts` (`useToggleLike`). Flat files, like `src/api/` and `src/store/`,
+  `likes.ts` (`useToggleLike`) and `notifications.ts` (`useNotifications`,
+  keyed by the account and the one query that polls — every 60 s, and again
+  when the window regains focus — and `useMarkNotificationsRead`, which sets
+  the unread count at once and refetches the list). Flat files, like `src/api/` and `src/store/`,
   and outside the Atomic Design levels for the same reason.
 
   Five things worth knowing before editing it:
@@ -254,7 +264,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     antd removed its own `Comment` in v5).
   - `organisms/` — `AppHeader` (nav menu — "My Books" only for the `author`
     Role — `SearchBar`, and the three auth states — signed out / loading /
-    signed in); `BookForm` (presentational fields for creating and editing a
+    signed in, the last with a `NotificationBell`); `NotificationBell` (a
+    badge with the unread count, also in the button's name, over a `Popover`
+    of the newest notifications in words, the work's title linked while the
+    work exists — a book to its page, a series to its editor. Opening it marks
+    the unread ones read at once but keeps them highlighted until it closes); `BookForm` (presentational fields for creating and editing a
     book; `showStatus` adds the status radios, which creating leaves out
     because every new book is a draft, and "No series" travels as 0 inside the
     form and leaves as `null`); `SeriesForm` (BookForm's fields
@@ -370,7 +384,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   and `publishedChapters` — the public `BookPage` and the reader's
   previous/next show only chapters that are out, even to a Co-author, whose
   list from the server carries the rest), `comment.ts`,
-  `like.ts`, `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
+  `like.ts`, `notification.ts` (`PublicNotification` and `NotificationList`),
+  `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
   shapes) and `css.d.ts`. Dates cross the wire as ISO strings, not `Date`,
   throughout — the server types them as `Date` in process but they arrive as
   JSON strings.

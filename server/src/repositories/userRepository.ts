@@ -13,6 +13,7 @@ import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
 import { toAuthorSummary, toPublicUser, User } from '../models/User.ts';
 import { containsPattern } from './likePattern.ts';
+import { notify } from './notificationRepository.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
   AuthorSummary,
@@ -102,33 +103,56 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
 }
 
 interface CreditedWorks {
-  // Every work the account is credited on.
-  workIds: number[];
+  // Every work the account is credited on, with the title it has now.
+  works: { id: number; title: string }[];
   // One entry per credit on those works, every Co-author included.
-  creditWorkIds: number[];
+  credits: { workId: number; userId: number }[];
 }
 
-// Reads the works an account is credited on, locks them, and only then counts
-// their credits, so the count cannot change underneath the caller. The reads
-// are passed in because books and series keep their credits in two tables.
+// Reads the works an account is credited on, locks them, and only then reads
+// their credits, so they cannot change underneath the caller. The reads are
+// passed in because books and series keep their credits in two tables.
 async function lockCreditedWorks(
   userId: number,
-  lock: (workIds: number[]) => Promise<unknown>,
+  lock: (workIds: number[]) => Promise<{ id: number; title: string }[]>,
   creditedWorkIds: (userId: number) => Promise<number[]>,
-  creditsOn: (workIds: number[]) => Promise<number[]>
+  creditsOn: (
+    workIds: number[]
+  ) => Promise<{ workId: number; userId: number }[]>
 ): Promise<CreditedWorks> {
   const workIds = await creditedWorkIds(userId);
-  if (workIds.length === 0) return { workIds, creditWorkIds: [] };
+  if (workIds.length === 0) return { works: [], credits: [] };
 
-  await lock(workIds);
-  return { workIds, creditWorkIds: await creditsOn(workIds) };
+  const works = await lock(workIds);
+  return { works, credits: await creditsOn(workIds) };
 }
 
 // The works whose only credit is the account's own.
-function soleCredits({ workIds, creditWorkIds }: CreditedWorks): number[] {
-  return workIds.filter(
-    (workId) => creditWorkIds.filter((id) => id === workId).length === 1
-  );
+function soleCredits({ works, credits }: CreditedWorks): number[] {
+  return works
+    .map((work) => work.id)
+    .filter(
+      (workId) =>
+        credits.filter((credit) => credit.workId === workId).length === 1
+    );
+}
+
+// The works the account shares, each with the Co-authors who stay on it —
+// the ones told the account is gone.
+function sharedCredits(
+  { works, credits }: CreditedWorks,
+  userId: number
+): { id: number; title: string; others: number[] }[] {
+  return works.flatMap((work) => {
+    const others = credits
+      .filter((credit) => credit.workId === work.id && credit.userId !== userId)
+      .map((credit) => credit.userId);
+    // Copied field by field: the works are model instances, whose attributes
+    // are getters a spread would not carry.
+    return others.length > 0
+      ? [{ id: work.id, title: work.title, others }]
+      : [];
+  });
 }
 
 export function createSequelizeUserRepository(): UserRepository {
@@ -246,69 +270,97 @@ export function createSequelizeUserRepository(): UserRepository {
       }
 
       return sequelize.transaction(async (transaction) => {
-        const soleSeriesIds = soleCredits(
-          await lockCreditedWorks(
-            id,
-            (seriesIds) =>
-              Series.findAll({
-                where: { id: seriesIds },
-                attributes: ['id'],
-                lock: transaction.LOCK.UPDATE,
+        const creditedSeries = await lockCreditedWorks(
+          id,
+          (seriesIds) =>
+            Series.findAll({
+              where: { id: seriesIds },
+              attributes: ['id', 'title'],
+              lock: transaction.LOCK.UPDATE,
+              transaction,
+            }),
+          async (userId) =>
+            (
+              await SeriesAuthor.findAll({
+                where: { userId },
+                attributes: ['seriesId'],
                 transaction,
-              }),
-            async (userId) =>
-              (
-                await SeriesAuthor.findAll({
-                  where: { userId },
-                  attributes: ['seriesId'],
-                  transaction,
-                })
-              ).map((credit) => credit.seriesId),
-            async (seriesIds) =>
-              (
-                await SeriesAuthor.findAll({
-                  where: { seriesId: seriesIds },
-                  attributes: ['seriesId'],
-                  transaction,
-                })
-              ).map((credit) => credit.seriesId)
-          )
+              })
+            ).map((credit) => credit.seriesId),
+          async (seriesIds) =>
+            (
+              await SeriesAuthor.findAll({
+                where: { seriesId: seriesIds },
+                attributes: ['seriesId', 'userId'],
+                transaction,
+              })
+            ).map((credit) => ({
+              workId: credit.seriesId,
+              userId: credit.userId,
+            }))
         );
+        const soleSeriesIds = soleCredits(creditedSeries);
         if (soleSeriesIds.length > 0) {
           await Series.destroy({ where: { id: soleSeriesIds }, transaction });
         }
 
-        const soleBookIds = soleCredits(
-          await lockCreditedWorks(
-            id,
-            (bookIds) =>
-              Book.findAll({
-                where: { id: bookIds },
-                attributes: ['id'],
-                lock: transaction.LOCK.UPDATE,
+        const creditedBooks = await lockCreditedWorks(
+          id,
+          (bookIds) =>
+            Book.findAll({
+              where: { id: bookIds },
+              attributes: ['id', 'title'],
+              lock: transaction.LOCK.UPDATE,
+              transaction,
+            }),
+          async (userId) =>
+            (
+              await BookAuthor.findAll({
+                where: { userId },
+                attributes: ['bookId'],
                 transaction,
-              }),
-            async (userId) =>
-              (
-                await BookAuthor.findAll({
-                  where: { userId },
-                  attributes: ['bookId'],
-                  transaction,
-                })
-              ).map((credit) => credit.bookId),
-            async (bookIds) =>
-              (
-                await BookAuthor.findAll({
-                  where: { bookId: bookIds },
-                  attributes: ['bookId'],
-                  transaction,
-                })
-              ).map((credit) => credit.bookId)
-          )
+              })
+            ).map((credit) => credit.bookId),
+          async (bookIds) =>
+            (
+              await BookAuthor.findAll({
+                where: { bookId: bookIds },
+                attributes: ['bookId', 'userId'],
+                transaction,
+              })
+            ).map((credit) => ({
+              workId: credit.bookId,
+              userId: credit.userId,
+            }))
         );
+        const soleBookIds = soleCredits(creditedBooks);
         if (soleBookIds.length > 0) {
           await Book.destroy({ where: { id: soleBookIds }, transaction });
         }
+
+        // Every work the account shares keeps its other Co-authors, and each of
+        // them is told — as by a deleted account, which has no name to give.
+        // The works it alone was credited on went above and tell nobody.
+        await notify(
+          [
+            ...sharedCredits(creditedSeries, id).map((series) => ({
+              type: 'series' as const,
+              ...series,
+            })),
+            ...sharedCredits(creditedBooks, id).map((book) => ({
+              type: 'book' as const,
+              ...book,
+            })),
+          ].map((work) => ({
+            recipientIds: work.others,
+            kind: 'co_author_account_deleted' as const,
+            work: { type: work.type, id: work.id, title: work.title },
+            actorKind: 'deleted_account' as const,
+            actorName: null,
+          })),
+          id,
+          transaction
+        );
 
         // silent, or every tombstone this leaves shares one updatedAt — a
         // stamp linking them to each other and to the moment of the delete.
