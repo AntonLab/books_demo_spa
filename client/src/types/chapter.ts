@@ -1,20 +1,15 @@
+import type * as Shared from 'shared';
+import type { Wire } from 'shared';
+
 // Dates cross the wire as ISO strings; the server types them as Date in
-// process. See client/CLAUDE.md.
-export interface PublicChapter {
-  id: number;
-  bookId: number;
-  title: string;
-  text: string;
-  // The Publication time: null for a Draft chapter, a future moment for a
-  // Scheduled one, a past one once it is Published. See CONTEXT.md.
-  publishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+// process, and Wire<> makes that translation. `publishedAt` is the Publication
+// time: null for a Draft chapter, a future moment for a Scheduled one, a past
+// one once it is Published. See CONTEXT.md.
+export type PublicChapter = Wire<Shared.PublicChapter>;
 
 // What the list endpoint returns: the same record minus the body, so a page of
 // chapters cannot drag a MEDIUMTEXT column per row across the wire.
-export type ChapterSummary = Omit<PublicChapter, 'text'>;
+export type ChapterSummary = Wire<Shared.ChapterSummary>;
 
 export type ChapterState = 'draft' | 'scheduled' | 'published';
 
