@@ -1,9 +1,14 @@
+import { USER_ROLES, USER_STATUSES } from 'shared';
 import { z } from 'zod';
-import { USER_ROLES, type UserRole } from './permission.ts';
 
-// `as const` union rather than an enum, per the repository rules.
-export const USER_STATUSES = ['active', 'blocked', 'pending'] as const;
-export type UserStatus = (typeof USER_STATUSES)[number];
+// The response shapes and the status union are the client's contract too, so
+// they live in the shared workspace (ADR-0006); the schemas stay here.
+export {
+  USER_STATUSES,
+  type AuthorSummary,
+  type PublicUser,
+  type UserStatus,
+} from 'shared';
 
 // No `role` here, and none in updateUserSchema below, which is derived from
 // this one with `.partial()` — a field added here appears there for free, and
@@ -65,27 +70,3 @@ export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 
 // What the repository applies: the body minus the proof that gated it.
 export type UserChanges = Omit<UpdateUserInput, 'currentPassword'>;
-
-// The password is absent by construction: it must never reach a response.
-export interface PublicUser {
-  id: number;
-  login: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  status: UserStatus;
-  role: UserRole;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// PublicUser minus the email address. That single omission is what makes an
-// author safe to embed in a public response: the email is the whole reason
-// /api/users is guarded, so a shape without one carries nothing that guard
-// exists to protect.
-export interface AuthorSummary {
-  id: number;
-  login: string;
-  firstName: string;
-  lastName: string;
-}

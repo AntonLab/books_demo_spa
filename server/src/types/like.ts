@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+// The response shape is the client's contract too, so it lives in the shared
+// workspace (ADR-0006); the schemas stay here.
+export type { PublicLike } from 'shared';
+
 const idSchema = z.coerce.number().int().positive();
 
 // Nullable *and* defaulted to null, so an omitted key and an explicit null
@@ -72,14 +76,3 @@ export const idParamSchema = z.object({
 export type CreateLikeInput = z.infer<typeof createLikeSchema>;
 export type UpdateLikeInput = z.infer<typeof updateLikeSchema>;
 export type ListLikesQuery = z.infer<typeof listLikesQuerySchema>;
-
-// The full record. Exactly one of bookId / commentId is non-null.
-export interface PublicLike {
-  id: number;
-  userId: number;
-  bookId: number | null;
-  commentId: number | null;
-  isLike: boolean;
-  // No updatedAt: the table keeps createdAt alone.
-  createdAt: Date;
-}

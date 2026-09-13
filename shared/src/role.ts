@@ -1,20 +1,11 @@
-// `as const` unions rather than enums, per the repository rules. The server's
-// permission matrix is keyed by these; its modules, actions and scopes are the
+// `as const` unions rather than enums, per the repository rules. Only the roles
+// an account can hold live here; `ROLES`, which adds `guest` for the
+// permission matrix, and the matrix's modules, actions and scopes are the
 // server's alone and stay in server/src/types/permission.ts.
 
-// Every role the matrix has a row for. `guest` is not storable: it is what
-// requirePermission assumes when there is no session, and it exists so public
-// reads are described by the matrix rather than by the absence of a guard.
-export const ROLES = [
-  'guest',
-  'user',
-  'author',
-  'admin',
-  'superadmin',
-] as const;
-export type Role = (typeof ROLES)[number];
-
-// What may actually sit in users.role. `guest` is deliberately absent.
+// What may actually sit in users.role. `guest` is deliberately absent: it is
+// what the server assumes for a caller with no session, never a value a row
+// carries.
 export const USER_ROLES = ['user', 'author', 'admin', 'superadmin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 

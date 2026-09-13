@@ -44,6 +44,3 @@ export interface PublicNotification {
 export interface NotificationList extends ListResponse<PublicNotification> {
   unread: number;
 }
-
-// What POST /api/notifications/read answers: how many are still unread.
-export type NotificationsReadResponse = Pick<NotificationList, 'unread'>;
