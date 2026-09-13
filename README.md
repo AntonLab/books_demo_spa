@@ -1,16 +1,19 @@
 # books_demo_spa
 
+[![CI](https://github.com/AntonLab/books_demo_spa/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonLab/books_demo_spa/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml/badge.svg)](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml)
+
 A demo single-page application for browsing books: a React 19 + TypeScript
 frontend and an Express 5 + Sequelize/MySQL API, kept in one repository as two
 npm workspaces.
 
 ## Stack
 
-| Layer    | Technology                                                                |
-| -------- | ------------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5    |
-| Backend  | Node.js >= 22.5, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
-| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)     |
+| Layer    | Technology                                                                 |
+| -------- | -------------------------------------------------------------------------- |
+| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5     |
+| Backend  | Node.js >= 22.18, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
+| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)      |
 
 ## Layout
 
@@ -24,8 +27,9 @@ One root `package.json` declares both as npm workspaces, so a single
 
 ## Prerequisites
 
-- Node.js >= 22.5 (the server runs TypeScript directly via Node's native
-  type-stripping)
+- Node.js >= 22.18 (the server runs TypeScript directly via Node's native
+  type-stripping, which runs unflagged only from 22.18); `.nvmrc` names the
+  version CI uses
 - A running MySQL server
 
 ## Getting started
@@ -121,7 +125,17 @@ configured before `npm test` there.
 Before committing, run `npm run typecheck`, `npm run lint`,
 `npm run format:check` and `npm test` from the repo root; each covers both
 workspaces. Commit messages follow the conventional-commit prefixes (`feat:`,
-`fix:`, `chore:`, `docs:`, `test:`).
+`fix:`, `chore:`, `docs:`, `test:`, `ci:`).
+
+### Continuous integration
+
+Feature branches start from `dev` and open their PR against it; `dev` is merged
+into `main` for a release. Every PR into and push to either branch runs
+`.github/workflows/ci.yml` — `lint` (ESLint and Prettier), `typecheck`,
+`test-client`, `test-server` against a MySQL 8.4 service container, and `build`
+— and `.github/workflows/codeql.yml`. All seven checks must pass before a PR
+merges. Dependabot opens weekly update PRs for npm packages and for the
+workflows' actions.
 
 ### Pre-commit hook
 

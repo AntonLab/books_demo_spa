@@ -2,11 +2,11 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import mysql from 'mysql2/promise';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
+import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import {
   Book,
   Chapter,
@@ -39,27 +39,7 @@ function testDbConfig() {
   return config.db;
 }
 
-async function probe(): Promise<true | string> {
-  if (!process.env.DB_USER)
-    return 'DB_USER is not set — configure server/.env.local';
-  try {
-    const db = testDbConfig();
-    const connection = await mysql.createConnection({
-      host: db.host,
-      port: db.port,
-      user: db.username,
-      password: db.password,
-      connectTimeout: 4000,
-    });
-    await connection.end();
-    return true;
-  } catch (error) {
-    return `MySQL unreachable: ${(error as Error).message}`;
-  }
-}
-
-const reachable = await probe();
-const skip = reachable === true ? false : reachable;
+const skip = await skipWithoutMysql();
 
 const owner = {
   login: 'LikeOwner',
