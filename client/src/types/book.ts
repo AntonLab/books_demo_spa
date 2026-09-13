@@ -1,5 +1,17 @@
 import type { AuthorSummary } from './user';
 
+// A mirror of the server's BOOK_STATUSES. Only `draft` keeps a book from
+// readers; see CONTEXT.md.
+export type BookStatus = 'draft' | 'in_progress' | 'complete';
+
+// What a reader sees for each status. Kept beside the type so every place that
+// shows a status says the same words.
+export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
+  draft: 'Draft',
+  in_progress: 'In progress',
+  complete: 'Complete',
+};
+
 // No userId: a book has no single owner (ADR-0005).
 export interface PublicBook {
   id: number;
@@ -10,6 +22,7 @@ export interface PublicBook {
   title: string;
   description: string;
   tags: string[];
+  status: BookStatus;
   createdAt: string;
   updatedAt: string;
 }

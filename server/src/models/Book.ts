@@ -10,7 +10,11 @@ import {
 } from 'sequelize';
 import type { Series } from './Series.ts';
 import { toTagArray } from './tagArray.ts';
-import type { PublicBook } from '../types/book.ts';
+import {
+  BOOK_STATUSES,
+  type BookStatus,
+  type PublicBook,
+} from '../types/book.ts';
 import type { AuthorSummary } from '../types/user.ts';
 
 export class Book extends Model<
@@ -26,6 +30,9 @@ export class Book extends Model<
   declare title: string;
   declare description: string;
   declare tags: string[];
+  // Creation-optional: the column defaults to `draft`, which is where every
+  // book starts.
+  declare status: CreationOptional<BookStatus>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -67,6 +74,14 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         type: DataTypes.JSON,
         allowNull: false,
       },
+      // The Book status (CONTEXT.md). A DDL default, unlike tags, because an
+      // ENUM column can carry one — so a row written straight through the
+      // model is a draft too, not only one created through the API.
+      status: {
+        type: DataTypes.ENUM(...BOOK_STATUSES),
+        allowNull: false,
+        defaultValue: 'draft',
+      },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
       createdAt: { type: DataTypes.DATE, allowNull: false },
@@ -103,6 +118,7 @@ export function toPublicBook(book: Book, authors: AuthorSummary[]): PublicBook {
     title: book.title,
     description: book.description,
     tags: toTagArray(book.tags),
+    status: book.status,
     createdAt: book.createdAt,
     updatedAt: book.updatedAt,
   };

@@ -23,6 +23,7 @@ import {
   NotFoundError,
 } from '../types/errors.ts';
 import { createSequelizeLikeRepository } from './likeRepository.ts';
+import type { Viewer } from './visibility.ts';
 
 // A schema of its own rather than the other suites': node:test runs spec files
 // in parallel processes, and two suites calling sync({ force: true }) on one
@@ -127,7 +128,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
       likerId
     );
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, null);
 
     assert.equal(reloaded?.bookId, bookId);
     assert.equal(reloaded?.commentId, null);
@@ -141,7 +142,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
       likerId
     );
 
-    const reloaded = await repository.findById(created.id);
+    const reloaded = await repository.findById(created.id, null);
 
     assert.equal(reloaded?.bookId, null);
     assert.equal(reloaded?.commentId, commentId);
@@ -186,7 +187,10 @@ describe('likeRepository against real MySQL', { skip }, () => {
       likerId
     );
 
-    assert.equal((await repository.list({ limit: 20, offset: 0 })).total, 3);
+    assert.equal(
+      (await repository.list({ limit: 20, offset: 0 }, null)).total,
+      3
+    );
   });
 
   test('two users may like the same book', async () => {
@@ -203,7 +207,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     );
 
     assert.equal(
-      (await repository.list({ limit: 20, offset: 0, bookId })).total,
+      (await repository.list({ limit: 20, offset: 0, bookId }, null)).total,
       2
     );
   });
@@ -325,11 +329,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await repository.create({ bookId, commentId: null, isLike: true }, likerId);
     await repository.create({ bookId: null, commentId, isLike: true }, likerId);
 
-    const onComment = await repository.list({
-      limit: 20,
-      offset: 0,
-      commentId,
-    });
+    const onComment = await repository.list(
+      {
+        limit: 20,
+        offset: 0,
+        commentId,
+      },
+      null
+    );
 
     assert.equal(onComment.total, 1);
     assert.equal(onComment.items[0]?.commentId, commentId);
@@ -343,11 +350,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
       likerId
     );
 
-    const dislikes = await repository.list({
-      limit: 20,
-      offset: 0,
-      isLike: false,
-    });
+    const dislikes = await repository.list(
+      {
+        limit: 20,
+        offset: 0,
+        isLike: false,
+      },
+      null
+    );
 
     assert.equal(dislikes.total, 1);
     assert.equal(dislikes.items[0]?.isLike, false);
@@ -363,7 +373,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
     assert.equal(updated?.isLike, false);
     assert.equal(updated?.bookId, bookId);
-    assert.equal((await repository.findById(created.id))?.isLike, false);
+    assert.equal((await repository.findById(created.id, null))?.isLike, false);
   });
 
   test('updating a like that is not there returns null', async () => {
@@ -378,7 +388,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.remove(created.id), false);
-    assert.equal(await repository.findById(created.id), null);
+    assert.equal(await repository.findById(created.id, null), null);
   });
 
   // CASCADE rather than SET NULL: a like whose target was deleted would have
@@ -389,7 +399,10 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
     await Book.destroy({ where: { id: bookId } });
 
-    assert.equal((await repository.list({ limit: 20, offset: 0 })).total, 0);
+    assert.equal(
+      (await repository.list({ limit: 20, offset: 0 }, null)).total,
+      0
+    );
   });
 
   test('deleting a comment takes the likes on it', async () => {
@@ -398,8 +411,51 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
     await Comment.destroy({ where: { id: commentId } });
 
-    const left = await repository.list({ limit: 20, offset: 0 });
+    const left = await repository.list({ limit: 20, offset: 0 }, null);
     assert.equal(left.total, 1);
     assert.equal(left.items[0]?.bookId, bookId);
+  });
+
+  test('nobody may like a draft or a comment on one', async () => {
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+
+    await assert.rejects(
+      repository.create({ bookId, commentId: null, isLike: true }, likerId),
+      (error: unknown) =>
+        error instanceof ForbiddenError && /draft/i.test(error.message)
+    );
+    await assert.rejects(
+      repository.create({ bookId: null, commentId, isLike: true }, likerId),
+      (error: unknown) =>
+        error instanceof ForbiddenError && /draft/i.test(error.message)
+    );
+  });
+
+  test('returning a book to draft hides its likes from readers and keeps them', async () => {
+    const onBook = await repository.create(
+      { bookId, commentId: null, isLike: true },
+      likerId
+    );
+    const onComment = await repository.create(
+      { bookId: null, commentId, isLike: true },
+      likerId
+    );
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+
+    const readerView: Viewer = { id: likerId, role: 'user' };
+    const coAuthor: Viewer = { id: userId, role: 'author' };
+    const moderator: Viewer = { id: likerId + 1_000, role: 'superadmin' };
+    const total = async (viewer: Viewer): Promise<number> =>
+      (await repository.list({ limit: 20, offset: 0 }, viewer)).total;
+
+    assert.equal(await total(null), 0);
+    assert.equal(await total(readerView), 0);
+    assert.equal(await repository.findById(onBook.id, readerView), null);
+    assert.equal(await repository.findById(onComment.id, readerView), null);
+    assert.equal(await total(coAuthor), 2);
+    assert.equal(await total(moderator), 2);
+
+    await Book.update({ status: 'in_progress' }, { where: { id: bookId } });
+    assert.equal(await total(null), 2);
   });
 });

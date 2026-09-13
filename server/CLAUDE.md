@@ -20,10 +20,12 @@ Express app under `/api`. Routes, controllers, repositories, models, and
 middleware are all wired for those six. `node:test` is the test runner
 (`npm test`).
 
-Neither `Book` nor `Chapter` carries a draft or visibility state: a row
-created through the API is world-readable the instant it exists. "Publish" in
-this repo's language means "create," not a two-step release — there is no way
-to save a chapter privately before showing it to readers.
+A book carries a **Book status** — `books.status`, an ENUM of `draft`,
+`in_progress` and `complete` that defaults to `draft` (`BOOK_STATUSES` in
+`types/book.ts`). `POST /api/books` takes no status, so every book starts as a
+draft; `PATCH` moves it to any other. Only `draft` changes what anyone may do —
+see **Draft books** under **Auth**. A chapter has no state of its own yet: it is
+readable exactly when its book is.
 
 `books` and `series` each carry a `title` (`VARCHAR(255) NOT NULL`, trimmed)
 alongside their `description`, which now unambiguously means the annotation.
@@ -151,7 +153,8 @@ added.
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
   `commentRepository.ts`, `likeRepository.ts`, `sessionRepository.ts`,
   `passwordResetRepository.ts`, Sequelize-backed; `likePattern.ts` holds the
-  LIKE escaping they share). Note the collision: `likePattern.ts` is about the
+  LIKE escaping they share; `visibility.ts` holds the Draft book rule every
+  read goes through — see **Draft books** under Auth). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
@@ -231,6 +234,9 @@ One series is co-authored too (`shareSeries`): the last author's first series
 also credits the first author, so `nquinn` and `mhale` share it while its books
 stay credited to `nquinn` alone. Book likes are drawn only from accounts not
 credited on the book, because no Co-author may like their own book.
+Each author's newest book is a Draft, with no comments or likes; the one before
+it, and every book of the series that draft belongs to, is In progress; every
+older book is Complete (`statusOf` in `planAuthor`).
 
 Three things about it are worth knowing before changing it:
 
@@ -446,6 +452,38 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     hard-deleted comments follow only the books that actually go.
   - **Switching Role from `author` to `user` keeps every credit.** Nothing
     strips it; the matrix alone takes away the write access.
+- **Draft books** (CONTEXT.md). A Draft book is readable by its Co-authors
+  and Moderators and by nobody else, and that rule lives in one module,
+  `repositories/visibility.ts`, not in the controllers. Every repository read
+  that can reach a book takes a `Viewer` (`{ id, role } | null`), which each
+  controller builds from `req.user` with `viewerOf` — `requirePermission`
+  resolves the session on public reads too, so an unset `req.user` really is a
+  Guest.
+  - **Readable** (`readableBookWhere`, `readableBookInclude`): every non-draft
+    book, the drafts the viewer co-authors, or everything for `admin` and
+    `superadmin`. `GET /api/books/:id`, and the list and detail reads of
+    chapters and comments, join through it; a hidden row is the same 404 (or
+    absence from a list) as a missing one, so a refusal never confirms a draft
+    exists.
+  - **Likes** point at a book or at a comment on one, so they exclude instead
+    (`hiddenBookIds`): the likes on a hidden draft and on the comments under it
+    drop out. Drafts are few, so the exclusion lists stay short.
+  - **Listed** is narrower than readable: no book list shows a draft — a
+    Moderator's included, since a Moderator reaches a draft by direct link
+    only — except `GET /api/books?userId=` naming the caller's own id, which
+    returns their drafts beside their published books. That is the list a
+    "My books" page reads.
+  - **Series** have no status. A series is visible when it holds at least one
+    non-draft book, or the viewer co-authors it, or is a Moderator
+    (`visibleSeriesWhere`). The published side is a fixed subquery with no
+    caller-supplied value, because an id list would grow with the catalogue.
+  - **Nobody writes to a draft's conversation.** `commentRepository.create`
+    refuses a comment on a Draft book, and `likeRepository.create` a like on
+    one or on a comment under one — 403 for everyone, Co-authors and
+    Moderators included. Returning a book to Draft keeps its comments and
+    likes; they are hidden with it and come back when it is published again.
+  - **`findById` is viewer-aware too**, so `PATCH` and `DELETE` on a comment or
+    a like hanging off a hidden draft answer 404 before any owner check.
 - **Deleting a comment leaves a tombstone, not a hole** (ADR-0003).
   `DELETE /api/comments/:id` sets `tombstone` on that one row and touches
   nothing else; the replies stay, so the thread reads around the gap rather
@@ -756,7 +794,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   decision (see **Co-authors** under Auth). The MySQL-backed suites create
   works through `createCreditedBook` / `createCreditedSeries` in
   `models/creditedBook.testkit.ts`, the one place that knows a work needs its
-  credits written beside it.
+  credits written beside it. `createCreditedBook` makes an `in_progress` book
+  unless the fixture names a status, because a draft would hide the very rows
+  a suite that is not about drafts reads back.
 - **`books.seriesId` is optional, and that drives its `ON DELETE`**: a book can
   stand alone, so the column is nullable and `Series.hasMany(Book)` uses
   `ON DELETE SET NULL` — dropping a series unlinks its books instead of
@@ -889,7 +929,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `books.userId` and `series.userId` are gone and `book_authors` and
   `series_authors` are new, and a surviving `NOT NULL` owner column makes every
   book or series insert fail, so a database created before them needs the drop
-  too.
+  too. So does `books.status`: a database without the column fails every read
+  that filters on it.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of

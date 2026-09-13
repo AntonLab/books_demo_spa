@@ -5,6 +5,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
+import { viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -38,7 +39,7 @@ export function createLikeController(
   // compared: a handler mounted without requirePermission fails closed rather
   // than acting as `any`.
   const assertOwned = async (req: Request, id: number): Promise<PublicLike> => {
-    const existing = await repository.findById(id);
+    const existing = await repository.findById(id, viewerOf(req.user));
     if (!existing) throw new NotFoundError('Like', id);
 
     if (req.permissionScope !== 'any' && existing.userId !== req.user?.id) {
@@ -67,13 +68,13 @@ export function createLikeController(
     // or a boolean, so there is nothing large to keep behind GET /:id.
     list: async (req, res) => {
       const query = validatedQuery<ListLikesQuery>(req);
-      const { items, total } = await repository.list(query);
+      const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const like = await repository.findById(id);
+      const like = await repository.findById(id, viewerOf(req.user));
       if (!like) throw new NotFoundError('Like', id);
       res.json(like);
     },

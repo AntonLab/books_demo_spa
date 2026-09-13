@@ -10,6 +10,7 @@ import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
+import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
@@ -44,15 +45,15 @@ export interface BookRepository {
   // it comes from the session, never the request body, so it is supplied as a
   // separate argument rather than a schema field a caller could set.
   create(input: CreateBookInput & { userId: number }): Promise<PublicBook>;
-  list(query: ListBooksQuery): Promise<BookListResult>;
+  list(query: ListBooksQuery, viewer: Viewer): Promise<BookListResult>;
   findById(id: number): Promise<PublicBook | null>;
   // Separate from findById rather than replacing it: the detail read costs a
   // series join and two like queries, and the write paths that only need to
   // know a row exists should not pay for them.
-  findDetailById(
-    id: number,
-    viewerId: number | null
-  ): Promise<BookDetail | null>;
+  //
+  // null, too, for a Draft book the viewer may not read: the caller reports it
+  // exactly as a missing book, so a refusal does not reveal the draft exists.
+  findDetailById(id: number, viewer: Viewer): Promise<BookDetail | null>;
   update(id: number, input: UpdateBookInput): Promise<PublicBook | null>;
   remove(id: number): Promise<boolean>;
   // null when the book is not there, as update/remove report it.
@@ -140,13 +141,23 @@ async function withAuthors(
 // paging over books, which an include on the credits would not.
 function buildWhere(
   query: ListBooksQuery,
-  creditedBookIds: number[] | undefined
+  creditedBookIds: number[] | undefined,
+  viewer: Viewer
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
 
   if (creditedBookIds !== undefined) {
     // An empty list becomes `IN (NULL)`, which matches nothing, as it should.
     clauses.push({ id: creditedBookIds });
+  }
+
+  // A Draft book shows in exactly one list: its own Co-author's `?userId=`,
+  // which is where "My books" finds it. Every other list — a Moderator's
+  // included — leaves it out; a Moderator reaches a draft by direct link only.
+  const listingOwnBooks =
+    viewer !== null && query.userId !== undefined && query.userId === viewer.id;
+  if (!listingOwnBooks) {
+    clauses.push({ status: { [Op.ne]: 'draft' } });
   }
 
   if (query.seriesId !== undefined) {
@@ -199,7 +210,7 @@ export function createSequelizeBookRepository(): BookRepository {
       }
     },
 
-    async list(query) {
+    async list(query, viewer) {
       const creditedBookIds =
         query.userId === undefined
           ? undefined
@@ -211,7 +222,7 @@ export function createSequelizeBookRepository(): BookRepository {
             ).map((credit) => credit.bookId);
 
       const { rows, count } = await Book.findAndCountAll({
-        where: buildWhere(query, creditedBookIds),
+        where: buildWhere(query, creditedBookIds, viewer),
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -229,8 +240,10 @@ export function createSequelizeBookRepository(): BookRepository {
       return book ? withAuthors(book) : null;
     },
 
-    async findDetailById(id, viewerId) {
-      const book = await Book.findByPk(id, {
+    async findDetailById(id, viewer) {
+      const viewerId = viewer?.id ?? null;
+      const book = await Book.findOne({
+        where: { [Op.and]: [{ id }, await readableBookWhere(viewer)] },
         include: [{ model: Series, as: 'series' }],
       });
       if (!book) return null;

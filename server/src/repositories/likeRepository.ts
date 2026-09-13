@@ -19,6 +19,7 @@ import type {
   PublicLike,
   UpdateLikeInput,
 } from '../types/like.ts';
+import { hiddenBookIds, type Viewer } from './visibility.ts';
 
 // Not to be confused with likePattern.ts next door, which is about the SQL
 // LIKE operator and has nothing to do with this resource.
@@ -32,8 +33,10 @@ export interface LikeRepository {
   // actorId is separate from the input rather than folded into it, so the type
   // itself says the liker is not caller-supplied data. See types/like.ts.
   create(input: CreateLikeInput, actorId: number): Promise<PublicLike>;
-  list(query: ListLikesQuery): Promise<LikeListResult>;
-  findById(id: number): Promise<PublicLike | null>;
+  // Both leave out the likes on a Draft book the viewer may not read, and on
+  // the comments under one.
+  list(query: ListLikesQuery, viewer: Viewer): Promise<LikeListResult>;
+  findById(id: number, viewer: Viewer): Promise<PublicLike | null>;
   update(id: number, input: UpdateLikeInput): Promise<PublicLike | null>;
   remove(id: number): Promise<boolean>;
 }
@@ -78,8 +81,14 @@ async function assertLikeable(
   actorId: number
 ): Promise<void> {
   if (input.bookId !== null) {
-    const book = await Book.findByPk(input.bookId, { attributes: ['id'] });
+    const book = await Book.findByPk(input.bookId, {
+      attributes: ['id', 'status'],
+    });
     if (!book) throw new NotFoundError('Book', input.bookId);
+    // Nobody likes a Draft book, its Co-authors and Moderators included.
+    if (book.status === 'draft') {
+      throw new ForbiddenError('You cannot like a draft book');
+    }
     // Every Co-author counts as the book's own, not just whoever created it.
     // Unlike a comment's owner, credits do change — but a co-author added
     // between this check and the insert could at worst leave one like that
@@ -96,8 +105,13 @@ async function assertLikeable(
   if (input.commentId !== null) {
     const comment = await Comment.findByPk(input.commentId, {
       attributes: ['userId', 'tombstone'],
+      include: [{ model: Book, as: 'book', attributes: ['status'] }],
     });
     if (!comment) throw new NotFoundError('Comment', input.commentId);
+    // A comment on a Draft book is not out either.
+    if (comment.book?.status === 'draft') {
+      throw new ForbiddenError('You cannot like a comment on a draft book');
+    }
     // A tombstone takes no new reactions: a like there would be a vote on a
     // comment nobody can see.
     if (comment.tombstone !== null) {
@@ -114,6 +128,34 @@ function asConflict(error: unknown): never {
     throw new ConflictError('like');
   }
   throw error;
+}
+
+// Leaves out the likes on a Draft book the viewer may not read, and on the
+// comments under one. NULL-safe on both columns: every like leaves one of them
+// empty, and `NOT IN` alone would drop those rows too.
+async function visibleLikeWhere(viewer: Viewer): Promise<WhereOptions> {
+  const hiddenBooks = await hiddenBookIds(viewer);
+  if (hiddenBooks.length === 0) return {};
+
+  const hiddenComments = (
+    await Comment.findAll({
+      where: { bookId: hiddenBooks },
+      attributes: ['id'],
+    })
+  ).map((comment) => comment.id);
+
+  const clauses: WhereOptions[] = [
+    { [Op.or]: [{ bookId: null }, { bookId: { [Op.notIn]: hiddenBooks } }] },
+  ];
+  if (hiddenComments.length > 0) {
+    clauses.push({
+      [Op.or]: [
+        { commentId: null },
+        { commentId: { [Op.notIn]: hiddenComments } },
+      ],
+    });
+  }
+  return { [Op.and]: clauses };
 }
 
 function buildWhere(query: ListLikesQuery): WhereOptions {
@@ -157,11 +199,13 @@ export function createSequelizeLikeRepository(): LikeRepository {
       }
     },
 
-    async list(query) {
+    async list(query, viewer) {
       // No attributes list, unlike chapterRepository: every column here is a
       // number or a boolean, so there is no large one worth omitting.
       const { rows, count } = await Like.findAndCountAll({
-        where: buildWhere(query),
+        where: {
+          [Op.and]: [buildWhere(query), await visibleLikeWhere(viewer)],
+        },
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'ASC']],
@@ -170,8 +214,10 @@ export function createSequelizeLikeRepository(): LikeRepository {
       return { items: rows.map(toPublicLike), total: count };
     },
 
-    async findById(id) {
-      const like = await Like.findByPk(id);
+    async findById(id, viewer) {
+      const like = await Like.findOne({
+        where: { [Op.and]: [{ id }, await visibleLikeWhere(viewer)] },
+      });
       return like ? toPublicLike(like) : null;
     },
 

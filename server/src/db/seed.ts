@@ -34,7 +34,7 @@ import {
   User,
   initModels,
 } from '../models/index.ts';
-import { createBookSchema } from '../types/book.ts';
+import { createBookSchema, type BookStatus } from '../types/book.ts';
 import { createChapterSchema } from '../types/chapter.ts';
 import { createCommentSchema, type Tombstone } from '../types/comment.ts';
 import { createLikeSchema } from '../types/like.ts';
@@ -625,6 +625,7 @@ interface PlannedBook {
   coAuthorLogins: string[];
   // An index into the author's own series list, or null for a standalone book.
   seriesIndex: number | null;
+  status: BookStatus;
   createdAt: Date;
   chapters: PlannedChapter[];
 }
@@ -749,6 +750,20 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   // One shuffled deck per author, so no author repeats a book title.
   const titles = rng.shuffle(genre.bookTitles);
 
+  // The newest book is still a Draft; the one before it, and every book of the
+  // series the draft belongs to, is In progress; everything older is Complete.
+  // `slots` is in timeline order, so "newest" is simply the last one.
+  const last = slots.length - 1;
+  const ongoingSeries = slots[last];
+  const statusOf = (index: number): BookStatus => {
+    if (index === last) return 'draft';
+    if (index === last - 1) return 'in_progress';
+    if (ongoingSeries !== null && slots[index] === ongoingSeries) {
+      return 'in_progress';
+    }
+    return 'complete';
+  };
+
   const books: PlannedBook[] = slots.map((seriesIndex, index) => {
     const dates = timeline[index];
     const chapters = chapterTitles(rng, genre, dates.length).map(
@@ -765,6 +780,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
       tags: rng.sample(genre.tags, rng.int(3, 5)),
       coAuthorLogins: [spec.login],
       seriesIndex,
+      status: statusOf(index),
       // The record exists a few days before chapter one does.
       createdAt: new Date(dates[0].getTime() - rng.int(1, 5) * DAY_MS),
       chapters,
@@ -853,6 +869,9 @@ function planThreads(
   const accountIndexes = accounts.map((_, i) => i);
 
   for (const book of books) {
+    // Nobody comments on or likes a Draft book, so the seed writes neither.
+    if (book.status === 'draft') continue;
+
     // Readers arrive once there is something to read; the third chapter is a
     // reasonable stand-in for "this book has started".
     const from =
@@ -1122,7 +1141,14 @@ async function writeContent(
           book.seriesIndex === null ? null : seriesIds[book.seriesIndex],
       });
       const row = await Book.create(
-        { ...fields, createdAt: book.createdAt, updatedAt: book.createdAt },
+        {
+          ...fields,
+          // Attached after the parse, like the Co-authors: createBookSchema
+          // has no status, because every book the API creates is a draft.
+          status: book.status,
+          createdAt: book.createdAt,
+          updatedAt: book.createdAt,
+        },
         { transaction, silent: true }
       );
       bookIds.set(book, row.id);

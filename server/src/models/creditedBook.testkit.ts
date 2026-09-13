@@ -2,12 +2,14 @@ import { Book } from './Book.ts';
 import { BookAuthor } from './BookAuthor.ts';
 import { Series } from './Series.ts';
 import { SeriesAuthor } from './SeriesAuthor.ts';
+import type { BookStatus } from '../types/book.ts';
 
 interface BookFixture {
   title: string;
   description: string;
   tags: string[];
   seriesId?: number | null;
+  status?: BookStatus;
 }
 
 // A book as the MySQL-backed suites need it: stored through the model, with
@@ -18,7 +20,9 @@ export async function createCreditedBook(
   fixture: BookFixture,
   coAuthorIds: [number, ...number[]]
 ): Promise<Book> {
-  const book = await Book.create(fixture);
+  // Published unless the fixture says otherwise: most suites are not about
+  // Draft books, and a draft would hide the very rows they read back.
+  const book = await Book.create({ status: 'in_progress', ...fixture });
   for (const userId of coAuthorIds) {
     await BookAuthor.create({ bookId: book.id, userId });
   }
