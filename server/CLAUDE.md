@@ -170,7 +170,7 @@ scripts below still run from this directory, or from the root with `-w server`.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
-  silently skip that suite instead of failing loudly). Each of those ten
+  silently skip that suite instead of failing loudly). Each of those twelve
   specs asks `skipWithoutMysql()` (`src/db/mysqlProbe.testkit.ts`) whether to
   run: with `DB_USER` unset or MySQL unreachable it skips the suite, and the
   run still exits 0. Set `REQUIRE_MYSQL=1` and the same two conditions throw
@@ -199,6 +199,51 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 There is no `sequelize-cli` dependency yet — do not reference it until it is
 added.
 
+## Test layers
+
+Each layer answers a question the others cannot:
+
+- **Unit specs** exercise a module or middleware against doubles.
+  `middleware/errorHandler.spec.ts` pins the redaction guarantees: a parse
+  failure's raw body is never returned or logged, a 500 logs only
+  name/message/stack, and a `UniqueConstraintError` answers a bare 409. A body
+  over `express.json()`'s default limit (102,400 bytes) is 413 and an
+  unsupported charset 415, both `{ error: 'Invalid request' }`. To capture log
+  output, replace the `logger` singleton's methods with
+  `t.mock.method(logger, level, …)`, which restores them after each test.
+- **Repository specs** run the real repositories on MySQL. Every domain rule —
+  Draft book visibility, the last Co-author, the Author role a credit needs,
+  duplicate credits, Notifications, the reorder 409s, tombstones, the role
+  hierarchy — is proven here and nowhere else.
+- **Route specs** run `createApp` on in-memory fakes and assert the HTTP
+  mapping and the permission checks. The fakes for book, series, chapter,
+  comment, like and user live in
+  `repositories/<name>Repository.fake.testkit.ts`; each takes its seeds and the
+  spies a route spec reads (`viewers`, `actors`, …) as one options object, and
+  none may grow a domain rule. The users, auth and authors specs share the one
+  user fake. The session, password-reset and notification fakes stay inline in
+  their route specs.
+- **Contracts** keep those six fakes honest.
+  `<name>Repository.contract.testkit.ts` registers cases against a harness —
+  the repository plus arrange helpers such as `anAuthor()` or
+  `aSeries(coAuthorIds)` — and runs twice: from `<name>Repository.spec.ts` on
+  MySQL, and from `<name>Repository.fake.spec.ts` without it. A contract
+  asserts interface semantics only: `null` or `false` for a missing row, which
+  error class is thrown and which resource a `NotFoundError` names, an order a
+  controller depends on, an explicit `seriesId: null` unlinking a book. Never
+  the domain rules above. A repository method a controller comes to rely on
+  belongs in its contract, and a fake change must keep its fake spec green.
+  `chapterRepository.findBookCoAuthorIds` has no `ORDER BY`, unlike the book
+  and series lookups, so its contract compares ids as a set.
+- **`src/app.spec.ts`** is the only suite that goes from HTTP through the real
+  repositories to MySQL, on its own `_app` schema: sign-in with the real CSRF
+  handshake, a Co-author's edit, filing a book into a series, chapter
+  ownership, comment tombstones and restore, a role switch, and a Guest refused
+  a Draft book. `src/index.ts` cannot be imported — it runs `main()` — so the
+  spec repeats its startup steps, and a change to startup (a new dependency, a
+  new sync step) needs the same change there. Its admin account is made through
+  `User.create`, because no API can create one.
+
 ## Layout
 
 - `src/index.ts` — process entry point: loads `.env.local`, ensures the schema,
@@ -222,7 +267,8 @@ added.
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
   excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
-  `dist/`.
+  `dist/`. See **Test layers** for which fakes the route specs run on.
+- `src/app.spec.ts` — the full-stack smoke suite; see **Test layers**
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
@@ -234,7 +280,9 @@ added.
   mark-read reads, plus `notify`, which the book, series and user
   repositories call inside their own transactions), Sequelize-backed; `likePattern.ts` holds the
   LIKE escaping they share; `visibility.ts` holds the Draft book rule every
-  read goes through — see **Draft books** under Auth). Note the collision: `likePattern.ts` is about the
+  read goes through — see **Draft books** under Auth; the
+  `*.fake.testkit.ts`, `*.contract.testkit.ts` and `*.fake.spec.ts` files
+  beside six of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
@@ -260,6 +308,8 @@ added.
   imports — it carries no suffix, because `.testkit.ts` means _test support_
   and this is neither, so `tsconfig.build.json` names it in `exclude`
   directly rather than growing a second suffix convention for one file.
+  `seedGuards.ts` (`assertSafeTarget`, `DEMO_DATABASE`) is named beside it for
+  the same reason: only the seed and its specs use it.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
   `requirePermission.ts`, `optionalAuth.ts` (unmounted —
@@ -287,7 +337,7 @@ value.
 | `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
-(default `books_demo_spa_test`, the prefix of the ten test schemas) and
+(default `books_demo_spa_test`, the prefix of the twelve test schemas) and
 `REQUIRE_MYSQL`, which CI sets to `1` so the MySQL-backed suites fail rather
 than skip without a database (see `npm test` above).
 
@@ -371,6 +421,14 @@ leaves the previous demo intact.
 
 Two guards: `NODE_ENV=production` is refused whatever the flags, and a
 `DB_NAME` other than `books_demo_spa` is warned about loudly before the delete.
+Both live in `seedGuards.ts`, pinned by `seedGuards.spec.ts`. `seed.spec.ts`
+runs the script itself as a child process — it cannot be imported, since it
+calls `main()` at the top level — twice: a dry run without `--force` against
+a `_seed` test schema, asserting every content table's row count is
+unchanged, and a production run, pointed at a closed port, asserting it is
+refused before any connection is attempted. The child inherits the runner's
+V8 coverage, so a coverage report lists `seed.ts` at the fraction a dry run
+reaches.
 
 ## Auth
 
@@ -697,6 +755,8 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     session's token to every request that carries a session cookie, the way
     the client does, and `csrfProtection.spec.ts` covers the refusals — the
     layers on their own, and `createApp` refusing before any route runs.
+    `app.spec.ts` is the one suite that performs the handshake for real,
+    reading the token from the cookie the server issued.
 - **Identity comes from the session, never the body.** Neither
   `createCommentSchema` nor `createLikeSchema` accepts a `userId`; both
   controllers read `req.user.id`. This is load-bearing rather than tidy: if the
@@ -1062,10 +1122,10 @@ snippets — still get wrong. Verified against the 5.x router and request source
   that destroyed `User` first would leave orphaned `Comment` rows behind
   instead of clearing them, so every suite that touches comments clears
   `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
-  own schema — ten of them, `books_demo_spa_test` plus
+  own schema — twelve of them, `books_demo_spa_test` plus
   `books_demo_spa_test_` and the suite's name (`series`, `books`, `chapters`,
   `likes`, `comments`, `notifications`, `sessions`, `password_resets`,
-  `permissions`) —
+  `permissions`, `app`, `seed`) —
   because `node:test`
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
@@ -1079,7 +1139,7 @@ snippets — still get wrong. Verified against the 5.x router and request source
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
   That per-suite naming is also what the `posttest` cleanup keys on: those
-  ten names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
+  twelve names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
   `dropTestDatabases.testkit.ts` drops whatever `SHOW DATABASES` reports under
   that prefix rather than a list it would have to be told to update. Name a
   new suite's schema the same way and it is cleaned up for free; name it
