@@ -1074,13 +1074,17 @@ snippets — still get wrong. Verified against the 5.x router and request source
   serve a table of contents. The body is reachable through `GET /:id`. Keeping
   the omission in the _type_ is what stops a future call site from quietly
   putting it back.
-- **Two foreign keys need two error messages**: `bookRepository` cannot map
-  every `ForeignKeyConstraintError` to one resource the way `seriesRepository`
-  does — blaming the user for a bad `seriesId` sends the caller hunting for a
-  user that exists. The columns are only distinguishable through MySQL's
-  constraint text, so `asMissingReference` matches the column name in it and
-  falls back to `userId`, which is the only candidate when no `seriesId` was
-  supplied. Both branches are covered by the MySQL-backed suite.
+- **Only one of a book's foreign keys can fail**: `bookRepository` maps a
+  `ForeignKeyConstraintError` on create to `NotFoundError('User')` through
+  `asMissingUser`, because the first credit's `book_authors.userId` is the
+  only reference a book write can have rejected. `books.seriesId` never is: a
+  write that files a book into a new series calls `nextSeriesPosition` first,
+  which answers a missing series with `NotFoundError('Series')` and holds its
+  row under a lock until commit, and a write that keeps the series holds a
+  lock on a book row pointing at it, which the series' `SET NULL` delete would
+  have to wait for. So `update` maps no foreign-key error at all. An earlier
+  version matched the column name in MySQL's constraint text to tell the two
+  apart; that `seriesId` branch could not be reached.
 - **`likes` is the one table with an invariant the database cannot hold**: a
   like points at exactly one of a book or a comment, so `bookId` and
   `commentId` are both nullable and exactly one is filled. MySQL 8 would
