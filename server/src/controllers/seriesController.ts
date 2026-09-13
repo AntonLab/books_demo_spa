@@ -6,7 +6,7 @@ import {
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import { viewerOf } from '../repositories/visibility.ts';
+import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -103,7 +103,7 @@ export function createSeriesController(
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayTouch(req, id);
 
-      const deleted = await repository.remove(id);
+      const deleted = await repository.remove(id, actorOf(req));
       if (!deleted) throw new NotFoundError('Series', id);
       res.status(204).end();
     },
@@ -115,7 +115,7 @@ export function createSeriesController(
       const { userId } = validatedBody<AddCoAuthorInput>(req);
       await assertCoAuthor(req, id);
 
-      const series = await repository.addCoAuthor(id, userId);
+      const series = await repository.addCoAuthor(id, userId, actorOf(req));
       if (!series) throw new NotFoundError('Series', id);
       res.json(series);
     },
@@ -136,7 +136,7 @@ export function createSeriesController(
         await assertCoAuthor(req, id);
       }
 
-      const series = await repository.removeCoAuthor(id, userId);
+      const series = await repository.removeCoAuthor(id, userId, actorOf(req));
       if (!series) throw new NotFoundError('Series', id);
       res.json(series);
     },

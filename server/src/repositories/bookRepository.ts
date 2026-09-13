@@ -29,6 +29,12 @@ import type {
 } from '../types/book.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import { containsPattern } from './likePattern.ts';
+import {
+  deleterOf,
+  displayNameOf,
+  notify,
+  type Actor,
+} from './notificationRepository.ts';
 
 function sequelizeOf(): Sequelize {
   const sequelize = Book.sequelize;
@@ -56,12 +62,24 @@ export interface BookRepository {
   // exactly as a missing book, so a refusal does not reveal the draft exists.
   findDetailById(id: number, viewer: Viewer): Promise<BookDetail | null>;
   update(id: number, input: UpdateBookInput): Promise<PublicBook | null>;
-  remove(id: number): Promise<boolean>;
+  // The three writes that change who is credited on a book, or end it, take
+  // the actor: each tells the other Co-authors in the same transaction
+  // (repositories/notificationRepository.ts). Who may act is the controller's
+  // business.
+  remove(id: number, actor: Actor): Promise<boolean>;
   // null when the book is not there, as update/remove report it.
-  addCoAuthor(bookId: number, userId: number): Promise<PublicBook | null>;
-  // Covers both removing someone else and leaving: the caller's identity is
-  // the controller's business, the rules on the book's credits are this one's.
-  removeCoAuthor(bookId: number, userId: number): Promise<PublicBook | null>;
+  addCoAuthor(
+    bookId: number,
+    userId: number,
+    actor: Actor
+  ): Promise<PublicBook | null>;
+  // Covers both removing someone else and leaving — the actor naming the
+  // account removed is what makes it a leave.
+  removeCoAuthor(
+    bookId: number,
+    userId: number,
+    actor: Actor
+  ): Promise<PublicBook | null>;
   // The cheapest question the ownership check can ask: one indexed lookup, no
   // eager loads, no serialisation. null when the book is not there.
   findCoAuthorIds(id: number): Promise<number[] | null>;
@@ -353,12 +371,43 @@ export function createSequelizeBookRepository(): BookRepository {
       }
     },
 
-    async remove(id) {
-      const deleted = await Book.destroy({ where: { id } });
-      return deleted > 0;
+    // Under a lock on the book row, so the Co-authors told are exactly the ones
+    // credited when it went.
+    async remove(id, actor) {
+      return sequelizeOf().transaction(async (transaction) => {
+        const book = await Book.findByPk(id, {
+          attributes: ['id', 'title'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!book) return false;
+
+        const coAuthorIds = (
+          await BookAuthor.findAll({
+            where: { bookId: id },
+            attributes: ['userId'],
+            transaction,
+          })
+        ).map((credit) => credit.userId);
+        await notify(
+          [
+            {
+              recipientIds: coAuthorIds,
+              kind: 'work_deleted',
+              work: { type: 'book', id: null, title: book.title },
+              ...(await deleterOf(actor, coAuthorIds, transaction)),
+            },
+          ],
+          actor.id,
+          transaction
+        );
+
+        await Book.destroy({ where: { id }, transaction });
+        return true;
+      });
     },
 
-    async addCoAuthor(bookId, userId) {
+    async addCoAuthor(bookId, userId, actor) {
       const book = await Book.findByPk(bookId);
       if (!book) return null;
 
@@ -371,7 +420,22 @@ export function createSequelizeBookRepository(): BookRepository {
       }
 
       try {
-        await BookAuthor.create({ bookId, userId });
+        await sequelizeOf().transaction(async (transaction) => {
+          await BookAuthor.create({ bookId, userId }, { transaction });
+          await notify(
+            [
+              {
+                recipientIds: [userId],
+                kind: 'co_author_added',
+                work: { type: 'book', id: bookId, title: book.title },
+                actorKind: 'co_author',
+                actorName: await displayNameOf(actor.id, transaction),
+              },
+            ],
+            actor.id,
+            transaction
+          );
+        });
       } catch (error) {
         if (error instanceof UniqueConstraintError) {
           throw new StateConflictError(
@@ -387,7 +451,7 @@ export function createSequelizeBookRepository(): BookRepository {
     // row: without it, two co-authors of a two-author book leaving at once
     // would each count two, each delete, and leave the book credited to
     // nobody. userRepository.remove takes the same lock for the same reason.
-    async removeCoAuthor(bookId, userId) {
+    async removeCoAuthor(bookId, userId, actor) {
       return sequelizeOf().transaction(async (transaction) => {
         const book = await Book.findByPk(bookId, {
           transaction,
@@ -412,6 +476,24 @@ export function createSequelizeBookRepository(): BookRepository {
         }
 
         await BookAuthor.destroy({ where: { bookId, userId }, transaction });
+        // A Co-author leaving tells the ones who remain; one removed by
+        // another is told themselves.
+        const leaving = userId === actor.id;
+        await notify(
+          [
+            {
+              recipientIds: leaving
+                ? credits.map((credit) => credit.userId)
+                : [userId],
+              kind: leaving ? 'co_author_left' : 'co_author_removed',
+              work: { type: 'book', id: bookId, title: book.title },
+              actorKind: 'co_author',
+              actorName: await displayNameOf(actor.id, transaction),
+            },
+          ],
+          actor.id,
+          transaction
+        );
         return withAuthors(book, transaction);
       });
     },

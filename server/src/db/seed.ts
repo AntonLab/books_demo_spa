@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the eight content
+// Destructive by design: with --force it deletes every row in the nine content
 // tables before inserting. Without --force it reports what it found and exits
 // without writing.
 
@@ -29,6 +29,7 @@ import {
   Chapter,
   Comment,
   Like,
+  Notification,
   Series,
   SeriesAuthor,
   User,
@@ -1058,6 +1059,7 @@ function buildPlan(rng: Rng): Plan {
 // rows behind silently. `permissions` is deliberately absent — it is reference
 // data syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
+  Notification,
   Like,
   Comment,
   Chapter,
@@ -1117,6 +1119,7 @@ async function writeContent(
   transaction: Transaction
 ): Promise<{
   bookIds: Map<PlannedBook, number>;
+  seriesIds: Map<PlannedSeries, number>;
   chapters: number;
   series: number;
 }> {
@@ -1136,6 +1139,7 @@ async function writeContent(
   };
 
   const bookIds = new Map<PlannedBook, number>();
+  const seriesIdsByPlan = new Map<PlannedSeries, number>();
   const creditRows: { bookId: number; userId: number; createdAt: Date }[] = [];
   const seriesCreditRows: {
     seriesId: number;
@@ -1162,6 +1166,7 @@ async function writeContent(
         { transaction, silent: true }
       );
       seriesIds.push(row.id);
+      seriesIdsByPlan.set(entry, row.id);
       seriesCount += 1;
       for (const login of entry.coAuthorLogins) {
         seriesCreditRows.push({
@@ -1237,7 +1242,12 @@ async function writeContent(
     Chapter.bulkCreate(batch, { transaction })
   );
 
-  return { bookIds, chapters: chapterRows.length, series: seriesCount };
+  return {
+    bookIds,
+    seriesIds: seriesIdsByPlan,
+    chapters: chapterRows.length,
+    series: seriesCount,
+  };
 }
 
 // The next place in the author's series at `seriesIndex`, or null for a
@@ -1250,6 +1260,98 @@ function seriesPositionOf(
   const position = (filedSoFar.get(seriesIndex) ?? 0) + 1;
   filedSoFar.set(seriesIndex, position);
   return position;
+}
+
+// Two unread notifications for each author, drawn from the credits the plan
+// already holds so that none contradicts a byline. Every Co-author credited on
+// a shared work beyond its first is told the first added them; and each author
+// is told the next author in AUTHORS left one of their books that nobody else
+// shares now — which reads true, since a Co-author who left is credited
+// nowhere on it. The actor's name is written as a notification would have
+// written it at the time.
+async function writeNotifications(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  seriesIds: Map<PlannedSeries, number>,
+  transaction: Transaction
+): Promise<number> {
+  const idOf = (login: string): number => {
+    const index = plan.accounts.findIndex(
+      (account) => account.spec.login === login
+    );
+    if (index === -1) throw new Error(`No account was planned for ${login}`);
+    return accountIds[index];
+  };
+  const nameOf = (author: PlannedAuthor): string =>
+    `${author.spec.firstName} ${author.spec.lastName}`;
+  const now = Date.now();
+
+  const rows: {
+    userId: number;
+    kind: 'co_author_added' | 'co_author_left';
+    workType: 'book' | 'series';
+    bookId: number | null;
+    seriesId: number | null;
+    workTitle: string;
+    actorKind: 'co_author';
+    actorName: string;
+    createdAt: Date;
+  }[] = [];
+
+  for (const [index, author] of plan.authors.entries()) {
+    for (const entry of author.series) {
+      for (const login of entry.coAuthorLogins.slice(1)) {
+        rows.push({
+          userId: idOf(login),
+          kind: 'co_author_added',
+          workType: 'series',
+          bookId: null,
+          seriesId: seriesIds.get(entry) ?? null,
+          workTitle: entry.title,
+          actorKind: 'co_author',
+          actorName: nameOf(author),
+          createdAt: new Date(now - 3 * DAY_MS),
+        });
+      }
+    }
+    for (const book of author.books) {
+      for (const login of book.coAuthorLogins.slice(1)) {
+        rows.push({
+          userId: idOf(login),
+          kind: 'co_author_added',
+          workType: 'book',
+          bookId: bookIds.get(book) ?? null,
+          seriesId: null,
+          workTitle: book.title,
+          actorKind: 'co_author',
+          actorName: nameOf(author),
+          createdAt: new Date(now - 2 * DAY_MS),
+        });
+      }
+    }
+
+    const leaver = plan.authors[(index + 1) % plan.authors.length];
+    const left = author.books.find(
+      (book) => book.coAuthorLogins.length === 1 && book.status !== 'draft'
+    );
+    if (left) {
+      rows.push({
+        userId: idOf(author.spec.login),
+        kind: 'co_author_left',
+        workType: 'book',
+        bookId: bookIds.get(left) ?? null,
+        seriesId: null,
+        workTitle: left.title,
+        actorKind: 'co_author',
+        actorName: nameOf(leaver),
+        createdAt: new Date(now - DAY_MS),
+      });
+    }
+  }
+
+  await Notification.bulkCreate(rows, { transaction });
+  return rows.length;
 }
 
 async function writeThreads(
@@ -1400,6 +1502,13 @@ async function main(): Promise<void> {
         content.bookIds,
         transaction
       );
+      const notifications = await writeNotifications(
+        plan,
+        accountIds,
+        content.bookIds,
+        content.seriesIds,
+        transaction
+      );
 
       return {
         accounts: accountIds.length,
@@ -1407,6 +1516,7 @@ async function main(): Promise<void> {
         books: content.bookIds.size,
         chapters: content.chapters,
         ...threads,
+        notifications,
       };
     });
 

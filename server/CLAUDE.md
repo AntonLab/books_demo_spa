@@ -137,6 +137,16 @@ that one row instead of removing it, so its replies keep a parent, and its
 text and author are withheld on the way out; `POST /api/comments/:id/restore`
 reverses a moderator's `removed` tombstone. See **Auth**.
 
+A **Notification** (`Notification`, table `notifications`) tells a Co-author
+that someone else changed who is credited on a shared book or series, or
+deleted it — the safeguard ADR-0005 leans on. `GET /api/notifications`
+(`limit` 1-100, `offset`) lists the caller's own, newest first, as
+`{ items, total, unread, limit, offset }`, and `POST /api/notifications/read`
+(`{ ids }`) marks those that are the caller's and answers `{ unread }`. Both
+sit behind `requireAuth`, not the matrix, and whose notifications they are
+comes from the session only; there is no delete and no retention limit. See
+**Notifications** under **Auth**.
+
 ## Development Commands
 
 This package is an npm workspace. Install from the repo root, not here; the
@@ -153,14 +163,14 @@ scripts below still run from this directory, or from the root with `-w server`.
   are never emitted
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
-  **It deletes every row in the eight content tables**, so it does nothing
+  **It deletes every row in the nine content tables**, so it does nothing
   without `--force`: `npm run seed -w server -- --force` from the repo root,
   or `npm run seed -- --force` from here. Without the flag it prints the row
   counts it found and exits
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
-  silently skip that suite instead of failing loudly). Each of those nine
+  silently skip that suite instead of failing loudly). Each of those ten
   specs asks `skipWithoutMysql()` (`src/db/mysqlProbe.testkit.ts`) whether to
   run: with `DB_USER` unset or MySQL unreachable it skips the suite, and the
   run still exits 0. Set `REQUIRE_MYSQL=1` and the same two conditions throw
@@ -206,25 +216,30 @@ added.
   and the logger-backed implementation that is the only sink so far
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
   `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`, `seriesBookRoutes.ts`,
-  `commentRoutes.ts`, `likeRoutes.ts`, mounted under `/api`).
+  `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
+  `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
   excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
   `dist/`.
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
-  `chapterController.ts`, `commentController.ts`, `likeController.ts`)
+  `chapterController.ts`, `commentController.ts`, `likeController.ts`,
+  `notificationController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
   `commentRepository.ts`, `likeRepository.ts`, `sessionRepository.ts`,
-  `passwordResetRepository.ts`, Sequelize-backed; `likePattern.ts` holds the
+  `passwordResetRepository.ts`, `notificationRepository.ts` (the list and
+  mark-read reads, plus `notify`, which the book, series and user
+  repositories call inside their own transactions), Sequelize-backed; `likePattern.ts` holds the
   LIKE escaping they share; `visibility.ts` holds the Draft book rule every
   read goes through — see **Draft books** under Auth). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
   `SeriesAuthor.ts`, `Book.ts`, `BookAuthor.ts`, `Chapter.ts`, `Comment.ts`,
-  `Like.ts`, `Session.ts`, `PasswordResetToken.ts`, `Permission.ts`,
+  `Like.ts`, `Notification.ts`, `Session.ts`, `PasswordResetToken.ts`,
+  `Permission.ts`,
   `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation `Series`
   and `Book` share; `creditedBook.testkit.ts` is the suites' way to create a
   book or a series with its Co-authors)
@@ -249,7 +264,8 @@ added.
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
   three build on), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `comment.ts`, `like.ts`, `permission.ts` (`Role`, `Module`,
+  `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
+  (`Role`, `Module`,
   `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
   `errors.ts`, `express.d.ts`)
 
@@ -269,7 +285,7 @@ value.
 | `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
-(default `books_demo_spa_test`, the prefix of the nine test schemas) and
+(default `books_demo_spa_test`, the prefix of the ten test schemas) and
 `REQUIRE_MYSQL`, which CI sets to `1` so the MySQL-backed suites fail rather
 than skip without a database (see `npm test` above).
 
@@ -316,7 +332,11 @@ scheduled (`publicationOf`); every other chapter was published when it was
 written. Each book's chapters take positions 1…N in the order the plan wrote
 them, so the Reading order starts out as the order of writing, and each
 series' books take positions 1…N in the order the plan files them
-(`seriesPositionOf`).
+(`seriesPositionOf`). Each author also starts with two unread notifications
+drawn from those credits, so none contradicts a byline
+(`writeNotifications`): a Co-author credited on a shared work beyond its
+first is told the first added them, and each author is told the next author
+in `AUTHORS` left one of their unshared books.
 
 Three things about it are worth knowing before changing it:
 
@@ -340,7 +360,7 @@ Three things about it are worth knowing before changing it:
   is passed explicitly and `{ silent: true }` is what stops `save()` from
   overwriting the backdated `updatedAt`.
 
-It deletes `likes` → `comments` → `chapters` → `book_authors` → `books` →
+It deletes `notifications` → `likes` → `comments` → `chapters` → `book_authors` → `books` →
 `series_authors` → `series` → `users` by explicit enumeration rather than leaning on the cascades, which would work
 today and start leaving rows behind the day an `onDelete` changes.
 `permissions` is untouched: it is reference data `syncPermissions()` derives
@@ -534,6 +554,29 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
     hard-deleted comments follow only the books that actually go.
   - **Switching Role from `author` to `user` keeps every credit.** Nothing
     strips it; the matrix alone takes away the write access.
+- **Notifications** (CONTEXT.md). Every change to who is credited on a shared
+  work, and every deletion of one, writes a notification per recipient in the
+  same transaction as the change (`notify` in
+  `repositories/notificationRepository.ts`), so a change that fails raises
+  nothing. The actor is never a recipient. Books and series behave alike:
+  - **Added** tells the account added, naming the Co-author who added it;
+    **removed** tells the account removed; **leaving** — `removeCoAuthor`
+    naming the actor's own id — tells every Co-author who remains.
+  - **Deleting the work** tells every other Co-author. A deleter credited on
+    the work is named; anyone else is a Moderator and is not (`deleterOf`).
+  - **Deleting an account** tells the remaining Co-authors of every work it
+    shared, as a `deleted_account` with no name. The works it alone was
+    credited on go with it and tell nobody.
+  - Text, status, series filing, order and chapter changes raise nothing.
+  - **A snapshot, not a view.** The row copies the work's title and the
+    actor's display name as they were, so it reads the same after a rename,
+    the work's deletion or the actor's own. Only the link is live:
+    `bookId` / `seriesId` are nullable foreign keys with `ON DELETE SET NULL`,
+    and `toPublicNotification` answers `work.id: null` once the work is gone.
+    The recipient's `userId` cascades.
+  - The three repository writes that raise one — `remove`, `addCoAuthor`,
+    `removeCoAuthor` on books and on series — take an `Actor` (`{ id, role }`),
+    which each controller builds with `actorOf` in `repositories/visibility.ts`.
 - **Draft books** (CONTEXT.md). A Draft book is readable by its Co-authors
   and Moderators and by nobody else, and that rule lives in one module,
   `repositories/visibility.ts`, not in the controllers. Every repository read
@@ -991,9 +1034,10 @@ snippets — still get wrong. Verified against the 5.x router and request source
   that destroyed `User` first would leave orphaned `Comment` rows behind
   instead of clearing them, so every suite that touches comments clears
   `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
-  own schema — nine of them, `books_demo_spa_test` plus
+  own schema — ten of them, `books_demo_spa_test` plus
   `books_demo_spa_test_` and the suite's name (`series`, `books`, `chapters`,
-  `likes`, `comments`, `sessions`, `password_resets`, `permissions`) —
+  `likes`, `comments`, `notifications`, `sessions`, `password_resets`,
+  `permissions`) —
   because `node:test`
   runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one database drop each other's tables mid-run.
@@ -1002,13 +1046,15 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `SeriesAuthor` go with either of their parents by cascade); `Like` is the
   leaf of every chain, and `Comment` must precede both `Book` (its
   still-cascading foreign key) and `User` (its no-longer-cascading one).
+  `Notification` goes with `User` by cascade but only unlinks from `Book` and
+  `Series`, so a suite that counts notifications clears them first.
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
   That per-suite naming is also what the `posttest` cleanup keys on: those
-  nine names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
+  ten names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
   `dropTestDatabases.testkit.ts` drops whatever `SHOW DATABASES` reports under
   that prefix rather than a list it would have to be told to update. Name a
-  tenth suite's schema the same way and it is cleaned up for free; name it
+  new suite's schema the same way and it is cleaned up for free; name it
   anything else and it is left on disk forever.
 - **Migrations**: `sequelize-cli` is not installed. When it is added, remember
   this is an ESM package — `.js` migrations are parsed as ESM, so the CLI's
@@ -1033,7 +1079,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `chapters.position`, a `NOT NULL` column every chapter insert and list
   needs, or swap the `(bookId, id)` index for `(bookId, position)` — nor
   add `books.seriesPosition` or swap `(seriesId, id)` for
-  `(seriesId, seriesPosition)`.
+  `(seriesId, seriesPosition)`. The `notifications` table is the exception:
+  a table that does not exist yet is exactly what `sync()` does create.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of
