@@ -66,12 +66,22 @@ sessions.
 An Account status reserved for a future email-verification step. Today it
 restricts nothing: a Pending Account signs in like an active one.
 
+**Avatar**:
+The optional picture an Account shows beside its name, whatever its Role. An
+Account without one is shown by its initials.
+_Avoid_: Author photo, profile picture, userpic
+
 ### Content
 
 **Book**:
 A work credited to one or more Co-authors, read as a sequence of Chapters in
 its Reading order and optionally grouped into a Series.
 _Avoid_: Title, work
+
+**Cover**:
+The one optional picture that stands for a Book. A Book without one is shown
+with a placeholder bearing its title.
+_Avoid_: Image, thumbnail, poster
 
 **Book status**:
 Where a Book stands: Draft, In progress or Complete. Every Book has exactly one.
