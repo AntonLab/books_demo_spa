@@ -22,9 +22,12 @@ npm-debug.log*
 
 # agent skills — materialized from skills-lock.json via `npx skills`
 # (.claude holds machine-specific absolute symlinks into .agents/, plus the
-# git worktrees created for isolated task execution)
+# git worktrees created for isolated task execution). The exception is
+# .claude/agents/, the checked-in plan pipeline agents; `/.claude/*` matches
+# direct children only, so un-ignoring that directory lets its files through.
 /.agents
-/.claude
+/.claude/*
+!/.claude/agents/
 
 # agent working notes — plans and specs generated per task, not project docs.
 # Two exceptions are checked in: docs/agents/ configures the engineering skills,
