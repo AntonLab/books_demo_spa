@@ -1,26 +1,28 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-# `client/` and `server/` are npm workspaces under one root package.json, but each
-# still builds into its own directory, so the rules below are written to match at
-# any depth rather than being repeated per package.
+# `client/`, `server/` and `shared/` are npm workspaces under one root
+# package.json, but each still builds into its own directory, so the rules
+# below are written to match at any depth rather than being repeated per package.
+#
+# Only what this repo's own tools produce, or a secret, belongs here. Files a
+# contributor's OS or editor leaves behind (.DS_Store, Thumbs.db, .vscode/)
+# go in their global excludes file, ~/.config/git/ignore.
 
 # dependencies
 node_modules/
 
-# testing
+# testing — Jest writes coverage/ when run with --coverage
 coverage/
 
 # build output — `client` emits build/, `server` emits dist/
 build/
 dist/
 
-# misc
-.DS_Store
-npm-debug.log*
+# local environment / secrets — any .env file, however it is named, stays out
+# (the server reads .env.local); the example is the one checked in
+.env
+.env.*
+!.env.example
 
-# local environment / secrets (server reads .env.local; .env.example is checked in)
-.env*.local
-
-# agent skills — materialized from skills-lock.json via `npx skills`
+# agent skills — materialized from skills-lock.json via `npm run skills`
 # (.claude holds machine-specific absolute symlinks into .agents/, plus the
 # git worktrees created for isolated task execution). The exception is
 # .claude/agents/, the checked-in plan pipeline agents; `/.claude/*` matches
