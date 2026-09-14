@@ -4,7 +4,12 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import type { Model, ModelStatic, Sequelize } from 'sequelize';
+import {
+  QueryTypes,
+  type Model,
+  type ModelStatic,
+  type Sequelize,
+} from 'sequelize';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import {
   Book,
@@ -161,5 +166,103 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     assert.doesNotMatch(run.stderr, /\] (WARN|ERROR) /);
     assert.equal(found.users, 1);
     assert.deepEqual(await countRows(), found);
+  });
+});
+
+// After the dry run, in the same schema: node:test runs one file's suites in
+// order, and the dry run's bystander would not survive this one.
+describe('seed.ts --force against real MySQL', { skip }, () => {
+  let sequelize: Sequelize;
+
+  // The offending rows rather than a count, so a failure names them.
+  const offending = (sql: string): Promise<object[]> =>
+    sequelize.query(sql, { type: QueryTypes.SELECT });
+
+  before(async () => {
+    const db = parseConfig({
+      ...process.env,
+      NODE_ENV: 'test',
+      DB_NAME: TEST_DB_NAME,
+    }).db;
+    await ensureDatabase(db);
+    sequelize = createSequelize(db);
+    initModels(sequelize);
+    await sequelize.sync({ force: true });
+
+    const run = await runSeed(
+      { ...process.env, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME },
+      ['--force']
+    );
+    assert.equal(run.code, 0, run.stderr);
+  });
+
+  after(async () => {
+    await sequelize.close();
+  });
+
+  // The seed writes through the models, past likeRepository's checks, so
+  // nothing but this stops it writing a like the API would refuse.
+  test('writes no like the API would refuse', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT l.id FROM likes l
+         JOIN comments c ON c.id = l.commentId
+         WHERE c.userId = l.userId OR c.tombstone IS NOT NULL`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT l.id FROM likes l
+         JOIN book_authors ba ON ba.bookId = l.bookId AND ba.userId = l.userId`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT l.id FROM likes l
+         LEFT JOIN comments c ON c.id = l.commentId
+         JOIN books b ON b.id = COALESCE(l.bookId, c.bookId)
+         WHERE b.status = 'draft'`
+      ),
+      []
+    );
+  });
+
+  test('dates no comment or like before its account was created', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT c.id FROM comments c
+         JOIN users u ON u.id = c.userId
+         WHERE c.createdAt < u.createdAt`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT l.id FROM likes l
+         JOIN users u ON u.id = l.userId
+         WHERE l.createdAt < u.createdAt`
+      ),
+      []
+    );
+  });
+
+  test('titles no chapter "X and X" or "A" before a vowel sound', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT title FROM chapters
+         WHERE title LIKE '% and %'
+           AND SUBSTRING_INDEX(title, ' and ', 1) = SUBSTRING_INDEX(title, ' and ', -1)`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT title FROM chapters
+         WHERE title COLLATE utf8mb4_bin REGEXP '^A ([AEIOU]|Honest )'`
+      ),
+      []
+    );
   });
 });

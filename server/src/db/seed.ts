@@ -445,10 +445,17 @@ function chapterTitle(rng: Rng, genre: Genre): string {
     case 0:
       return `The ${adjective} ${noun}`;
     case 1:
-      return `${noun} and ${rng.pick(genre.chapterNouns)}`;
+      // A different noun, or "Rain and Rain" turns up.
+      return `${noun} and ${rng.pick(genre.chapterNouns.filter((other) => other !== noun))}`;
     default:
-      return `A ${adjective} ${noun}`;
+      return `${indefiniteArticle(adjective)} ${adjective} ${noun}`;
   }
+}
+
+// By the sound, not the letter: the banks hold "Empty" and "Outer", and also
+// "Honest", whose h is silent.
+function indefiniteArticle(word: string): 'A' | 'An' {
+  return /^([AEIOU]|Honest$)/.test(word) ? 'An' : 'A';
 }
 
 // Deduplicated within one book only: a repeat across two books of a
@@ -901,6 +908,17 @@ function planThreads(
   const likes: PlannedLike[] = [];
   const now = Date.now();
   const accountIndexes = accounts.map((_, i) => i);
+  const registeredBy = (time: number): number[] =>
+    accountIndexes.filter((i) => accounts[i].createdAt.getTime() <= time);
+  // Nobody reacts before their account exists: a reader who registered last
+  // month likes a two-year-old book last month, not two years ago.
+  const reactionTime = (accountIndex: number, earliest: number): Date =>
+    new Date(
+      rng.float(
+        Math.max(earliest, accounts[accountIndex].createdAt.getTime()),
+        now
+      )
+    );
 
   for (const book of books) {
     // Nobody comments on or likes a Draft book, so the seed writes neither.
@@ -939,8 +957,9 @@ function planThreads(
 
       const comment: PlannedComment = {
         book,
-        // Any account, the book's own author included.
-        accountIndex: rng.pick(accountIndexes),
+        // Any account that existed by then, the book's own author included.
+        // Never empty: the staff predate every author, and so every book.
+        accountIndex: rng.pick(registeredBy(time)),
         // The modulo only matters if a bank is ever made smaller than the
         // 15 comments a book can hold.
         text:
@@ -969,7 +988,7 @@ function planThreads(
         comment: null,
         accountIndex,
         isLike: !rng.chance(0.15),
-        createdAt: new Date(rng.float(from, now)),
+        createdAt: reactionTime(accountIndex, from),
       });
     }
   }
@@ -992,18 +1011,22 @@ function planThreads(
   );
 
   // Likes on comments come after the tombstones, so a withheld comment does not
-  // carry a like count for text nobody can read.
+  // carry a like count for text nobody can read. The comment's own author is
+  // left out, as the API would refuse their like.
   for (const comment of comments) {
     if (tombstones.has(comment)) {
       continue;
     }
-    for (const accountIndex of rng.sample(accountIndexes, rng.int(0, 4))) {
+    const likers = accountIndexes.filter(
+      (index) => index !== comment.accountIndex
+    );
+    for (const accountIndex of rng.sample(likers, rng.int(0, 4))) {
       likes.push({
         book: null,
         comment,
         accountIndex,
         isLike: !rng.chance(0.15),
-        createdAt: new Date(rng.float(comment.createdAt.getTime(), now)),
+        createdAt: reactionTime(accountIndex, comment.createdAt.getTime()),
       });
     }
   }
