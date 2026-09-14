@@ -381,7 +381,10 @@ of the first two authors' last standalone book also credits the next author in
 One series is co-authored too (`shareSeries`): the last author's first series
 also credits the first author, so `nquinn` and `mhale` share it while its books
 stay credited to `nquinn` alone. Book likes are drawn only from accounts not
-credited on the book, because no Co-author may like their own book.
+credited on the book, and comment likes from accounts other than the comment's
+author, because the API refuses both. Nobody comments or likes before their
+account's `createdAt`: a comment picks from the accounts that existed by then,
+and a like is dated after its account was created.
 Each author's newest book is a Draft, with no comments or likes; the one before
 it, and every book of the series that draft belongs to, is In progress; every
 older book is Complete (`statusOf` in `planAuthor`). A Draft book's last two
@@ -430,12 +433,15 @@ Two guards: `NODE_ENV=production` is refused whatever the flags, and a
 `DB_NAME` other than `books_demo_spa` is warned about loudly before the delete.
 Both live in `seedGuards.ts`, pinned by `seedGuards.spec.ts`. `seed.spec.ts`
 runs the script itself as a child process — it cannot be imported, since it
-calls `main()` at the top level — twice: a dry run without `--force` against
-a `_seed` test schema, asserting every content table's row count is
-unchanged, and a production run, pointed at a closed port, asserting it is
-refused before any connection is attempted. The child inherits the runner's
-V8 coverage, so a coverage report lists `seed.ts` at the fraction a dry run
-reaches.
+calls `main()` at the top level — three times: a production run, pointed at
+a closed port, asserting it is refused before any connection is attempted; a
+dry run without `--force` against a `_seed` test schema, asserting every
+content table's row count is unchanged; and then a `--force` run into that
+same schema, which queries what landed for rows the API would have refused
+(a like on one's own book or comment, on a tombstone or on a Draft book),
+comments and likes dated before their account, and malformed chapter titles.
+The child inherits the runner's V8 coverage, so a coverage report lists
+`seed.ts` at the fraction the forced run reaches.
 
 ## Auth
 
