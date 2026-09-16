@@ -49,3 +49,12 @@ test('updatedAt carries millisecond precision; there is no createdAt or content-
   assert.doesNotMatch(createTableSql, /createdAt/);
   assert.doesNotMatch(createTableSql, /contentType/i);
 });
+
+// The cascade is the one mechanism this table exists to deliver (S1/S3):
+// deleting a User must take its Avatar with it, with no application code.
+test('userId cascades to users.id — deleting a User removes its Avatar', () => {
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`userId`\) REFERENCES `users` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+  );
+});

@@ -49,3 +49,12 @@ test('updatedAt carries millisecond precision; there is no createdAt or content-
   assert.doesNotMatch(createTableSql, /createdAt/);
   assert.doesNotMatch(createTableSql, /contentType/i);
 });
+
+// The cascade is the one mechanism this table exists to deliver (S1/S3):
+// deleting a Book must take its Cover with it, with no application code.
+test('bookId cascades to books.id — deleting a Book removes its Cover', () => {
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+  );
+});
