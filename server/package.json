@@ -22,6 +22,7 @@
     "mysql2": "3.24.4",
     "sequelize": "6.37.8",
     "shared": "*",
+    "sharp": "0.35.4",
     "zod": "4.6.4"
   },
   "devDependencies": {
