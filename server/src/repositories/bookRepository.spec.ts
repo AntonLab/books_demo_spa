@@ -7,7 +7,14 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import { Book, BookAuthor, initModels, Series, User } from '../models/index.ts';
+import {
+  Book,
+  BookAuthor,
+  BookCover,
+  initModels,
+  Series,
+  User,
+} from '../models/index.ts';
 import { createCreditedSeries } from '../models/creditedBook.testkit.ts';
 import {
   AppError,
@@ -898,6 +905,95 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     assert.equal(loadedSeries?.books?.length, 1);
+  });
+
+  // --- Cover storage (S1-S4, T2). ---
+
+  test('a cover round-trips through setCover/getCoverData, and a second upload replaces the first', async () => {
+    // Published, not a fresh draft: this test is about the round-trip, not
+    // about who may read a draft's cover — that is the next test's job, and a
+    // guest reading a draft's cover would fail for the wrong reason.
+    const created = await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Has a cover',
+      tags: [],
+    });
+    const guest: Viewer = null;
+
+    assert.equal(await repository.getCoverData(created.id, guest), null);
+
+    const first = Buffer.from('first-cover-bytes');
+    assert.equal(await repository.setCover(created.id, first), true);
+    const stored = await repository.getCoverData(created.id, guest);
+    assert.deepEqual(stored?.data, first);
+
+    const second = Buffer.from('second-cover-bytes, longer than the first');
+    assert.equal(await repository.setCover(created.id, second), true);
+    const replaced = await repository.getCoverData(created.id, guest);
+    assert.deepEqual(replaced?.data, second);
+    assert.ok(
+      (replaced?.updatedAt.getTime() ?? 0) >= (stored?.updatedAt.getTime() ?? 0)
+    );
+  });
+
+  test('setCover and removeCover on a missing book report it, and removing a cover that never existed is a no-op', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'No cover yet',
+      tags: [],
+    });
+    const missingId = ownerId + 10_000;
+
+    assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
+    await repository.removeCover(missingId);
+    await repository.removeCover(created.id);
+    assert.equal(await repository.getCoverData(created.id, null), null);
+  });
+
+  test('a draft book cover is unreadable to a guest and a non-co-author, readable to a co-author and a moderator', async () => {
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Draft',
+      description: 'Private',
+      tags: [],
+    });
+    await repository.setCover(draft.id, Buffer.from('draft-cover'));
+    const stranger = ownerId + 10_000;
+
+    assert.equal(await repository.getCoverData(draft.id, null), null);
+    assert.equal(
+      await repository.getCoverData(draft.id, { id: stranger, role: 'user' }),
+      null
+    );
+    assert.ok(
+      await repository.getCoverData(draft.id, { id: ownerId, role: 'author' })
+    );
+    assert.ok(
+      await repository.getCoverData(draft.id, { id: stranger, role: 'admin' })
+    );
+  });
+
+  test('deleting a book takes its cover with it', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Doomed',
+      tags: [],
+    });
+    await repository.setCover(created.id, Buffer.from('gone-soon'));
+
+    await repository.remove(created.id, asOwner());
+
+    // A fresh row would answer null through getCoverData too, but a direct
+    // model read is what actually proves the cascade rather than merely a
+    // missing book.
+    assert.equal(await BookCover.findByPk(created.id), null);
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

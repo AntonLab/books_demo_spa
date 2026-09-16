@@ -49,6 +49,10 @@ export function createFakeBookRepository(
     actors = [],
   } = options;
   const rows = new Map<number, PublicBook>();
+  // bookId -> its stored Cover. Visibility is the real repository's domain
+  // rule (readableBookWhere) — the fake stays rule-free (T3) and answers for
+  // whatever book exists in `rows`, mirroring findById.
+  const covers = new Map<number, { data: Buffer; updatedAt: Date }>();
   // bookId -> co-author ids, in credit order.
   const credits = new Map<number, number[]>();
   // bookId -> its place in the Series order, for a book filed in a series.
@@ -241,6 +245,21 @@ export function createFakeBookRepository(
         }
       });
       return true;
+    },
+
+    async setCover(bookId, data) {
+      if (!rows.has(bookId)) return false;
+      covers.set(bookId, { data, updatedAt: new Date() });
+      return true;
+    },
+
+    async removeCover(bookId) {
+      covers.delete(bookId);
+    },
+
+    async getCoverData(bookId) {
+      if (!rows.has(bookId)) return null;
+      return covers.get(bookId) ?? null;
     },
   };
 }
