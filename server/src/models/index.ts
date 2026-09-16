@@ -1,6 +1,7 @@
 import type { Sequelize } from 'sequelize';
 import { initBookModel, Book } from './Book.ts';
 import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
+import { initBookCoverModel, BookCover } from './BookCover.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initLikeModel, Like } from './Like.ts';
@@ -14,12 +15,15 @@ import { initSeriesModel, Series } from './Series.ts';
 import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
+import { initUserAvatarModel, UserAvatar } from './UserAvatar.ts';
 
 export interface Models {
   User: typeof User;
+  UserAvatar: typeof UserAvatar;
   Series: typeof Series;
   SeriesAuthor: typeof SeriesAuthor;
   Book: typeof Book;
+  BookCover: typeof BookCover;
   BookAuthor: typeof BookAuthor;
   Chapter: typeof Chapter;
   Comment: typeof Comment;
@@ -32,11 +36,13 @@ export interface Models {
 
 export function initModels(sequelize: Sequelize): Models {
   initUserModel(sequelize);
+  initUserAvatarModel(sequelize);
   // Reference data, unrelated to any row — no association block follows it.
   initPermissionModel(sequelize);
   initSeriesModel(sequelize);
   initSeriesAuthorModel(sequelize);
   initBookModel(sequelize);
+  initBookCoverModel(sequelize);
   initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
   initCommentModel(sequelize);
@@ -47,6 +53,16 @@ export function initModels(sequelize: Sequelize): Models {
 
   // Associations are declared after every model is initialised, so the target
   // is always a registered model no matter what order the files load in.
+  // An Account's Avatar (S1/S3, ADR-0007): one row, cascading with the
+  // Account — deleting a User removes its Avatar with no application code.
+  User.hasOne(UserAvatar, {
+    as: 'avatar',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  UserAvatar.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
   // A series' Co-authors, the same shape as a book's below (ADR-0005). Both
   // sides cascade; userRepository.remove deletes the series an account was the
   // last Co-author of before its credits go.
@@ -98,6 +114,16 @@ export function initModels(sequelize: Sequelize): Models {
     onUpdate: 'CASCADE',
   });
   BookAuthor.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  // A Book's Cover (S1/S3, ADR-0007): one row, cascading with the Book —
+  // deleting a Book removes its Cover with no application code.
+  Book.hasOne(BookCover, {
+    as: 'cover',
+    foreignKey: 'bookId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  BookCover.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
   Book.hasMany(Chapter, {
     as: 'chapters',
@@ -255,9 +281,11 @@ export function initModels(sequelize: Sequelize): Models {
 
   return {
     User,
+    UserAvatar,
     Series,
     SeriesAuthor,
     Book,
+    BookCover,
     BookAuthor,
     Chapter,
     Comment,
@@ -270,9 +298,11 @@ export function initModels(sequelize: Sequelize): Models {
 }
 
 export { User, toPublicUser } from './User.ts';
+export { UserAvatar } from './UserAvatar.ts';
 export { Series, toPublicSeries } from './Series.ts';
 export { SeriesAuthor } from './SeriesAuthor.ts';
 export { Book, toPublicBook } from './Book.ts';
+export { BookCover } from './BookCover.ts';
 export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 export { Comment, toPublicComment } from './Comment.ts';
