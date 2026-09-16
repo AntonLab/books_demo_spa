@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
@@ -11,6 +11,10 @@ import {
   listBooksQuerySchema,
   updateBookSchema,
 } from '../types/book.ts';
+import {
+  ACCEPTED_IMAGE_CONTENT_TYPES,
+  IMAGE_MAX_BYTES,
+} from '../types/image.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createBookRoutes(deps: RouteDeps): Router {
@@ -76,6 +80,34 @@ export function createBookRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ params: coAuthorParamSchema }),
     controller.removeCoAuthor
+  );
+
+  // A1/A2: the raw body parser is mounted on this PUT alone, never
+  // app-wide, and after requirePermission so a refused request's 2 MiB is
+  // never read.
+  router.put(
+    '/:id/cover',
+    requirePermission('books', 'update'),
+    validate({ params: idParamSchema }),
+    express.raw({
+      type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
+      limit: IMAGE_MAX_BYTES,
+    }),
+    controller.uploadCover
+  );
+  router.delete(
+    '/:id/cover',
+    requirePermission('books', 'update'),
+    validate({ params: idParamSchema }),
+    controller.removeCover
+  );
+  // A3: books x read, which a guest holds — the same public-read pattern as
+  // GET /:id.
+  router.get(
+    '/:id/cover',
+    requirePermission('books', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getCover
   );
 
   return router;
