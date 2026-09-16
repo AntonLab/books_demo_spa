@@ -59,11 +59,22 @@ export function createFakeBookRepository(
   const positions = new Map<number, number>();
   let nextId = 1;
 
+  // Mirrors loadCoverUrls in the real repository (T3-safe: it reads the
+  // fake's own covers map, no visibility rule attached), so a route spec can
+  // see coverUrl change after a PUT/DELETE on /:id/cover.
+  const coverUrlOf = (bookId: number): string | null => {
+    const cover = covers.get(bookId);
+    return cover
+      ? `/api/books/${bookId}/cover?v=${cover.updatedAt.getTime()}`
+      : null;
+  };
+
   const withCredits = (book: PublicBook): PublicBook => ({
     ...book,
     authors: (credits.get(book.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
+    coverUrl: coverUrlOf(book.id),
   });
 
   // Stands in for the series row's foreign key, which the real repository
