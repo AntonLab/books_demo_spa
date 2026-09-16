@@ -179,4 +179,28 @@ export function userRepositoryContract(
     assert.equal(await repository.findById(created.id), null);
     assert.equal(await repository.remove(created.id), false);
   });
+
+  test('contract: an avatar round-trips, and a missing account reports false/null', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create(input('Pictured'));
+    const missingId = MISSING_ID;
+
+    assert.equal(await repository.getAvatarData(created.id), null);
+    assert.equal(
+      await repository.setAvatar(created.id, Buffer.from('a')),
+      true
+    );
+    assert.deepEqual(
+      (await repository.getAvatarData(created.id))?.data,
+      Buffer.from('a')
+    );
+    assert.equal(
+      await repository.setAvatar(missingId, Buffer.from('a')),
+      false
+    );
+
+    await repository.removeAvatar(created.id);
+    assert.equal(await repository.getAvatarData(created.id), null);
+    await repository.removeAvatar(missingId);
+  });
 }

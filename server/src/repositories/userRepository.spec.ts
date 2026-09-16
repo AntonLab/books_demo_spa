@@ -11,6 +11,7 @@ import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import {
   Book,
   BookAuthor,
+  BookCover,
   Comment,
   initModels,
   Like,
@@ -18,6 +19,7 @@ import {
   SeriesAuthor,
   Session,
   User,
+  UserAvatar,
 } from '../models/index.ts';
 import {
   createCreditedBook,
@@ -661,6 +663,61 @@ describe('userRepository against real MySQL', { skip }, () => {
       ),
       ['ipetrov']
     );
+  });
+
+  // --- Avatar storage (S1-S4, T2). ---
+
+  test('an avatar round-trips through setAvatar/getAvatarData, and a second upload replaces the first', async () => {
+    const created = await repository.create({
+      ...base,
+      login: 'AvatarOwner',
+      email: 'avatarowner@example.com',
+    });
+
+    assert.equal(await repository.getAvatarData(created.id), null);
+
+    const first = Buffer.from('first-avatar-bytes');
+    assert.equal(await repository.setAvatar(created.id, first), true);
+    assert.deepEqual((await repository.getAvatarData(created.id))?.data, first);
+
+    const second = Buffer.from('second-avatar-bytes, longer than the first');
+    assert.equal(await repository.setAvatar(created.id, second), true);
+    assert.deepEqual(
+      (await repository.getAvatarData(created.id))?.data,
+      second
+    );
+  });
+
+  test('setAvatar and removeAvatar on a missing account report it, and removing an avatar that never existed is a no-op', async () => {
+    const missingId = 999_999;
+
+    assert.equal(
+      await repository.setAvatar(missingId, Buffer.from('x')),
+      false
+    );
+    await repository.removeAvatar(missingId);
+  });
+
+  test('deleting an account takes its own avatar, and the covers of the books it was the last co-author of', async () => {
+    const solo = await repository.create(
+      { ...base, login: 'SoleAuthor', email: 'soleauthor@example.com' },
+      'author'
+    );
+    await repository.setAvatar(solo.id, Buffer.from('avatar-bytes'));
+    const book = await createCreditedBook(
+      { title: 'Solo Book', description: 'x', tags: [] },
+      [solo.id]
+    );
+    await BookCover.create({
+      bookId: book.id,
+      data: Buffer.from('cover-bytes'),
+    });
+
+    assert.equal(await repository.remove(solo.id), true);
+
+    assert.equal(await UserAvatar.findByPk(solo.id), null);
+    assert.equal(await Book.findByPk(book.id), null);
+    assert.equal(await BookCover.findByPk(book.id), null);
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

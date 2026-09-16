@@ -34,6 +34,9 @@ export function createFakeUserRepository(
 ): UserRepository {
   const { seed = [], authorQueries = [] } = options;
   const rows = new Map<number, FakeUserRow>(seed.map((row) => [row.id, row]));
+  // userId -> its stored Avatar. Rule-free, like the book fake's covers map
+  // (T3): it answers for whatever account exists in `rows`.
+  const avatars = new Map<number, { data: Buffer; updatedAt: Date }>();
   let nextId = 1;
 
   // Stands in for the unique indexes: login is case-sensitive, email is not,
@@ -158,6 +161,21 @@ export function createFakeUserRepository(
 
     async findPasswordHashById(id) {
       return rows.get(id)?.password ?? null;
+    },
+
+    async setAvatar(id, data) {
+      if (!rows.has(id)) return false;
+      avatars.set(id, { data, updatedAt: new Date() });
+      return true;
+    },
+
+    async removeAvatar(id) {
+      avatars.delete(id);
+    },
+
+    async getAvatarData(id) {
+      if (!rows.has(id)) return null;
+      return avatars.get(id) ?? null;
     },
   };
 }
