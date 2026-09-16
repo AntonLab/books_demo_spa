@@ -109,6 +109,7 @@ export function createFakeBookRepository(
         title: input.title,
         description: input.description,
         tags: input.tags,
+        coverUrl: null,
         createdAt: now,
         updatedAt: now,
       };

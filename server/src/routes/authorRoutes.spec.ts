@@ -13,8 +13,20 @@ import {
 // On the `author` and `otherAuthor` personas' ids, so a session for either
 // resolves to an author account.
 const AUTHORS: AuthorSummary[] = [
-  { id: 2, login: 'mhale', firstName: 'Margaret', lastName: 'Hale' },
-  { id: 5, login: 'ipetrov', firstName: 'Ivan', lastName: 'Petrov' },
+  {
+    id: 2,
+    login: 'mhale',
+    firstName: 'Margaret',
+    lastName: 'Hale',
+    avatarUrl: null,
+  },
+  {
+    id: 5,
+    login: 'ipetrov',
+    firstName: 'Ivan',
+    lastName: 'Petrov',
+    avatarUrl: null,
+  },
 ];
 
 // The name matching and the blocked accounts it leaves out are the real

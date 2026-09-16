@@ -5,12 +5,21 @@ import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
   id: 1,
-  authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
+  authors: [
+    {
+      id: 3,
+      login: 'Author',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+  ],
   seriesId: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
   status: 'in_progress',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };

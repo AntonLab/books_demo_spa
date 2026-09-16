@@ -68,6 +68,7 @@ export function createFakeUserRepository(
         lastName: input.lastName,
         status: input.status ?? 'pending',
         role,
+        avatarUrl: null,
         password: await hashPassword(input.password, 'test'),
         createdAt: now,
         updatedAt: now,
@@ -99,6 +100,7 @@ export function createFakeUserRepository(
           login,
           firstName,
           lastName,
+          avatarUrl: null,
         }));
     },
 

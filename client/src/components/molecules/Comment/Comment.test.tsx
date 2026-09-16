@@ -12,7 +12,13 @@ const comment: CommentWithAuthor = {
   tombstone: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
+  author: {
+    id: 3,
+    login: 'Reader',
+    firstName: 'Read',
+    lastName: 'Er',
+    avatarUrl: null,
+  },
   likeCount: 2,
   viewerLikeId: null,
 };

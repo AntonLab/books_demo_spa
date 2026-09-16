@@ -645,6 +645,7 @@ describe('userRepository against real MySQL', { skip }, () => {
       ['mhale', 'ipetrov']
     );
     assert.deepEqual(Object.keys(everyone[0] ?? {}).sort(), [
+      'avatarUrl',
       'firstName',
       'id',
       'lastName',

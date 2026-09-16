@@ -15,6 +15,7 @@ import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
+import { loadAvatarUrls } from './userRepository.ts';
 import {
   BadRequestError,
   NotFoundError,
@@ -147,6 +148,28 @@ async function nextSeriesPosition(
   return (last ?? 0) + 1;
 }
 
+// Every Cover's URL for the books named, in one query — the same batching
+// loadAuthors uses, and for the same reason: a page's LIMIT must stay over
+// books, never over a joined table.
+async function loadCoverUrls(
+  bookIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, string>> {
+  if (bookIds.length === 0) return new Map();
+
+  const covers = await BookCover.findAll({
+    where: { bookId: bookIds },
+    attributes: ['bookId', 'updatedAt'],
+    transaction,
+  });
+  return new Map(
+    covers.map((cover) => [
+      cover.bookId,
+      `/api/books/${cover.bookId}/cover?v=${cover.updatedAt.getTime()}`,
+    ])
+  );
+}
+
 // Every Co-author of every book named, in credit order, in one query. Books
 // with no credits come back with an empty list rather than missing, so a
 // caller can index the map without a fallback.
@@ -165,9 +188,17 @@ async function loadAuthors(
     order: [['id', 'ASC']],
     transaction,
   });
+  const avatarUrls = await loadAvatarUrls(
+    credits.flatMap((credit) => (credit.user ? [credit.user.id] : [])),
+    transaction
+  );
   for (const credit of credits) {
     if (credit.user) {
-      authors.get(credit.bookId)?.push(toAuthorSummary(credit.user));
+      authors
+        .get(credit.bookId)
+        ?.push(
+          toAuthorSummary(credit.user, avatarUrls.get(credit.user.id) ?? null)
+        );
     }
   }
   return authors;
@@ -177,8 +208,15 @@ async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const authors = await loadAuthors([book.id], transaction);
-  return toPublicBook(book, authors.get(book.id) ?? []);
+  const [authors, coverUrls] = await Promise.all([
+    loadAuthors([book.id], transaction),
+    loadCoverUrls([book.id], transaction),
+  ]);
+  return toPublicBook(
+    book,
+    authors.get(book.id) ?? [],
+    coverUrls.get(book.id) ?? null
+  );
 }
 
 // creditedBookIds is the books `?userId=` names, looked up beforehand: a book
@@ -287,9 +325,18 @@ export function createSequelizeBookRepository(): BookRepository {
               ],
       });
 
-      const authors = await loadAuthors(rows.map((row) => row.id));
+      const [authors, coverUrls] = await Promise.all([
+        loadAuthors(rows.map((row) => row.id)),
+        loadCoverUrls(rows.map((row) => row.id)),
+      ]);
       return {
-        items: rows.map((row) => toPublicBook(row, authors.get(row.id) ?? [])),
+        items: rows.map((row) =>
+          toPublicBook(
+            row,
+            authors.get(row.id) ?? [],
+            coverUrls.get(row.id) ?? null
+          )
+        ),
         total: count,
       };
     },

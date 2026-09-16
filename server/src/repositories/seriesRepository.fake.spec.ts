@@ -19,6 +19,7 @@ describe('the fake seriesRepository', () => {
           login: `author${id}`,
           firstName: 'Contract',
           lastName: `Author ${id}`,
+          avatarUrl: null,
         });
         return id;
       },

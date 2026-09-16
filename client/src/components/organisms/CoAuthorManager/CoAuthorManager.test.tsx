@@ -22,18 +22,21 @@ const ann: AuthorSummary = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  avatarUrl: null,
 };
 const cora: AuthorSummary = {
   id: 4,
   login: 'cora',
   firstName: 'Cora',
   lastName: 'Writer',
+  avatarUrl: null,
 };
 const ivan: AuthorSummary = {
   id: 5,
   login: 'ipetrov',
   firstName: 'Ivan',
   lastName: 'Petrov',
+  avatarUrl: null,
 };
 
 const renderManager = (

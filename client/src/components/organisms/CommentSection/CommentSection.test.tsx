@@ -23,6 +23,7 @@ const viewer: PublicUser = {
   lastName: 'Er',
   status: 'active',
   role: 'user',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -36,7 +37,13 @@ const root: CommentWithAuthor = {
   tombstone: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
+  author: {
+    id: 3,
+    login: 'Reader',
+    firstName: 'Read',
+    lastName: 'Er',
+    avatarUrl: null,
+  },
   likeCount: 0,
   viewerLikeId: null,
 };
@@ -47,7 +54,13 @@ const reply: CommentWithAuthor = {
   parentId: 5,
   userId: 4,
   text: 'Agreed',
-  author: { id: 4, login: 'Other', firstName: 'Oth', lastName: 'Er' },
+  author: {
+    id: 4,
+    login: 'Other',
+    firstName: 'Oth',
+    lastName: 'Er',
+    avatarUrl: null,
+  },
 };
 
 // Seeding the session through the query client is what makes the component

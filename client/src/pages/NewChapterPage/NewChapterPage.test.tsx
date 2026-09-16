@@ -20,12 +20,21 @@ const mockedChapters = jest.mocked(chaptersApi);
 
 const book: BookDetail = {
   id: 1,
-  authors: [{ id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' }],
+  authors: [
+    {
+      id: 3,
+      login: 'ann',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+  ],
   seriesId: null,
   title: 'A Tale of Dragons',
   description: 'Long ago.',
   tags: [],
   status: 'in_progress',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: null,
@@ -41,6 +50,7 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,

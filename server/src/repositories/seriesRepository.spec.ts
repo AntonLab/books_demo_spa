@@ -103,6 +103,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         login: 'SeriesOwner',
         firstName: 'Ola',
         lastName: 'Owner',
+        avatarUrl: null,
       },
     ];
     assert.deepEqual(created.authors, expected);
