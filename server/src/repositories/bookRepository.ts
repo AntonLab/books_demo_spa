@@ -9,6 +9,7 @@ import {
 import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
+import { BookCover } from '../models/BookCover.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
@@ -96,6 +97,15 @@ export interface BookRepository {
   // series exactly once; anything else is a StateConflictError that changes
   // nothing. False when the series is not there.
   reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
+  // The Cover's bytes never ride along with any other read (S2) — these
+  // three are the only place book_covers is touched. false/null mean "no
+  // such Book", exactly as the other single-row methods report it.
+  setCover(bookId: number, data: Buffer): Promise<boolean>;
+  removeCover(bookId: number): Promise<void>;
+  getCoverData(
+    bookId: number,
+    viewer: Viewer
+  ): Promise<{ data: Buffer; updatedAt: Date } | null>;
 }
 
 // A rejected FK while creating a book means its first credit names an account
@@ -552,6 +562,30 @@ export function createSequelizeBookRepository(): BookRepository {
         );
         return true;
       });
+    },
+
+    async setCover(bookId, data) {
+      const book = await Book.findByPk(bookId, { attributes: ['id'] });
+      if (!book) return false;
+      await BookCover.upsert({ bookId, data });
+      return true;
+    },
+
+    async removeCover(bookId) {
+      await BookCover.destroy({ where: { bookId } });
+    },
+
+    async getCoverData(bookId, viewer) {
+      const book = await Book.findOne({
+        where: { [Op.and]: [{ id: bookId }, await readableBookWhere(viewer)] },
+        attributes: ['id'],
+      });
+      if (!book) return null;
+
+      const cover = await BookCover.findByPk(bookId, {
+        attributes: ['data', 'updatedAt'],
+      });
+      return cover ? { data: cover.data, updatedAt: cover.updatedAt } : null;
     },
   };
 }
