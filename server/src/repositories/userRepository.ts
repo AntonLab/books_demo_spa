@@ -4,7 +4,7 @@ import {
   UniqueConstraintError,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { WhereOptions } from 'sequelize';
+import type { Transaction, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
@@ -12,6 +12,7 @@ import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
 import { toAuthorSummary, toPublicUser, User } from '../models/User.ts';
+import { UserAvatar } from '../models/UserAvatar.ts';
 import { containsPattern } from './likePattern.ts';
 import { notify } from './notificationRepository.ts';
 import { ConflictError } from '../types/errors.ts';
@@ -55,6 +56,12 @@ export interface UserRepository {
   // currentPassword against. As narrow as findByLoginWithPassword, for the
   // same reason: the hash must not travel further than the check.
   findPasswordHashById(id: number): Promise<string | null>;
+  // The Avatar's bytes never ride along with any other read (S2). null/false
+  // mean "no such account or no such picture" — always public, so unlike a
+  // book's Cover this takes no Viewer.
+  setAvatar(id: number, data: Buffer): Promise<boolean>;
+  removeAvatar(id: number): Promise<void>;
+  getAvatarData(id: number): Promise<{ data: Buffer; updatedAt: Date } | null>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -74,6 +81,30 @@ function asConflict(error: unknown): never {
     throw new ConflictError(conflictFieldOf(error));
   }
   throw error;
+}
+
+// The URL every embedded AuthorSummary or PublicUser resolves an Avatar to
+// (A7), versioned by the picture's own updatedAt so a replace is never
+// served stale under the immutable cache header. Exported for
+// bookRepository, seriesRepository and commentRepository, which each embed
+// AuthorSummary the same batched way loadAuthors already does.
+export async function loadAvatarUrls(
+  userIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, string>> {
+  if (userIds.length === 0) return new Map();
+
+  const avatars = await UserAvatar.findAll({
+    where: { userId: userIds },
+    attributes: ['userId', 'updatedAt'],
+    transaction,
+  });
+  return new Map(
+    avatars.map((avatar) => [
+      avatar.userId,
+      `/api/users/${avatar.userId}/avatar?v=${avatar.updatedAt.getTime()}`,
+    ])
+  );
 }
 
 function buildWhere(query: ListUsersQuery): WhereOptions {
@@ -403,6 +434,24 @@ export function createSequelizeUserRepository(): UserRepository {
         attributes: ['password'],
       });
       return user ? user.password : null;
+    },
+
+    async setAvatar(id, data) {
+      const user = await User.findByPk(id, { attributes: ['id'] });
+      if (!user) return false;
+      await UserAvatar.upsert({ userId: id, data });
+      return true;
+    },
+
+    async removeAvatar(id) {
+      await UserAvatar.destroy({ where: { userId: id } });
+    },
+
+    async getAvatarData(id) {
+      const avatar = await UserAvatar.findByPk(id, {
+        attributes: ['data', 'updatedAt'],
+      });
+      return avatar ? { data: avatar.data, updatedAt: avatar.updatedAt } : null;
     },
   };
 }
