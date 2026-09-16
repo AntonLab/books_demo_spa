@@ -191,7 +191,8 @@ export function createSequelizeUserRepository(): UserRepository {
     async create(input, role = 'user') {
       try {
         const user = await User.create({ ...input, role });
-        return toPublicUser(user);
+        // A brand-new account cannot have an Avatar yet.
+        return toPublicUser(user, null);
       } catch (error) {
         asConflict(error);
       }
@@ -204,8 +205,14 @@ export function createSequelizeUserRepository(): UserRepository {
         offset: query.offset,
         order: [['id', 'ASC']],
       });
+      const avatarUrls = await loadAvatarUrls(rows.map((row) => row.id));
 
-      return { items: rows.map(toPublicUser), total: count };
+      return {
+        items: rows.map((row) =>
+          toPublicUser(row, avatarUrls.get(row.id) ?? null)
+        ),
+        total: count,
+      };
     },
 
     async listAuthors(query) {
@@ -234,12 +241,19 @@ export function createSequelizeUserRepository(): UserRepository {
         limit: query.limit,
         order: [['id', 'ASC']],
       });
-      return authors.map(toAuthorSummary);
+      const avatarUrls = await loadAvatarUrls(
+        authors.map((author) => author.id)
+      );
+      return authors.map((author) =>
+        toAuthorSummary(author, avatarUrls.get(author.id) ?? null)
+      );
     },
 
     async findById(id) {
       const user = await User.findByPk(id);
-      return user ? toPublicUser(user) : null;
+      if (!user) return null;
+      const avatarUrls = await loadAvatarUrls([id]);
+      return toPublicUser(user, avatarUrls.get(id) ?? null);
     },
 
     // One transaction, so a block or a password change and the sessions it
@@ -276,7 +290,8 @@ export function createSequelizeUserRepository(): UserRepository {
           await Session.destroy({ where: { userId: id }, transaction });
         }
 
-        return toPublicUser(user);
+        const avatarUrls = await loadAvatarUrls([id], transaction);
+        return toPublicUser(user, avatarUrls.get(id) ?? null);
       });
     },
 
@@ -409,7 +424,8 @@ export function createSequelizeUserRepository(): UserRepository {
       if (!user) return null;
 
       await user.update({ role });
-      return toPublicUser(user);
+      const avatarUrls = await loadAvatarUrls([id]);
+      return toPublicUser(user, avatarUrls.get(id) ?? null);
     },
 
     // The one place the password column is read. unscoped() bypasses the
@@ -426,7 +442,9 @@ export function createSequelizeUserRepository(): UserRepository {
     // reset flow wants — it needs the id, not the credential.
     async findByEmail(email) {
       const user = await User.findOne({ where: { email } });
-      return user ? toPublicUser(user) : null;
+      if (!user) return null;
+      const avatarUrls = await loadAvatarUrls([user.id]);
+      return toPublicUser(user, avatarUrls.get(user.id) ?? null);
     },
 
     async findPasswordHashById(id) {

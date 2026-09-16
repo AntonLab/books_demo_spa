@@ -24,18 +24,32 @@ const author: PublicUser = {
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const book = (id: number, title: string, status: PublicBook['status']) => ({
+const book = (
+  id: number,
+  title: string,
+  status: PublicBook['status']
+): PublicBook => ({
   id,
-  authors: [{ id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' }],
+  authors: [
+    {
+      id: 3,
+      login: 'ann',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+  ],
   seriesId: null,
   title,
   description: `${title}, described`,
   tags: [],
   status,
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 });
@@ -61,8 +75,20 @@ beforeEach(() => {
       {
         id: 12,
         authors: [
-          { id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' },
-          { id: 4, login: 'cora', firstName: 'Cora', lastName: 'Writer' },
+          {
+            id: 3,
+            login: 'ann',
+            firstName: 'Ann',
+            lastName: 'Author',
+            avatarUrl: null,
+          },
+          {
+            id: 4,
+            login: 'cora',
+            firstName: 'Cora',
+            lastName: 'Writer',
+            avatarUrl: null,
+          },
         ],
         title: 'The Scale Cycle',
         description: 'Dragons.',

@@ -167,6 +167,7 @@ export function userRepositoryContract(
         login: 'Searchable',
         firstName: 'Contract',
         lastName: 'Searchable',
+        avatarUrl: null,
       },
     ]);
   });

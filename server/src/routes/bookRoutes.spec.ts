@@ -58,6 +58,7 @@ const AUTHOR: AuthorSummary = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  avatarUrl: null,
 };
 
 // Every persona a fake credit can name, so a response's `authors` carries real
@@ -71,6 +72,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'otherAuthor',
       firstName: 'O',
       lastName: 'A',
+      avatarUrl: null,
     },
   ],
   [
@@ -80,6 +82,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'TestUser',
       firstName: 'Test',
       lastName: 'User',
+      avatarUrl: null,
     },
   ],
 ]);

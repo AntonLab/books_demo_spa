@@ -9,6 +9,7 @@ import { Book } from '../models/Book.ts';
 import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
+import { loadAvatarUrls } from './userRepository.ts';
 import type {
   CommentWithAuthor,
   CreateCommentInput,
@@ -156,6 +157,10 @@ export function createSequelizeCommentRepository(): CommentRepository {
         }
       }
 
+      const avatarUrls = await loadAvatarUrls(
+        rows.flatMap((row) => (row.user ? [row.user.id] : []))
+      );
+
       return {
         items: rows.map((row) => {
           // A live comment always has its owner loaded: the include is
@@ -167,7 +172,9 @@ export function createSequelizeCommentRepository(): CommentRepository {
 
           return toCommentWithAuthor(
             row,
-            row.user ? toAuthorSummary(row.user) : null,
+            row.user
+              ? toAuthorSummary(row.user, avatarUrls.get(row.user.id) ?? null)
+              : null,
             counts.get(row.id) ?? 0,
             viewerLikes.get(row.id) ?? null
           );

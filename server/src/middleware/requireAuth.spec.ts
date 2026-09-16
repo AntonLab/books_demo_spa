@@ -20,6 +20,7 @@ const USER: PublicUser = {
   lastName: 'Bobsson',
   status: 'active',
   role: 'user',
+  avatarUrl: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

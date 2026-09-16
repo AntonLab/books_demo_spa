@@ -116,10 +116,22 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     assert.deepEqual(created.authors, [
-      { id: ownerId, login: 'BookOwner', firstName: 'Ola', lastName: 'Owner' },
+      {
+        id: ownerId,
+        login: 'BookOwner',
+        firstName: 'Ola',
+        lastName: 'Owner',
+        avatarUrl: null,
+      },
     ]);
     assert.deepEqual((await repository.findById(created.id))?.authors, [
-      { id: ownerId, login: 'BookOwner', firstName: 'Ola', lastName: 'Owner' },
+      {
+        id: ownerId,
+        login: 'BookOwner',
+        firstName: 'Ola',
+        lastName: 'Owner',
+        avatarUrl: null,
+      },
     ]);
   });
 
@@ -994,6 +1006,35 @@ describe('bookRepository against real MySQL', { skip }, () => {
     // model read is what actually proves the cascade rather than merely a
     // missing book.
     assert.equal(await BookCover.findByPk(created.id), null);
+  });
+
+  test('a list read returns the version without the bytes', async () => {
+    const withCover = await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Has A Cover',
+      description: 'B',
+      tags: [],
+    });
+    const withoutCover = await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'No Cover',
+      description: 'B',
+      tags: [],
+    });
+    await repository.setCover(withCover.id, Buffer.from('list-cover-bytes'));
+
+    const { items } = await listAsGuest({ limit: 20, offset: 0 });
+
+    const withCoverItem = items.find((item) => item.id === withCover.id);
+    const withoutCoverItem = items.find((item) => item.id === withoutCover.id);
+    assert.match(
+      withCoverItem?.coverUrl ?? '',
+      new RegExp(`^/api/books/${withCover.id}/cover\\?v=\\d+$`)
+    );
+    assert.ok(withCoverItem && !('data' in withCoverItem));
+    assert.equal(withoutCoverItem?.coverUrl, null);
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

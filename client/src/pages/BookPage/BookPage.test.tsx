@@ -24,14 +24,27 @@ const mockedLikes = jest.mocked(likesApi);
 const book: BookDetail = {
   id: 1,
   authors: [
-    { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
-    { id: 4, login: 'Cowriter', firstName: 'Cora', lastName: 'Writer' },
+    {
+      id: 3,
+      login: 'Author',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+    {
+      id: 4,
+      login: 'Cowriter',
+      firstName: 'Cora',
+      lastName: 'Writer',
+      avatarUrl: null,
+    },
   ],
   seriesId: 2,
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   status: 'in_progress',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: { id: 2, title: 'The Scale Cycle' },
@@ -47,6 +60,7 @@ const reader: PublicUser = {
   lastName: 'Er',
   status: 'active',
   role: 'user',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

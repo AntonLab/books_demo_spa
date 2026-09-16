@@ -96,7 +96,7 @@ export function initUserModel(sequelize: Sequelize): typeof User {
 
 // Second guard: defaultScope does not apply to the result of create(), and can
 // be bypassed with unscoped(), so the shape is narrowed explicitly.
-export function toPublicUser(user: User): PublicUser {
+export function toPublicUser(user: User, avatarUrl: string | null): PublicUser {
   return {
     id: user.id,
     login: user.login,
@@ -105,6 +105,7 @@ export function toPublicUser(user: User): PublicUser {
     lastName: user.lastName,
     status: user.status,
     role: user.role,
+    avatarUrl,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -113,11 +114,15 @@ export function toPublicUser(user: User): PublicUser {
 // The shape public endpoints embed when they name an author. Deliberately not
 // derived from toPublicUser with a delete: an author summary that grew a field
 // because PublicUser did is exactly the leak this exists to prevent.
-export function toAuthorSummary(user: User): AuthorSummary {
+export function toAuthorSummary(
+  user: User,
+  avatarUrl: string | null
+): AuthorSummary {
   return {
     id: user.id,
     login: user.login,
     firstName: user.firstName,
     lastName: user.lastName,
+    avatarUrl,
   };
 }
