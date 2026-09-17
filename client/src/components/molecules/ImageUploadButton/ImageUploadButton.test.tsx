@@ -69,6 +69,27 @@ describe('ImageUploadButton', () => {
     expect(onFile).not.toHaveBeenCalled();
   });
 
+  it('rejects an empty file without calling onFile', async () => {
+    const onFile = jest.fn();
+    const onReject = jest.fn();
+    renderWithProviders(
+      <ImageUploadButton
+        label="Upload cover"
+        onFile={onFile}
+        onReject={onReject}
+      />
+    );
+    const file = new File([], 'empty.png', { type: 'image/png' });
+
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    await userEvent.upload(input, file);
+
+    expect(onReject).toHaveBeenCalledWith('That file is empty.');
+    expect(onFile).not.toHaveBeenCalled();
+  });
+
   it('rejects a file over the byte ceiling without calling onFile', async () => {
     const onFile = jest.fn();
     const onReject = jest.fn();

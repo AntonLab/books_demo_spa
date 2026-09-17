@@ -9,9 +9,14 @@ import { BadRequestError } from './types/errors.ts';
 const DECODABLE_FORMATS = new Set(['jpeg', 'png', 'webp']);
 
 async function decode(buffer: Buffer): Promise<Sharp> {
-  const image = sharp(buffer);
+  // sharp(buffer) itself throws synchronously for input it rejects outright
+  // (an empty buffer's "Input Buffer is empty" included), so the constructor
+  // call has to sit inside the same try as metadata() — otherwise that throw
+  // reaches the caller as sharp's own error instead of this function's 400.
+  let image: Sharp;
   let format: string | undefined;
   try {
+    image = sharp(buffer);
     ({ format } = await image.metadata());
   } catch {
     throw new BadRequestError('Not a valid image');
