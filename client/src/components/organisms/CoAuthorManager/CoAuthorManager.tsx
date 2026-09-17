@@ -6,10 +6,12 @@ import {
   List,
   Popconfirm,
   Select,
+  Space,
   theme,
   Typography,
 } from 'antd';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { useAuthorSearch } from '@/queries/authors';
 import {
   useAddCoAuthor,
@@ -111,7 +113,18 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
                     </Button>,
                   ];
 
-          return <List.Item actions={actions}>{nameOf(author)}</List.Item>;
+          return (
+            <List.Item actions={actions}>
+              <Space size={token.marginXS}>
+                <AccountAvatar
+                  avatarUrl={author.avatarUrl}
+                  name={nameOf(author)}
+                  size="small"
+                />
+                {nameOf(author)}
+              </Space>
+            </List.Item>
+          );
         }}
       />
 
@@ -136,7 +149,24 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
           options={candidates.map((author) => ({
             value: author.id,
             label: `${nameOf(author)} (${author.login})`,
+            avatarUrl: author.avatarUrl,
+            name: nameOf(author),
           }))}
+          // Keeping `label` a plain string preserves antd's own derived
+          // `title` (used for the option's tooltip, and by this component's
+          // tests) and rc-select's search-filter matching; drawing the
+          // avatar through optionRender instead avoids the breakage a
+          // ReactNode label would cause there (Ruling P9).
+          optionRender={(option) => (
+            <Space size={token.marginXS}>
+              <AccountAvatar
+                avatarUrl={option.data.avatarUrl}
+                name={option.data.name}
+                size="small"
+              />
+              {option.label}
+            </Space>
+          )}
           onSelect={(userId) => {
             add.mutate(userId);
             setTerm('');

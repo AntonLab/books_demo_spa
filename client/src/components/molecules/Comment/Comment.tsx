@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Button, Space, theme, Typography } from 'antd';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { LikeButton } from '@/components/molecules/LikeButton';
 import type { CommentWithAuthor, Tombstone } from '@/types/comment';
 
@@ -53,6 +54,13 @@ export const Comment: FC<CommentProps> = ({
   return (
     <article style={{ marginBottom: token.marginSM }}>
       <Space size={token.marginXS}>
+        {comment.author && (
+          <AccountAvatar
+            avatarUrl={comment.author.avatarUrl}
+            name={`${comment.author.firstName} ${comment.author.lastName}`}
+            size="small"
+          />
+        )}
         <Typography.Text strong>
           {comment.author
             ? `${comment.author.firstName} ${comment.author.lastName}`
