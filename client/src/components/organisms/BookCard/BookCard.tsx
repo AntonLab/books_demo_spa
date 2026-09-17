@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Card, Space, Tag, theme, Typography } from 'antd';
+import { Card, Flex, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover';
@@ -22,7 +22,13 @@ export const BookCard: FC<BookCardProps> = ({ book }) => {
 
   return (
     <Card size="small">
-      <Space align="start" size={token.margin} style={{ width: '100%' }}>
+      {/* Flex, not Space: Space wraps each child in a div.ant-space-item
+          that carries no flex rule of its own, so a flex style on a child
+          beneath it does nothing. Flex's children are the flex items
+          themselves, so the text column below really takes the rest of the
+          row and can shrink at phone width, while the cover keeps its
+          size. */}
+      <Flex align="start" gap={token.margin} style={{ width: '100%' }}>
         <BookCover coverUrl={book.coverUrl} title={book.title} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <Typography.Title level={4} style={{ marginTop: 0 }}>
@@ -78,7 +84,7 @@ export const BookCard: FC<BookCardProps> = ({ book }) => {
             </Typography.Text>
           </Space>
         </div>
-      </Space>
+      </Flex>
     </Card>
   );
 };
