@@ -1,6 +1,8 @@
 import type { FC } from 'react';
 import { Alert, Divider, Skeleton, Space, Tag, theme, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar';
+import { BookCover } from '@/components/molecules/BookCover';
 import { LikeButton } from '@/components/molecules/LikeButton';
 import { ChapterList } from '@/components/organisms/ChapterList';
 import { CommentSection } from '@/components/organisms/CommentSection';
@@ -42,48 +44,72 @@ export const BookPage: FC = () => {
 
   return (
     <article>
-      <Typography.Title level={2}>{book.title}</Typography.Title>
+      <Space align="start" size={token.margin} style={{ width: '100%' }}>
+        <BookCover coverUrl={book.coverUrl} title={book.title} />
+        {/* flex: 1 lets this column take the rest of the row; minWidth: 0
+            overrides the flex item's default content-based floor, so long
+            text wraps instead of forcing horizontal scroll at phone
+            width. */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Typography.Title level={2} style={{ marginTop: 0 }}>
+            {book.title}
+          </Typography.Title>
 
-      <Space size={token.marginSM} wrap>
-        <Typography.Text>
-          {book.authors
-            .map((author) => `${author.firstName} ${author.lastName}`)
-            .join(', ')}
-        </Typography.Text>
-        <Tag color={isDraft ? 'orange' : undefined}>
-          {BOOK_STATUS_LABELS[book.status]}
-        </Tag>
-        {/* Only for a Co-author: a Moderator reaches the edit page by its
-            address, the way they reach a draft. */}
-        {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
-        {book.series && (
-          <Link to={`/series?id=${book.series.id}`}>{book.series.title}</Link>
-        )}
-        {canLike && (
-          <LikeButton
-            count={book.likeCount}
-            likedId={book.viewerLikeId}
-            onToggle={(existingId) =>
-              toggleLike.mutate({
-                existingId,
-                payload: { bookId: book.id, isLike: true },
-              })
-            }
-          />
-        )}
-      </Space>
+          <Space size={token.marginSM} wrap>
+            <Space size={4} wrap>
+              {book.authors.map((author, index) => (
+                <Space key={author.id} size={4}>
+                  <AccountAvatar
+                    avatarUrl={author.avatarUrl}
+                    name={`${author.firstName} ${author.lastName}`}
+                    size="small"
+                  />
+                  <Typography.Text>
+                    {`${author.firstName} ${author.lastName}${
+                      index < book.authors.length - 1 ? ',' : ''
+                    }`}
+                  </Typography.Text>
+                </Space>
+              ))}
+            </Space>
+            <Tag color={isDraft ? 'orange' : undefined}>
+              {BOOK_STATUS_LABELS[book.status]}
+            </Tag>
+            {/* Only for a Co-author: a Moderator reaches the edit page by
+                its address, the way they reach a draft. */}
+            {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
+            {book.series && (
+              <Link to={`/series?id=${book.series.id}`}>
+                {book.series.title}
+              </Link>
+            )}
+            {canLike && (
+              <LikeButton
+                count={book.likeCount}
+                likedId={book.viewerLikeId}
+                onToggle={(existingId) =>
+                  toggleLike.mutate({
+                    existingId,
+                    payload: { bookId: book.id, isLike: true },
+                  })
+                }
+              />
+            )}
+          </Space>
 
-      {book.tags.length > 0 && (
-        <div style={{ marginTop: token.marginXS }}>
-          {book.tags.map((tag) => (
-            <Tag key={tag}>{tag}</Tag>
-          ))}
+          {book.tags.length > 0 && (
+            <div style={{ marginTop: token.marginXS }}>
+              {book.tags.map((tag) => (
+                <Tag key={tag}>{tag}</Tag>
+              ))}
+            </div>
+          )}
+
+          <Typography.Paragraph style={{ marginTop: token.marginSM }}>
+            {book.description}
+          </Typography.Paragraph>
         </div>
-      )}
-
-      <Typography.Paragraph style={{ marginTop: token.marginSM }}>
-        {book.description}
-      </Typography.Paragraph>
+      </Space>
 
       <Divider />
 

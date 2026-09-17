@@ -10,14 +10,21 @@ interface AccountAvatarProps {
   size?: 'small' | 'default' | 'large';
 }
 
+// Decorative: a name always sits beside this at every call site, so its
+// picture (or fallback initial) would otherwise be read out twice — once as
+// that name, once as this element's own `?v=` URL or initial letter.
+// `AvatarProps` has no `aria-hidden` of its own, so the wrapping <span>
+// carries it for the whole element rather than passing it through `Avatar`.
 export const AccountAvatar: FC<AccountAvatarProps> = ({
   avatarUrl,
   name,
   size = 'default',
 }) => {
   return (
-    <Avatar src={avatarUrl ?? undefined} size={size}>
-      {name.charAt(0).toUpperCase()}
-    </Avatar>
+    <span aria-hidden="true">
+      <Avatar src={avatarUrl ?? undefined} size={size} alt="">
+        {name.charAt(0).toUpperCase()}
+      </Avatar>
+    </span>
   );
 };
