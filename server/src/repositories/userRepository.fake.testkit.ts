@@ -112,7 +112,7 @@ export function createFakeUserRepository(
           login,
           firstName,
           lastName,
-          avatarUrl: null,
+          avatarUrl: avatarUrlOf(id),
         }));
     },
 
