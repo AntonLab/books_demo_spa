@@ -941,12 +941,18 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const stored = await repository.getCoverData(created.id, guest);
     assert.deepEqual(stored?.data, first);
 
+    // A gap between the two uploads, as the route specs wait between theirs:
+    // cache-busting depends on ?v= changing, so the second updatedAt must be
+    // strictly later, not merely no earlier — `>=` would pass even if the
+    // column never moved.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
     const second = Buffer.from('second-cover-bytes, longer than the first');
     assert.equal(await repository.setCover(created.id, second), true);
     const replaced = await repository.getCoverData(created.id, guest);
     assert.deepEqual(replaced?.data, second);
     assert.ok(
-      (replaced?.updatedAt.getTime() ?? 0) >= (stored?.updatedAt.getTime() ?? 0)
+      (replaced?.updatedAt.getTime() ?? 0) > (stored?.updatedAt.getTime() ?? 0)
     );
   });
 

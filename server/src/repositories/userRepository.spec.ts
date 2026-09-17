@@ -679,13 +679,20 @@ describe('userRepository against real MySQL', { skip }, () => {
 
     const first = Buffer.from('first-avatar-bytes');
     assert.equal(await repository.setAvatar(created.id, first), true);
-    assert.deepEqual((await repository.getAvatarData(created.id))?.data, first);
+    const stored = await repository.getAvatarData(created.id);
+    assert.deepEqual(stored?.data, first);
+
+    // A gap between the two uploads, as the route specs wait between theirs:
+    // cache-busting depends on ?v= changing, so the second updatedAt must be
+    // strictly later, not merely no earlier.
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const second = Buffer.from('second-avatar-bytes, longer than the first');
     assert.equal(await repository.setAvatar(created.id, second), true);
-    assert.deepEqual(
-      (await repository.getAvatarData(created.id))?.data,
-      second
+    const replaced = await repository.getAvatarData(created.id);
+    assert.deepEqual(replaced?.data, second);
+    assert.ok(
+      (replaced?.updatedAt.getTime() ?? 0) > (stored?.updatedAt.getTime() ?? 0)
     );
   });
 
