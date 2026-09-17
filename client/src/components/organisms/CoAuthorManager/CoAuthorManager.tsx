@@ -19,6 +19,18 @@ import {
   type CreditedWork,
 } from '@/queries/coAuthors';
 import type { AuthorSummary } from '@/types/user';
+import type { DefaultOptionType } from 'antd/es/select';
+
+// A typed stand-in for antd's own `DefaultOptionType`, whose extra fields
+// fall back to an index signature typed `any`. Naming `avatarUrl` and `name`
+// here is what makes `optionRender` below type-check them as
+// `string | null` and `string` rather than silently accepting a typo.
+interface CandidateOption extends DefaultOptionType {
+  value: number;
+  label: string;
+  avatarUrl: string | null;
+  name: string;
+}
 
 interface CoAuthorManagerProps {
   // A book or a series: both keep their Co-authors the same way, through
@@ -129,7 +141,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
       />
 
       {canManage && (
-        <Select<number>
+        <Select<number, CandidateOption>
           showSearch
           aria-label="Add a co-author"
           placeholder="Search authors by name or login"
@@ -146,7 +158,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
           value={null}
           loading={search.isFetching}
           notFoundContent={search.isFetching ? null : 'No authors found'}
-          options={candidates.map((author) => ({
+          options={candidates.map((author): CandidateOption => ({
             value: author.id,
             label: `${nameOf(author)} (${author.login})`,
             avatarUrl: author.avatarUrl,
