@@ -121,6 +121,21 @@ describe('AppHeader when logged in', () => {
     expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
   });
 
+  it('shows the avatar image once the account has one', () => {
+    // Not getByRole('img'): antd's Input.Search and Menu render their own
+    // icons as SVGs with role="img", so an actual <img> tag is the
+    // unambiguous query here.
+    const { container } = renderWithProviders(
+      <AppHeader />,
+      withSession({ ...user, avatarUrl: '/api/users/1/avatar?v=1' })
+    );
+
+    expect(container.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/users/1/avatar?v=1'
+    );
+  });
+
   it('shows My Books to an author', () => {
     renderWithProviders(
       <AppHeader />,
