@@ -1,7 +1,12 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useBooks, useSearchBooks } from './books';
+import {
+  useBooks,
+  useDeleteBookCover,
+  useSearchBooks,
+  useUploadBookCover,
+} from './books';
 import { createTestQueryClient } from '../test/queryClient';
 import * as booksApi from '../api/books';
 import type { PublicBook } from '../types/book';
@@ -138,5 +143,47 @@ describe('useSearchBooks', () => {
     // Two entries, not one overwritten twice. searchSlice existed as its own
     // slice to guarantee exactly this; the cache keys guarantee it now.
     expect(client.getQueryCache().getAll()).toHaveLength(2);
+  });
+});
+
+describe('useUploadBookCover', () => {
+  it('uploads and invalidates the books and series caches', async () => {
+    mockedBooks.uploadBookCover.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=2',
+    });
+    const client = createTestQueryClient();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+    const file = new File([new Uint8Array([1])], 'a.webp', {
+      type: 'image/webp',
+    });
+
+    const { result } = renderHook(() => useUploadBookCover(1), {
+      wrapper: wrapper(client),
+    });
+    result.current.mutate(file);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedBooks.uploadBookCover).toHaveBeenCalledWith(1, file);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
+  });
+});
+
+describe('useDeleteBookCover', () => {
+  it('deletes and invalidates the books and series caches', async () => {
+    mockedBooks.deleteBookCover.mockResolvedValue(undefined);
+    const client = createTestQueryClient();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+
+    const { result } = renderHook(() => useDeleteBookCover(1), {
+      wrapper: wrapper(client),
+    });
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedBooks.deleteBookCover).toHaveBeenCalledWith(1);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
   });
 });
