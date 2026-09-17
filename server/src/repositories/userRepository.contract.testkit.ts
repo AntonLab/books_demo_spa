@@ -170,6 +170,15 @@ export function userRepositoryContract(
         avatarUrl: null,
       },
     ]);
+
+    // An author search embeds each result's own Avatar, exactly as
+    // findById/list/etc do — not a hardcoded null.
+    await repository.setAvatar(author.id, Buffer.from('a'));
+    const [pictured] = await repository.listAuthors({ limit: 20 });
+    assert.match(
+      pictured?.avatarUrl ?? '',
+      new RegExp(`^/api/users/${author.id}/avatar\\?v=\\d+$`)
+    );
   });
 
   test('contract: a removed account is gone', async () => {

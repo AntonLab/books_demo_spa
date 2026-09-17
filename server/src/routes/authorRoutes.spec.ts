@@ -84,6 +84,24 @@ test('the author search is closed to a guest', async () => {
   });
 });
 
+test('an author with an Avatar is listed with its avatarUrl, not null', async () => {
+  const repository = createFakeUsers([]);
+  await repository.setAvatar(AUTHORS[0].id, Buffer.from('a'));
+
+  await withAuthenticatedApp({ userRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/authors?q=hale`, {
+      headers: { cookie: ROLE_COOKIES.author },
+    });
+
+    assert.equal(response.status, 200);
+    const body = await json<{ items: AuthorSummary[] }>(response);
+    assert.match(
+      body.items[0]?.avatarUrl ?? '',
+      new RegExp(`^/api/users/${AUTHORS[0].id}/avatar\\?v=\\d+$`)
+    );
+  });
+});
+
 test('an over-long limit is a 400', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeUsers([]) },
