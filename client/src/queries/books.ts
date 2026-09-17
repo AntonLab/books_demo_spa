@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createBook,
   deleteBook,
+  deleteBookCover,
   getBook,
   listBooks,
   updateBook,
+  uploadBookCover,
   type CreateBookPayload,
   type UpdateBookPayload,
 } from '../api/books';
@@ -89,3 +91,11 @@ export const useUpdateBook = (id: number) =>
 
 export const useDeleteBook = (id: number) =>
   useBookMutation(() => deleteBook(id));
+
+// A Cover change invalidates the books prefix, exactly as every other book
+// mutation does (K3): a PublicBook in any list may carry it.
+export const useUploadBookCover = (id: number) =>
+  useBookMutation((file: File) => uploadBookCover(id, file));
+
+export const useDeleteBookCover = (id: number) =>
+  useBookMutation(() => deleteBookCover(id));
