@@ -1079,6 +1079,19 @@ test('DELETE /api/users/:id/avatar answers 204 whether or not an avatar existed'
   );
 });
 
+test('DELETE /api/users/:id/avatar answers 404 for a missing account even under `any` scope (an admin)', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(`${base}/api/users/999999/avatar`, {
+        method: 'DELETE',
+        headers: { cookie: ROLE_COOKIES.admin },
+      });
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
 test('GET /api/users/:id/avatar answers 404 for an account with no avatar, and for a missing account', async () => {
   await withApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },

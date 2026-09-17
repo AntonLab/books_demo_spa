@@ -266,7 +266,9 @@ export function createFakeBookRepository(
     },
 
     async removeCover(bookId) {
+      if (!rows.has(bookId)) return false;
       covers.delete(bookId);
+      return true;
     },
 
     async getCoverData(bookId) {
