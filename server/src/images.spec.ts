@@ -122,3 +122,14 @@ test('a truncated JPEG is refused', async () => {
   await assert.rejects(processCoverImage(truncated), isNotAValidImage);
   await assert.rejects(processAvatarImage(truncated), isNotAValidImage);
 });
+
+// sharp(buffer) throws synchronously ("Input Buffer is empty") for a 0-byte
+// buffer. A PUT with no body still reaches here as Buffer.alloc(0), and
+// P1 says that must be the same 400 as any other undecodable input, not an
+// uncaught error that surfaces as a 500.
+test('an empty buffer is refused, not left to crash the caller', async () => {
+  const empty = Buffer.alloc(0);
+
+  await assert.rejects(processCoverImage(empty), isNotAValidImage);
+  await assert.rejects(processAvatarImage(empty), isNotAValidImage);
+});

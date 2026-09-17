@@ -36,6 +36,8 @@ export const ImageUploadButton: FC<ImageUploadButtonProps> = ({
   const handleBeforeUpload = (file: File): boolean => {
     if (!isAcceptedType(file.type)) {
       onReject('Choose a JPEG, PNG or WebP image.');
+    } else if (file.size === 0) {
+      onReject('That file is empty.');
     } else if (file.size > IMAGE_MAX_BYTES) {
       onReject('Images must be 2 MiB or smaller.');
     } else {

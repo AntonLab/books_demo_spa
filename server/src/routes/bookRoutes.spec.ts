@@ -1298,6 +1298,25 @@ test('PUT /api/books/:id/cover answers 400 for bytes that are not a real image, 
   });
 });
 
+test('PUT /api/books/:id/cover answers 400 for an empty body, even under an accepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Empty upload',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.author },
+      body: Buffer.alloc(0),
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
 test('PUT /api/books/:id/cover replaces the cover and answers with the updated book, its coverUrl version changing', async () => {
   const repository = createFakeRepository();
   const created = await repository.create({

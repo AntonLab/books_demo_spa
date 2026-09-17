@@ -1017,6 +1017,23 @@ test('PUT /api/users/:id/avatar answers 400 for bytes that are not a real image'
   );
 });
 
+test('PUT /api/users/:id/avatar answers 400 for an empty body, even under an accepted content type', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.user },
+          body: Buffer.alloc(0),
+        }
+      );
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
 test('PUT /api/users/:id/avatar replaces the avatar and answers with the updated account, its avatarUrl version changing', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
