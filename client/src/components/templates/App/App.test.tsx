@@ -197,7 +197,7 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the profile stub at /profile', async () => {
+  it('renders the profile page at /profile', async () => {
     renderWithProviders(<AppShell />, { route: '/profile' });
 
     expect(
