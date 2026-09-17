@@ -168,6 +168,18 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   every account but may not delete its own or change its own role. See
   `server/CLAUDE.md` for the full matrix, the cookie flags, the
   SHA-256-not-argon2 choice for tokens, and the login timing defence.
+- A Book carries an optional **Cover** and an Account of any Role an
+  optional **Avatar** (CONTEXT.md, ADR-0007), re-encoded to a fixed WebP
+  shape by `server`'s `sharp`-based `src/images.ts` and stored in two new
+  MySQL tables, `book_covers` and `user_avatars` — no rebuild needed, since
+  `sync()` creates a missing table. Six routes (`PUT`/`DELETE`/`GET` on
+  each) serve and manage them under `/api/books/:id/cover` and
+  `/api/users/:id/avatar`; see `server/CLAUDE.md` for the guards, the raw
+  body parser and the cache headers. `PublicBook` and
+  `PublicUser`/`AuthorSummary` carry the versioned `coverUrl`/`avatarUrl`.
+  `client` shows both through three new molecules — `BookCover` and
+  `AccountAvatar` display them, `ImageUploadButton` is the shared upload
+  picker behind both — and `ProfilePage` is no longer a stub.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
 - A dev database created before the Co-authors change must be dropped and
