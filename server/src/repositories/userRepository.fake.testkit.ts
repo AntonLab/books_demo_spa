@@ -14,13 +14,6 @@ export interface FakeUserRepositoryOptions {
   authorQueries?: ListAuthorsQuery[];
 }
 
-// The public shape of a stored row. Strips the hash by name and nothing else,
-// so a key a caller should never have handed in still shows in the answer.
-function publicView(row: FakeUserRow): PublicUser {
-  const { password: _password, ...user } = row;
-  return user;
-}
-
 // An in-memory UserRepository for the route specs — the users, auth and
 // author-search routes alike — held to the real one by
 // userRepository.contract.testkit.ts on the parts the controllers rely on.
@@ -38,6 +31,25 @@ export function createFakeUserRepository(
   // (T3): it answers for whatever account exists in `rows`.
   const avatars = new Map<number, { data: Buffer; updatedAt: Date }>();
   let nextId = 1;
+
+  // Mirrors loadAvatarUrls in the real repository (T3-safe: it reads the
+  // fake's own avatars map, no visibility rule attached), so a route spec can
+  // see avatarUrl change after a PUT/DELETE on /:id/avatar.
+  const avatarUrlOf = (id: number): string | null => {
+    const avatar = avatars.get(id);
+    return avatar
+      ? `/api/users/${id}/avatar?v=${avatar.updatedAt.getTime()}`
+      : null;
+  };
+
+  // The public shape of a stored row. Strips the hash by name and nothing
+  // else, so a key a caller should never have handed in still shows in the
+  // answer — avatarUrl is computed from the avatars map rather than the
+  // row's own field, which a create leaves null forever.
+  const publicView = (row: FakeUserRow): PublicUser => {
+    const { password: _password, ...user } = row;
+    return { ...user, avatarUrl: avatarUrlOf(row.id) };
+  };
 
   // Stands in for the unique indexes: login is case-sensitive, email is not,
   // as their collations make them in MySQL.
