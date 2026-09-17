@@ -6,6 +6,7 @@ import { once } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Sequelize } from 'sequelize';
+import sharp from 'sharp';
 import { createApp } from './app.ts';
 import { parseConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
@@ -97,6 +98,11 @@ interface Browser {
     body?: unknown,
     options?: SendOptions
   ): Promise<Reply<T>>;
+  // The two credentials a raw (non-JSON) upload has to carry itself, since
+  // send() always JSON-encodes its body. Both come from the same jar send()
+  // reads, so a raw request built from them is the same handshake.
+  cookieHeader(): string;
+  xsrfToken(): string;
 }
 
 function createBrowser(base: string, trustedOrigin: string): Browser {
@@ -160,6 +166,16 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
         status: response.status,
         body: (text === '' ? undefined : JSON.parse(text)) as T,
       };
+    },
+    cookieHeader(): string {
+      return [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+    },
+    xsrfToken(): string {
+      const token = jar.get(XSRF_COOKIE_NAME);
+      if (token === undefined) {
+        throw new Error('No XSRF token issued to this browser yet');
+      }
+      return decodeURIComponent(token);
     },
   };
 }
@@ -520,5 +536,47 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     );
     assert.equal(own.status, 200);
     assert.equal(own.body.status, 'draft');
+  });
+
+  test('a co-author uploads a book cover through the real CSRF handshake, and reads it back as WebP', async () => {
+    const author = await signUp('coverAuthor', 'author');
+    const book = await createBook(author, 'Cover Test');
+    // GET /cover is filtered through the same Draft visibility as everything
+    // else, so publish it first and read it back as a guest would.
+    assert.equal(
+      (
+        await author.browser.send('PATCH', `/books/${book.id}`, {
+          status: 'in_progress',
+        })
+      ).status,
+      200
+    );
+
+    const cover = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+
+    const upload = await fetch(`${base}/api/books/${book.id}/cover`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'image/jpeg',
+        origin: trustedOrigin,
+        cookie: author.browser.cookieHeader(),
+        [XSRF_HEADER_NAME]: author.browser.xsrfToken(),
+      },
+      body: cover,
+    });
+    assert.equal(upload.status, 200);
+
+    const read = await fetch(`${base}/api/books/${book.id}/cover`);
+    assert.equal(read.status, 200);
+    assert.equal(read.headers.get('content-type'), 'image/webp');
+    const bytes = Buffer.from(await read.arrayBuffer());
+    const metadata = await sharp(bytes).metadata();
+    assert.equal(metadata.format, 'webp');
+    assert.equal(metadata.width, 600);
+    assert.equal(metadata.height, 900);
   });
 });
