@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
+import { ApiError } from '@/api/client';
 import * as usersApi from '@/api/users';
 import type { PublicUser } from '@/types/user';
 
@@ -49,6 +50,27 @@ describe('ProfilePage while the session is loading', () => {
 
     renderWithProviders(<ProfilePage />);
 
+    expect(
+      screen.getByRole('heading', { name: 'Profile' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Log in to see your profile.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Upload avatar' })).toBeNull();
+  });
+});
+
+describe('ProfilePage when the session fails to load', () => {
+  it('shows an error instead of the profile', async () => {
+    // Not a 401: that one is the ordinary "nobody is signed in" case, which
+    // the query itself turns into a `null` success (see queries/auth.ts).
+    // The test query client already sets `retry: false`, so this surfaces
+    // as `isError` on the first attempt with no backoff delay.
+    mockedAuth.me.mockRejectedValue(new ApiError(500, 'Server error'));
+
+    renderWithProviders(<ProfilePage />);
+
+    expect(
+      await screen.findByText('Could not load your profile.')
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Profile' })
     ).toBeInTheDocument();
