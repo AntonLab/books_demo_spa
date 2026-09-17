@@ -42,12 +42,22 @@ export const ProfilePage: FC = () => {
 
   // While the session is still resolving, showing the Empty state would
   // flash a log-in prompt at a signed-in user who loaded /profile directly,
-  // and the avatar block cannot render without an id. A failed session fetch
-  // (distinct from the ordinary "nobody is signed in" 401, which the query
-  // already turns into a `null` success) falls back to the same bare
-  // heading rather than a page-specific error state nothing else needs.
-  if (isPending || isError) {
+  // and the avatar block cannot render without an id.
+  if (isPending) {
     return <Typography.Title level={2}>Profile</Typography.Title>;
+  }
+
+  // A failed session fetch — a 5xx or a network error, distinct from the
+  // ordinary "nobody is signed in" 401, which the query already turns into
+  // a `null` success — gets its own visible state, the way EditBookPage,
+  // MyBooksPage and EditChapterPage each report their own failed query.
+  if (isError) {
+    return (
+      <>
+        <Typography.Title level={2}>Profile</Typography.Title>
+        <Alert type="error" title="Could not load your profile." />
+      </>
+    );
   }
 
   return (
