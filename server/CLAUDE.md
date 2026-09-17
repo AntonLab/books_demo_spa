@@ -147,6 +147,51 @@ sit behind `requireAuth`, not the matrix, and whose notifications they are
 comes from the session only; there is no delete and no retention limit. See
 **Notifications** under **Auth**.
 
+A Book carries an optional **Cover** and an Account of any Role an optional
+**Avatar** (CONTEXT.md, ADR-0007). Both are stored as bytes in a table of
+their own — `book_covers` (`bookId` primary key, `FOREIGN KEY … ON DELETE
+CASCADE`, `data` `MEDIUMBLOB`, `updatedAt` `DATETIME(3)`) and `user_avatars`
+(the same shape, keyed by `userId`) — never as a column on `books` or
+`users`, so no list or detail query can drag the bytes along.
+`Book.hasOne(BookCover)` and `User.hasOne(UserAvatar)` — both
+`onDelete: CASCADE` — mean deleting a Book or an Account removes its
+picture with no application code, and that includes the Covers of the
+books `userRepository.remove` deletes because the account was their last
+Co-author. `src/images.ts` wraps every `sharp` call (`0.35.4`,
+pinned exactly, as every dependency in `server/package.json` is):
+`processCoverImage`/`processAvatarImage` decode the upload for real
+(`metadata().format`, never the trusted `Content-Type` header), apply EXIF
+orientation and drop it, centre-crop to fill a fixed 600×900 or 256×256
+frame, and encode WebP with no metadata — the uploaded bytes themselves are
+never stored, and an animated upload keeps only its first frame. Six
+routes: `PUT`/`DELETE`/`GET /api/books/:id/cover` ride on `books × update`
+(the `PATCH` Co-author check) and `books × read`; `PUT`/`DELETE`/`GET
+/api/users/:id/avatar` ride on `users × update`
+(`userController.assertMayTouch`) — except the `GET`, which is fully public
+and carries **no** permission middleware at all, unlike every other read
+here, because it does not ride on `users × read`, which a guest lacks.
+Walking ids therefore collects every uploaded Avatar without a name
+attached; that cost is accepted, since ids are already public in every
+`AuthorSummary`. Both `PUT`s carry `express.raw()` mounted on that one
+route only, right after `requirePermission` and `validate`: a request the
+matrix refuses never has its 2 MiB body read at all, but one that clears it
+is buffered before anything else runs — a 415 (`UnsupportedMediaTypeError`,
+"Unsupported image type") when the `Content-Type` was not one
+`express.raw()` accepted, so `req.body` never became a `Buffer`; then the
+row's own 404/403 (`assertMayTouch`, the same Co-author/rank check `PATCH`
+uses); only then `sharp`'s 400 ("Not a valid image") when the bytes will
+not decode, including bytes over `sharp`'s input-pixel limit. A body over 2
+MiB is a 413, mapped through the existing `errorHandler`, the same generic
+body-parser path `express.json()`'s own limit uses. Both `GET`s answer
+`Content-Type: image/webp`, `X-Content-Type-Options: nosniff` and
+`Cache-Control: private, max-age=31536000, immutable` — safe because
+`PublicBook.coverUrl` and `PublicUser`/`AuthorSummary.avatarUrl` are
+versioned by the picture's own `updatedAt` (`?v=<ms>`), so a replace is
+never served stale. No permission matrix row changes: a Cover is a field
+of the Book under `books × update` and an Avatar a field of the Account
+under `users × update`, both writes last-write-wins with no Notification
+raised.
+
 ## Development Commands
 
 This package is an npm workspace. Install from the repo root, not here; the
@@ -217,7 +262,8 @@ Each layer answers a question the others cannot:
 - **Repository specs** run the real repositories on MySQL. Every domain rule —
   Draft book visibility, the last Co-author, the Author role a credit needs,
   duplicate credits, Notifications, the reorder 409s, tombstones, the role
-  hierarchy — is proven here and nowhere else.
+  hierarchy, a Cover's or Avatar's replace-in-place and cascade — is proven
+  here and nowhere else.
 - **Route specs** run `createApp` on in-memory fakes and assert the HTTP
   mapping and the permission checks. The fakes for book, series, chapter,
   comment, like and user live in
@@ -241,8 +287,9 @@ Each layer answers a question the others cannot:
 - **`src/app.spec.ts`** is the only suite that goes from HTTP through the real
   repositories to MySQL, on its own `_app` schema: sign-in with the real CSRF
   handshake, a Co-author's edit, filing a book into a series, chapter
-  ownership, comment tombstones and restore, a role switch, and a Guest refused
-  a Draft book. `src/index.ts` cannot be imported — it runs `main()` — so the
+  ownership, comment tombstones and restore, a role switch, a Cover upload
+  read back as WebP, and a Guest refused a Draft book. `src/index.ts` cannot
+  be imported — it runs `main()` — so the
   spec repeats its startup steps, and a change to startup (a new dependency, a
   new sync step) needs the same change there. Its admin account is made through
   `User.create`, because no API can create one.
@@ -263,6 +310,9 @@ Each layer answers a question the others cannot:
   set/clear helpers, which set and clear the `xsrfToken` cookie beside it
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
   and the logger-backed implementation that is the only sink so far
+- `src/images.ts` — the one module every `sharp` call lives in:
+  `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
+  pipeline for its own frame size (CONTEXT.md, ADR-0007)
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
   `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`, `seriesBookRoutes.ts`,
   `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
@@ -288,10 +338,10 @@ Each layer answers a question the others cannot:
   beside six of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
-- `src/models/` — Sequelize models & associations (`User.ts`, `Series.ts`,
-  `SeriesAuthor.ts`, `Book.ts`, `BookAuthor.ts`, `Chapter.ts`, `Comment.ts`,
-  `Like.ts`, `Notification.ts`, `Session.ts`, `PasswordResetToken.ts`,
-  `Permission.ts`,
+- `src/models/` — Sequelize models & associations (`User.ts`, `UserAvatar.ts`,
+  `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`, `BookAuthor.ts`,
+  `Chapter.ts`, `Comment.ts`, `Like.ts`, `Notification.ts`, `Session.ts`,
+  `PasswordResetToken.ts`, `Permission.ts`,
   `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation `Series`
   and `Book` share; `creditedBook.testkit.ts` is the suites' way to create a
   book or a series with its Co-authors)
@@ -322,11 +372,15 @@ Each layer answers a question the others cannot:
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
   `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
-  `errors.ts`, `express.d.ts`). The response types (`Public*`, `BookDetail`,
-  …) and the unions the client also uses (`BOOK_STATUSES`, `USER_ROLES`,
-  `USER_STATUSES`, `REGISTRABLE_ROLES`, …) are re-exported from the `shared`
-  workspace, so a change to what the API returns starts there; the zod
-  schemas and the input types inferred from them stay here
+  `image.ts`, `errors.ts`, `express.d.ts`). The response types (`Public*`,
+  `BookDetail`, …) and the unions the client also uses (`BOOK_STATUSES`,
+  `USER_ROLES`, `USER_STATUSES`, `REGISTRABLE_ROLES`, …) are re-exported from
+  the `shared` workspace, so a change to what the API returns starts there;
+  the zod schemas and the input types inferred from them stay here.
+  `image.ts` is the one file with nothing of its own — both
+  `ACCEPTED_IMAGE_CONTENT_TYPES` and `IMAGE_MAX_BYTES` are the client's
+  contract too, so they are re-exported from `shared` rather than declared
+  here
 
 ## Environment
 
@@ -1024,7 +1078,8 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `bookId` / `seriesId` / `userId` columns of `book_authors` and
   `series_authors` are `INTEGER UNSIGNED` because `users.id`, `series.id` and
   `books.id` are; a plain `INTEGER` makes MySQL reject the constraint with
-  errno 3780.
+  errno 3780. `book_covers.bookId` and `user_avatars.userId` follow the same
+  rule — each is both the table's primary key and its foreign key.
 - **`book_authors` and `series_authors` replace `books.userId` and
   `series.userId`**: one row per Co-author credit, unique on
   `(bookId, userId)` / `(seriesId, userId)`, both foreign keys `CASCADE`. Two
@@ -1073,6 +1128,13 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `CHAPTER_TEXT_MAX_LENGTH` caps input at 1,000,000 characters, which stays
   inside the 16 MB column even at 4 bytes per character. The descriptions on
   `series` and `books` are short by nature and stay `TEXT`.
+- **`book_covers` and `user_avatars` are the only tables that keep
+  `updatedAt` but drop `createdAt`**: a replace overwrites the one row in
+  place, so only the current version's moment matters — the reverse of
+  `book_authors`/`series_authors`, which keep `createdAt` and drop
+  `updatedAt` because a credit is only ever added or removed, never
+  edited. Neither carries a content-type column: every stored picture is
+  WebP, re-encoded by `src/images.ts` on the way in (ADR-0007).
 - **A large column belongs out of the list SELECT**: `chapterRepository.list`
   passes an explicit `attributes` array that omits `text`, and returns
   `ChapterSummary` (`Omit<PublicChapter, 'text'>`) rather than the full record,
@@ -1187,6 +1249,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   add `books.seriesPosition` or swap `(seriesId, id)` for
   `(seriesId, seriesPosition)`. The `notifications` table is the exception:
   a table that does not exist yet is exactly what `sync()` does create.
+  `book_covers` and `user_avatars` join it: both are new tables too, so
+  `sync()` creates them on the next boot and this branch needs no
+  drop-and-rebuild.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of
