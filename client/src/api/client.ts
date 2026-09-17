@@ -59,8 +59,14 @@ export const request = async <T>(
 ): Promise<T> => {
   const { method = 'GET', body, signal } = options;
   const token = method === 'GET' ? undefined : xsrfToken();
+  // A File is a Blob — a Cover/Avatar upload sends it as-is, with its own
+  // content type, and never JSON.stringify'd. Every other body keeps the
+  // JSON path.
+  const isBlobBody = body instanceof Blob;
   const headers = {
-    ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    ...(body === undefined
+      ? {}
+      : { 'Content-Type': isBlobBody ? body.type : 'application/json' }),
     ...(token === undefined ? {} : { 'X-XSRF-Token': token }),
   };
 
@@ -70,7 +76,8 @@ export const request = async <T>(
     // authenticated call silently fails as a 401.
     credentials: 'include',
     headers: Object.keys(headers).length === 0 ? undefined : headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body:
+      body === undefined ? undefined : isBlobBody ? body : JSON.stringify(body),
     signal,
   });
 
