@@ -1,5 +1,14 @@
 import type { FC } from 'react';
-import { Alert, Divider, Skeleton, Space, Tag, theme, Typography } from 'antd';
+import {
+  Alert,
+  Divider,
+  Flex,
+  Skeleton,
+  Space,
+  Tag,
+  theme,
+  Typography,
+} from 'antd';
 import { Link, useParams } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover';
@@ -44,7 +53,11 @@ export const BookPage: FC = () => {
 
   return (
     <article>
-      <Space align="start" size={token.margin} style={{ width: '100%' }}>
+      {/* Flex, not Space: Space wraps each child in a div.ant-space-item
+          that carries no flex rule of its own, so a flex style on a child
+          beneath it does nothing. Flex's children are the flex items
+          themselves. */}
+      <Flex align="start" gap={token.margin} style={{ width: '100%' }}>
         <BookCover coverUrl={book.coverUrl} title={book.title} />
         {/* flex: 1 lets this column take the rest of the row; minWidth: 0
             overrides the flex item's default content-based floor, so long
@@ -109,7 +122,7 @@ export const BookPage: FC = () => {
             {book.description}
           </Typography.Paragraph>
         </div>
-      </Space>
+      </Flex>
 
       <Divider />
 
