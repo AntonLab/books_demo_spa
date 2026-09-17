@@ -241,12 +241,16 @@ export function createBookController(
       res.json(book);
     },
 
-    // A2: same guards as uploadCover; 204 whether or not a Cover existed.
+    // A2: same guards as uploadCover; 204 whether or not a Cover existed, but
+    // 404 for a missing Book. assertMayTouch alone cannot catch a missing
+    // Book under `any` scope — it returns immediately for a Moderator — so
+    // this checks removeCover's own report of whether the row was there.
     removeCover: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayTouch(req, id);
 
-      await repository.removeCover(id);
+      const found = await repository.removeCover(id);
+      if (!found) throw new NotFoundError('Book', id);
       res.status(204).end();
     },
 

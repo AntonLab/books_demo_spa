@@ -326,9 +326,10 @@ export function bookRepositoryContract(
     );
     assert.equal(await repository.setCover(missingId, Buffer.from('a')), false);
 
-    await repository.removeCover(created.id);
+    assert.equal(await repository.removeCover(created.id), true);
     assert.equal(await repository.getCoverData(created.id, viewer), null);
-    // A cover that never existed is a no-op, not an error.
-    await repository.removeCover(missingId);
+    // A cover that never existed is a no-op, not an error — but a missing
+    // book itself is reported, exactly as setCover reports it.
+    assert.equal(await repository.removeCover(missingId), false);
   });
 }

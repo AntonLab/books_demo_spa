@@ -100,9 +100,11 @@ export interface BookRepository {
   reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
   // The Cover's bytes never ride along with any other read (S2) — these
   // three are the only place book_covers is touched. false/null mean "no
-  // such Book", exactly as the other single-row methods report it.
+  // such Book", exactly as the other single-row methods report it —
+  // removeCover included, so a caller can tell "no such Book" from "no Cover
+  // to remove", which are both otherwise silent no-ops.
   setCover(bookId: number, data: Buffer): Promise<boolean>;
-  removeCover(bookId: number): Promise<void>;
+  removeCover(bookId: number): Promise<boolean>;
   getCoverData(
     bookId: number,
     viewer: Viewer
@@ -619,7 +621,10 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async removeCover(bookId) {
+      const book = await Book.findByPk(bookId, { attributes: ['id'] });
+      if (!book) return false;
       await BookCover.destroy({ where: { bookId } });
+      return true;
     },
 
     async getCoverData(bookId, viewer) {

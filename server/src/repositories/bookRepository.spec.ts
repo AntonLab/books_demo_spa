@@ -961,8 +961,8 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const missingId = ownerId + 10_000;
 
     assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
-    await repository.removeCover(missingId);
-    await repository.removeCover(created.id);
+    assert.equal(await repository.removeCover(missingId), false);
+    assert.equal(await repository.removeCover(created.id), true);
     assert.equal(await repository.getCoverData(created.id, null), null);
   });
 
