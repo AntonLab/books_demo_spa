@@ -84,6 +84,19 @@ describe('request', () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(502);
   });
+
+  it('sends a Blob body as-is, with the blob’s own content type', async () => {
+    const fetchMock = mockFetch(jsonResponse({ id: 1 }));
+    const file = new File([new Uint8Array([1, 2, 3])], 'cover.webp', {
+      type: 'image/webp',
+    });
+
+    await request('/books/1/cover', { method: 'PUT', body: file });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.body).toBe(file);
+    expect(init.headers).toEqual({ 'Content-Type': 'image/webp' });
+  });
 });
 
 describe('request and the XSRF token', () => {
@@ -146,5 +159,21 @@ describe('request and the XSRF token', () => {
     expect(
       (write.mock.calls[0] as [string, RequestInit])[1].headers
     ).toBeUndefined();
+  });
+
+  it('sends the XSRF token beside a Blob body too', async () => {
+    setCookie('xsrfToken=tok-123');
+    const fetchMock = mockFetch(jsonResponse({ id: 1 }));
+    const file = new File([new Uint8Array([1])], 'a.webp', {
+      type: 'image/webp',
+    });
+
+    await request('/books/1/cover', { method: 'PUT', body: file });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).toEqual({
+      'Content-Type': 'image/webp',
+      'X-XSRF-Token': 'tok-123',
+    });
   });
 });
