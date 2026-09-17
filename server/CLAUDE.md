@@ -211,9 +211,10 @@ scripts below still run from this directory, or from the root with `-w server`.
   that link and a type-stripping Node like `npm start` does (ADR-0006)
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
-  **It deletes every row in the nine content tables**, so it does nothing
-  without `--force`: `npm run seed -w server -- --force` from the repo root,
-  or `npm run seed -- --force` from here. Without the flag it prints the row
+  **It deletes every row in the nine content tables**, and every uploaded
+  Cover and Avatar with them, so it does nothing without `--force`:
+  `npm run seed -w server -- --force` from the repo root, or
+  `npm run seed -- --force` from here. Without the flag it prints the row
   counts it found and exits
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
@@ -479,6 +480,10 @@ Three things about it are worth knowing before changing it:
 It deletes `notifications` → `likes` → `comments` → `chapters` → `book_authors` → `books` →
 `series_authors` → `series` → `users` by explicit enumeration rather than leaning on the cascades, which would work
 today and start leaving rows behind the day an `onDelete` changes.
+`book_covers` and `user_avatars` are not in that list — nothing seeds a
+Cover or an Avatar — but they are not spared either: both cascade from
+`books`/`users` (`ON DELETE CASCADE`, S1/S3), so deleting those two rows
+removes every uploaded Cover and Avatar along with them.
 `permissions` is untouched: it is reference data `syncPermissions()` derives
 from code. The delete and every insert share one transaction, so a failure
 leaves the previous demo intact.

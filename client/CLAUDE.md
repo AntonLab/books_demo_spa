@@ -279,8 +279,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     placeholder too, and a fresh `?v=` URL after an upload gets its own try
     rather than staying stuck on an earlier, unrelated failure); `AccountAvatar`
     (decorative throughout — the wrapping `<span>` is `aria-hidden` and the
-    image itself `alt=""`, because a name always sits beside it at every call
-    site — falling back to the name's first letter with no picture);
+    image itself `alt=""`; a name always sits beside it at every call site
+    (header login, bylines, comment author, `CoAuthorManager`) except
+    `ProfilePage`, where it is the signed-in Account's own picture under the
+    "Profile" heading — falling back to the name's first letter with no
+    picture);
     `ImageUploadButton` (the shared image picker behind an antd `Upload` and
     `Button`: checks a picked file's type against
     `ACCEPTED_IMAGE_CONTENT_TYPES` and its size against `IMAGE_MAX_BYTES`

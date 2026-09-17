@@ -194,12 +194,14 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
   with a scattering of tombstones, and likes on both books and comments. Run
   it with `npm run seed -w server -- --force`; **the flag is required because
-  it deletes every row in the nine content tables first**, and without it the
-  script only reports what it found. Counts come from a fixed PRNG seed, so
-  the shape is reproducible; the dates are anchored to the run, so the newest
-  chapter is always a few days old. See `server/CLAUDE.md` for the personas,
-  the two safety guards, and why it writes through the models rather than the
-  API.
+  it deletes every row in the nine content tables first** — `book_covers` and
+  `user_avatars` are not among them, but every Cover and Avatar goes too,
+  through the `ON DELETE CASCADE` off the `books` and `users` rows it
+  deletes — and without it the script only reports what it found. Counts
+  come from a fixed PRNG seed, so the shape is reproducible; the dates are
+  anchored to the run, so the newest chapter is always a few days old. See
+  `server/CLAUDE.md` for the personas, the two safety guards, and why it
+  writes through the models rather than the API.
 
 ## Quality Gates
 
