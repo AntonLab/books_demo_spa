@@ -29,6 +29,11 @@ updates:
         versions: ['>=10']
       - dependency-name: '@eslint/js'
         versions: ['>=10']
+      # @types/node follows the Node floor (`engines.node` in the root
+      # package.json): a newer major types APIs Node 24 does not have. Raise
+      # it by hand, together with the floor.
+      - dependency-name: '@types/node'
+        versions: ['>=25']
 
   # Keeps the commit SHAs the workflows pin their actions to up to date.
   - package-ecosystem: github-actions

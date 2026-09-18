@@ -47,12 +47,14 @@ that matters: Node strips types only from a file whose real path lies outside
 
 ## Stack
 
-- Node.js >= 22.18, TypeScript. The floor is set by the server, which runs
-  `.ts` files with no flag (type stripping is unflagged from 22.18) and loads
-  `.env.local` through `--env-file-if-exists` (22.9). `.nvmrc` pins the
-  version CI runs, the current LTS line. The floor holds for the built server
-  too: `server/dist/` still imports `shared` as `.ts`, so a deployment needs
-  the workspace link and a type-stripping Node (ADR-0006).
+- Node.js >= 24, TypeScript. The floor is the LTS line `.nvmrc` pins and CI
+  runs, and `@types/node` follows its major (`.github/dependabot.yml` holds
+  it there), so the types never describe an API the runtime lacks. The
+  server's own needs sit below it: running `.ts` files with no flag and
+  loading `.env.local` through `--env-file-if-exists` both work unflagged in
+  every 24.x. The floor holds for the built server too: `server/dist/` still
+  imports `shared` as `.ts`, so a deployment needs the workspace link and a
+  type-stripping Node (ADR-0006).
 - Frontend: React 19
 - Backend: Express 5, Sequelize 6 (MySQL via `mysql2`)
 

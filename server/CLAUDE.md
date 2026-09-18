@@ -197,7 +197,7 @@ raised.
 This package is an npm workspace. Install from the repo root, not here; the
 scripts below still run from this directory, or from the root with `-w server`.
 
-- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.18)
+- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 24)
 - `npm run dev` — `node --watch ./src/index.ts`: Node's own watch mode
   restarts the process when the entry point or any module it imports
   changes. That includes `../shared/src`, the API types this package loads
@@ -983,9 +983,10 @@ The child inherits the runner's V8 coverage, so a coverage report lists
 
 ## Runtime notes
 
-- ESM package (`"type": "module"`), Node >= 22.18 — the first release that
-  strips types without `--experimental-strip-types`. `tsconfig.json` uses
-  `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
+- ESM package (`"type": "module"`), Node >= 24 — the repo's `engines` floor.
+  Every 24.x strips types without `--experimental-strip-types`, so nothing
+  here needs a flag. `tsconfig.json` uses `module`/`moduleResolution:
+NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `dev` run the `.ts` entry directly via Node (native TS
   type-stripping); `dev` only adds `--watch` on top.
 - Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
