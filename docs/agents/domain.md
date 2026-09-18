@@ -15,6 +15,7 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 `docs/specs/` holds one living spec per capability: what the system does now, as numbered requirements. `docs/specs/README.md` has the format, the ID rules and the index.
 
 - Before working in an area, read `docs/specs/<capability>/spec.md` for every capability the work touches.
+- If the capability has no spec yet, its behaviour is still described in the package `CLAUDE.md`; the migration moves one capability at a time.
 - Use its IDs and cite them — in a test title, in a comment that restates a rule, in an issue or a plan.
 - If your output contradicts a requirement, surface it explicitly rather than silently overriding it, as with an ADR:
 
@@ -30,6 +31,7 @@ Single-context repo (most repos):
 ├── docs/adr/
 │   ├── 0001-event-sourced-orders.md
 │   └── 0002-postgres-for-write-model.md
+├── docs/specs/
 ├── client/
 └── server/
 ```

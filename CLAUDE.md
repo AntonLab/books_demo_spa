@@ -228,10 +228,12 @@ Run these from the repo root before commit. All but `format:check` and
   twelve test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
 - `npm run specs:check` — repo-wide: fails when a requirement ID is declared
-  twice or under the wrong prefix, when anything cites an ID no spec in
-  `docs/specs/` declares, or when anything outside `docs/specs/` cites a
-  Retired one. It also lists, without failing, the live requirements no test
-  cites. See **The check** in `docs/specs/README.md`.
+  twice, under the wrong prefix, with a leading zero, or under the reserved
+  `EX` prefix; when a declaration line looks Retired but doesn't match the
+  exact form; when a spec is misplaced under `docs/specs/`; when anything
+  cites an ID no spec in `docs/specs/` declares; or when anything outside
+  `docs/specs/` cites a Retired one. It also lists, without failing, the live
+  requirements no test cites. See **The check** in `docs/specs/README.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
@@ -352,9 +354,13 @@ feature changes those specs first, and the code follows:
 
 1. Settle the design in the main session (grilling or brainstorming).
 2. Edit the living spec(s) there: new or changed requirements get new IDs, and
-   superseded ones are Retired. This is the branch's **first commit**
-   (`docs(specs): …`), so the PR diff shows the requirement change before any
-   code.
+   superseded ones are Retired, re-pointing every citation of a Retired ID
+   (comments and test titles) to its replacement in the same commit, so
+   `npm run specs:check` stays green between tasks. This is the branch's
+   **first commit** (`docs(specs): …`), so the PR diff shows the requirement
+   change before any code. If the capability has no spec yet, its behaviour is
+   still in the package `CLAUDE.md`: update it there instead, cite no ID, and
+   leave the spec to that capability's migration PR.
 3. Write the design doc to
    `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, citing those IDs,
    and dispatch `plan-writer` with its path.

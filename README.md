@@ -27,7 +27,8 @@ One root `package.json` declares both as npm workspaces, so a single
 
 What the app does — who may do what, which status code comes back, what a
 reader sees — is specified one capability at a time in
-[`docs/specs/`](docs/specs/README.md).
+[`docs/specs/`](docs/specs/README.md). A capability without a spec yet is
+still described in that package's `CLAUDE.md`.
 
 ## Prerequisites
 
@@ -113,8 +114,8 @@ Run these from the repo root.
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
-Every script except the Prettier pair and `specs:check` fans out over both
-workspaces; target one with npm's `-w` flag (`npm run dev -w client`,
+Every script except the Prettier pair and `specs:check` fans out over every
+workspace; target one with npm's `-w` flag (`npm run dev -w client`,
 `npm run build -w server`). The root deliberately defines no single-package
 aliases, so `-w` is the one way to narrow any script. Prettier is root-only
 because its config is repo-wide — the packages define no `format` script — and
