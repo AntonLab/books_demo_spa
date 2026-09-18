@@ -305,26 +305,24 @@ test('a non-401 outcome — malformed or successful — does not consume the per
   });
 });
 
-test('parallel attempts cannot bypass the budget: 20 at once still gets at most 10 through', async () => {
+test('parallel attempts cannot bypass the budget: 20 at once gets exactly 10 through, no more and no fewer', async () => {
   await withGatedLoginApp(async (client, release) => {
     // All 20 name the same login, so the binding budget is the 10-per-name
     // one. None of them can finish until the gate opens, so every one of
     // them arrives, and the limiter must decide on all 20 while none has
     // answered yet — exactly the window a check-then-record design leaves
-    // open for parallel requests to share one unspent count.
+    // open for parallel requests to share one unspent count. Exactly 10, not
+    // merely "at most 10", also catches a refusal that over-counts and
+    // starves the budget below what it should allow.
     const attempts = Array.from({ length: 20 }, () => client.login('bob', 401));
     try {
       // Give every request time to reach the server and run the limiter
       // before any of them is allowed to respond.
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      // Decided already, before a single response has gone out: at most 10
-      // were ever let through to the handler.
-      assert.equal(
-        client.handled() <= 10,
-        true,
-        `handled: ${client.handled()}`
-      );
+      // Decided already, before a single response has gone out: exactly 10
+      // were let through to the handler.
+      assert.equal(client.handled(), 10);
     } finally {
       // However the assertion above comes out, every gated request is still
       // waiting on this: release it, or a failure here leaves 20 open
@@ -335,13 +333,153 @@ test('parallel attempts cannot bypass the budget: 20 at once still gets at most 
     const statuses = (await Promise.all(attempts)).map(
       (response) => response.status
     );
-    assert.equal(
-      statuses.filter((status) => status === 401).length,
-      client.handled()
-    );
-    assert.equal(
-      statuses.filter((status) => status === 429).length,
-      20 - client.handled()
-    );
+    assert.equal(statuses.filter((status) => status === 401).length, 10);
+    assert.equal(statuses.filter((status) => status === 429).length, 10);
   });
+});
+
+test('a refusal leaves no count behind on either budget, including the one that did not refuse it', async () => {
+  // Built directly, not through withGatedLoginApp, so the test can inspect
+  // loginByIp's own state afterward rather than inferring it indirectly
+  // through more HTTP responses.
+  const limits = createAuthRateLimits();
+  let handled = 0;
+  let releaseGate: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+
+  const app = express();
+  app.set('trust proxy', 1);
+  app.use(express.json());
+  app.post('/login', limitFailedLogins(limits), (req, res) => {
+    handled += 1;
+    void gate.then(() => {
+      const { status } = req.body as { status: number };
+      res.status(status).end();
+    });
+  });
+  app.use(errorHandler);
+
+  const server = app.listen(0);
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  const base = `http://127.0.0.1:${port}`;
+  const loginAs = (login: string, status: number) =>
+    fetch(`${base}/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': CLIENT,
+      },
+      body: JSON.stringify({ login, password: 'irrelevant', status }),
+    });
+
+  try {
+    // 50 different names from the same address, all held open on the gate:
+    // the per-IP budget (50) is now fully claimed by in-flight requests,
+    // none of them settled as a 401 yet — a budget "at its limit" only
+    // because of claims still in flight, not because of 50 real failures.
+    const inFlight = Array.from({ length: 50 }, (_, index) =>
+      loginAs(`held-${index}`, 400)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(handled, 50);
+
+    // Five more attempts, each a fresh name, arrive and are refused by the
+    // per-IP budget alone (their own name budget has room). If a refusal
+    // left its count behind — on either budget — each of these would push
+    // the address further over 50, on top of the 50 already claimed.
+    const refused = await Promise.all(
+      Array.from({ length: 5 }, (_, index) => loginAs(`late-${index}`, 400))
+    );
+    for (const response of refused) {
+      assert.equal(response.status, 429);
+    }
+    // None of the refused attempts ever reached the handler.
+    assert.equal(handled, 50);
+
+    releaseGate();
+    const inFlightStatuses = (await Promise.all(inFlight)).map(
+      (response) => response.status
+    );
+    assert.deepEqual(inFlightStatuses, Array<number>(50).fill(400));
+    // Give every 'finish' handler a moment to run before inspecting state.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // None of the 50 in-flight requests was a 401, so settling them as 400
+    // must free the per-IP budget completely — back to no window at all,
+    // not merely back down to 50. A residual left behind by the 5 refusals
+    // would show up here as a window that is still open (a non-zero
+    // retryAfterMs) rather than fully forgotten.
+    assert.deepEqual(limits.loginByIp.peek(CLIENT), {
+      allowed: true,
+      retryAfterMs: 0,
+    });
+  } finally {
+    limits.stop();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test('an aborted connection releases its claim, even though finish never fires', async () => {
+  const limits = createAuthRateLimits();
+  let destroy: (() => void) | undefined;
+  let notifyReady: () => void = () => {};
+  const ready = new Promise<void>((resolve) => {
+    notifyReady = resolve;
+  });
+  // Only the very first request is left hanging; every one after it answers
+  // normally, so the 10 follow-up probes below get a real response.
+  let captured = false;
+
+  const app = express();
+  app.set('trust proxy', 1);
+  app.use(express.json());
+  app.post('/login', limitFailedLogins(limits), (req, res) => {
+    if (!captured) {
+      captured = true;
+      // Left open rather than answered: only 'close' ever fires for this
+      // one, never 'finish' — the abort path release-on-close exists for.
+      destroy = () => res.socket?.destroy();
+      notifyReady();
+      return;
+    }
+    const { status } = req.body as { status: number };
+    res.status(status).end();
+  });
+  app.use(errorHandler);
+
+  const server = app.listen(0);
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  const base = `http://127.0.0.1:${port}`;
+  const login = (status: number) =>
+    fetch(`${base}/login`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': CLIENT,
+      },
+      body: JSON.stringify({ login: 'bob', password: 'irrelevant', status }),
+    });
+
+  try {
+    // The client sees the destroyed connection as a network error.
+    const aborted = login(200).catch(() => undefined);
+    await ready;
+    destroy?.();
+    await aborted;
+
+    // The claim is gone, not merely capped: the full ten-per-name budget is
+    // still there for genuine failures, proving nothing was left spent by
+    // the aborted attempt.
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      assert.equal((await login(401)).status, 401);
+    }
+    assert.equal((await login(401)).status, 429);
+  } finally {
+    limits.stop();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
 });

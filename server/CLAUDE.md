@@ -320,7 +320,8 @@ Each layer answers a question the others cannot:
 - `src/rateLimit.ts` — `createRateLimiter`: a fixed-window, in-memory
   limiter (`hit`/`peek`/`release`/`reset`/`stop`) with lazy expiry and an
   `unref()`ed sweep. `release` gives back one `hit` that turned out not to
-  count — see **Sign-in rate limiting** under Operations.
+  count, deleting the key once its count reaches 0 rather than leaving an
+  empty window behind — see **Sign-in rate limiting** under Operations.
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1077,20 +1078,30 @@ of `validate` so a refused request costs no parsing, no lookup and no argon2:
   claim when the response finishes.** A check that ran first and recorded
   only later would let unlimited parallel attempts each read the same
   unspent count while they all wait on the lookup and argon2, so both
-  budgets are `hit` up front instead: a request that either one refuses is
-  turned away before the handler ever runs, and any claim the _other_ budget
-  had already accepted is released rather than left spent on a request that
-  was never let through. Once the request runs, a 401 is the only outcome
-  that keeps the claim; anything else — a 400, a 403 (a blocked account), a
-  2xx, or the connection closing before either — releases both claims, and a
-  2xx additionally clears the rest of the IP + login budget's own history.
-  The per-IP budget survives a success on its own, or signing in to one real
+  budgets are `hit` up front instead. A request either budget refuses is
+  turned away before the handler ever runs, and **both** claims are released
+  regardless of which budget did the refusing — `hit` always increments even
+  on the budget that refuses, so leaving that one un-released would let a
+  burst of refused attempts keep inflating the very count that refused them,
+  locking the address or the name out for longer than its own limit ever
+  earned. A refusal this way leaves nothing behind on either budget. Once the
+  request runs, a 401 is the only outcome that keeps the claim; anything
+  else — a 400, a 403 (a blocked account), a 2xx, or the connection closing
+  before either — frees both claims **entirely**, not merely decrements them
+  (a released count that reaches 0 drops the key outright rather than
+  leaving an empty window behind — see `src/rateLimit.ts` below), and a 2xx
+  additionally clears the rest of the IP + login budget's own history. The
+  per-IP budget survives a success on its own, or signing in to one real
   account would buy fresh guesses at every other.
-- **The login is trimmed and lower-cased** before it becomes part of a key,
-  so a change of case or stray whitespace buys no fresh budget. `login`
-  itself is case-sensitive (`utf8mb4_0900_as_cs`), so two accounts that
-  differ only in case share one budget per address — the limit errs toward
-  refusing.
+- **The login is trimmed, lower-cased and hashed** (SHA-256, hex) before it
+  becomes the name half of the IP + login key, so a change of case or stray
+  whitespace buys no fresh budget, and the key stays a fixed size whatever
+  the body carries — `loginSchema` puts no cap on `login`, this middleware
+  runs ahead of `validate`, and `express.json()` alone allows up to 100 KB;
+  without hashing, an unbounded login would leave an unbounded key sitting in
+  the limiter's map until the sweep drops it. `login` itself is
+  case-sensitive (`utf8mb4_0900_as_cs`), so two accounts that differ only in
+  case share one budget per address — the limit errs toward refusing.
 - **Register and the reset request count every request**, up front, so
   malformed spam spends the budget too. A body that is not JSON at all never
   reaches the route: `express.json()` refuses it first.
