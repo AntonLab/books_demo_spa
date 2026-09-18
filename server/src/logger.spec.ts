@@ -34,8 +34,8 @@ test('includes the level and the message in the formatted line', () => {
   createLogger(sink).info('listening on 4000');
 
   assert.equal(calls.length, 1);
-  assert.match(String(calls[0].args[0]), /INFO/);
-  assert.match(String(calls[0].args[0]), /listening on 4000/);
+  assert.match(String(calls[0]!.args[0]), /INFO/);
+  assert.match(String(calls[0]!.args[0]), /listening on 4000/);
 });
 
 test('passes meta through as a second argument only when given', () => {
@@ -45,7 +45,7 @@ test('passes meta through as a second argument only when given', () => {
   log.info('no meta');
   log.error('with meta', { code: 'E_TEST' });
 
-  assert.equal(calls[0].args.length, 1);
-  assert.equal(calls[1].args.length, 2);
-  assert.deepEqual(calls[1].args[1], { code: 'E_TEST' });
+  assert.equal(calls[0]!.args.length, 1);
+  assert.equal(calls[1]!.args.length, 2);
+  assert.deepEqual(calls[1]!.args[1], { code: 'E_TEST' });
 });

@@ -522,6 +522,11 @@ off `@typescript-eslint/no-require-imports`.
   deliberate fire-and-forget the same way, with the reason beside it; never
   with an `eslint-disable`. The webpack configs, `jest.config.mjs` and
   `eslint.config.mjs` are JavaScript and are linted without types.
+- `noUncheckedIndexedAccess` is on (root `tsconfig.base.json`), so
+  `items[0]` is `T | undefined`. Component code handles the miss — `?.`/`??`
+  where absence is legitimate, an early return otherwise; tests
+  (`*.test.ts(x)` and `src/test/`) may write `items[0]!`, since a miss fails
+  the test anyway.
 
 ## Testing
 

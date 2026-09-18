@@ -99,7 +99,7 @@ describe('RegisterModal submission', () => {
       role: 'user',
     });
     // The server has no `confirm` field; zod would strip it silently.
-    const sent = mockedAuth.register.mock.calls[0][0];
+    const sent = mockedAuth.register.mock.calls[0]![0];
     expect(sent).not.toHaveProperty('confirm');
   });
 

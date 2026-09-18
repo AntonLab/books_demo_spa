@@ -1047,6 +1047,12 @@ snippets — still get wrong. Verified against the 5.x router and request source
 - No synchronous filesystem calls in request handlers; no `console.log` for logging
   in production code — use a logger. ESLint flags `console` (`no-console`) and
   `any` (`@typescript-eslint/no-explicit-any`).
+- **Index reads are checked**: `noUncheckedIndexedAccess` (root
+  `tsconfig.base.json`) types `items[i]` as `T | undefined`. Application
+  code — `seed.ts` included — handles the miss with an early return, a throw
+  that names what was missing (`itemAt` in `seed.ts`), or `?.`/`??` where
+  absence is legitimate. Only test files (`*.spec.ts`, `*.testkit.ts`) may
+  assert it away with `!`.
 
 ## Sequelize & MySQL conventions
 

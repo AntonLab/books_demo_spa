@@ -170,7 +170,7 @@ describe('userRepository against real MySQL', { skip }, () => {
       status: 'blocked',
     });
     assert.equal(blocked.total, 1);
-    assert.equal(blocked.items[0].login, 'b');
+    assert.equal(blocked.items[0]!.login, 'b');
   });
 
   test('search stays case-insensitive even though login is not', async () => {

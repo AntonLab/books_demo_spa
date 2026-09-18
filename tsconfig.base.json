@@ -15,6 +15,13 @@
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    // An index read (`items[i]`, `record[key]`) is typed `T | undefined`, as
+    // it can be at runtime. Application code handles the miss — an early
+    // return, a throw naming what was missing, or `?.`/`??` where absence is
+    // legitimate. Only test files (*.spec.ts, *.test.ts(x), *.testkit.ts,
+    // client/src/test/) may assert it away with `!`, since a miss there fails
+    // the test anyway.
+    "noUncheckedIndexedAccess": true
   }
 }

@@ -58,9 +58,9 @@ test('--force against another database warns, naming it, and does not throw', ()
   assertSafeTarget(configFor('development', 'elsewhere'), true, logger);
 
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].level, 'warn');
-  assert.match(calls[0].message, /--force given for a database other than/);
-  assert.deepEqual(calls[0].meta, { database: 'elsewhere' });
+  assert.equal(calls[0]!.level, 'warn');
+  assert.match(calls[0]!.message, /--force given for a database other than/);
+  assert.deepEqual(calls[0]!.meta, { database: 'elsewhere' });
 });
 
 test('--force against the demo database passes silently', () => {
