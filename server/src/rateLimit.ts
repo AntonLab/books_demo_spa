@@ -16,8 +16,11 @@ export interface RateLimiter {
   peek(key: string): RateLimitState;
   // Gives back one hit that turned out not to count, such as a request that
   // was tentatively counted on arrival but did not end in the outcome the
-  // budget tracks. Floors at 0 and never touches the window's end; a no-op
-  // when the key holds no open window.
+  // budget tracks. Floors at 0, deleting the key once its count reaches 0
+  // rather than leaving an empty window behind — an unbounded stream of
+  // requests that are counted and then released must not grow the map
+  // without limit. While the count stays above 0 the window's end is
+  // unchanged. A no-op when the key holds no open window.
   release(key: string): void;
   // Forgets the key's window.
   reset(key: string): void;
@@ -101,10 +104,12 @@ export function createRateLimiter({
       if (window === undefined) {
         return;
       }
-      windows.set(key, {
-        count: Math.max(0, window.count - 1),
-        endsAt: window.endsAt,
-      });
+      const count = Math.max(0, window.count - 1);
+      if (count === 0) {
+        windows.delete(key);
+        return;
+      }
+      windows.set(key, { count, endsAt: window.endsAt });
     },
 
     reset(key) {

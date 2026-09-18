@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Request, RequestHandler, Response } from 'express';
 import { createRateLimiter, type RateLimiter } from '../rateLimit.ts';
 import { TooManyRequestsError } from '../types/errors.ts';
@@ -79,6 +80,20 @@ function normalisedLogin(body: unknown): string {
   return '';
 }
 
+// The name half of the IP+login key, hashed (SHA-256, hex) rather than kept
+// verbatim. loginSchema puts no cap on login, and this runs ahead of
+// validate, so an unbounded body (express.json() allows up to 100 KB) would
+// otherwise leave an unbounded key sitting in the limiter's map until the
+// sweep drops it — a cheap way to grow retained memory without ever failing
+// a single login. A fixed-size digest keeps the key's size constant whatever
+// the client sends.
+function loginNameKey(address: string, body: unknown): string {
+  const digest = createHash('sha256')
+    .update(normalisedLogin(body))
+    .digest('hex');
+  return JSON.stringify([address, digest]);
+}
+
 function refusal(res: Response, retryAfterMs: number): TooManyRequestsError {
   // Whole seconds, rounded up, so a client that waits exactly this long is
   // not refused again by the same window.
@@ -116,18 +131,22 @@ export function limitFailedLogins(
 ): RequestHandler {
   return (req, res, next) => {
     const address = addressOf(req);
-    const nameKey = JSON.stringify([address, normalisedLogin(req.body)]);
+    const nameKey = loginNameKey(address, req.body);
 
     const nameHit = limits.loginByIpAndLogin.hit(nameKey);
     const addressHit = limits.loginByIp.hit(address);
     const refused = [nameHit, addressHit].filter((state) => !state.allowed);
 
     if (refused.length > 0) {
-      // The other budget may have had room and already counted this
-      // request: a request refused here never reaches the handler, so it
-      // must not spend a budget it was never let through to try.
-      if (nameHit.allowed) limits.loginByIpAndLogin.release(nameKey);
-      if (addressHit.allowed) limits.loginByIp.release(address);
+      // A request refused here never reaches the handler, so it was never
+      // really an attempt: both budgets give back the hit this hit added,
+      // including the one that did not refuse it — hit() always increments,
+      // even on the budget that refuses, so leaving that one un-released
+      // would let a burst of refused attempts keep inflating the count that
+      // refused them, locking the budget for longer than its own limit ever
+      // earned.
+      limits.loginByIpAndLogin.release(nameKey);
+      limits.loginByIp.release(address);
       next(
         refusal(res, Math.max(...refused.map((state) => state.retryAfterMs)))
       );

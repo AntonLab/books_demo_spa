@@ -98,6 +98,16 @@ test('release never takes the count below zero', (t) => {
   );
 });
 
+test('release forgets the key once its count reaches zero, rather than leaving an empty window in the map', (t) => {
+  const limiter = limiterOn(t, { now: 0 });
+  limiter.hit('a');
+
+  limiter.release('a');
+
+  assert.equal(limiter.size(), 0);
+  assert.deepEqual(limiter.peek('a'), { allowed: true, retryAfterMs: 0 });
+});
+
 test('release does nothing when the key has no open window', (t) => {
   const clock = { now: 0 };
   const limiter = limiterOn(t, clock);
@@ -120,6 +130,10 @@ test('release does nothing when the key has no open window', (t) => {
 test('release does not move the window’s end', (t) => {
   const clock = { now: 0 };
   const limiter = limiterOn(t, clock);
+  // Two hits, so the released count (1) stays above zero and the window
+  // stays open — release deletes the key outright once it reaches zero,
+  // which would make "the window's end" meaningless to ask about.
+  limiter.hit('a');
   limiter.hit('a');
 
   clock.now = 400;
