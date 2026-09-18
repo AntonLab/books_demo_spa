@@ -44,6 +44,9 @@ export function createUnusedRepository<T>(name: string): T {
     listAuthors: unreachable,
     findByEmail: unreachable,
     findPasswordHashById: unreachable,
+    // The expiry purge's. Unreachable from any route, like the rest.
+    deleteExpired: unreachable,
+    deleteExpiredBefore: unreachable,
   } as T;
 }
 
