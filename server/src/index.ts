@@ -1,5 +1,5 @@
 import { createApp } from './app.ts';
-import { createLoggerResetDelivery } from './delivery/resetDelivery.ts';
+import { createResetDelivery } from './delivery/resetDelivery.ts';
 import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
@@ -62,7 +62,11 @@ async function main(): Promise<void> {
     notificationRepository: createSequelizeNotificationRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
-    resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
+    resetDelivery: createResetDelivery(
+      config.resetDelivery,
+      logger,
+      config.appBaseUrl
+    ),
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
   });
