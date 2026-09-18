@@ -4,8 +4,11 @@ What the system does **now**, one spec per capability: who may do what, which
 status code comes back, what a reader sees. A feature changes its specs first
 and the code follows; the steps are under **Workflow** in the root `CLAUDE.md`.
 The words come from the glossary, [`CONTEXT.md`](../../CONTEXT.md), and the
-decisions behind the rules from [`docs/adr/`](../adr/). The `CLAUDE.md` files
-keep the engineering guide only: layout, commands, conventions and tests.
+decisions behind the rules from [`docs/adr/`](../adr/). The migration moves
+one capability at a time: until a capability has a row in the
+[Index](#index) below, its behaviour is still described in the package
+`CLAUDE.md` files, which otherwise keep the engineering guide only — layout,
+commands, conventions and tests.
 
 `npm run specs:check` holds every citation in the repo to these specs; see
 [The check](#the-check).
@@ -17,7 +20,8 @@ keep the engineering guide only: layout, commands, conventions and tests.
 
 A capability gets its row here, linked to its spec, in the PR that writes it.
 Its prefix is already reserved under
-[Capabilities and prefixes](#capabilities-and-prefixes).
+[Capabilities and prefixes](#capabilities-and-prefixes). Until then, its
+behaviour is still described in the package `CLAUDE.md` files.
 
 ## Format
 
@@ -102,6 +106,8 @@ only if it adds something, and cites the first.
   one sequence per prefix.
 - Numbers are assigned in order of writing, never reused and never
   renumbered.
+- An edit that only rewords a requirement keeps its ID; a change to what it
+  demands retires the old ID and adds a new one.
 - A requirement that stops applying stays where it is, retired:
 
   ```markdown
@@ -109,7 +115,9 @@ only if it adds something, and cites the first.
   ```
 
   An old citation then never silently points at a different rule. Only
-  `docs/specs/` may still cite a Retired ID.
+  `docs/specs/` may still cite a Retired ID, and retiring one re-points every
+  other citation of it — comments and test titles — in the same commit, so
+  `specs:check` stays green between tasks.
 
 ### Out of scope
 
@@ -181,8 +189,13 @@ It fails, naming the file and line, when:
 
 - a spec has no `Prefix:` line;
 - two specs declare the same prefix;
+- a spec declares the reserved `EX` prefix;
 - an ID is declared twice;
 - an ID is declared in a spec whose prefix is not its own;
+- a declaration's number starts with `0`;
+- a declaration line looks Retired but does not match the exact form;
+- a `.md` file sits under `docs/specs/` that is neither `README.md` nor
+  `<capability>/spec.md`;
 - a reference names an ID no spec declares;
 - a reference outside `docs/specs/` names a Retired ID.
 
