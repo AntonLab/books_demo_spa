@@ -75,6 +75,10 @@ function createFakeSessions(users: UserRepository) {
       }
       return removed;
     },
+    // The expiry purge runs on a timer, never through a route.
+    async deleteExpired() {
+      throw new Error('the expiry purge is not reachable from a route');
+    },
   };
 
   return { repository, rows };
@@ -115,6 +119,10 @@ function createFakeResets(
       await users.update(row.userId, { password: newPassword });
       await sessions.repository.deleteAllForUser(row.userId);
       return true;
+    },
+    // The expiry purge runs on a timer, never through a route.
+    async deleteExpiredBefore() {
+      throw new Error('the expiry purge is not reachable from a route');
     },
   };
 
