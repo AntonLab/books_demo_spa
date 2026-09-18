@@ -304,7 +304,8 @@ Each layer answers a question the others cannot:
   error-handling middleware
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
-- `src/password.ts` — argon2id password hashing and verification
+- `src/password.ts` — argon2id password hashing and verification; argon2id
+  is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
   `hashToken()` (SHA-256) for session and reset tokens, and `xsrfTokenFor()`,
   a session's XSRF token
@@ -995,6 +996,16 @@ NodeNext` to match, and emits ESM to `dist/`.
   `rewriteRelativeImportExtensions: true`, so `npm run build` rewrites those
   same imports to `.js` when compiling to `dist/`, and the same source runs
   unmodified in both modes.
+- `tsconfig.json` sets `erasableSyntaxOnly` and `verbatimModuleSyntax`, as
+  `shared/tsconfig.json` does: Node strips types rather than compiling them,
+  so no enum, namespace or parameter property may appear, and a type-only
+  import must say `type`. An ambient `const enum` from a dependency is
+  refused as well — which is why `password.ts` names no argon2 `algorithm`
+  and relies on `@node-rs/argon2`'s argon2id default, pinned by
+  `password.spec.ts` through the hash's PHC prefix
+  (`$argon2id$v=19$m=19456,t=2,p=1$` outside tests).
+- `target` and `lib` are `ES2024`, which Node 24 runs in full. The client and
+  `shared` stay on ES2020.
 
 ## Express 5 notes
 
