@@ -99,37 +99,70 @@ export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
   };
 }
 
-// Login: only a failure counts, so the answer decides what is recorded. The
-// budgets are peeked first — a request either one refuses never reaches
-// validate, the lookup or argon2 — and written when the response finishes:
-// a 401 against both, a 2xx by clearing this name's. The per-address budget
-// survives a success, or signing in to one real account would buy fresh
-// guesses at every other.
+// Login: only a failure counts, but both budgets are counted the moment the
+// request arrives, before validate, the lookup or argon2 run — never on a
+// later check-then-record path. A request is counted, provisionally, against
+// both the instant it is seen; the reservation is given back unless the
+// answer turns out to be a 401. Counting up front is what closes the race a
+// peek-then-record design leaves open: with the count written only when the
+// response finishes, every request still waiting on argon2 reads the same
+// unspent budget, so C requests fired at once cost only about one slot
+// between them instead of C. Hitting first means each arrival claims its own
+// slot as it is seen — Node runs one request's synchronous middleware to
+// completion before starting the next's, so there is no window for two
+// arrivals to read the same count.
 export function limitFailedLogins(
   limits: Pick<AuthRateLimits, 'loginByIpAndLogin' | 'loginByIp'>
 ): RequestHandler {
   return (req, res, next) => {
     const address = addressOf(req);
     const nameKey = JSON.stringify([address, normalisedLogin(req.body)]);
-    const refused = [
-      limits.loginByIpAndLogin.peek(nameKey),
-      limits.loginByIp.peek(address),
-    ].filter((state) => !state.allowed);
+
+    const nameHit = limits.loginByIpAndLogin.hit(nameKey);
+    const addressHit = limits.loginByIp.hit(address);
+    const refused = [nameHit, addressHit].filter((state) => !state.allowed);
 
     if (refused.length > 0) {
+      // The other budget may have had room and already counted this
+      // request: a request refused here never reaches the handler, so it
+      // must not spend a budget it was never let through to try.
+      if (nameHit.allowed) limits.loginByIpAndLogin.release(nameKey);
+      if (addressHit.allowed) limits.loginByIp.release(address);
       next(
         refusal(res, Math.max(...refused.map((state) => state.retryAfterMs)))
       );
       return;
     }
 
+    // Settled exactly once: on finish, or — if the connection closes first,
+    // an abort that never fires 'finish' — on close instead, so a request
+    // that never got an answer never leaves its claim spent either.
+    let settled = false;
     res.on('finish', () => {
+      if (settled) return;
+      settled = true;
       if (res.statusCode === 401) {
-        limits.loginByIpAndLogin.hit(nameKey);
-        limits.loginByIp.hit(address);
-      } else if (res.statusCode >= 200 && res.statusCode < 300) {
+        // A genuine failure: both claims stay spent.
+        return;
+      }
+      // Anything else gives both claims back — only a 401 is an attempt
+      // worth counting.
+      limits.loginByIpAndLogin.release(nameKey);
+      limits.loginByIp.release(address);
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        // A success also clears the rest of this name's own history, or
+        // signing in to one real account would buy fresh guesses at every
+        // other name sharing the address.
         limits.loginByIpAndLogin.reset(nameKey);
       }
+    });
+    res.on('close', () => {
+      if (settled) return;
+      settled = true;
+      // No answer ever went out, so this proves nothing about the password:
+      // give both claims back, never the success reset above.
+      limits.loginByIpAndLogin.release(nameKey);
+      limits.loginByIp.release(address);
     });
     next();
   };
