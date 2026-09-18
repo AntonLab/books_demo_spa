@@ -317,6 +317,9 @@ Each layer answers a question the others cannot:
   bind error reported instead of ignored (see **Operations**)
 - `src/expiryPurge.ts` — `startExpiryPurge`: the hourly delete of expired
   sessions and old reset tokens (see **Operations**)
+- `src/rateLimit.ts` — `createRateLimiter`: a fixed-window, in-memory
+  limiter (`hit`/`peek`/`reset`/`stop`) with lazy expiry and an `unref()`ed
+  sweep
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
