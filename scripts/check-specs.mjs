@@ -135,9 +135,9 @@ function checkSpecs(root) {
     .filter(({ lines }) => lines !== null);
   const specs = files.filter(({ file }) => SPEC_FILE.test(file));
   const { prefixes, declared } = readSpecs(specs, errors);
-  checkReferences(files, prefixes, declared, errors);
+  const cited = checkReferences(files, prefixes, declared, errors);
   const live = [...declared].filter(([, where]) => !where.retired);
-  const uncovered = [];
+  const uncovered = live.filter(([id]) => !cited.has(id));
   errors.sort((a, b) =>
     a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1
   );

@@ -258,3 +258,36 @@ test('skips a tracked file deleted from the working tree', (t) => {
   assert.equal(result.stderr, '');
   assert.equal(result.status, 0);
 });
+
+test('lists, without failing, every live requirement no test file cites', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec(
+      'FOO',
+      '**FOO-1** — Cited by a .spec.ts file.',
+      '**FOO-2** — Cited by a .test.ts file.',
+      '**FOO-3** — Cited by a .test.tsx file.',
+      '**FOO-4** — Cited by a .testkit.ts file.',
+      '**FOO-5** — Cited by production code only.',
+      '**FOO-6** — _Retired 2026-10-01: replaced by FOO-5._'
+    ),
+    'server/a.spec.ts': "test('FOO-1: a rule', () => {});\n",
+    'server/b.test.ts': "test('FOO-2: a rule', () => {});\n",
+    'client/c.test.tsx': "it('FOO-3: a rule', () => {});\n",
+    'server/d.testkit.ts': '// FOO-4: a helper that pins it.\n',
+    'server/e.ts': '// FOO-5: the gist of the rule.\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.stderr, '');
+  assert.equal(result.status, 0);
+  assert.equal(
+    result.stdout,
+    [
+      'specs:check: 1 live requirement(s) no test cites:',
+      '  FOO-5  docs/specs/foo/spec.md:11',
+      'specs:check: 1 spec(s), 5 live requirement(s), 0 error(s)',
+      '',
+    ].join('\n')
+  );
+});
