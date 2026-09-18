@@ -76,8 +76,8 @@ describe('BookCard', () => {
         book={{
           ...book,
           authors: [
-            { ...book.authors[0], avatarUrl: '/api/users/3/avatar?v=1' },
-            book.authors[1],
+            { ...book.authors[0]!, avatarUrl: '/api/users/3/avatar?v=1' },
+            book.authors[1]!,
           ],
         }}
       />

@@ -21,9 +21,12 @@ of them read. Early scaffold — most feature directories exist but are empty.
   `typecheck`, `lint` and `lint:fix` only; `wire.typetest.ts` pins `Wire<T>`
   with type-level assertions that `typecheck` checks.
 - `tsconfig.base.json` — compiler options shared by every package; each
-  `tsconfig.json` extends it with a relative path. Keep `include`, `exclude` and
-  `paths` out of it: TypeScript resolves those against the file that declares
-  them, so they would point at the repo root instead of the package.
+  `tsconfig.json` extends it with a relative path. It sets
+  `noUncheckedIndexedAccess` for all three: an index read is `T | undefined`,
+  application code handles the miss explicitly, and only test files assert
+  it away with `!`. Keep `include`, `exclude` and `paths` out of it:
+  TypeScript resolves those against the file that declares them, so they
+  would point at the repo root instead of the package.
 - `eslint.config.base.mjs` — the shared flat-config core, built with ESLint's
   `defineConfig` and exported as
   `createConfig({ ignores, tsconfigRootDir }, ...packageConfigs)`. Each
