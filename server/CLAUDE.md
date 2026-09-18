@@ -339,7 +339,8 @@ Each layer answers a question the others cannot:
   `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
   `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
-  `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
+  `withAuthenticatedApp`, `AUTH_COOKIE`, `json`, `defaultDeps`,
+  `unlimitedAuthRateLimits`); `tsconfig.build.json`
   excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
   `dist/`. See **Test layers** for which fakes the route specs run on.
 - `src/app.spec.ts` — the full-stack smoke suite; see **Test layers**
@@ -391,7 +392,7 @@ Each layer answers a question the others cannot:
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
   `requirePermission.ts`, `optionalAuth.ts` (unmounted —
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
-  three build on), `securityHeaders.ts` (`noSniff`, see **Security headers** under Operations), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
+  three build on), `securityHeaders.ts` (`noSniff`, see **Security headers** under Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
@@ -412,16 +413,16 @@ Each layer answers a question the others cannot:
 with zod and throws on anything malformed rather than starting with a broken
 value.
 
-| Variable                  | Default                   | Notes                                                                                                                                                                                                    |
-| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`             | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                   |
-| `PORT`                    | `4000`                    | The API's own port.                                                                                                                                                                                      |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                                                                                                                          |
-| `DB_NAME`                 | `books_demo_spa`          |                                                                                                                                                                                                          |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                         |
-| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                     |
-| `TRUST_PROXY`             | `0`                       | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. |
-| `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.     |
+| Variable                  | Default                   | Notes                                                                                                                                                                                                                                                                       |
+| ------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`             | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                                                                                      |
+| `PORT`                    | `4000`                    | The API's own port.                                                                                                                                                                                                                                                         |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                                                                                                                                                                                             |
+| `DB_NAME`                 | `books_demo_spa`          |                                                                                                                                                                                                                                                                             |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                                                                                            |
+| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                                                                                        |
+| `TRUST_PROXY`             | `0`                       | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. The sign-in rate limits key on `req.ip`, so set it behind a proxy. |
+| `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.                                                                        |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
 (default `books_demo_spa_test`, the prefix of the twelve test schemas) and
@@ -600,8 +601,11 @@ The child inherits the runner's V8 coverage, so a coverage report lists
 - **Login always opens a new session** rather than reusing an existing row,
   which is what rules out session fixation.
 - **Reset requests always answer 202**, whether or not the address exists —
-  branching would make the endpoint an account-enumeration oracle. A new
-  request invalidates any outstanding token first, so two live links never
+  branching would make the endpoint an account-enumeration oracle. (Past the
+  address's hourly limit it is refused with 429 before anything is looked
+  up — see **Sign-in rate limiting** under Operations — which says nothing
+  about any account either.) A new request invalidates any outstanding token
+  first, so two live links never
   coexist. Tokens last one hour, far less than a session's seven days, because
   a link sits in a mailbox.
 - **Reset confirmation revokes every session** for that user, in the same
@@ -1054,6 +1058,52 @@ it after `syncPermissions()`: one pass at boot, then one an hour on an
 `unref()`ed interval, which the graceful shutdown stops. A pass logs its
 counts at `info` only when it deleted something, and a failure at `error`;
 it never rejects, so a database hiccup costs one pass, not the process.
+
+### Sign-in rate limiting
+
+Three auth routes carry an in-memory, fixed-window limit
+(`middleware/authRateLimit.ts`, built on `src/rateLimit.ts`), mounted ahead
+of `validate` so a refused request costs no parsing, no lookup and no argon2:
+
+| Route                                   | Key        | Limit         | What counts          |
+| --------------------------------------- | ---------- | ------------- | -------------------- |
+| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed attempts only |
+| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed attempts only |
+| `POST /api/auth/register`               | IP         | 5 per hour    | every request        |
+| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request        |
+
+- **Login counts only failures, so it checks first and records last.** It
+  peeks both budgets and refuses if either is spent; otherwise the request
+  runs, and when the response finishes a 401 is counted against both, while
+  a 2xx clears the IP + login budget. The per-IP budget survives a success,
+  or signing in to one real account would buy fresh guesses at every other.
+  A 400 or a 403 (a blocked account) counts nowhere.
+- **The login is trimmed and lower-cased** before it becomes part of a key,
+  so a change of case or stray whitespace buys no fresh budget. `login`
+  itself is case-sensitive (`utf8mb4_0900_as_cs`), so two accounts that
+  differ only in case share one budget per address — the limit errs toward
+  refusing.
+- **Register and the reset request count every request**, up front, so
+  malformed spam spends the budget too. A body that is not JSON at all never
+  reaches the route: `express.json()` refuses it first.
+- **A refusal is 429**, with `Retry-After` in whole seconds, rounded up, and
+  `{ "error": "Too many attempts. Try again in N minutes." }` — singular,
+  `"...in 1 minute."`, when N is exactly 1 — N rounded up and at least 1
+  (`TooManyRequestsError`, rendered by `errorHandler`). The client's auth
+  modals already show `error.message`.
+- **Keyed on `req.ip`**, which `TRUST_PROXY` governs: behind a proxy, set it,
+  or every client shares the proxy's budget.
+- **Memory, not the database.** Nothing is written, and a limited Account is
+  not Blocked — the two are unrelated. Expired windows are dropped when their
+  key is next touched and swept once a window by an `unref()`ed interval,
+  which the graceful shutdown stops. Each process keeps its own counts, and a
+  restart forgets them.
+- `createApp` requires the set (`AppDeps.authRateLimits`); `index.ts` builds
+  the real one with `createAuthRateLimits()`. Every test harness passes
+  `unlimitedAuthRateLimits()` from `routes/routeTestKit.testkit.ts` instead,
+  since the suites sign in far more often than the limits allow;
+  `middleware/authRateLimit.spec.ts` and the rate-limit cases in
+  `routes/authRoutes.spec.ts` pass the real one.
 
 ## Runtime notes
 

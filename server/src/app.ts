@@ -1,6 +1,7 @@
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
 import type { ResetDelivery } from './delivery/resetDelivery.ts';
+import type { AuthRateLimits } from './middleware/authRateLimit.ts';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
@@ -36,6 +37,10 @@ export interface AppDeps {
   // TRUST_PROXY: how many proxy hops in front of the API may name the client
   // in X-Forwarded-For. Governs req.ip.
   trustProxy: number;
+  // The sign-in rate limits (middleware/authRateLimit.ts). Required, so no
+  // app is ever built without them by accident; tests pass
+  // unlimitedAuthRateLimits() from the route test kit.
+  authRateLimits: AuthRateLimits;
 }
 
 // No listen() here: tests bind an ephemeral port themselves.

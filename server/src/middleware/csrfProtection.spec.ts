@@ -5,7 +5,10 @@ import type { AddressInfo } from 'node:net';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { createApp, type AppDeps } from '../app.ts';
-import { createUnusedRepository } from '../routes/routeTestKit.testkit.ts';
+import {
+  createUnusedRepository,
+  unlimitedAuthRateLimits,
+} from '../routes/routeTestKit.testkit.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import {
   createCrossOriginProtection,
@@ -226,6 +229,7 @@ describe('the app', () => {
     resetDelivery: createUnusedRepository('resetDelivery'),
     trustedOrigin: TRUSTED_ORIGIN,
     trustProxy: 0,
+    authRateLimits: unlimitedAuthRateLimits(),
   });
 
   // Refused before any route or repository is reached: every repository here

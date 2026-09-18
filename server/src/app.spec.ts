@@ -29,6 +29,7 @@ import { createSequelizePasswordResetRepository } from './repositories/passwordR
 import { createSequelizeSessionRepository } from './repositories/sessionRepository.ts';
 import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
 import { createSequelizeUserRepository } from './repositories/userRepository.ts';
+import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
 import type { BookDetail, PublicBook } from './types/book.ts';
 import type { PublicChapter } from './types/chapter.ts';
 import type { CommentWithAuthor, PublicComment } from './types/comment.ts';
@@ -241,9 +242,11 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   before(async () => {
     // Built the way src/index.ts builds the app. That file runs main() when it
     // is imported, so its steps are repeated here rather than imported — keep
-    // the two in step. The one deliberate difference is sync({ force: true }):
+    // the two in step. Two differences are deliberate. sync({ force: true }):
     // a red run leaves this schema behind for inspection, and the next run
-    // must not inherit its rows.
+    // must not inherit its rows. And unlimitedAuthRateLimits(): this suite
+    // registers a dozen accounts from one address, more than the five an hour
+    // the real limits allow; those limits have specs of their own.
     const config = testConfig();
     trustedOrigin = config.appBaseUrl;
     await ensureDatabase(config.db);
@@ -270,6 +273,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       ),
       trustedOrigin: config.appBaseUrl,
       trustProxy: config.trustProxy,
+      authRateLimits: unlimitedAuthRateLimits(),
     });
 
     // An ephemeral port, so this suite never collides with a running server.
