@@ -10,6 +10,16 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
+## Read the specs of the capabilities you touch
+
+`docs/specs/` holds one living spec per capability: what the system does now, as numbered requirements. `docs/specs/README.md` has the format, the ID rules and the index.
+
+- Before working in an area, read `docs/specs/<capability>/spec.md` for every capability the work touches.
+- Use its IDs and cite them — in a test title, in a comment that restates a rule, in an issue or a plan.
+- If your output contradicts a requirement, surface it explicitly rather than silently overriding it, as with an ADR:
+
+> _Contradicts `<PREFIX>-<n>` (the rule it states), but worth changing because…_
+
 ## File structure
 
 Single-context repo (most repos):

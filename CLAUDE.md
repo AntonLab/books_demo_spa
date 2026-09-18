@@ -36,6 +36,14 @@ of them read. Early scaffold — most feature directories exist but are empty.
   `skills` is the CLI that materializes `skills-lock.json` into `.agents/`;
   it is pinned here rather than run through `npx` so a fresh clone rebuilds
   the same skill set. Run it with `npm run skills`.
+- `docs/specs/` — the living spec of each capability: what the system does
+  now, as numbered requirements that code comments and test titles cite. The
+  format, the ID rules and the index are in `docs/specs/README.md`; the steps
+  that keep the specs current are under **Workflow** below.
+- `scripts/check-specs.mjs` — `npm run specs:check`, plain Node with no
+  dependencies. Its tests, `scripts/check-specs.test.mjs`, run under
+  `node --test "scripts/*.test.mjs"` from the repo root; no workspace's
+  `npm test` reaches them, so CI runs them in the `lint` job.
 
 One `npm install` at the repo root installs every workspace into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
@@ -205,8 +213,9 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
 
 ## Quality Gates
 
-Run these from the repo root before commit; each fans out over every workspace.
-Target one with npm's `-w` flag (`npm test -w client`):
+Run these from the repo root before commit. All but `format:check` and
+`specs:check` fan out over every workspace; target one with npm's `-w` flag
+(`npm test -w client`):
 
 - `npm run typecheck` — TypeScript, no emit
 - `npm run lint` — ESLint 9 flat config (`eslint.config.mjs`)
@@ -218,6 +227,11 @@ Target one with npm's `-w` flag (`npm test -w client`):
   why its script is not plain `jest`). A **green** server run then drops the
   twelve test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
+- `npm run specs:check` — repo-wide: fails when a requirement ID is declared
+  twice or under the wrong prefix, when anything cites an ID no spec in
+  `docs/specs/` declares, or when anything outside `docs/specs/` cites a
+  Retired one. It also lists, without failing, the live requirements no test
+  cites. See **The check** in `docs/specs/README.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
@@ -254,8 +268,9 @@ run the same automation from `.github/`:
 
 - `workflows/ci.yml` — on every PR into and push to `dev` or `main`, plus a
   manual `workflow_dispatch`, five parallel jobs on `ubuntu-latest` with the
-  Node version from `.nvmrc`: `lint` (`npm run lint` and
-  `npm run format:check`), `typecheck`, `test-client`, `test-server` and
+  Node version from `.nvmrc`: `lint` (`npm run lint`,
+  `npm run format:check`, the spec check's own tests and
+  `npm run specs:check`), `typecheck`, `test-client`, `test-server` and
   `build`. `test-server` runs against a `mysql:8.4` service container and sets
   `REQUIRE_MYSQL=1`, which makes a missing or unreachable database fail the
   MySQL-backed suites instead of skipping them — without it a broken container
@@ -330,6 +345,29 @@ Do not:
    `ci:`).
 4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
 
+### Spec-driven features
+
+What the system does is specified per capability in `docs/specs/`. Every
+feature changes those specs first, and the code follows:
+
+1. Settle the design in the main session (grilling or brainstorming).
+2. Edit the living spec(s) there: new or changed requirements get new IDs, and
+   superseded ones are Retired. This is the branch's **first commit**
+   (`docs(specs): …`), so the PR diff shows the requirement change before any
+   code.
+3. Write the design doc to
+   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`, citing those IDs,
+   and dispatch `plan-writer` with its path.
+4. The plan names in each task the IDs it implements. Its last task updates
+   `## Implementation` in every spec it touched, and the package `CLAUDE.md`
+   only if an engineering convention changed.
+5. Tests cite the IDs they pin at the start of their titles, and a comment
+   that restates a business rule shrinks to a one-line gist plus its ID — see
+   **Citing requirements** in `docs/specs/README.md`.
+
+"Spec-driven" is not "SDD": in this repo SDD is subagent-driven development,
+the `sdd-*` agents that execute a plan.
+
 ## Agent skills
 
 ### Issue tracker
@@ -344,8 +382,8 @@ The five canonical roles, each label string equal to its name. See
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See
-`docs/agents/domain.md`.
+Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root, and one
+living spec per capability in `docs/specs/`. See `docs/agents/domain.md`.
 
 ### Plan pipeline agents
 
@@ -357,11 +395,13 @@ drive them; their bodies are copied from superpowers 6.3.0 templates, each
 named in a comment under the frontmatter, and must be re-synced when the
 plugin's templates change.
 
-- **Before `plan-writer`, write the spec to a file.** A subagent does not see
-  the conversation. Save the agreed design to
+- **Before `plan-writer`, write the design doc to a file.** A subagent does
+  not see the conversation. Save the agreed design to
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored, like the
   plans) and dispatch `plan-writer` with that path; it refuses to run without
-  one.
+  one. The agent definitions call this file "the spec"; it is not a living
+  spec, which lives in `docs/specs/` and is edited first (see **Spec-driven
+  features** under **Workflow**).
 - **In `superpowers:subagent-driven-development`, dispatch the named agents
   instead of `general-purpose`:** implementer → `sdd-implementer` (preloads
   the `tdd` skill), task reviewer → `sdd-task-reviewer`, scoped re-review →

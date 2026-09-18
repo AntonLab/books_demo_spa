@@ -25,6 +25,10 @@ server/   Express API on Sequelize/MySQL     — see server/CLAUDE.md
 One root `package.json` declares both as npm workspaces, so a single
 `npm install` at the repo root covers the whole repo and writes one lockfile.
 
+What the app does — who may do what, which status code comes back, what a
+reader sees — is specified one capability at a time in
+[`docs/specs/`](docs/specs/README.md).
+
 ## Prerequisites
 
 - Node.js >= 22.18 (the server runs TypeScript directly via Node's native
@@ -105,14 +109,16 @@ Run these from the repo root.
 | `npm run typecheck`    | both: `tsc --noEmit`                                                |
 | `npm run lint`         | both: ESLint                                                        |
 | `npm run format:check` | Prettier over the whole repo                                        |
+| `npm run specs:check`  | every requirement ID the repo cites, against `docs/specs/`          |
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
-Every script except the Prettier pair fans out over both workspaces; target one
-with npm's `-w` flag (`npm run dev -w client`, `npm run build -w server`). The
-root deliberately defines no single-package aliases, so `-w` is the one way to
-narrow any script. Prettier is root-only because its config is repo-wide — the
-packages define no `format` script.
+Every script except the Prettier pair and `specs:check` fans out over both
+workspaces; target one with npm's `-w` flag (`npm run dev -w client`,
+`npm run build -w server`). The root deliberately defines no single-package
+aliases, so `-w` is the one way to narrow any script. Prettier is root-only
+because its config is repo-wide — the packages define no `format` script — and
+`specs:check` because the specs and their citations span the whole repo.
 
 The API alone, without nodemon, is `npm run start -w server`. `client` also has
 `npm run test:watch`.
@@ -123,19 +129,19 @@ configured before `npm test` there.
 ## Quality gates
 
 Before committing, run `npm run typecheck`, `npm run lint`,
-`npm run format:check` and `npm test` from the repo root; each covers both
-workspaces. Commit messages follow the conventional-commit prefixes (`feat:`,
+`npm run format:check`, `npm run specs:check` and `npm test` from the repo
+root. Commit messages follow the conventional-commit prefixes (`feat:`,
 `fix:`, `chore:`, `docs:`, `test:`, `ci:`).
 
 ### Continuous integration
 
 Feature branches start from `dev` and open their PR against it; `dev` is merged
 into `main` for a release. Every PR into and push to either branch runs
-`.github/workflows/ci.yml` — `lint` (ESLint and Prettier), `typecheck`,
-`test-client`, `test-server` against a MySQL 8.4 service container, and `build`
-— and `.github/workflows/codeql.yml`. All seven checks must pass before a PR
-merges. Dependabot opens weekly update PRs for npm packages and for the
-workflows' actions.
+`.github/workflows/ci.yml` — `lint` (ESLint, Prettier and the spec check),
+`typecheck`, `test-client`, `test-server` against a MySQL 8.4 service
+container, and `build` — and `.github/workflows/codeql.yml`. All seven checks
+must pass before a PR merges. Dependabot opens weekly update PRs for npm
+packages and for the workflows' actions.
 
 ### Pre-commit hook
 
