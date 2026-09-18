@@ -9,11 +9,11 @@ npm workspaces.
 
 ## Stack
 
-| Layer    | Technology                                                                 |
-| -------- | -------------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5     |
-| Backend  | Node.js >= 22.18, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
-| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)      |
+| Layer    | Technology                                                              |
+| -------- | ----------------------------------------------------------------------- |
+| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5  |
+| Backend  | Node.js >= 24, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
+| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)   |
 
 ## Layout
 
@@ -27,9 +27,8 @@ One root `package.json` declares both as npm workspaces, so a single
 
 ## Prerequisites
 
-- Node.js >= 22.18 (the server runs TypeScript directly via Node's native
-  type-stripping, which runs unflagged only from 22.18); `.nvmrc` names the
-  version CI uses
+- Node.js >= 24 — the LTS line `.nvmrc` names and CI runs; the server runs
+  TypeScript directly through Node's native type stripping
 - A running MySQL server
 
 ## Getting started
