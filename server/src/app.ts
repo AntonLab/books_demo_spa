@@ -32,11 +32,18 @@ export interface AppDeps {
   // The client's origin (APP_BASE_URL): the one foreign origin a write may
   // come from. See middleware/csrfProtection.ts.
   trustedOrigin: string;
+  // TRUST_PROXY: how many proxy hops in front of the API may name the client
+  // in X-Forwarded-For. Governs req.ip.
+  trustProxy: number;
 }
 
 // No listen() here: tests bind an ephemeral port themselves.
 export function createApp(deps: AppDeps): Express {
   const app = express();
+
+  // Before anything reads req.ip: whether X-Forwarded-For names the client.
+  // Express treats 0 as trusting no proxy.
+  app.set('trust proxy', deps.trustProxy);
 
   app.use(express.json());
   // Express 5 can set cookies but not read them; resolveSessionUser, behind

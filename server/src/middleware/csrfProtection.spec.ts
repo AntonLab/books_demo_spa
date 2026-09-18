@@ -225,6 +225,7 @@ describe('the app', () => {
     passwordResetRepository: createUnusedRepository('passwordReset'),
     resetDelivery: createUnusedRepository('resetDelivery'),
     trustedOrigin: TRUSTED_ORIGIN,
+    trustProxy: 0,
   });
 
   // Refused before any route or repository is reached: every repository here
