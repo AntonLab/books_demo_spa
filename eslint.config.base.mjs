@@ -14,6 +14,7 @@
  */
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
 // The repo-wide anti-patterns from CLAUDE.md, applied to both packages.
@@ -37,10 +38,10 @@ const sharedRules = {
  *                 are spliced in before the Prettier tail.
  */
 export const createConfig = (ignores = [], ...packageConfigs) =>
-  tseslint.config(
+  defineConfig(
     { ignores: ['coverage', 'node_modules', ...ignores] },
     js.configs.recommended,
-    ...tseslint.configs.recommended,
+    tseslint.configs.recommended,
     { files: ['**/*.{ts,tsx}'], rules: sharedRules },
     ...packageConfigs,
     // Disables stylistic rules that conflict with Prettier. Must stay last,
