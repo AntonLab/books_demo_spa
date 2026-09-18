@@ -24,8 +24,20 @@ const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedSeries = jest.mocked(seriesApi);
 
-const ann = { id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' };
-const cora = { id: 4, login: 'cora', firstName: 'Cora', lastName: 'Writer' };
+const ann = {
+  id: 3,
+  login: 'ann',
+  firstName: 'Ann',
+  lastName: 'Author',
+  avatarUrl: null,
+};
+const cora = {
+  id: 4,
+  login: 'cora',
+  firstName: 'Cora',
+  lastName: 'Writer',
+  avatarUrl: null,
+};
 
 const book: BookDetail = {
   id: 1,
@@ -35,6 +47,7 @@ const book: BookDetail = {
   description: 'Long ago.',
   tags: ['epic'],
   status: 'draft',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: null,
@@ -50,6 +63,7 @@ const account = (overrides: Partial<PublicUser>): PublicUser => ({
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,
@@ -334,5 +348,143 @@ describe('EditBookPage Reading order', () => {
     await waitFor(() =>
       expect(titlesOnScreen()).toEqual(['One', 'Two', 'Three', 'Four'])
     );
+  });
+});
+
+describe('EditBookPage, the Cover block', () => {
+  const fileInput = () =>
+    document.querySelector('input[type="file"]') as HTMLInputElement;
+
+  it('shows the current cover, or the title placeholder when there is none', async () => {
+    renderPage();
+
+    expect(await screen.findByText('A Tale of Dragons')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upload cover' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove cover' })).toBeNull();
+  });
+
+  it('offers Remove behind a confirm once the book has a cover', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=1',
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole('button', { name: 'Remove cover' })
+    ).toBeInTheDocument();
+  });
+
+  it('uploads the picked file', async () => {
+    mockedBooks.uploadBookCover.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=2',
+    });
+    renderPage();
+    await screen.findByLabelText('Title');
+    const file = new File([new Uint8Array([1, 2, 3])], 'cover.png', {
+      type: 'image/png',
+    });
+
+    await userEvent.upload(fileInput(), file);
+
+    await waitFor(() =>
+      expect(mockedBooks.uploadBookCover).toHaveBeenCalledWith(1, file)
+    );
+  });
+
+  it('rejects an unaccepted file type before calling the API', async () => {
+    // user-event v14 applies the input's `accept` attribute by default, which
+    // would silently drop the .gif before it ever reached the precheck.
+    const user = userEvent.setup({ applyAccept: false });
+    renderPage();
+    await screen.findByLabelText('Title');
+    const file = new File([new Uint8Array([1])], 'cover.gif', {
+      type: 'image/gif',
+    });
+
+    await user.upload(fileInput(), file);
+
+    expect(mockedBooks.uploadBookCover).not.toHaveBeenCalled();
+    expect(
+      screen.getByText('Choose a JPEG, PNG or WebP image.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the server error on a failed upload', async () => {
+    mockedBooks.uploadBookCover.mockRejectedValue(
+      new Error('Not a valid image')
+    );
+    renderPage();
+    await screen.findByLabelText('Title');
+    const file = new File([new Uint8Array([1])], 'cover.png', {
+      type: 'image/png',
+    });
+
+    await userEvent.upload(fileInput(), file);
+
+    expect(await screen.findByText('Not a valid image')).toBeInTheDocument();
+  });
+
+  it('removes the cover on confirm', async () => {
+    mockedBooks.deleteBookCover.mockResolvedValue(undefined);
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=1',
+    });
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Remove cover' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+
+    expect(mockedBooks.deleteBookCover).toHaveBeenCalledWith(1);
+  });
+
+  it('shows the server error on a failed remove', async () => {
+    mockedBooks.deleteBookCover.mockRejectedValue(
+      new Error('Could not remove the cover')
+    );
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=1',
+    });
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Remove cover' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+
+    expect(
+      await screen.findByText('Could not remove the cover')
+    ).toBeInTheDocument();
+  });
+
+  it('clears a previous rejection message once a new, accepted file is picked', async () => {
+    mockedBooks.uploadBookCover.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=2',
+    });
+    renderPage();
+    await screen.findByLabelText('Title');
+    const bad = new File([new Uint8Array([1])], 'cover.gif', {
+      type: 'image/gif',
+    });
+    const user = userEvent.setup({ applyAccept: false });
+    await user.upload(fileInput(), bad);
+    expect(
+      await screen.findByText('Choose a JPEG, PNG or WebP image.')
+    ).toBeInTheDocument();
+
+    const good = new File([new Uint8Array([1, 2, 3])], 'cover.png', {
+      type: 'image/png',
+    });
+    await user.upload(fileInput(), good);
+
+    expect(screen.queryByText('Choose a JPEG, PNG or WebP image.')).toBeNull();
   });
 });

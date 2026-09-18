@@ -87,3 +87,18 @@ export const removeCoAuthor = (
     method: 'DELETE',
   });
 };
+
+// K2: the body is a Blob (a File), so request() sends it as-is (K1).
+export const uploadBookCover = (
+  id: number,
+  file: File
+): Promise<PublicBook> => {
+  return request<PublicBook>(`/books/${id}/cover`, {
+    method: 'PUT',
+    body: file,
+  });
+};
+
+export const deleteBookCover = (id: number): Promise<void> => {
+  return request<void>(`/books/${id}/cover`, { method: 'DELETE' });
+};

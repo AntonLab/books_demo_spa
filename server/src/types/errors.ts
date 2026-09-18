@@ -56,3 +56,9 @@ export class ForbiddenError extends AppError {
     super(message, 403);
   }
 }
+
+export class UnsupportedMediaTypeError extends AppError {
+  constructor(message = 'Unsupported image type') {
+    super(message, 415);
+  }
+}

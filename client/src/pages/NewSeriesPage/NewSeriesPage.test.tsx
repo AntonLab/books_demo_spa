@@ -22,13 +22,22 @@ const author: PublicUser = {
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 const created: PublicSeries = {
   id: 12,
-  authors: [{ id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' }],
+  authors: [
+    {
+      id: 3,
+      login: 'ann',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+  ],
   title: 'The Scale Cycle',
   description: 'Dragons, in four parts.',
   tags: [],

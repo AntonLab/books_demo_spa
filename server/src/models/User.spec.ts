@@ -87,7 +87,7 @@ test('toPublicUser carries the role and defaults it to user', () => {
     lastName: 'One',
   });
 
-  assert.equal(toPublicUser(user).role, 'user');
+  assert.equal(toPublicUser(user, null).role, 'user');
 });
 
 test('toPublicUser carries an explicit role', () => {
@@ -101,5 +101,5 @@ test('toPublicUser carries an explicit role', () => {
     role: 'superadmin',
   });
 
-  assert.equal(toPublicUser(user).role, 'superadmin');
+  assert.equal(toPublicUser(user, null).role, 'superadmin');
 });

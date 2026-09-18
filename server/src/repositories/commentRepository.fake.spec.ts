@@ -19,6 +19,7 @@ describe('the fake commentRepository', () => {
           login: `reader${id}`,
           firstName: 'Contract',
           lastName: `Reader ${id}`,
+          avatarUrl: null,
         });
         return id;
       },

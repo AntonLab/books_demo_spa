@@ -37,12 +37,21 @@ beforeEach(() => {
   });
   mockedBooks.getBook.mockResolvedValue({
     id: 1,
-    authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
+    authors: [
+      {
+        id: 3,
+        login: 'Author',
+        firstName: 'Ann',
+        lastName: 'Author',
+        avatarUrl: null,
+      },
+    ],
     seriesId: null,
     title: 'A Tale of Dragons',
     description: 'Long ago, in a kingdom of scales.',
     tags: [],
     status: 'in_progress',
+    coverUrl: null,
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
     series: null,
@@ -53,7 +62,15 @@ beforeEach(() => {
   mockedComments.listComments.mockResolvedValue(emptyEnvelope);
   mockedSeries.getSeries.mockResolvedValue({
     id: 12,
-    authors: [{ id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' }],
+    authors: [
+      {
+        id: 3,
+        login: 'Author',
+        firstName: 'Ann',
+        lastName: 'Author',
+        avatarUrl: null,
+      },
+    ],
     title: 'The Scale Cycle',
     description: 'Dragons.',
     tags: [],
@@ -180,7 +197,7 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the profile stub at /profile', async () => {
+  it('renders the profile page at /profile', async () => {
     renderWithProviders(<AppShell />, { route: '/profile' });
 
     expect(

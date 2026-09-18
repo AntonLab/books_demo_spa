@@ -1,7 +1,11 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { createUserController } from '../controllers/userController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
+import {
+  ACCEPTED_IMAGE_CONTENT_TYPES,
+  IMAGE_MAX_BYTES,
+} from '../types/image.ts';
 import {
   createUserSchema,
   idParamSchema,
@@ -60,6 +64,32 @@ export function createUserRoutes(deps: RouteDeps): Router {
     requirePermission('users', 'delete'),
     validate({ params: idParamSchema }),
     controller.remove
+  );
+
+  // A4/A5: the raw body parser is mounted on this PUT alone, never app-wide,
+  // and after requirePermission so a refused request's 2 MiB is never read.
+  router.put(
+    '/:id/avatar',
+    requirePermission('users', 'update'),
+    validate({ params: idParamSchema }),
+    express.raw({
+      type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
+      limit: IMAGE_MAX_BYTES,
+    }),
+    controller.uploadAvatar
+  );
+  router.delete(
+    '/:id/avatar',
+    requirePermission('users', 'update'),
+    validate({ params: idParamSchema }),
+    controller.removeAvatar
+  );
+  // A6: deliberately no requirePermission here — an avatar is public.
+  // /:id/avatar cannot collide with /:id, the same reason /:id/role cannot.
+  router.get(
+    '/:id/avatar',
+    validate({ params: idParamSchema }),
+    controller.getAvatar
   );
 
   return router;

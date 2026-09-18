@@ -29,6 +29,7 @@ const AUTHOR: AuthorSummary = {
   login: TEST_USER.login,
   firstName: TEST_USER.firstName,
   lastName: TEST_USER.lastName,
+  avatarUrl: null,
 };
 
 // Every persona a spec posts as, so a live comment's `author` is a real
@@ -38,7 +39,13 @@ const ACCOUNTS = new Map<number, AuthorSummary>(
     id,
     id === TEST_USER.id
       ? AUTHOR
-      : { id, login: `persona-${id}`, firstName: 'Persona', lastName: `${id}` },
+      : {
+          id,
+          login: `persona-${id}`,
+          firstName: 'Persona',
+          lastName: `${id}`,
+          avatarUrl: null,
+        },
   ])
 );
 

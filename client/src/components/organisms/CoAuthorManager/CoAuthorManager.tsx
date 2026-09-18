@@ -6,10 +6,12 @@ import {
   List,
   Popconfirm,
   Select,
+  Space,
   theme,
   Typography,
 } from 'antd';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { useAuthorSearch } from '@/queries/authors';
 import {
   useAddCoAuthor,
@@ -17,6 +19,18 @@ import {
   type CreditedWork,
 } from '@/queries/coAuthors';
 import type { AuthorSummary } from '@/types/user';
+import type { DefaultOptionType } from 'antd/es/select';
+
+// A typed stand-in for antd's own `DefaultOptionType`, whose extra fields
+// fall back to an index signature typed `any`. Naming `avatarUrl` and `name`
+// here is what makes `optionRender` below type-check them as
+// `string | null` and `string` rather than silently accepting a typo.
+interface CandidateOption extends DefaultOptionType {
+  value: number;
+  label: string;
+  avatarUrl: string | null;
+  name: string;
+}
 
 interface CoAuthorManagerProps {
   // A book or a series: both keep their Co-authors the same way, through
@@ -111,12 +125,23 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
                     </Button>,
                   ];
 
-          return <List.Item actions={actions}>{nameOf(author)}</List.Item>;
+          return (
+            <List.Item actions={actions}>
+              <Space size={token.marginXS}>
+                <AccountAvatar
+                  avatarUrl={author.avatarUrl}
+                  name={nameOf(author)}
+                  size="small"
+                />
+                {nameOf(author)}
+              </Space>
+            </List.Item>
+          );
         }}
       />
 
       {canManage && (
-        <Select<number>
+        <Select<number, CandidateOption>
           showSearch
           aria-label="Add a co-author"
           placeholder="Search authors by name or login"
@@ -133,10 +158,27 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
           value={null}
           loading={search.isFetching}
           notFoundContent={search.isFetching ? null : 'No authors found'}
-          options={candidates.map((author) => ({
+          options={candidates.map((author): CandidateOption => ({
             value: author.id,
             label: `${nameOf(author)} (${author.login})`,
+            avatarUrl: author.avatarUrl,
+            name: nameOf(author),
           }))}
+          // Keeping `label` a plain string preserves antd's own derived
+          // `title` (used for the option's tooltip, and by this component's
+          // tests) and rc-select's search-filter matching; drawing the
+          // avatar through optionRender instead avoids the breakage a
+          // ReactNode label would cause there (Ruling P9).
+          optionRender={(option) => (
+            <Space size={token.marginXS}>
+              <AccountAvatar
+                avatarUrl={option.data.avatarUrl}
+                name={option.data.name}
+                size="small"
+              />
+              {option.label}
+            </Space>
+          )}
           onSelect={(userId) => {
             add.mutate(userId);
             setTerm('');

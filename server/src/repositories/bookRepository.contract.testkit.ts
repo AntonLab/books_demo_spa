@@ -305,4 +305,31 @@ export function bookRepositoryContract(
     assert.equal(await repository.listInSeries(MISSING_ID), null);
     assert.equal(await repository.reorderInSeries(MISSING_ID, [1]), false);
   });
+
+  // A fresh book is a draft, so the viewer here is one of its co-authors
+  // rather than a guest — the real repository hides a draft's cover from a
+  // guest, and that visibility rule is bookRepository.spec.ts's alone to
+  // cover. This case is only about the round-trip and the missing-book
+  // answers.
+  test('contract: a cover round-trips, and a missing book reports false/null', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    const viewer = { id: authorId, role: 'author' } as const;
+    const created = await aBook(repository, authorId);
+    const missingId = created.id + 10_000;
+
+    assert.equal(await repository.getCoverData(created.id, viewer), null);
+    assert.equal(await repository.setCover(created.id, Buffer.from('a')), true);
+    assert.deepEqual(
+      (await repository.getCoverData(created.id, viewer))?.data,
+      Buffer.from('a')
+    );
+    assert.equal(await repository.setCover(missingId, Buffer.from('a')), false);
+
+    assert.equal(await repository.removeCover(created.id), true);
+    assert.equal(await repository.getCoverData(created.id, viewer), null);
+    // A cover that never existed is a no-op, not an error — but a missing
+    // book itself is reported, exactly as setCover reports it.
+    assert.equal(await repository.removeCover(missingId), false);
+  });
 }

@@ -12,7 +12,13 @@ const comment: CommentWithAuthor = {
   tombstone: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  author: { id: 3, login: 'Reader', firstName: 'Read', lastName: 'Er' },
+  author: {
+    id: 3,
+    login: 'Reader',
+    firstName: 'Read',
+    lastName: 'Er',
+    avatarUrl: null,
+  },
   likeCount: 2,
   viewerLikeId: null,
 };
@@ -85,6 +91,50 @@ describe('Comment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Like' }));
 
     expect(onLike).toHaveBeenCalledWith(comment);
+  });
+
+  it('shows the author’s avatar picture when they have one', () => {
+    // Not screen.getByRole('img'): the avatar is aria-hidden (Task 14's
+    // ruling), so a container query by src is the unambiguous way to reach it.
+    const { container } = render(
+      <Comment
+        {...baseProps}
+        comment={{
+          ...comment,
+          author: { ...comment.author!, avatarUrl: '/api/users/3/avatar?v=1' },
+        }}
+      />
+    );
+
+    expect(
+      container.querySelector('img[src="/api/users/3/avatar?v=1"]')
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to an initial when the author has no avatar', () => {
+    render(<Comment {...baseProps} />);
+
+    // Read Er's initial — the fixture author has no avatarUrl.
+    expect(screen.getByText('R')).toBeInTheDocument();
+  });
+
+  it('shows no avatar at all for a tombstone', () => {
+    const { container } = render(
+      <Comment
+        {...baseProps}
+        comment={{
+          ...comment,
+          tombstone: 'deleted',
+          author: null,
+          text: '',
+          userId: null,
+        }}
+      />
+    );
+
+    // Neither an <img> nor antd's fallback-initial Avatar should exist at all.
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.ant-avatar')).toBeNull();
   });
 
   it('hides the reply button on a reply', () => {

@@ -2,10 +2,12 @@ import {
   addCoAuthor,
   createBook,
   deleteBook,
+  deleteBookCover,
   getBook,
   listBooks,
   removeCoAuthor,
   updateBook,
+  uploadBookCover,
 } from './books';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
@@ -271,5 +273,37 @@ describe('removeCoAuthor', () => {
       status: 409,
       message: 'The last co-author cannot leave; delete the book instead',
     });
+  });
+});
+
+describe('uploadBookCover', () => {
+  it('PUTs the file as-is to /books/:id/cover', async () => {
+    const fetchMock = mockFetch({ id: 1, coverUrl: '/api/books/1/cover?v=2' });
+    const file = new File([new Uint8Array([1, 2, 3])], 'cover.webp', {
+      type: 'image/webp',
+    });
+
+    await uploadBookCover(1, file);
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/books/1/cover');
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBe(file);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'image/webp'
+    );
+  });
+});
+
+describe('deleteBookCover', () => {
+  it('DELETEs /books/:id/cover with no body', async () => {
+    const fetchMock = mockFetch(undefined, 204);
+
+    await deleteBookCover(1);
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/books/1/cover');
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
   });
 });

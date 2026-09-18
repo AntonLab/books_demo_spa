@@ -167,8 +167,18 @@ export function userRepositoryContract(
         login: 'Searchable',
         firstName: 'Contract',
         lastName: 'Searchable',
+        avatarUrl: null,
       },
     ]);
+
+    // An author search embeds each result's own Avatar, exactly as
+    // findById/list/etc do — not a hardcoded null.
+    await repository.setAvatar(author.id, Buffer.from('a'));
+    const [pictured] = await repository.listAuthors({ limit: 20 });
+    assert.match(
+      pictured?.avatarUrl ?? '',
+      new RegExp(`^/api/users/${author.id}/avatar\\?v=\\d+$`)
+    );
   });
 
   test('contract: a removed account is gone', async () => {
@@ -178,5 +188,29 @@ export function userRepositoryContract(
     assert.equal(await repository.remove(created.id), true);
     assert.equal(await repository.findById(created.id), null);
     assert.equal(await repository.remove(created.id), false);
+  });
+
+  test('contract: an avatar round-trips, and a missing account reports false/null', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create(input('Pictured'));
+    const missingId = MISSING_ID;
+
+    assert.equal(await repository.getAvatarData(created.id), null);
+    assert.equal(
+      await repository.setAvatar(created.id, Buffer.from('a')),
+      true
+    );
+    assert.deepEqual(
+      (await repository.getAvatarData(created.id))?.data,
+      Buffer.from('a')
+    );
+    assert.equal(
+      await repository.setAvatar(missingId, Buffer.from('a')),
+      false
+    );
+
+    await repository.removeAvatar(created.id);
+    assert.equal(await repository.getAvatarData(created.id), null);
+    await repository.removeAvatar(missingId);
   });
 }

@@ -13,6 +13,8 @@ export interface PublicUser {
   lastName: string;
   status: UserStatus;
   role: UserRole;
+  // A7: the same versioned-URL shape as a Book's Cover.
+  avatarUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,4 +33,5 @@ export interface AuthorSummary {
   login: string;
   firstName: string;
   lastName: string;
+  avatarUrl: string | null;
 }

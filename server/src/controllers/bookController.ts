@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from 'express';
+import { processCoverImage } from '../images.ts';
 import {
   validatedBody,
   validatedParams,
@@ -11,6 +12,7 @@ import {
   ForbiddenError,
   NotFoundError,
   UnauthorizedError,
+  UnsupportedMediaTypeError,
 } from '../types/errors.ts';
 import type {
   AddCoAuthorInput,
@@ -30,6 +32,9 @@ export interface BookController {
   removeCoAuthor: RequestHandler;
   listInSeries: RequestHandler;
   reorderInSeries: RequestHandler;
+  uploadCover: RequestHandler;
+  removeCover: RequestHandler;
+  getCover: RequestHandler;
 }
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -217,6 +222,55 @@ export function createBookController(
       const found = await repository.reorderInSeries(id, bookIds);
       if (!found) throw new NotFoundError('Series', id);
       res.status(204).end();
+    },
+
+    // A1: books x update, then the same Co-author check PATCH uses.
+    uploadCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      if (!Buffer.isBuffer(req.body)) {
+        throw new UnsupportedMediaTypeError();
+      }
+      await assertMayTouch(req, id);
+
+      const processed = await processCoverImage(req.body);
+      const found = await repository.setCover(id, processed);
+      if (!found) throw new NotFoundError('Book', id);
+
+      const book = await repository.findById(id);
+      if (!book) throw new NotFoundError('Book', id);
+      res.json(book);
+    },
+
+    // A2: same guards as uploadCover; 204 whether or not a Cover existed, but
+    // 404 for a missing Book. assertMayTouch alone cannot catch a missing
+    // Book under `any` scope — it returns immediately for a Moderator — so
+    // this checks removeCover's own report of whether the row was there.
+    removeCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
+      const found = await repository.removeCover(id);
+      if (!found) throw new NotFoundError('Book', id);
+      res.status(204).end();
+    },
+
+    // A3: rides on books x read, which a guest holds; goes through the
+    // repository's own readableBookWhere, so a Draft book's Cover is a 404
+    // to anyone who may not read the book — the same 404 as a missing one.
+    getCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const cover = await repository.getCoverData(id, viewerOf(req.user));
+      if (!cover) throw new NotFoundError('Book', id);
+
+      res
+        .status(200)
+        .set({
+          'Content-Type': 'image/webp',
+          'X-Content-Type-Options': 'nosniff',
+          // Versioned by the URL's own ?v=, so immutable is safe (A3).
+          'Cache-Control': 'private, max-age=31536000, immutable',
+        })
+        .send(cover.data);
     },
   };
 }
