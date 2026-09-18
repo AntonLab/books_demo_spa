@@ -47,7 +47,9 @@ export function createUnusedRepository<T>(name: string): T {
   } as T;
 }
 
-function defaultDeps(): AppDeps {
+// Every repository an unreachable stub. Exported for createApp.spec.ts, which
+// listens on createApp's own app rather than through withApp's wrapper.
+export function defaultDeps(): AppDeps {
   return {
     userRepository: createUnusedRepository('user'),
     seriesRepository: createUnusedRepository('series'),
@@ -64,6 +66,7 @@ function defaultDeps(): AppDeps {
       },
     },
     trustedOrigin: 'http://localhost:3000',
+    trustProxy: 0,
   };
 }
 

@@ -19,6 +19,11 @@ const envSchema = z.object({
   // not surface until a reset link was built from it, in an email nobody can
   // fix. The default is the webpack dev server the client runs on.
   APP_BASE_URL: z.url().default('http://localhost:3000'),
+  // How many reverse-proxy hops in front of the API may name the client in
+  // X-Forwarded-For — Express's 'trust proxy'. 0 trusts none, so req.ip is
+  // the socket's peer. Only a whole, non-negative count is accepted: a hop
+  // count is the form that cannot silently trust every address.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 });
 
 export interface DbConfig {
@@ -33,6 +38,7 @@ export interface AppConfig {
   env: 'development' | 'test' | 'production';
   port: number;
   appBaseUrl: string;
+  trustProxy: number;
   db: DbConfig;
 }
 
@@ -51,6 +57,7 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
     env: env.NODE_ENV,
     port: env.PORT,
     appBaseUrl: env.APP_BASE_URL,
+    trustProxy: env.TRUST_PROXY,
     db: {
       host: env.DB_HOST,
       port: env.DB_PORT,

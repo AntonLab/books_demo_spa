@@ -65,3 +65,20 @@ test('a malformed APP_BASE_URL is a config error, not a broken link later', () =
     parseConfig({ DB_USER: 'u', DB_PASSWORD: 'p', APP_BASE_URL: 'not-a-url' })
   );
 });
+
+test('TRUST_PROXY defaults to 0, trusting no proxy', () => {
+  assert.equal(parseConfig({ ...minimal }).trustProxy, 0);
+});
+
+test('TRUST_PROXY takes a whole number of proxy hops', () => {
+  assert.equal(parseConfig({ ...minimal, TRUST_PROXY: '2' }).trustProxy, 2);
+});
+
+test('TRUST_PROXY refuses a negative, fractional or non-numeric value', () => {
+  for (const value of ['-1', '1.5', 'yes']) {
+    assert.throws(
+      () => parseConfig({ ...minimal, TRUST_PROXY: value }),
+      /TRUST_PROXY/
+    );
+  }
+});

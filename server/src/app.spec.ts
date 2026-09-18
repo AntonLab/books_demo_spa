@@ -265,6 +265,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       passwordResetRepository: createSequelizePasswordResetRepository(),
       resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
       trustedOrigin: config.appBaseUrl,
+      trustProxy: config.trustProxy,
     });
 
     // An ephemeral port, so this suite never collides with a running server.

@@ -64,6 +64,7 @@ broken server.
 | `DB_NAME`                 | `books_demo_spa`        |                                                                                         |
 | `DB_USER` / `DB_PASSWORD` | _(none)_                | Required — no default, on purpose. An empty password is accepted, a missing one is not. |
 | `APP_BASE_URL`            | `http://localhost:3000` | Client origin used to build password-reset links                                        |
+| `TRUST_PROXY`             | `0`                     | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none |
 
 ## API
 

@@ -331,6 +331,9 @@ Each layer answers a question the others cannot:
   excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
   `dist/`. See **Test layers** for which fakes the route specs run on.
 - `src/app.spec.ts` — the full-stack smoke suite; see **Test layers**
+- `src/createApp.spec.ts` — `createApp`'s own settings, on the route test
+  kit's unreachable repositories (`defaultDeps()`): `trust proxy` from
+  `AppDeps.trustProxy`
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
@@ -397,14 +400,15 @@ Each layer answers a question the others cannot:
 with zod and throws on anything malformed rather than starting with a broken
 value.
 
-| Variable                  | Default                 | Notes                                                                                                                                                            |
-| ------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.           |
-| `PORT`                    | `4000`                  | The API's own port.                                                                                                                                              |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                                                                                                  |
-| `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                  |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not. |
-| `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
+| Variable                  | Default                 | Notes                                                                                                                                                                                                    |
+| ------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                   |
+| `PORT`                    | `4000`                  | The API's own port.                                                                                                                                                                                      |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                                                                                                                                          |
+| `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                                                          |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                         |
+| `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                     |
+| `TRUST_PROXY`             | `0`                     | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
 (default `books_demo_spa_test`, the prefix of the twelve test schemas) and
