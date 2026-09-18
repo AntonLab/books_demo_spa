@@ -244,9 +244,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 
   Five things worth knowing before editing it:
 
-  - **`retry` is off** and `staleTime` is 30s. Every error this API
-    surfaces is a 4xx to show at once — a 401 from `/auth/me` is the
+  - **A query retries only what may pass on its own**, and `staleTime` is
+    30s. `shouldRetryQuery` retries at most twice, with TanStack's default
+    backoff, and only a failure that is no `ApiError` (fetch rejected: the
+    network, a dropped connection) or an `ApiError` with a 5xx status.
+    Every other answer shows at once — a 401 from `/auth/me` is the
     _normal_ answer for an anonymous visitor, not a failure to retry.
+    Mutations never retry: a repeated write that did land the first time
+    would land twice. The test client (`src/test/queryClient.ts`) keeps
+    `retry: false`.
   - **The session is `PublicUser | null`**, never `undefined`: `null` means
     "asked, nobody is signed in". `useSession` maps the 401 to it inside
     the `queryFn`. TanStack rejects an `undefined` return outright, which

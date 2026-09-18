@@ -1,4 +1,22 @@
 import { QueryClient } from '@tanstack/react-query';
+import { ApiError } from '../api/client';
+
+const MAX_QUERY_RETRIES = 2;
+
+// Whether a failed query is asked again. Only a failure that may pass on its
+// own is: one that never got an answer from the API — fetch rejected, so it
+// is no ApiError (the network, a dropped connection) — or a 5xx. Any other
+// status is the API's considered answer and is shown at once: a 401 from
+// /auth/me is the normal answer for an anonymous visitor, a 404 a missing
+// book, a 409 a taken login, and asking again reaches the same conclusion.
+// At most twice, with TanStack's default backoff between tries; TanStack
+// passes 0 on the first failure. Exported for its test.
+export const shouldRetryQuery = (
+  failureCount: number,
+  error: unknown
+): boolean =>
+  failureCount < MAX_QUERY_RETRIES &&
+  (!(error instanceof ApiError) || error.status >= 500);
 
 // A factory as well as a singleton, mirroring `createAppStore`/`store` in
 // src/store/index.ts — and safe for the same reason that one is: there is no
@@ -7,14 +25,7 @@ export const createQueryClient = (): QueryClient => {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // TanStack's default is three retries with exponential backoff, which
-        // is wrong for this API: every error the client surfaces is a 4xx it
-        // should show at once. A 401 from /auth/me is the *normal* answer for
-        // an anonymous visitor and a 409 from register is a username
-        // collision; retrying either spends three round trips reaching the
-        // same conclusion. It also matches the thunks this replaces, none of
-        // which retried anything.
-        retry: false,
+        retry: shouldRetryQuery,
         // The thunks never refetched on focus. Turning it on would be a
         // behaviour change, and this migration is not making any.
         refetchOnWindowFocus: false,
@@ -24,6 +35,10 @@ export const createQueryClient = (): QueryClient => {
         // anything looking frozen.
         staleTime: 30_000,
       },
+      // A write is never repeated behind the user's back: a retried request
+      // that did land the first time would land twice. TanStack's default is
+      // already no retry; this says so.
+      mutations: { retry: false },
     },
   });
 };
