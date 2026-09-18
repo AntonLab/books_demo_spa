@@ -155,3 +155,76 @@ test('fails on a spec with no Prefix line', (t) => {
     /^docs\/specs\/foo\/spec\.md:3: FOO-1 is declared in a spec whose prefix is \(none\)$/m
   );
 });
+
+test('fails on a reference to an undeclared ID, naming its file and line', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+    'src/a.ts': 'const a = 1;\n// FOO-2 and FOO-12: neither exists.\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^src\/a\.ts:2: FOO-2 is not declared in any spec$/m
+  );
+  assert.match(
+    result.stderr,
+    /^src\/a\.ts:2: FOO-12 is not declared in any spec$/m
+  );
+});
+
+test('matches whole IDs under a declared prefix only', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+    'src/a.ts': '// XFOO-7 FOO-7a FOO_7 foo-7 BAR-7 FOO-1\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.stderr, '');
+  assert.equal(result.status, 0);
+});
+
+test('a declaration line declares its own ID and references any other', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — Relies on FOO-3.'),
+    'docs/specs/foo/notes.md': '**FOO-2** — Only spec.md declares.\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:7: FOO-3 is not declared in any spec$/m
+  );
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/notes\.md:1: FOO-2 is not declared in any spec$/m
+  );
+  assert.doesNotMatch(result.stderr, /FOO-1/);
+});
+
+test('a Retired ID may be cited inside docs/specs/ but nowhere else', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec(
+      'FOO',
+      '**FOO-1** — _Retired 2026-10-01: replaced by FOO-2._',
+      '**FOO-2** — The rule now.'
+    ),
+    'docs/specs/README.md': 'FOO-1 was retired.\n',
+    'src/a.ts': '// FOO-1: the old rule.\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^src\/a\.ts:1: FOO-1 is retired \(docs\/specs\/foo\/spec\.md:7\)$/m
+  );
+  assert.doesNotMatch(result.stderr, /README/);
+  assert.match(result.stdout, /1 live requirement\(s\), 1 error\(s\)/);
+});

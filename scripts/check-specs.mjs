@@ -13,6 +13,7 @@ const SPEC_FILE = /^docs\/specs\/[^/]+\/spec\.md$/;
 const PREFIX_LINE = /^Prefix: `([A-Z]+)`/;
 const DECLARATION = /^\*\*([A-Z]+)-(\d+)\*\*/;
 const RETIRED = /^\*\*[A-Z]+-\d+\*\*\s*—\s*_Retired\b/;
+const TEST_FILE = /\.(?:spec\.ts|test\.tsx?|testkit\.ts)$/;
 
 function listFiles(root) {
   const out = execFileSync('git', ['ls-files', '-z'], {
@@ -72,8 +73,45 @@ function readSpecs(specs, errors) {
   return { prefixes, declared };
 }
 
-function checkReferences() {
-  return new Set();
+// Checks every occurrence of an ID under a declared prefix, except the one a
+// declaration line opens with, and returns the IDs test files cite.
+function checkReferences(files, prefixes, declared, errors) {
+  const cited = new Set();
+  if (prefixes.size === 0) return cited;
+  const reference = new RegExp(
+    `\\b(?:${[...prefixes.keys()].join('|')})-\\d+\\b`,
+    'g'
+  );
+  for (const { file, lines } of files) {
+    const isSpec = SPEC_FILE.test(file);
+    const inSpecs = file.startsWith('docs/specs/');
+    const isTest = TEST_FILE.test(file);
+    lines.forEach((text, i) => {
+      // A declaration's own ID sits right after the opening `**`.
+      const ownIdAt = isSpec && DECLARATION.test(text) ? 2 : -1;
+      for (const match of text.matchAll(reference)) {
+        if (match.index === ownIdAt) continue;
+        const id = match[0];
+        const target = declared.get(id);
+        if (!target) {
+          errors.push({
+            file,
+            line: i + 1,
+            message: `${id} is not declared in any spec`,
+          });
+        } else if (target.retired && !inSpecs) {
+          errors.push({
+            file,
+            line: i + 1,
+            message: `${id} is retired (${target.file}:${target.line})`,
+          });
+        } else if (isTest) {
+          cited.add(id);
+        }
+      }
+    });
+  }
+  return cited;
 }
 
 function checkSpecs(root) {
