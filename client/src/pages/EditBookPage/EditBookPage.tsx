@@ -29,6 +29,7 @@ import {
 } from '@/queries/books';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { useMySeries } from '@/queries/series';
+import { formatDate } from '@/format/date';
 import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
 
 // One row of the book's chapter list: a link to the chapter's editor, a badge
@@ -47,7 +48,7 @@ const chapterRow = (bookId: number, chapter: ChapterSummary) => {
       </Space>
       {chapter.publishedAt !== null && (
         <Typography.Text type="secondary">
-          {new Date(chapter.publishedAt).toLocaleDateString()}
+          {formatDate(chapter.publishedAt)}
         </Typography.Text>
       )}
     </Space>

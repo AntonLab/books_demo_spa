@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { EditBookPage } from './EditBookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { formatDate } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
@@ -223,6 +224,9 @@ describe('EditBookPage chapters', () => {
       screen.getByText('Draft', { selector: '.ant-tag' })
     ).toBeInTheDocument();
     expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(
+      screen.getByText(formatDate('2026-09-02T00:00:00.000Z'))
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Add chapter' })).toHaveAttribute(
       'href',
       '/books/1/chapters/new'
