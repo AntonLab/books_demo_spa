@@ -24,11 +24,18 @@ of them read. Early scaffold — most feature directories exist but are empty.
   `tsconfig.json` extends it with a relative path. Keep `include`, `exclude` and
   `paths` out of it: TypeScript resolves those against the file that declares
   them, so they would point at the repo root instead of the package.
-- `eslint.config.base.mjs` — the shared flat-config core, exported as
-  `createConfig(ignores, ...packageConfigs)`. ESLint does not search parent
-  directories, so each package keeps its own `eslint.config.mjs` that calls
-  this. It imports its own plugins: the root `package.json` declares them and
-  npm hoists them into the root `node_modules`, so bare specifiers resolve.
+- `eslint.config.base.mjs` — the shared flat-config core, built with ESLint's
+  `defineConfig` and exported as
+  `createConfig({ ignores, tsconfigRootDir }, ...packageConfigs)`. Each
+  package passes its own directory (`import.meta.dirname`) as
+  `tsconfigRootDir`: the `**/*.{ts,tsx}` block turns on typed linting
+  (`projectService`) against that package's tsconfig for three rules —
+  `no-floating-promises` (node:test's `test`/`describe`/`it`/`suite`
+  exempt), `no-misused-promises` and `await-thenable` — while JavaScript
+  files stay untyped. ESLint does not search parent directories, so each
+  package keeps its own `eslint.config.mjs` that calls this. It imports its
+  own plugins: the root `package.json` declares them and npm hoists them into
+  the root `node_modules`, so bare specifiers resolve.
 - `package.json` — the workspace root. It declares `client`, `server` and
   `shared` as workspaces, owns the seven devDependencies every package needs (eslint,
   @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
@@ -229,11 +236,12 @@ Target one with npm's `-w` flag (`npm test -w client`):
 staged files only, re-stages whatever they rewrote, and blocks the commit if an
 ESLint **error** survives the autofix. Warnings (`no-console`) print but pass.
 ESLint runs once per package, from inside it, because flat config does not
-cascade — a staged path is routed by its `client/`, `server/` or `shared/` prefix. Prettier
-runs once from the repo root over every staged file, including the root-level
-configs and markdown no package's ESLint config reaches. Both binaries come from
-the single hoisted `node_modules/.bin`; if it is missing the hook warns and lets
-the commit through rather than failing it.
+cascade — which is also what points typed linting at that package's tsconfig.
+A staged path is routed by its `client/`, `server/` or `shared/` prefix.
+Prettier runs once from the repo root over every staged file, including the
+root-level configs and markdown no package's ESLint config reaches. Both
+binaries come from the single hoisted `node_modules/.bin`; if it is missing
+the hook warns and lets the commit through rather than failing it.
 
 `core.hooksPath` lives in `.git/config` and is therefore per-clone. The root
 `package.json`'s `prepare` script sets it, so `npm install` enables the hook;

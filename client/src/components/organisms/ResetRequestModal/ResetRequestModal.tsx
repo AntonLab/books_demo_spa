@@ -56,7 +56,13 @@ export const ResetRequestModal: FC = () => {
             />
           )}
 
-          <Form form={form} layout="vertical" onFinish={handleFinish}>
+          {/* void: handleFinish reports its own failure in the form, so nothing
+              is left for a caller to await. */}
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={(values) => void handleFinish(values)}
+          >
             <Form.Item
               name="email"
               label="Email"

@@ -462,10 +462,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   for `shared`, not for this package: `shared` is type-checked as part of this
   program, and its relative imports end in `.ts` because Node loads it too.
   This package's own imports stay extensionless
-- `eslint.config.mjs` — calls `createConfig` from the repo-root
-  `eslint.config.base.mjs`, which supplies the recommended sets, the repo-wide
-  rules and the Prettier tail. This file adds only the
-  React + hooks + jsx-a11y block (including
+- `eslint.config.mjs` — calls `createConfig` (passing its own directory as
+  `tsconfigRootDir`) from the repo-root `eslint.config.base.mjs`, which
+  supplies the recommended sets, the repo-wide rules and the Prettier tail.
+  This file adds only the React + hooks + jsx-a11y block (including
   `react/function-component-definition` set to `arrow-function`) and the
   webpack-config override
 
@@ -512,6 +512,16 @@ off `@typescript-eslint/no-require-imports`.
 - `tsconfig` is `noEmit` — webpack produces the build; `tsc` only checks types.
 - `no-console` is a warning here, inherited from `eslint.config.base.mjs`. Client
   code has none today; use a proper logger rather than silencing it.
+- **Three typed lint rules** run over every `.ts`/`.tsx` file with type
+  information from this package's `tsconfig.json` (`projectService`, rooted
+  at `import.meta.dirname` in `eslint.config.mjs`): `no-floating-promises`,
+  `no-misused-promises` and `await-thenable`, all errors. The only hits were
+  the four auth modals handing an async `onFinish` straight to antd's
+  `Form`; they now read `onFinish={(values) => void handleFinish(values)}` —
+  `void` because `handleFinish` reports its own failure in the form. Mark a
+  deliberate fire-and-forget the same way, with the reason beside it; never
+  with an `eslint-disable`. The webpack configs, `jest.config.mjs` and
+  `eslint.config.mjs` are JavaScript and are linted without types.
 
 ## Testing
 
