@@ -315,6 +315,8 @@ Each layer answers a question the others cannot:
   graceful shutdown on `SIGTERM`/`SIGINT` (see **Operations**)
 - `src/listen.ts` — `listen(app, port, deps)`: `app.listen` with Express 5's
   bind error reported instead of ignored (see **Operations**)
+- `src/expiryPurge.ts` — `startExpiryPurge`: the hourly delete of expired
+  sessions and old reset tokens (see **Operations**)
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1036,6 +1038,19 @@ an error it logs `Could not start the HTTP server` with the message and
 never "listening"; `index.ts` then sets `process.exitCode = 1` and runs the
 graceful shutdown, so the database pool closes and the process exits. Only a
 bound server logs `server listening on …`.
+
+### Expiry purge
+
+`src/expiryPurge.ts` deletes the rows nothing will read again: sessions
+whose `expiresAt` has passed (`sessionRepository.deleteExpired`, the same
+rows `findValidByTokenHash` already refuses) and password-reset tokens more
+than 30 days past their own expiry, used or not
+(`passwordResetRepository.deleteExpiredBefore`, `RESET_TOKEN_RETENTION_MS`)
+— the month keeps the evidence that a reset was requested. `index.ts` starts
+it after `syncPermissions()`: one pass at boot, then one an hour on an
+`unref()`ed interval, which the graceful shutdown stops. A pass logs its
+counts at `info` only when it deleted something, and a failure at `error`;
+it never rejects, so a database hiccup costs one pass, not the process.
 
 ## Runtime notes
 

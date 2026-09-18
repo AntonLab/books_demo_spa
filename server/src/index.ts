@@ -3,6 +3,7 @@ import { createResetDelivery } from './delivery/resetDelivery.ts';
 import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
+import { startExpiryPurge } from './expiryPurge.ts';
 import { listen } from './listen.ts';
 import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
@@ -54,6 +55,15 @@ async function main(): Promise<void> {
   // never provisioned, and failing loudly at boot beats discovering it later.
   await syncPermissions();
 
+  const sessionRepository = createSequelizeSessionRepository();
+  const passwordResetRepository = createSequelizePasswordResetRepository();
+  // After syncPermissions(): by now the schema is known to be provisioned.
+  const expiryPurge = startExpiryPurge({
+    sessionRepository,
+    passwordResetRepository,
+    logger,
+  });
+
   const app = createApp({
     userRepository: createSequelizeUserRepository(),
     seriesRepository: createSequelizeSeriesRepository(),
@@ -62,8 +72,8 @@ async function main(): Promise<void> {
     commentRepository: createSequelizeCommentRepository(),
     likeRepository: createSequelizeLikeRepository(),
     notificationRepository: createSequelizeNotificationRepository(),
-    sessionRepository: createSequelizeSessionRepository(),
-    passwordResetRepository: createSequelizePasswordResetRepository(),
+    sessionRepository,
+    passwordResetRepository,
     resetDelivery: createResetDelivery(
       config.resetDelivery,
       logger,
@@ -86,7 +96,7 @@ async function main(): Promise<void> {
   const shutdown = createShutdown({
     server,
     sequelize,
-    stoppables: [],
+    stoppables: [expiryPurge],
     logger,
     exit: (code) => process.exit(code),
   });
