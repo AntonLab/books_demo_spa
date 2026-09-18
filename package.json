@@ -20,7 +20,8 @@
     "lint:fix": "npm run lint:fix --workspaces",
     "test": "npm run test --workspaces --if-present",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "specs:check": "node scripts/check-specs.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

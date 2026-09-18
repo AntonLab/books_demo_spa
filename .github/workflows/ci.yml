@@ -34,6 +34,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      # The spec check and its own tests live here rather than in a job of
+      # their own: the ruleset matches required checks by job name.
+      - run: node --test "scripts/*.test.mjs"
+      - run: npm run specs:check
 
   typecheck:
     runs-on: ubuntu-latest
