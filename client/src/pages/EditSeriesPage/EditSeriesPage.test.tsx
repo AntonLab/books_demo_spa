@@ -18,8 +18,20 @@ jest.mock('@/api/series');
 const mockedAuthors = jest.mocked(authorsApi);
 const mockedSeries = jest.mocked(seriesApi);
 
-const ann = { id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' };
-const cora = { id: 4, login: 'cora', firstName: 'Cora', lastName: 'Writer' };
+const ann = {
+  id: 3,
+  login: 'ann',
+  firstName: 'Ann',
+  lastName: 'Author',
+  avatarUrl: null,
+};
+const cora = {
+  id: 4,
+  login: 'cora',
+  firstName: 'Cora',
+  lastName: 'Writer',
+  avatarUrl: null,
+};
 
 const series: PublicSeries = {
   id: 12,
@@ -50,6 +62,7 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,

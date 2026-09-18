@@ -1,20 +1,12 @@
 import type { FC } from 'react';
-import {
-  Avatar,
-  Button,
-  Dropdown,
-  Layout,
-  Menu,
-  Skeleton,
-  Space,
-  theme,
-} from 'antd';
+import { Button, Dropdown, Layout, Menu, Skeleton, Space, theme } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { openModal } from '@/store/authSlice';
 import { useLogout, useSession } from '@/queries/auth';
 import { SearchBar } from '@/components/molecules/SearchBar';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { NotificationBell } from '@/components/organisms/NotificationBell';
 
 export const AppHeader: FC = () => {
@@ -84,11 +76,11 @@ export const AppHeader: FC = () => {
               for free. */}
             <Button type="text" style={{ color: token.colorTextLightSolid }}>
               <Space>
-                {/* An initial rather than an icon, so `@ant-design/icons`
-                  stays out of the dependency list. */}
-                <Avatar size="small">
-                  {user.login.charAt(0).toUpperCase()}
-                </Avatar>
+                <AccountAvatar
+                  avatarUrl={user.avatarUrl}
+                  name={user.login}
+                  size="small"
+                />
                 {user.login}
               </Space>
             </Button>

@@ -125,7 +125,11 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
 // The authors are passed in rather than read off an eager load: a page of books
 // loads its credits in one query of its own (bookRepository.loadAuthors), and
 // an include with a LIMIT would page over credit rows instead of books.
-export function toPublicBook(book: Book, authors: AuthorSummary[]): PublicBook {
+export function toPublicBook(
+  book: Book,
+  authors: AuthorSummary[],
+  coverUrl: string | null
+): PublicBook {
   return {
     id: book.id,
     authors,
@@ -134,6 +138,7 @@ export function toPublicBook(book: Book, authors: AuthorSummary[]): PublicBook {
     description: book.description,
     tags: toTagArray(book.tags),
     status: book.status,
+    coverUrl,
     createdAt: book.createdAt,
     updatedAt: book.updatedAt,
   };

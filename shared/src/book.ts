@@ -17,6 +17,9 @@ export interface PublicBook {
   description: string;
   tags: string[];
   status: BookStatus;
+  // A7: the URL the browser fetches, versioned by the Cover's own
+  // updatedAt so a replace is never served stale. null when there is none.
+  coverUrl: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

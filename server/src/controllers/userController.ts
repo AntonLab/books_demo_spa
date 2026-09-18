@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from 'express';
+import { processAvatarImage } from '../images.ts';
 import {
   validatedBody,
   validatedParams,
@@ -7,7 +8,12 @@ import {
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { verifyPassword } from '../password.ts';
 import { clearSessionCookie } from '../sessionCookie.ts';
-import { AppError, ForbiddenError, NotFoundError } from '../types/errors.ts';
+import {
+  AppError,
+  ForbiddenError,
+  NotFoundError,
+  UnsupportedMediaTypeError,
+} from '../types/errors.ts';
 import type {
   CreateUserInput,
   ListUsersQuery,
@@ -25,6 +31,9 @@ export interface UserController {
   getById: RequestHandler;
   update: RequestHandler;
   remove: RequestHandler;
+  uploadAvatar: RequestHandler;
+  removeAvatar: RequestHandler;
+  getAvatar: RequestHandler;
 }
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -154,6 +163,49 @@ export function createUserController(
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('User', id);
       res.status(204).end();
+    },
+
+    // A4: users x update, then the same rank check PATCH uses.
+    uploadAvatar: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      if (!Buffer.isBuffer(req.body)) {
+        throw new UnsupportedMediaTypeError();
+      }
+      await assertMayTouch(req, id);
+
+      const processed = await processAvatarImage(req.body);
+      const found = await repository.setAvatar(id, processed);
+      if (!found) throw new NotFoundError('User', id);
+
+      const user = await repository.findById(id);
+      if (!user) throw new NotFoundError('User', id);
+      res.json(user);
+    },
+
+    // A5: same guards as uploadAvatar; 204 whether or not an Avatar existed.
+    removeAvatar: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayTouch(req, id);
+
+      await repository.removeAvatar(id);
+      res.status(204).end();
+    },
+
+    // A6: fully public — mounted with no permission middleware at all, not
+    // even users x read, which a guest lacks.
+    getAvatar: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const avatar = await repository.getAvatarData(id);
+      if (!avatar) throw new NotFoundError('User', id);
+
+      res
+        .status(200)
+        .set({
+          'Content-Type': 'image/webp',
+          'X-Content-Type-Options': 'nosniff',
+          'Cache-Control': 'private, max-age=31536000, immutable',
+        })
+        .send(avatar.data);
     },
   };
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import {
   createFakeUserRepository,
@@ -41,6 +42,7 @@ function seedPersonaRows(): FakeUserRow[] {
     lastName: 'User',
     status: 'active',
     role,
+    avatarUrl: null,
     password: PASSWORD_HASH,
     createdAt: now,
     updatedAt: now,
@@ -887,4 +889,242 @@ test('currentPassword never reaches the stored row', async () => {
       assert.equal('currentPassword' in (await json<object>(response)), false);
     }
   );
+});
+
+// --- An Account Avatar, uploaded, replaced, removed and served. ---
+
+const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
+  sharp({ create: { width, height, channels: 3, background: '#663399' } })
+    .webp()
+    .toBuffer();
+
+test('PUT /api/users/:id/avatar answers 401 with no session', async () => {
+  await withApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/webp' },
+          body: await aWebpImage(),
+        }
+      );
+      assert.equal(response.status, 401);
+    }
+  );
+});
+
+// assertMayTouch refuses a user/author with 403 before any lookup, so only
+// an `any`-scoped caller (admin/superadmin) ever reaches the 404 branch for
+// an id that does not exist.
+test('PUT /api/users/:id/avatar answers 404 before 403 for an account that does not exist', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(`${base}/api/users/999999/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.admin },
+        body: await aWebpImage(),
+      });
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test("PUT /api/users/:id/avatar answers 403 for a user or author touching someone else's avatar", async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.author}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
+          body: await aWebpImage(),
+        }
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test("PUT /api/users/:id/avatar answers 403 for an admin touching a superadmin's avatar", async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.superadmin}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.admin },
+          body: await aWebpImage(),
+        }
+      );
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('PUT /api/users/:id/avatar answers 413 for a body over 2 MiB', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
+          body: Buffer.alloc(2 * 1024 * 1024 + 1),
+        }
+      );
+      assert.equal(response.status, 413);
+    }
+  );
+});
+
+test('PUT /api/users/:id/avatar answers 415 for an unaccepted content type', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'text/plain', cookie: ROLE_COOKIES.user },
+          body: 'not an image',
+        }
+      );
+      assert.equal(response.status, 415);
+    }
+  );
+});
+
+test('PUT /api/users/:id/avatar answers 400 for bytes that are not a real image', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.user },
+          body: Buffer.from('not a real png'),
+        }
+      );
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('PUT /api/users/:id/avatar answers 400 for an empty body, even under an accepted content type', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.user },
+          body: Buffer.alloc(0),
+        }
+      );
+      assert.equal(response.status, 400);
+    }
+  );
+});
+
+test('PUT /api/users/:id/avatar replaces the avatar and answers with the updated account, its avatarUrl version changing', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const first = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
+        body: await aWebpImage(),
+      });
+      assert.equal(first.status, 200);
+      const firstBody = await json<PublicUser>(first);
+      assert.match(
+        firstBody.avatarUrl ?? '',
+        new RegExp(`^/api/users/${USER_IDS.user}/avatar\\?v=\\d+$`)
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const second = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
+        body: await aWebpImage(50, 50),
+      });
+      assert.equal(second.status, 200);
+      const secondBody = await json<PublicUser>(second);
+      assert.notEqual(secondBody.avatarUrl, firstBody.avatarUrl);
+    }
+  );
+});
+
+test('DELETE /api/users/:id/avatar answers 204 whether or not an avatar existed', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        {
+          method: 'DELETE',
+          headers: { cookie: ROLE_COOKIES.user },
+        }
+      );
+      assert.equal(response.status, 204);
+    }
+  );
+});
+
+test('DELETE /api/users/:id/avatar answers 404 for a missing account even under `any` scope (an admin)', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(`${base}/api/users/999999/avatar`, {
+        method: 'DELETE',
+        headers: { cookie: ROLE_COOKIES.admin },
+      });
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test('GET /api/users/:id/avatar answers 404 for an account with no avatar, and for a missing account', async () => {
+  await withApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/users/${USER_IDS.user}/avatar`)).status,
+        404
+      );
+      assert.equal(
+        (await fetch(`${base}/api/users/999999/avatar`)).status,
+        404
+      );
+    }
+  );
+});
+
+test('GET /api/users/:id/avatar serves the WebP bytes with the versioned cache headers, publicly (a guest included)', async () => {
+  const repository = createFakeRepository(seedPersonaRows());
+  await withAuthenticatedApp({ userRepository: repository }, async (base) => {
+    await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
+      body: await aWebpImage(),
+    });
+  });
+  await withApp({ userRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(
+      response.headers.get('cache-control'),
+      'private, max-age=31536000, immutable'
+    );
+  });
 });

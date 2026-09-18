@@ -14,9 +14,9 @@ the first component needs it rather than leaving empty folders around.
 
 | Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                                          |
 | --------- | --------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus two custom quarks — `appSearchBarMaxWidth` and `appNotificationPanelWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                              |
+| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus three custom quarks — `appSearchBarMaxWidth`, `appNotificationPanelWidth` and `appBookCoverWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`       |
 | Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                                             |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`                                                                                                                                                                           |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`, `BookCover`, `AccountAvatar`, `ImageUploadButton`                                                                                                                        |
 | Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
 | Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                    |
 | Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                                       |
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 36 (21 components, 15 pages) follow this layout, and the `@/` alias is
+All 39 (24 components, 15 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -178,8 +178,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
   responses into a typed `ApiError`), plus `auth.ts`, `authors.ts` (`searchAuthors`, the Co-author picker's
-  search), `books.ts` (reads, plus `createBook`, `updateBook`, `deleteBook`,
-  `addCoAuthor` and `removeCoAuthor`), `chapters.ts` (reads, plus
+  search), `users.ts` (`uploadAvatar`, `deleteAvatar`), `books.ts` (reads,
+  plus `createBook`, `updateBook`, `deleteBook`, `addCoAuthor`,
+  `removeCoAuthor`, `uploadBookCover` and `deleteBookCover`), `chapters.ts` (reads, plus
   `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` —
   `deleteChapter` and `reorderChapters`, a `PUT` of the book's whole Reading
   order), `comments.ts`,
@@ -196,6 +197,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   itself, setting `Content-Type` off whether it is `undefined`. Passing a
   JSON string would double-encode it.
 
+  A second trap in the other direction: when `body` is a `Blob` (a `File` is
+  one — Covers and Avatars upload this way), `request()` sends it as-is with
+  `Content-Type` set to the blob's own type and no `JSON.stringify`; every
+  other body keeps the object/JSON path above. `client.test.ts` pins both.
+
   `request()` also sends the session's CSRF token on every write (any method
   but `GET`): it reads the `xsrfToken` cookie the server sets beside the
   session and echoes it in the `X-XSRF-Token` header, without which the server
@@ -208,9 +214,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
   auth mutations), `books.ts` (`useBooks`, `useSearchBooks`, `useBook`,
   `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
-  list that includes their drafts — and five book mutations that all
-  invalidate the whole `books` prefix, since one write can move a book in or
-  out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
+  list that includes their drafts — and five book mutations, the
+  create/update/delete trio plus `useUploadBookCover`/`useDeleteBookCover`,
+  that all invalidate the whole `books` prefix, since one write can move a
+  book in or out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
   term), `series.ts` (`useMySeries`, `useSeries`, `useSeriesBooks` —
   disabled until the page knows the viewer may edit the series — four series
   mutations that invalidate both the `series` and `books` prefixes, and
@@ -224,11 +231,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   the row a Co-author added or removed), `chapters.ts` (`useChapters`, `useChapter`, three
   chapter mutations that invalidate every `chapters` key, and
   `useReorderChapters`, built on `useOptimisticReorder`),
-  `comments.ts` (`useComments` plus the three comment mutations) and
-  `likes.ts` (`useToggleLike`) and `notifications.ts` (`useNotifications`,
+  `comments.ts` (`useComments` plus the three comment mutations),
+  `likes.ts` (`useToggleLike`), `notifications.ts` (`useNotifications`,
   keyed by the account and the one query that polls — every 60 s, and again
   when the window regains focus — and `useMarkNotificationsRead`, which sets
-  the unread count at once and refetches the list). Flat files, like `src/api/` and `src/store/`,
+  the unread count at once and refetches the list) and `users.ts`
+  (`useUploadAvatar` and `useDeleteAvatar`, which invalidate the session
+  plus the `books`, `series`, `comments` and `authors` prefixes — an Avatar
+  change touches every place a `PublicUser` or `AuthorSummary` is embedded).
+  Flat files, like `src/api/` and `src/store/`,
   and outside the Atomic Design levels for the same reason.
 
   Five things worth knowing before editing it:
@@ -261,10 +272,29 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     rather than a boolean, so the caller can delete the right row on a second
     click, and uses a text glyph because `@ant-design/icons` is not a
     dependency here); `Comment` (presentational — the name is free because
-    antd removed its own `Comment` in v5).
+    antd removed its own `Comment` in v5); `BookCover` (a 2:3 frame sized off
+    the `appBookCoverWidth` quark, showing the book's cover image — `alt=""`,
+    since the title always sits right beside it — or, with none, that title
+    as an `aria-hidden` placeholder; a failed image load falls back to the
+    placeholder too, and a fresh `?v=` URL after an upload gets its own try
+    rather than staying stuck on an earlier, unrelated failure); `AccountAvatar`
+    (decorative throughout — the wrapping `<span>` is `aria-hidden` and the
+    image itself `alt=""`; a name always sits beside it at every call site
+    (header login, bylines, comment author, `CoAuthorManager`) except
+    `ProfilePage`, where it is the signed-in Account's own picture under the
+    "Profile" heading — falling back to the name's first letter with no
+    picture);
+    `ImageUploadButton` (the shared image picker behind an antd `Upload` and
+    `Button`: checks a picked file's type against
+    `ACCEPTED_IMAGE_CONTENT_TYPES` and its size against `IMAGE_MAX_BYTES`
+    before handing it to `onFile`, or explains the rejection through
+    `onReject` — purely presentational, with no `src/api`/`src/queries` call
+    of its own, so `EditBookPage`'s Cover block and `ProfilePage` each wire it
+    to their own upload/delete mutation).
   - `organisms/` — `AppHeader` (nav menu — "My Books" only for the `author`
     Role — `SearchBar`, and the three auth states — signed out / loading /
-    signed in, the last with a `NotificationBell`); `NotificationBell` (a
+    signed in, the trigger naming the account beside its `AccountAvatar`, and
+    the last with a `NotificationBell`); `NotificationBell` (a
     badge with the unread count, also in the button's name, over a `Popover`
     of the newest notifications in words, the work's title linked while the
     work exists — a book to its page, a series to its editor. Opening it marks
@@ -273,9 +303,13 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     because every new book is a draft, and "No series" travels as 0 inside the
     form and leaves as `null`); `SeriesForm` (BookForm's fields
     minus series and status — title, description, tags); `CoAuthorManager`
-    (the byline of the `work` it is given, a book or a series, with an
+    (the byline of the `work` it is given, a book or a series, each Co-author's
+    `AccountAvatar` beside their name, with an
     immediate Remove, a Leave behind a `Popconfirm`, and a search-as-you-type
-    picker over `/api/authors`; read-only unless `canManage`, and the last
+    picker over `/api/authors` whose `optionRender` draws the same `AccountAvatar`
+    beside each candidate — the option's `label` itself stays a plain string, so
+    antd's derived tooltip and rc-select's search-filter matching keep working;
+    read-only unless `canManage`, and the last
     Co-author is never offered Leave); `AuthModals` (reads
     `activeModal` from `authSlice` and renders only that one, so only one
     modal is ever mounted at a time) plus `LoginModal`, `RegisterModal` (an
@@ -283,7 +317,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     register call — the two roles `REGISTRABLE_ROLES` lets the public form
     reach; `admin` and `superadmin` have no signup path and are never
     reachable from this checkbox), `ResetRequestModal` and
-    `ResetConfirmModal`; `BookCard` (names every Co-author under the title,
+    `ResetConfirmModal`; `BookCard` (leads with the book's `BookCover`, names
+    every Co-author under the title beside their own `AccountAvatar`,
     from the `authors` the list response embeds, and tags the book's status)
     and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
@@ -324,14 +359,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     already knows whether a comment has children, so the server is not asked
     to. A tombstone that survives renders through the molecule as `[deleted]`
     or `[removed by moderator]` (`TOMBSTONE_LABELS` in `Comment.tsx`), with no
-    author and no controls at all, not even for its own author or a
+    author, no `AccountAvatar` and no controls at all, not even for its own author or a
     moderator: there are no moderation buttons anywhere in the client — remove
     and restore stay API-only until the reports feature brings a moderation
     screen. Edit, delete and like are rendered conditionally to mirror the
     server's rules — the server refuses each with a 403 regardless, so this
     only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
-  `SearchPage`, `BookPage` (`/books/:id`), `ChapterPage`
+  `SearchPage`, `BookPage` (`/books/:id`: the book's `BookCover` beside its
+  title, and each Co-author's `AccountAvatar` in the byline), `ChapterPage`
   (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
   author's own books, drafts included, and "Create book", and a Series tab of
   the series they co-author, each linked to its editor, with "Create
@@ -343,7 +379,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   than linked — then `CoAuthorManager` and delete behind a `Popconfirm`; a
   Moderator gets everything but the byline), `NewBookPage`
   (`/books/new`: the book's fields only, then on to editing it),
-  `EditBookPage` (`/books/:id/edit`: fields and status, every chapter through
+  `EditBookPage` (`/books/:id/edit`: fields and status; a Cover block —
+  `BookCover`, `ImageUploadButton` and "Remove cover" behind a `Popconfirm`,
+  with its own error `Alert`; every chapter through
   a `SortableList` that saves the Reading order on drop — with an
   error Alert when a save fails and a warning when a 409 reloaded the list —
   and "Add chapter",
@@ -352,8 +390,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (`/books/:bookId/chapters/new`) and `EditChapterPage`
   (`/books/:bookId/chapters/:chapterId/edit`: saves against the loaded
   `updatedAt`, and a 409 shows "This chapter was changed by a co-author —
-  reload" with a Reload button while keeping the typed text), `ProfilePage`,
-  `SeriesPage`, `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
+  reload" with a Reload button while keeping the typed text), `ProfilePage`
+  (a heading alone while the session is pending, an error `Alert` if the
+  session fetch fails, `Empty` when signed out, otherwise a large
+  `AccountAvatar`, "Upload avatar" and "Remove avatar" behind a
+  `Popconfirm`), `SeriesPage` (still a stub — series UI is an explicit
+  non-goal of the spec), `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
   `/reset-password` to the confirm modal without naming the component that
@@ -371,10 +413,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `role` (`'user' | 'author' | 'admin' | 'superadmin'`), a mirror of the
   server's role-permission matrix (see `server/CLAUDE.md`); the client sets
   it at registration (see `RegisterModal` under `organisms/` above) but does
-  not yet branch any rendering on it — and `AuthorSummary`, the email-free
-  shape the public endpoints embed),
+  not yet branch any rendering on it — and `avatarUrl`, versioned (`?v=<ms>`)
+  and never stale — and `AuthorSummary`, the email-free
+  shape the public endpoints embed, carrying the same `avatarUrl`),
   `book.ts` (`PublicBook`, which carries `authors: AuthorSummary[]` — every
-  Co-author in credit order, with no `userId` — and a `status`; `BookDetail`;
+  Co-author in credit order, with no `userId` — a `status` and a versioned
+  `coverUrl`; `BookDetail`;
   `BookStatus` and `BOOK_STATUS_LABELS`, the one place the three statuses get
   their words. `BookPage` hides the like button from every Co-author and from
   everyone on a Draft book, mirroring the server's 403s),
@@ -386,7 +430,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   list from the server carries the rest), `comment.ts`,
   `like.ts`, `notification.ts` (`PublicNotification` and `NotificationList`),
   `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
-  shapes) and `css.d.ts`. None of these shapes is written here any more: each
+  shapes, plus `ACCEPTED_IMAGE_CONTENT_TYPES` and `IMAGE_MAX_BYTES` —
+  `ImageUploadButton`'s own precheck, re-exported so the client fails fast on
+  the same JPEG/PNG/WebP/2 MiB shape the server enforces for real)
+  and `css.d.ts`. None of these shapes is written here any more: each
   is `Wire<…>` over the type of the same name in the `shared` workspace
   (ADR-0006), and the unions (`BOOK_STATUSES`, `USER_ROLES`, `USER_STATUSES`,
   `TOMBSTONES`, `REGISTRABLE_ROLES`, …) are re-exported from it — `BookForm`
@@ -483,7 +530,7 @@ The flag is load-bearing, not incidental. `react-router` 8 is ESM-only — its
 package root re-exports server-runtime code (cookie signing, etc.) that uses
 `import.meta`, which Jest's default CJS loader cannot parse.
 `--experimental-vm-modules` is what lets Jest load that code at all; without it
-12 of the 25 suites fail.
+34 of the 54 suites fail.
 
 Two details of the wrapping matter. `jest` is invoked by name rather than
 through `node_modules/jest/bin/jest.js`, because npm workspaces hoist Jest to
@@ -552,6 +599,14 @@ user)`) or a UI action (`store.dispatch(openResetConfirm(token))`).
   antd's stylesheet as hidden. A test that renders without the helper pays
   the old cost. Waiting on cheap text first and calling `getByRole` once is
   also faster than a `findByRole` polling through a loading phase.
+- **An Avatar or a Cover `<img>` is queried by `src`, never by role.**
+  `AccountAvatar` is `aria-hidden` end to end and `BookCover`'s image is
+  `alt=""`, so `screen.getByRole('img')` finds neither — and even where an
+  image is not hidden, antd's own icon spans already answer to `role="img"`,
+  so a bare role query is ambiguous. Reach for
+  `container.querySelector('img[src="..."]')` instead, naming the exact URL:
+  a card can show a book's Cover and several Co-authors' Avatars side by
+  side, and only the `src` tells them apart.
 
 ### What a component test must cover
 
@@ -566,10 +621,9 @@ Test the inputs and the outputs: props in, rendered DOM and fired callbacks
 out. Do not assert on internal state — a test that knows how a component
 stores something breaks on every refactor that changes nothing a user sees.
 
-Every component and page has a test file. The stub pages (`ProfilePage`,
-`SeriesPage`) take no props and have nothing to click, so
-their tests cover only the heading and the placeholder — that is the whole
-contract, not a shortcut.
+Every component and page has a test file. The stub page (`SeriesPage`) takes
+no props and has nothing to click, so its test covers only the heading and
+the placeholder — that is the whole contract, not a shortcut.
 
 ## Conventions
 

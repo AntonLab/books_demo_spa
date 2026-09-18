@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { CoAuthorManager } from './CoAuthorManager';
@@ -22,18 +22,21 @@ const ann: AuthorSummary = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  avatarUrl: null,
 };
 const cora: AuthorSummary = {
   id: 4,
   login: 'cora',
   firstName: 'Cora',
   lastName: 'Writer',
+  avatarUrl: null,
 };
 const ivan: AuthorSummary = {
   id: 5,
   login: 'ipetrov',
   firstName: 'Ivan',
   lastName: 'Petrov',
+  avatarUrl: null,
 };
 
 const renderManager = (
@@ -69,6 +72,39 @@ describe('CoAuthorManager', () => {
     renderManager({ authors: [ann] });
 
     expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
+  });
+
+  it('shows a co-author’s avatar picture in the byline when they have one', () => {
+    // Not screen.getByRole('img'): the avatar is aria-hidden (Task 14's
+    // ruling), so a container query by src is the unambiguous way to reach it.
+    const { container } = renderManager({
+      authors: [{ ...ann, avatarUrl: '/api/users/3/avatar?v=1' }, cora],
+    });
+
+    expect(
+      container.querySelector('img[src="/api/users/3/avatar?v=1"]')
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to an initial for a co-author with no avatar', () => {
+    renderManager();
+
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
+
+  it('still names each candidate in the picker, avatar included', async () => {
+    renderManager({ authors: [ann] });
+
+    await userEvent.type(screen.getByRole('combobox'), 'petrov');
+
+    const option = await screen.findByTitle('Ivan Petrov (ipetrov)');
+    expect(
+      within(option).getByText('Ivan Petrov (ipetrov)')
+    ).toBeInTheDocument();
+    // Ivan's fallback initial — the fixture has no avatarUrl — scoped to this
+    // option, so it would fail if the option stopped drawing an avatar at all.
+    expect(within(option).getByText('I')).toBeInTheDocument();
   });
 
   it('is read-only for someone who may not manage the byline', () => {

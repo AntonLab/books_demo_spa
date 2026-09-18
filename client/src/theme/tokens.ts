@@ -18,6 +18,8 @@ declare module 'antd/es/theme/interface' {
     appSearchBarMaxWidth: number;
     /** Width of the notification bell's panel. */
     appNotificationPanelWidth: number;
+    /** Width of a BookCover frame; its height is 1.5x this (a 2:3 ratio). */
+    appBookCoverWidth: number;
   }
 }
 
@@ -25,5 +27,6 @@ export const appTheme: ThemeConfig = {
   token: {
     appSearchBarMaxWidth: 400,
     appNotificationPanelWidth: 360,
+    appBookCoverWidth: 96,
   },
 };

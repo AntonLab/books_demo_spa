@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import { StateConflictError } from '../types/errors.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import {
@@ -58,6 +59,7 @@ const AUTHOR: AuthorSummary = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  avatarUrl: null,
 };
 
 // Every persona a fake credit can name, so a response's `authors` carries real
@@ -71,6 +73,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'otherAuthor',
       firstName: 'O',
       lastName: 'A',
+      avatarUrl: null,
     },
   ],
   [
@@ -80,6 +83,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'TestUser',
       firstName: 'Test',
       lastName: 'User',
+      avatarUrl: null,
     },
   ],
 ]);
@@ -1181,4 +1185,269 @@ test('credit changes and deletes are made as the signed-in caller, whom their no
       ]);
     }
   );
+});
+
+// --- A Book Cover, uploaded, replaced, removed and served. ---
+
+const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
+  sharp({ create: { width, height, channels: 3, background: '#336699' } })
+    .webp()
+    .toBuffer();
+
+test('PUT /api/books/:id/cover answers 401 with no session', async () => {
+  await withApp({}, async (base) => {
+    const response = await fetch(`${base}/api/books/${KNOWN_SERIES_ID}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp' },
+      body: await aWebpImage(),
+    });
+    assert.equal(response.status, 401);
+  });
+});
+
+test('PUT /api/books/:id/cover answers 404 before 403 for a book that does not exist', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(`${base}/api/books/999999/cover`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
+        body: await aWebpImage(),
+      });
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test('PUT /api/books/:id/cover answers 403 for a signed-in author who does not co-author the book', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: USER_IDS.otherAuthor,
+    seriesId: null,
+    title: 'Not yours',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
+      body: await aWebpImage(),
+    });
+    assert.equal(response.status, 403);
+  });
+});
+
+test('PUT /api/books/:id/cover answers 413 for a body over 2 MiB', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Big upload',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'image/webp',
+        cookie: ROLE_COOKIES.author,
+      },
+      body: Buffer.alloc(2 * 1024 * 1024 + 1),
+    });
+    assert.equal(response.status, 413);
+  });
+});
+
+test('PUT /api/books/:id/cover answers 415 for an unaccepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Wrong type',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'text/plain', cookie: ROLE_COOKIES.author },
+      body: 'not an image',
+    });
+    assert.equal(response.status, 415);
+  });
+});
+
+test('PUT /api/books/:id/cover answers 400 for bytes that are not a real image, even under an accepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Not really an image',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.author },
+      body: Buffer.from('not a real png'),
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test('PUT /api/books/:id/cover answers 400 for an empty body, even under an accepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Empty upload',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.author },
+      body: Buffer.alloc(0),
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test('PUT /api/books/:id/cover replaces the cover and answers with the updated book, its coverUrl version changing', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Gets a cover',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const first = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
+      body: await aWebpImage(),
+    });
+    assert.equal(first.status, 200);
+    const firstBody = await json<PublicBook>(first);
+    assert.match(
+      firstBody.coverUrl ?? '',
+      new RegExp(`^/api/books/${created.id}/cover\\?v=\\d+$`)
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const second = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
+      body: await aWebpImage(200, 300),
+    });
+    const secondBody = await json<PublicBook>(second);
+    assert.notEqual(secondBody.coverUrl, firstBody.coverUrl);
+  });
+});
+
+test('DELETE /api/books/:id/cover answers 401, then 404, then 403, in that order, and 204 on success — including with no cover', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'For deletion tests',
+    description: 'x',
+    tags: [],
+  });
+  const strangersBook = await repository.create({
+    userId: USER_IDS.otherAuthor,
+    seriesId: null,
+    title: 'Not the author persona’s',
+    description: 'x',
+    tags: [],
+  });
+
+  await withApp({ bookRepository: repository }, async (base) => {
+    const noSession = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'DELETE',
+    });
+    assert.equal(noSession.status, 401);
+  });
+
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const missing = await fetch(`${base}/api/books/999999/cover`, {
+      method: 'DELETE',
+      headers: { cookie: ROLE_COOKIES.author },
+    });
+    assert.equal(missing.status, 404);
+
+    const forbidden = await fetch(
+      `${base}/api/books/${strangersBook.id}/cover`,
+      { method: 'DELETE', headers: { cookie: ROLE_COOKIES.author } }
+    );
+    assert.equal(forbidden.status, 403);
+
+    const success = await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'DELETE',
+      headers: { cookie: ROLE_COOKIES.author },
+    });
+    assert.equal(success.status, 204);
+  });
+});
+
+test('DELETE /api/books/:id/cover answers 404 for a missing book even under `any` scope (a Moderator)', async () => {
+  const repository = createFakeRepository();
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/999999/cover`, {
+      method: 'DELETE',
+      headers: { cookie: ROLE_COOKIES.admin },
+    });
+    assert.equal(response.status, 404);
+  });
+});
+
+test('GET /api/books/:id/cover answers 404 for a book with no cover, and for a missing book', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'No cover',
+    description: 'x',
+    tags: [],
+  });
+  await withApp({ bookRepository: repository }, async (base) => {
+    assert.equal(
+      (await fetch(`${base}/api/books/${created.id}/cover`)).status,
+      404
+    );
+    assert.equal((await fetch(`${base}/api/books/999999/cover`)).status, 404);
+  });
+});
+
+test('GET /api/books/:id/cover serves the WebP bytes with the versioned cache headers, publicly (a guest included)', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: KNOWN_USER_ID,
+    seriesId: null,
+    title: 'Has a cover',
+    description: 'x',
+    tags: [],
+  });
+  await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
+    await fetch(`${base}/api/books/${created.id}/cover`, {
+      method: 'PUT',
+      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
+      body: await aWebpImage(),
+    });
+  });
+  await withApp({ bookRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/books/${created.id}/cover`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(
+      response.headers.get('cache-control'),
+      'private, max-age=31536000, immutable'
+    );
+  });
 });

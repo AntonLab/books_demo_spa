@@ -9,11 +9,13 @@ import {
 import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
+import { BookCover } from '../models/BookCover.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
+import { loadAvatarUrls } from './userRepository.ts';
 import {
   BadRequestError,
   NotFoundError,
@@ -96,6 +98,17 @@ export interface BookRepository {
   // series exactly once; anything else is a StateConflictError that changes
   // nothing. False when the series is not there.
   reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
+  // The Cover's bytes never ride along with any other read (S2) — these
+  // three are the only place book_covers is touched. false/null mean "no
+  // such Book", exactly as the other single-row methods report it —
+  // removeCover included, so a caller can tell "no such Book" from "no Cover
+  // to remove", which are both otherwise silent no-ops.
+  setCover(bookId: number, data: Buffer): Promise<boolean>;
+  removeCover(bookId: number): Promise<boolean>;
+  getCoverData(
+    bookId: number,
+    viewer: Viewer
+  ): Promise<{ data: Buffer; updatedAt: Date } | null>;
 }
 
 // A rejected FK while creating a book means its first credit names an account
@@ -137,6 +150,28 @@ async function nextSeriesPosition(
   return (last ?? 0) + 1;
 }
 
+// Every Cover's URL for the books named, in one query — the same batching
+// loadAuthors uses, and for the same reason: a page's LIMIT must stay over
+// books, never over a joined table.
+async function loadCoverUrls(
+  bookIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, string>> {
+  if (bookIds.length === 0) return new Map();
+
+  const covers = await BookCover.findAll({
+    where: { bookId: bookIds },
+    attributes: ['bookId', 'updatedAt'],
+    transaction,
+  });
+  return new Map(
+    covers.map((cover) => [
+      cover.bookId,
+      `/api/books/${cover.bookId}/cover?v=${cover.updatedAt.getTime()}`,
+    ])
+  );
+}
+
 // Every Co-author of every book named, in credit order, in one query. Books
 // with no credits come back with an empty list rather than missing, so a
 // caller can index the map without a fallback.
@@ -155,9 +190,17 @@ async function loadAuthors(
     order: [['id', 'ASC']],
     transaction,
   });
+  const avatarUrls = await loadAvatarUrls(
+    credits.flatMap((credit) => (credit.user ? [credit.user.id] : [])),
+    transaction
+  );
   for (const credit of credits) {
     if (credit.user) {
-      authors.get(credit.bookId)?.push(toAuthorSummary(credit.user));
+      authors
+        .get(credit.bookId)
+        ?.push(
+          toAuthorSummary(credit.user, avatarUrls.get(credit.user.id) ?? null)
+        );
     }
   }
   return authors;
@@ -167,8 +210,15 @@ async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const authors = await loadAuthors([book.id], transaction);
-  return toPublicBook(book, authors.get(book.id) ?? []);
+  const [authors, coverUrls] = await Promise.all([
+    loadAuthors([book.id], transaction),
+    loadCoverUrls([book.id], transaction),
+  ]);
+  return toPublicBook(
+    book,
+    authors.get(book.id) ?? [],
+    coverUrls.get(book.id) ?? null
+  );
 }
 
 // creditedBookIds is the books `?userId=` names, looked up beforehand: a book
@@ -277,9 +327,18 @@ export function createSequelizeBookRepository(): BookRepository {
               ],
       });
 
-      const authors = await loadAuthors(rows.map((row) => row.id));
+      const [authors, coverUrls] = await Promise.all([
+        loadAuthors(rows.map((row) => row.id)),
+        loadCoverUrls(rows.map((row) => row.id)),
+      ]);
       return {
-        items: rows.map((row) => toPublicBook(row, authors.get(row.id) ?? [])),
+        items: rows.map((row) =>
+          toPublicBook(
+            row,
+            authors.get(row.id) ?? [],
+            coverUrls.get(row.id) ?? null
+          )
+        ),
         total: count,
       };
     },
@@ -552,6 +611,33 @@ export function createSequelizeBookRepository(): BookRepository {
         );
         return true;
       });
+    },
+
+    async setCover(bookId, data) {
+      const book = await Book.findByPk(bookId, { attributes: ['id'] });
+      if (!book) return false;
+      await BookCover.upsert({ bookId, data });
+      return true;
+    },
+
+    async removeCover(bookId) {
+      const book = await Book.findByPk(bookId, { attributes: ['id'] });
+      if (!book) return false;
+      await BookCover.destroy({ where: { bookId } });
+      return true;
+    },
+
+    async getCoverData(bookId, viewer) {
+      const book = await Book.findOne({
+        where: { [Op.and]: [{ id: bookId }, await readableBookWhere(viewer)] },
+        attributes: ['id'],
+      });
+      if (!book) return null;
+
+      const cover = await BookCover.findByPk(bookId, {
+        attributes: ['data', 'updatedAt'],
+      });
+      return cover ? { data: cover.data, updatedAt: cover.updatedAt } : null;
     },
   };
 }

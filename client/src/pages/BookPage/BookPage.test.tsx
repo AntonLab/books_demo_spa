@@ -24,14 +24,27 @@ const mockedLikes = jest.mocked(likesApi);
 const book: BookDetail = {
   id: 1,
   authors: [
-    { id: 3, login: 'Author', firstName: 'Ann', lastName: 'Author' },
-    { id: 4, login: 'Cowriter', firstName: 'Cora', lastName: 'Writer' },
+    {
+      id: 3,
+      login: 'Author',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+    {
+      id: 4,
+      login: 'Cowriter',
+      firstName: 'Cora',
+      lastName: 'Writer',
+      avatarUrl: null,
+    },
   ],
   seriesId: 2,
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   status: 'in_progress',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: { id: 2, title: 'The Scale Cycle' },
@@ -47,6 +60,7 @@ const reader: PublicUser = {
   lastName: 'Er',
   status: 'active',
   role: 'user',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -94,9 +108,46 @@ describe('BookPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Ann Author, Cora Writer')).toBeInTheDocument();
+    // Each name carries a trailing comma except the last — so this also
+    // pins credit order: reversing the fixture would move the comma.
+    expect(screen.getByText('Ann Author,')).toBeInTheDocument();
+    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
     expect(
       screen.getByText('Long ago, in a kingdom of scales.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the cover image when the book has one', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      coverUrl: '/api/books/1/cover?v=1',
+    });
+    const { container } = renderPage();
+
+    await screen.findByText('A Tale of Dragons');
+    expect(
+      container.querySelector('img[src="/api/books/1/cover?v=1"]')
+    ).toHaveAttribute('alt', '');
+  });
+
+  it('shows a co-author’s avatar picture when they have one', async () => {
+    // Not screen.getByRole('img'): the avatar is aria-hidden (Task 14's
+    // ruling), so a container query by src is the unambiguous way to reach
+    // it, and it also disambiguates it from the book's own Cover image.
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      authors: [
+        { ...book.authors[0], avatarUrl: '/api/users/3/avatar?v=1' },
+        book.authors[1],
+      ],
+    });
+    const { container } = renderPage();
+
+    // Not findByText: with no coverUrl, BookCover's placeholder repeats the
+    // title as aria-hidden text, so the heading role disambiguates it.
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(
+      container.querySelector('img[src="/api/users/3/avatar?v=1"]')
     ).toBeInTheDocument();
   });
 

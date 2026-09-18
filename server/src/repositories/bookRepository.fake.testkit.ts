@@ -49,17 +49,32 @@ export function createFakeBookRepository(
     actors = [],
   } = options;
   const rows = new Map<number, PublicBook>();
+  // bookId -> its stored Cover. Visibility is the real repository's domain
+  // rule (readableBookWhere) — the fake stays rule-free (T3) and answers for
+  // whatever book exists in `rows`, mirroring findById.
+  const covers = new Map<number, { data: Buffer; updatedAt: Date }>();
   // bookId -> co-author ids, in credit order.
   const credits = new Map<number, number[]>();
   // bookId -> its place in the Series order, for a book filed in a series.
   const positions = new Map<number, number>();
   let nextId = 1;
 
+  // Mirrors loadCoverUrls in the real repository (T3-safe: it reads the
+  // fake's own covers map, no visibility rule attached), so a route spec can
+  // see coverUrl change after a PUT/DELETE on /:id/cover.
+  const coverUrlOf = (bookId: number): string | null => {
+    const cover = covers.get(bookId);
+    return cover
+      ? `/api/books/${bookId}/cover?v=${cover.updatedAt.getTime()}`
+      : null;
+  };
+
   const withCredits = (book: PublicBook): PublicBook => ({
     ...book,
     authors: (credits.get(book.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
+    coverUrl: coverUrlOf(book.id),
   });
 
   // Stands in for the series row's foreign key, which the real repository
@@ -105,6 +120,7 @@ export function createFakeBookRepository(
         title: input.title,
         description: input.description,
         tags: input.tags,
+        coverUrl: null,
         createdAt: now,
         updatedAt: now,
       };
@@ -241,6 +257,23 @@ export function createFakeBookRepository(
         }
       });
       return true;
+    },
+
+    async setCover(bookId, data) {
+      if (!rows.has(bookId)) return false;
+      covers.set(bookId, { data, updatedAt: new Date() });
+      return true;
+    },
+
+    async removeCover(bookId) {
+      if (!rows.has(bookId)) return false;
+      covers.delete(bookId);
+      return true;
+    },
+
+    async getCoverData(bookId) {
+      if (!rows.has(bookId)) return null;
+      return covers.get(bookId) ?? null;
     },
   };
 }

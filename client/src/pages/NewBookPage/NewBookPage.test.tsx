@@ -25,18 +25,28 @@ const author: PublicUser = {
   lastName: 'Author',
   status: 'active',
   role: 'author',
+  avatarUrl: null,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 const created: PublicBook = {
   id: 42,
-  authors: [{ id: 3, login: 'ann', firstName: 'Ann', lastName: 'Author' }],
+  authors: [
+    {
+      id: 3,
+      login: 'ann',
+      firstName: 'Ann',
+      lastName: 'Author',
+      avatarUrl: null,
+    },
+  ],
   seriesId: null,
   title: 'A Tale of Dragons',
   description: 'Long ago.',
   tags: [],
   status: 'draft',
+  coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };

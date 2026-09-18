@@ -11,6 +11,7 @@ import { Book } from '../models/Book.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { toAuthorSummary, User } from '../models/User.ts';
+import { loadAvatarUrls } from './userRepository.ts';
 import {
   BadRequestError,
   NotFoundError,
@@ -106,9 +107,17 @@ async function loadAuthors(
     order: [['id', 'ASC']],
     transaction,
   });
+  const avatarUrls = await loadAvatarUrls(
+    credits.flatMap((credit) => (credit.user ? [credit.user.id] : [])),
+    transaction
+  );
   for (const credit of credits) {
     if (credit.user) {
-      authors.get(credit.seriesId)?.push(toAuthorSummary(credit.user));
+      authors
+        .get(credit.seriesId)
+        ?.push(
+          toAuthorSummary(credit.user, avatarUrls.get(credit.user.id) ?? null)
+        );
     }
   }
   return authors;

@@ -28,7 +28,13 @@ const FILED_BOOK_ID = 40;
 const SUMMARIES = new Map<number, AuthorSummary>(
   [KNOWN_USER_ID, USER_IDS.otherAuthor, USER_IDS.user].map((id) => [
     id,
-    { id, login: `persona-${id}`, firstName: 'First', lastName: `Last${id}` },
+    {
+      id,
+      login: `persona-${id}`,
+      firstName: 'First',
+      lastName: `Last${id}`,
+      avatarUrl: null,
+    },
   ])
 );
 

@@ -13,8 +13,20 @@ import {
 // On the `author` and `otherAuthor` personas' ids, so a session for either
 // resolves to an author account.
 const AUTHORS: AuthorSummary[] = [
-  { id: 2, login: 'mhale', firstName: 'Margaret', lastName: 'Hale' },
-  { id: 5, login: 'ipetrov', firstName: 'Ivan', lastName: 'Petrov' },
+  {
+    id: 2,
+    login: 'mhale',
+    firstName: 'Margaret',
+    lastName: 'Hale',
+    avatarUrl: null,
+  },
+  {
+    id: 5,
+    login: 'ipetrov',
+    firstName: 'Ivan',
+    lastName: 'Petrov',
+    avatarUrl: null,
+  },
 ];
 
 // The name matching and the blocked accounts it leaves out are the real
@@ -69,6 +81,24 @@ test('a plain user may search authors too', async () => {
 test('the author search is closed to a guest', async () => {
   await withApp({ userRepository: createFakeUsers([]) }, async (base) => {
     assert.equal((await fetch(`${base}/api/authors?q=hale`)).status, 401);
+  });
+});
+
+test('an author with an Avatar is listed with its avatarUrl, not null', async () => {
+  const repository = createFakeUsers([]);
+  await repository.setAvatar(AUTHORS[0].id, Buffer.from('a'));
+
+  await withAuthenticatedApp({ userRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/authors?q=hale`, {
+      headers: { cookie: ROLE_COOKIES.author },
+    });
+
+    assert.equal(response.status, 200);
+    const body = await json<{ items: AuthorSummary[] }>(response);
+    assert.match(
+      body.items[0]?.avatarUrl ?? '',
+      new RegExp(`^/api/users/${AUTHORS[0].id}/avatar\\?v=\\d+$`)
+    );
   });
 });
 

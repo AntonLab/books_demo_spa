@@ -182,7 +182,13 @@ test('toCommentWithAuthor names no author for a tombstone', () => {
     text: 'Loved the ending.',
     tombstone: 'removed',
   });
-  const author = { id: 2, login: 'Cass', firstName: 'Cass', lastName: 'Owner' };
+  const author = {
+    id: 2,
+    login: 'Cass',
+    firstName: 'Cass',
+    lastName: 'Owner',
+    avatarUrl: null,
+  };
 
   assert.equal(toCommentWithAuthor(comment, author, 0, null).author, null);
 });
