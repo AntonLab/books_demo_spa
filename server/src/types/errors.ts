@@ -62,3 +62,15 @@ export class UnsupportedMediaTypeError extends AppError {
     super(message, 415);
   }
 }
+
+// A sign-in rate limit refused the request (middleware/authRateLimit.ts). The
+// message names the wait in whole minutes, rounded up and never under one —
+// singular at exactly one minute, plural otherwise; the middleware sets the
+// Retry-After header in seconds beside it.
+export class TooManyRequestsError extends AppError {
+  constructor(retryAfterMs: number) {
+    const minutes = Math.max(1, Math.ceil(retryAfterMs / 60_000));
+    const unit = minutes === 1 ? 'minute' : 'minutes';
+    super(`Too many attempts. Try again in ${minutes} ${unit}.`, 429);
+  }
+}

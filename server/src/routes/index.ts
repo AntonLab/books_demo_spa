@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { ResetDelivery } from '../delivery/resetDelivery.ts';
+import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
@@ -33,6 +34,7 @@ export interface RouteDeps {
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
   resetDelivery: ResetDelivery;
+  authRateLimits: AuthRateLimits;
 }
 
 export function createApiRouter(deps: RouteDeps): Router {

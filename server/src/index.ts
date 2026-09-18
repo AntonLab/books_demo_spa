@@ -6,6 +6,7 @@ import { createSequelize } from './db/sequelize.ts';
 import { startExpiryPurge } from './expiryPurge.ts';
 import { listen } from './listen.ts';
 import { logger } from './logger.ts';
+import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
@@ -63,6 +64,7 @@ async function main(): Promise<void> {
     passwordResetRepository,
     logger,
   });
+  const authRateLimits = createAuthRateLimits();
 
   const app = createApp({
     userRepository: createSequelizeUserRepository(),
@@ -81,6 +83,7 @@ async function main(): Promise<void> {
     ),
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
+    authRateLimits,
   });
   const server = listen(app, config.port, {
     logger,
@@ -96,7 +99,7 @@ async function main(): Promise<void> {
   const shutdown = createShutdown({
     server,
     sequelize,
-    stoppables: [expiryPurge],
+    stoppables: [expiryPurge, authRateLimits],
     logger,
     exit: (code) => process.exit(code),
   });
