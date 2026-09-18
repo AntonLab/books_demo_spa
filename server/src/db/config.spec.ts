@@ -82,3 +82,33 @@ test('TRUST_PROXY refuses a negative, fractional or non-numeric value', () => {
     );
   }
 });
+
+test('RESET_DELIVERY defaults to log in development and test', () => {
+  assert.equal(parseConfig({ ...minimal }).resetDelivery, 'log');
+  assert.equal(
+    parseConfig({ ...minimal, NODE_ENV: 'test' }).resetDelivery,
+    'log'
+  );
+});
+
+test('production without RESET_DELIVERY is a config error that says what log does', () => {
+  assert.throws(
+    () => parseConfig({ ...minimal, NODE_ENV: 'production' }),
+    /production must set RESET_DELIVERY explicitly.*writes password-reset links to the server log/
+  );
+});
+
+test('production accepts RESET_DELIVERY=log once it is set explicitly', () => {
+  assert.equal(
+    parseConfig({ ...minimal, NODE_ENV: 'production', RESET_DELIVERY: 'log' })
+      .resetDelivery,
+    'log'
+  );
+});
+
+test('RESET_DELIVERY refuses a delivery that does not exist', () => {
+  assert.throws(
+    () => parseConfig({ ...minimal, RESET_DELIVERY: 'email' }),
+    /RESET_DELIVERY/
+  );
+});

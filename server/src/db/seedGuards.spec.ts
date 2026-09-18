@@ -18,11 +18,14 @@ function makeLogger(): {
 }
 
 function configFor(env: string, database: string): AppConfig {
+  // RESET_DELIVERY is set so a production config parses at all: the refusal
+  // under test is the seed's own, not production's missing delivery.
   return parseConfig({
     DB_USER: 'u',
     DB_PASSWORD: 'p',
     NODE_ENV: env,
     DB_NAME: database,
+    RESET_DELIVERY: 'log',
   });
 }
 

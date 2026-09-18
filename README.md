@@ -56,15 +56,16 @@ clean MySQL install needs no manual migration step.
 with zod at start-up, so a malformed value fails loudly instead of booting a
 broken server.
 
-| Variable                  | Default                 | Notes                                                                                   |
-| ------------------------- | ----------------------- | --------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`                                                 |
-| `PORT`                    | `4000`                  | The API's port                                                                          |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                         |
-| `DB_NAME`                 | `books_demo_spa`        |                                                                                         |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                | Required — no default, on purpose. An empty password is accepted, a missing one is not. |
-| `APP_BASE_URL`            | `http://localhost:3000` | Client origin used to build password-reset links                                        |
-| `TRUST_PROXY`             | `0`                     | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none |
+| Variable                  | Default                    | Notes                                                                                                 |
+| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`              | `development` \| `test` \| `production`                                                               |
+| `PORT`                    | `4000`                     | The API's port                                                                                        |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`       |                                                                                                       |
+| `DB_NAME`                 | `books_demo_spa`           |                                                                                                       |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.               |
+| `APP_BASE_URL`            | `http://localhost:3000`    | Client origin used to build password-reset links                                                      |
+| `TRUST_PROXY`             | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none               |
+| `RESET_DELIVERY`          | `log` (none in production) | Where password-reset links go; `log` writes them to the server log. Production must set it explicitly |
 
 ## API
 
@@ -90,8 +91,11 @@ on books, series, chapters, comments and likes — only a row's owner, or an
 `server/CLAUDE.md` for the full matrix, account blocking, and the tombstone
 rules on deleted comments.
 
-Password-reset links are not emailed: the only delivery implemented writes the
-link to the server log, so copy it from there when exercising the flow.
+Password-reset links are not emailed: the only delivery implemented
+(`RESET_DELIVERY=log`) writes the link to the server log, so copy it from
+there when exercising the flow. Production refuses to start unless
+`RESET_DELIVERY` is set explicitly, so link-logging is never shipped by
+accident.
 
 ## Scripts
 

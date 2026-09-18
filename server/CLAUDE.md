@@ -317,8 +317,10 @@ Each layer answers a question the others cannot:
   a session's XSRF token
 - `src/sessionCookie.ts` — the `sid` cookie's name, TTL, and the shared
   set/clear helpers, which set and clear the `xsrfToken` cookie beside it
-- `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
-  and the logger-backed implementation that is the only sink so far
+- `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface,
+  `resetUrl()`, the logger-backed implementation that is the only sink so
+  far, and `createResetDelivery(kind, …)`, which builds the one
+  `RESET_DELIVERY` names (`RESET_DELIVERY_KINDS`)
 - `src/images.ts` — the one module every `sharp` call lives in:
   `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
@@ -400,15 +402,16 @@ Each layer answers a question the others cannot:
 with zod and throws on anything malformed rather than starting with a broken
 value.
 
-| Variable                  | Default                 | Notes                                                                                                                                                                                                    |
-| ------------------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                   |
-| `PORT`                    | `4000`                  | The API's own port.                                                                                                                                                                                      |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                                                                                                                                          |
-| `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                                                          |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                         |
-| `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                     |
-| `TRUST_PROXY`             | `0`                     | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. |
+| Variable                  | Default                   | Notes                                                                                                                                                                                                    |
+| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`             | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                   |
+| `PORT`                    | `4000`                    | The API's own port.                                                                                                                                                                                      |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                                                                                                                          |
+| `DB_NAME`                 | `books_demo_spa`          |                                                                                                                                                                                                          |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                         |
+| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                     |
+| `TRUST_PROXY`             | `0`                       | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. |
+| `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.     |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
 (default `books_demo_spa_test`, the prefix of the twelve test schemas) and
