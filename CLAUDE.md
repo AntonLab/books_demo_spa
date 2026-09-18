@@ -346,3 +346,36 @@ The five canonical roles, each label string equal to its name. See
 
 Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See
 `docs/agents/domain.md`.
+
+### Plan pipeline agents
+
+`.claude/agents/` holds five subagents that carry the role rules of the
+superpowers plan pipeline, so a dispatch sends only the values that change per
+call. They need the `superpowers` Claude Code plugin — a plugin, not an npm
+dependency — whose `writing-plans` and `subagent-driven-development` skills
+drive them; their bodies are copied from superpowers 6.3.0 templates, each
+named in a comment under the frontmatter, and must be re-synced when the
+plugin's templates change.
+
+- **Before `plan-writer`, write the spec to a file.** A subagent does not see
+  the conversation. Save the agreed design to
+  `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored, like the
+  plans) and dispatch `plan-writer` with that path; it refuses to run without
+  one.
+- **In `superpowers:subagent-driven-development`, dispatch the named agents
+  instead of `general-purpose`:** implementer → `sdd-implementer` (preloads
+  the `tdd` skill), task reviewer → `sdd-task-reviewer`, scoped re-review →
+  `sdd-re-reviewer`, final whole-branch review → `sdd-final-reviewer`. Do not
+  paste the template text into the prompt; send only its placeholder values
+  (brief, report and diff file paths, SHAs, global constraints, findings,
+  context). Pass `model` explicitly on every dispatch — it overrides the
+  agent's default.
+- The three reviewers get `Read`, `Grep`, `Glob` and `Bash` only; staying
+  read-only is a prompt rule, since `Bash` could still write. The implementer
+  and `plan-writer` get every tool except `Agent`.
+- Interactive skills stay in the main session, because a subagent cannot ask
+  the user anything: `grilling`, `domain-modeling` and
+  `finishing-a-development-branch`. The controller also creates the worktree
+  itself before Task 1; none of these agents sets `isolation: worktree`, which
+  would give every dispatch its own checkout and hide each implementer's
+  commits from the reviewer and the next task.
