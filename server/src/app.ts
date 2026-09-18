@@ -7,6 +7,7 @@ import {
 } from './middleware/csrfProtection.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
+import { noSniff } from './middleware/securityHeaders.ts';
 import type { BookRepository } from './repositories/bookRepository.ts';
 import type { ChapterRepository } from './repositories/chapterRepository.ts';
 import type { CommentRepository } from './repositories/commentRepository.ts';
@@ -44,6 +45,12 @@ export function createApp(deps: AppDeps): Express {
   // Before anything reads req.ip: whether X-Forwarded-For names the client.
   // Express treats 0 as trusting no proxy.
   app.set('trust proxy', deps.trustProxy);
+
+  // Names no framework to whoever is probing.
+  app.disable('x-powered-by');
+  // First, so every response carries it: a success, a 404, an error, and a
+  // body express.json() refuses to parse.
+  app.use(noSniff);
 
   app.use(express.json());
   // Express 5 can set cookies but not read them; resolveSessionUser, behind

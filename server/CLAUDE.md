@@ -335,7 +335,7 @@ Each layer answers a question the others cannot:
 - `src/app.spec.ts` — the full-stack smoke suite; see **Test layers**
 - `src/createApp.spec.ts` — `createApp`'s own settings, on the route test
   kit's unreachable repositories (`defaultDeps()`): `trust proxy` from
-  `AppDeps.trustProxy`
+  `AppDeps.trustProxy`, and the security headers
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
@@ -381,7 +381,7 @@ Each layer answers a question the others cannot:
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
   `requirePermission.ts`, `optionalAuth.ts` (unmounted —
   see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
-  three build on), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
+  three build on), `securityHeaders.ts` (`noSniff`, see **Security headers** under Operations), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
@@ -994,6 +994,19 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   remark. Superadmin's blanket `any` therefore has two carve-outs, not one:
   no `create` on `books`/`series`/`chapters`, and `update: own` rather than
   `any` on `comments` and `likes`.
+
+## Operations
+
+### Security headers
+
+`createApp` turns off Express's `X-Powered-By` and, as its first middleware
+(`middleware/securityHeaders.ts`), sets `X-Content-Type-Options: nosniff` on
+every response — a success, an error, a `notFound` 404 and a body
+`express.json()` refuses to parse alike. The Cover and Avatar `GET`s still
+set `nosniff` themselves beside their `Content-Type`; the two agree.
+`createApp.spec.ts` checks this on `createApp`'s own app: Express 5 sets
+`X-Powered-By` in `app.handle`, so a wrapping `express()`, like the route
+test kit's `withApp`, would add it back.
 
 ## Runtime notes
 
