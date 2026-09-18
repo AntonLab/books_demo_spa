@@ -14,6 +14,11 @@ export interface RateLimiter {
   hit(key: string): RateLimitState;
   // Reports the key's state without counting anything.
   peek(key: string): RateLimitState;
+  // Gives back one hit that turned out not to count, such as a request that
+  // was tentatively counted on arrival but did not end in the outcome the
+  // budget tracks. Floors at 0 and never touches the window's end; a no-op
+  // when the key holds no open window.
+  release(key: string): void;
   // Forgets the key's window.
   reset(key: string): void;
   // How many keys hold an open window — what the sweep keeps bounded.
@@ -88,6 +93,18 @@ export function createRateLimiter({
         allowed: window.count < limit,
         retryAfterMs: window.endsAt - at,
       };
+    },
+
+    release(key) {
+      const at = now();
+      const window = current(key, at);
+      if (window === undefined) {
+        return;
+      }
+      windows.set(key, {
+        count: Math.max(0, window.count - 1),
+        endsAt: window.endsAt,
+      });
     },
 
     reset(key) {

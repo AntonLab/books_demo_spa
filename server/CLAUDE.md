@@ -318,8 +318,9 @@ Each layer answers a question the others cannot:
 - `src/expiryPurge.ts` — `startExpiryPurge`: the hourly delete of expired
   sessions and old reset tokens (see **Operations**)
 - `src/rateLimit.ts` — `createRateLimiter`: a fixed-window, in-memory
-  limiter (`hit`/`peek`/`reset`/`stop`) with lazy expiry and an `unref()`ed
-  sweep
+  limiter (`hit`/`peek`/`release`/`reset`/`stop`) with lazy expiry and an
+  `unref()`ed sweep. `release` gives back one `hit` that turned out not to
+  count — see **Sign-in rate limiting** under Operations.
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1072,12 +1073,19 @@ of `validate` so a refused request costs no parsing, no lookup and no argon2:
 | `POST /api/auth/register`               | IP         | 5 per hour    | every request        |
 | `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request        |
 
-- **Login counts only failures, so it checks first and records last.** It
-  peeks both budgets and refuses if either is spent; otherwise the request
-  runs, and when the response finishes a 401 is counted against both, while
-  a 2xx clears the IP + login budget. The per-IP budget survives a success,
-  or signing in to one real account would buy fresh guesses at every other.
-  A 400 or a 403 (a blocked account) counts nowhere.
+- **Login counts against both budgets the moment it arrives, and settles the
+  claim when the response finishes.** A check that ran first and recorded
+  only later would let unlimited parallel attempts each read the same
+  unspent count while they all wait on the lookup and argon2, so both
+  budgets are `hit` up front instead: a request that either one refuses is
+  turned away before the handler ever runs, and any claim the _other_ budget
+  had already accepted is released rather than left spent on a request that
+  was never let through. Once the request runs, a 401 is the only outcome
+  that keeps the claim; anything else — a 400, a 403 (a blocked account), a
+  2xx, or the connection closing before either — releases both claims, and a
+  2xx additionally clears the rest of the IP + login budget's own history.
+  The per-IP budget survives a success on its own, or signing in to one real
+  account would buy fresh guesses at every other.
 - **The login is trimmed and lower-cased** before it becomes part of a key,
   so a change of case or stray whitespace buys no fresh budget. `login`
   itself is case-sensitive (`utf8mb4_0900_as_cs`), so two accounts that

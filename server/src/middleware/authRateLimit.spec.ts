@@ -84,6 +84,62 @@ async function withLimitedApp(
   }
 }
 
+// A gated variant of the /login stand-in: the handler waits on a promise the
+// test controls before it answers, so many concurrent requests can be made
+// to arrive — and pass or fail the limiter — before any of them is allowed
+// to respond. That is what makes a check-then-record race observable on
+// demand rather than by luck of scheduling.
+async function withGatedLoginApp(
+  fn: (
+    client: Pick<Client, 'login' | 'handled'>,
+    release: () => void
+  ) => Promise<void>
+): Promise<void> {
+  const limits = createAuthRateLimits();
+  let handled = 0;
+  let releaseGate: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    releaseGate = resolve;
+  });
+
+  const app = express();
+  app.set('trust proxy', 1);
+  app.use(express.json());
+  app.post('/login', limitFailedLogins(limits), (req, res) => {
+    handled += 1;
+    void gate.then(() => {
+      const { status } = req.body as { status: number };
+      res.status(status).end();
+    });
+  });
+  app.use(errorHandler);
+
+  const server = app.listen(0);
+  await once(server, 'listening');
+  const { port } = server.address() as AddressInfo;
+  const base = `http://127.0.0.1:${port}`;
+
+  const client: Pick<Client, 'login' | 'handled'> = {
+    login: (login, status, from = CLIENT) =>
+      fetch(`${base}/login`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': from,
+        },
+        body: JSON.stringify({ login, password: 'irrelevant', status }),
+      }),
+    handled: () => handled,
+  };
+
+  try {
+    await fn(client, releaseGate);
+  } finally {
+    limits.stop();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
 async function failTimes(
   client: Client,
   login: string,
@@ -225,5 +281,67 @@ test('every registration counts, and the sixth in an hour is refused', async () 
 
     clock.now = ONE_HOUR_MS;
     assert.equal((await client.register()).status, 201);
+  });
+});
+
+test('a non-401 outcome — malformed or successful — does not consume the per-IP budget', async () => {
+  await withLimitedApp(async (client) => {
+    // 30 malformed attempts and 30 successful logins across different names
+    // from the same address: 60 requests, more than the 50-per-IP budget,
+    // none of them a failed login.
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      assert.equal((await client.login(`bad-${attempt}`, 400)).status, 400);
+    }
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      assert.equal((await client.login(`ok-${attempt}`, 200)).status, 200);
+    }
+
+    // The per-IP budget is untouched by any of that: exactly 50 genuine
+    // failures still fit before the 51st is refused.
+    for (const name of ['a', 'b', 'c', 'd', 'e']) {
+      await failTimes(client, name, 10);
+    }
+    assert.equal((await client.login('f', 401)).status, 429);
+  });
+});
+
+test('parallel attempts cannot bypass the budget: 20 at once still gets at most 10 through', async () => {
+  await withGatedLoginApp(async (client, release) => {
+    // All 20 name the same login, so the binding budget is the 10-per-name
+    // one. None of them can finish until the gate opens, so every one of
+    // them arrives, and the limiter must decide on all 20 while none has
+    // answered yet — exactly the window a check-then-record design leaves
+    // open for parallel requests to share one unspent count.
+    const attempts = Array.from({ length: 20 }, () => client.login('bob', 401));
+    try {
+      // Give every request time to reach the server and run the limiter
+      // before any of them is allowed to respond.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Decided already, before a single response has gone out: at most 10
+      // were ever let through to the handler.
+      assert.equal(
+        client.handled() <= 10,
+        true,
+        `handled: ${client.handled()}`
+      );
+    } finally {
+      // However the assertion above comes out, every gated request is still
+      // waiting on this: release it, or a failure here leaves 20 open
+      // connections that keep the server from ever closing.
+      release();
+    }
+
+    const statuses = (await Promise.all(attempts)).map(
+      (response) => response.status
+    );
+    assert.equal(
+      statuses.filter((status) => status === 401).length,
+      client.handled()
+    );
+    assert.equal(
+      statuses.filter((status) => status === 429).length,
+      20 - client.handled()
+    );
   });
 });
