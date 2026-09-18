@@ -31,14 +31,16 @@ dist/
 /.claude/*
 !/.claude/agents/
 
-# agent working notes — plans and specs generated per task, not project docs.
-# Two exceptions are checked in: docs/agents/ configures the engineering skills,
-# and docs/adr/ holds the architecture decision records those skills are told to
-# read. `/docs/*` matches direct children only, so un-ignoring a directory is
-# enough to let the files inside it through.
+# agent working notes — plans and design docs generated per task, not project
+# docs. Three exceptions are checked in: docs/agents/ configures the engineering
+# skills, docs/adr/ holds the architecture decision records those skills are
+# told to read, and docs/specs/ holds the living spec of each capability.
+# `/docs/*` matches direct children only, so un-ignoring a directory is enough
+# to let the files inside it through.
 /docs/*
 !/docs/agents/
 !/docs/adr/
+!/docs/specs/
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 /.superpowers
