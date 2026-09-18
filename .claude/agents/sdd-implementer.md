@@ -4,7 +4,7 @@ description: Implements one task of a superpowers plan from a task brief file, t
 disallowedTools: Agent
 model: sonnet
 skills:
-  - tdd
+  - mattpocock-skills:tdd
 ---
 
 <!-- Source: superpowers 6.3.0 / skills/subagent-driven-development/implementer-prompt.md, role rules only. -->

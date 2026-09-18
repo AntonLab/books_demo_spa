@@ -33,9 +33,12 @@ of them read. Early scaffold — most feature directories exist but are empty.
   `shared` as workspaces, owns the seven devDependencies every package needs (eslint,
   @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
   typescript) plus `concurrently` and `skills`, and holds `engines.node`.
-  `skills` is the CLI that materializes `skills-lock.json` into `.agents/`;
-  it is pinned here rather than run through `npx` so a fresh clone rebuilds
-  the same skill set. Run it with `npm run skills`.
+  `skills` is the CLI behind `npm run skills` (see **Project skills**); it is
+  pinned here rather than run through `npx` so a fresh clone rebuilds the
+  same skill set.
+- `scripts/link-skills.mjs` — the second half of `npm run skills`. Plain Node
+  with no dependencies; Prettier checks it, but no package's ESLint config
+  reaches it.
 
 One `npm install` at the repo root installs every workspace into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
@@ -347,13 +350,30 @@ The five canonical roles, each label string equal to its name. See
 Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See
 `docs/agents/domain.md`.
 
+### Project skills
+
+`skills-lock.json` pins the repo's own skills — eight, kept for fit with this
+stack — and `npm run skills` restores them in two steps. The `skills` CLI
+writes them into `.agents/skills/`; `scripts/link-skills.mjs` then links each
+into `.claude/skills/`, because the restore installs only for the CLI's
+"universal" agents and Claude Code, which reads `.claude/skills/`, is not one
+of them. Both directories are git-ignored and per-clone, so run it after a
+fresh clone and after any change to the lock. A new skill goes in with
+`npx skills add <source>` (project-level, no `-g`), which writes the lock.
+
+A skill a Claude Code plugin already ships stays out of the lock. That covers
+every mattpocock/skills skill — `tdd`, `grilling`, `domain-modeling`,
+`triage` and the rest come from the `mattpocock-skills` plugin, which the
+sections above and the plan pipeline below rely on.
+
 ### Plan pipeline agents
 
 `.claude/agents/` holds five subagents that carry the role rules of the
 superpowers plan pipeline, so a dispatch sends only the values that change per
-call. They need the `superpowers` Claude Code plugin — a plugin, not an npm
-dependency — whose `writing-plans` and `subagent-driven-development` skills
-drive them; their bodies are copied from superpowers 6.3.0 templates, each
+call. They need two Claude Code plugins — plugins, not npm dependencies:
+`superpowers`, whose `writing-plans` and `subagent-driven-development` skills
+drive them, and `mattpocock-skills`, whose `tdd` the implementer preloads.
+Their bodies are copied from superpowers 6.3.0 templates, each
 named in a comment under the frontmatter, and must be re-synced when the
 plugin's templates change.
 
@@ -364,7 +384,8 @@ plugin's templates change.
   one.
 - **In `superpowers:subagent-driven-development`, dispatch the named agents
   instead of `general-purpose`:** implementer → `sdd-implementer` (preloads
-  the `tdd` skill), task reviewer → `sdd-task-reviewer`, scoped re-review →
+  `mattpocock-skills:tdd`; a name that resolves to nothing preloads nothing,
+  with no error), task reviewer → `sdd-task-reviewer`, scoped re-review →
   `sdd-re-reviewer`, final whole-branch review → `sdd-final-reviewer`. Do not
   paste the template text into the prompt; send only its placeholder values
   (brief, report and diff file paths, SHAs, global constraints, findings,
