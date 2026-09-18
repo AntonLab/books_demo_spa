@@ -242,15 +242,6 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   Flat files, like `src/api/` and `src/store/`,
   and outside the Atomic Design levels for the same reason.
 
-- `src/format/` — `date.ts`: `formatDate` ("Sep 18, 2026") and
-  `formatDateTime` ("Sep 18, 2026, 3:30 PM"), the one way the client writes
-  a date. Both take the ISO string a date arrives as and format it in the
-  fixed `en` locale — the UI is English, so the browser's locale would give
-  it a second language — and in the browser's own time zone, each through
-  one `Intl.DateTimeFormat` built at module scope. A test asserting a
-  rendered date builds its expectation with the same helper, so it holds in
-  any time zone. Flat, like `src/api/`, and outside the Atomic Design levels.
-
   Five things worth knowing before editing it:
 
   - **A query retries only what may pass on its own**, and `staleTime` is
@@ -280,6 +271,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     means "delete that row". It takes the key to invalidate as an argument,
     because a book like refreshes the book and a comment like refreshes the
     thread.
+
+- `src/format/` — `date.ts`: `formatDate` ("Sep 18, 2026") and
+  `formatDateTime` ("Sep 18, 2026, 3:30 PM"), the one way the client writes
+  a date. Both take the ISO string a date arrives as and format it in the
+  fixed `en` locale — the UI is English, so the browser's locale would give
+  it a second language — and in the browser's own time zone, each through
+  one `Intl.DateTimeFormat` built at module scope. A test asserting a
+  rendered date builds its expectation with the same helper, so it holds in
+  any time zone. Flat, like `src/api/`, and outside the Atomic Design levels.
 
 - `src/components/` — grouped by Atomic Design level (see above), not by
   feature. Each component becomes its own folder (see Component folders).
