@@ -3,6 +3,7 @@ import { createResetDelivery } from './delivery/resetDelivery.ts';
 import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
+import { listen } from './listen.ts';
 import { logger } from './logger.ts';
 import { initModels } from './models/index.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
@@ -71,8 +72,15 @@ async function main(): Promise<void> {
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
   });
-  const server = app.listen(config.port, () => {
-    logger.info(`server listening on http://127.0.0.1:${config.port}`);
+  const server = listen(app, config.port, {
+    logger,
+    // Binding fails asynchronously, after this statement returns, so
+    // `shutdown` below exists by the time this runs. The shutdown closes the
+    // pool, and the process then exits with the code set here.
+    onError: () => {
+      process.exitCode = 1;
+      void shutdown('the HTTP server could not start');
+    },
   });
 
   const shutdown = createShutdown({

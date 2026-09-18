@@ -313,6 +313,8 @@ Each layer answers a question the others cannot:
   through this instead of calling `console.*` directly
 - `src/shutdown.ts` — `createShutdown` and `registerShutdownSignals`: the
   graceful shutdown on `SIGTERM`/`SIGINT` (see **Operations**)
+- `src/listen.ts` — `listen(app, port, deps)`: `app.listen` with Express 5's
+  bind error reported instead of ignored (see **Operations**)
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1025,6 +1027,15 @@ every open connection, logs, and exits 1; so does a pool that fails to
 close. `node --watch` (`npm run dev`) restarts with `SIGTERM`, so every dev
 restart takes this path. `shutdown.spec.ts` drives it with fakes for the
 server, the pool and the timer rather than real signals.
+
+### A port that cannot be bound
+
+Express 5 hands `app.listen`'s callback the error when binding fails —
+`EADDRINUSE`, say — which Express 4 never did. `src/listen.ts` checks it: on
+an error it logs `Could not start the HTTP server` with the message and
+never "listening"; `index.ts` then sets `process.exitCode = 1` and runs the
+graceful shutdown, so the database pool closes and the process exits. Only a
+bound server logs `server listening on …`.
 
 ## Runtime notes
 
