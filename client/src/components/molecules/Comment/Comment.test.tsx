@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Comment } from './Comment';
+import { formatDate } from '@/format/date';
 import type { CommentWithAuthor } from '@/types/comment';
 
 const comment: CommentWithAuthor = {
@@ -44,6 +45,12 @@ describe('Comment', () => {
 
     expect(screen.getByText('Read Er')).toBeInTheDocument();
     expect(screen.getByText('A fine chapter')).toBeInTheDocument();
+  });
+
+  it('dates the comment with the app date helper', () => {
+    render(<Comment {...baseProps} />);
+
+    expect(screen.getByText(formatDate(comment.createdAt))).toBeInTheDocument();
   });
 
   it('hides edit and delete on another user comment', () => {

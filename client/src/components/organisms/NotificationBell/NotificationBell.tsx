@@ -6,6 +6,7 @@ import {
   useMarkNotificationsRead,
   useNotifications,
 } from '@/queries/notifications';
+import { formatDateTime } from '@/format/date';
 import type { PublicNotification } from '@/types/notification';
 
 interface NotificationBellProps {
@@ -146,7 +147,7 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
             {describe(item, close)}
           </Typography.Paragraph>
           <Typography.Text type="secondary">
-            {new Date(item.createdAt).toLocaleString()}
+            {formatDateTime(item.createdAt)}
           </Typography.Text>
         </li>
       ))}
