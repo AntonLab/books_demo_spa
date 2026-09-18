@@ -3,14 +3,21 @@
   // root tsconfig.base.json. Only what is specific to the Node build is here.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
+    // Node 24, the engines floor, runs all of ES2024.
+    "target": "ES2024",
+    "lib": ["ES2024"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "rootDir": "src",
     "outDir": "dist",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
+    // Node strips types rather than compiling them, exactly as for `shared`:
+    // no enums, namespaces or parameter properties, and every type-only
+    // import marked `type`, or it survives into the runtime import and fails
+    // to link. An ambient `const enum` from a dependency is refused too.
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     "sourceMap": true,
     "declaration": true
   },
