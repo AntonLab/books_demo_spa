@@ -305,11 +305,14 @@ Each layer answers a question the others cannot:
 ## Layout
 
 - `src/index.ts` — process entry point: loads `.env.local`, ensures the schema,
-  connects Sequelize, authenticates, and starts listening
+  connects Sequelize, authenticates, starts listening, and registers the
+  graceful shutdown (`src/shutdown.ts`, see **Operations**)
 - `src/app.ts` — builds the Express app (`createApp`), wiring routes and the
   error-handling middleware
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
+- `src/shutdown.ts` — `createShutdown` and `registerShutdownSignals`: the
+  graceful shutdown on `SIGTERM`/`SIGINT` (see **Operations**)
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1007,6 +1010,21 @@ set `nosniff` themselves beside their `Content-Type`; the two agree.
 `createApp.spec.ts` checks this on `createApp`'s own app: Express 5 sets
 `X-Powered-By` in `app.handle`, so a wrapping `express()`, like the route
 test kit's `withApp`, would add it back.
+
+### Graceful shutdown
+
+`index.ts` registers `src/shutdown.ts` for `SIGTERM` and `SIGINT`
+(`process.once`). On either it logs, stops every interval the process hands
+it (`stoppables`), closes the HTTP server and its idle connections, waits
+for the server to finish, then awaits `sequelize.close()`. It leaves
+`process.exitCode` alone, so a clean shutdown ends with 0 once nothing holds
+the event loop. A second signal, or the other one, joins the shutdown
+already under way rather than starting another. A 10-second deadline
+(`SHUTDOWN_TIMEOUT_MS`, on an `unref()`ed timer) forces the rest: it drops
+every open connection, logs, and exits 1; so does a pool that fails to
+close. `node --watch` (`npm run dev`) restarts with `SIGTERM`, so every dev
+restart takes this path. `shutdown.spec.ts` drives it with fakes for the
+server, the pool and the timer rather than real signals.
 
 ## Runtime notes
 

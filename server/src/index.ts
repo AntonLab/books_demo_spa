@@ -15,6 +15,7 @@ import { createSequelizePasswordResetRepository } from './repositories/passwordR
 import { createSequelizeSessionRepository } from './repositories/sessionRepository.ts';
 import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
 import { createSequelizeUserRepository } from './repositories/userRepository.ts';
+import { createShutdown, registerShutdownSignals } from './shutdown.ts';
 
 function loadLocalEnv(): void {
   try {
@@ -70,9 +71,18 @@ async function main(): Promise<void> {
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
   });
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     logger.info(`server listening on http://127.0.0.1:${config.port}`);
   });
+
+  const shutdown = createShutdown({
+    server,
+    sequelize,
+    stoppables: [],
+    logger,
+    exit: (code) => process.exit(code),
+  });
+  registerShutdownSignals(shutdown);
 }
 
 await main().catch((error: unknown) => {
