@@ -13,9 +13,9 @@ const root = path.resolve(__dirname, '..');
 const sharedSrc = path.dirname(require.resolve('shared'));
 
 /**
- * Shared configuration. `webpack.dev.js` and `webpack.prod.js` merge their own
- * overrides on top of this; nothing here is environment specific except the
- * flags derived from `isDevelopment`.
+ * Shared configuration. `webpack.dev.js` and `webpack.prod.js` spread it into
+ * a plain object and append their own rules and plugins; nothing here is
+ * environment specific except the flags derived from `isDevelopment`.
  *
  * @param {boolean} isDevelopment
  * @returns {import('webpack').Configuration}
