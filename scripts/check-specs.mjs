@@ -27,25 +27,46 @@ function readLines(root, file) {
 }
 
 // Reads each spec's prefix and its requirement declarations.
-function readSpecs(specs) {
+function readSpecs(specs, errors) {
   const prefixes = new Map(); // prefix -> { file, line } of its Prefix line
   const declared = new Map(); // ID -> { file, line, retired }
   for (const { file, lines } of specs) {
     const index = lines.findIndex((text) => PREFIX_LINE.test(text));
-    if (index !== -1) {
-      prefixes.set(PREFIX_LINE.exec(lines[index])[1], {
+    const prefix = index === -1 ? null : PREFIX_LINE.exec(lines[index])[1];
+    if (prefix === null) {
+      errors.push({ file, line: 1, message: 'has no Prefix header line' });
+    } else if (prefixes.has(prefix)) {
+      const first = prefixes.get(prefix);
+      errors.push({
         file,
         line: index + 1,
+        message: `prefix ${prefix} is already declared by ${first.file}:${first.line}`,
       });
+    } else {
+      prefixes.set(prefix, { file, line: index + 1 });
     }
     lines.forEach((text, i) => {
       const match = DECLARATION.exec(text);
       if (!match) return;
-      declared.set(`${match[1]}-${match[2]}`, {
-        file,
-        line: i + 1,
-        retired: RETIRED.test(text),
-      });
+      const id = `${match[1]}-${match[2]}`;
+      const line = i + 1;
+      if (match[1] !== prefix) {
+        errors.push({
+          file,
+          line,
+          message: `${id} is declared in a spec whose prefix is ${prefix ?? '(none)'}`,
+        });
+      }
+      const first = declared.get(id);
+      if (first) {
+        errors.push({
+          file,
+          line,
+          message: `${id} is already declared at ${first.file}:${first.line}`,
+        });
+      } else {
+        declared.set(id, { file, line, retired: RETIRED.test(text) });
+      }
     });
   }
   return { prefixes, declared };

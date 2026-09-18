@@ -89,3 +89,69 @@ test('passes when every reference names a declared requirement', (t) => {
     /specs:check: 1 spec\(s\), 2 live requirement\(s\), 0 error\(s\)/
   );
 });
+
+test('fails on a prefix declared by two specs', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO'),
+    'docs/specs/other/spec.md': spec('FOO'),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/other\/spec\.md:3: prefix FOO is already declared by docs\/specs\/foo\/spec\.md:3$/m
+  );
+});
+
+test('fails on a requirement ID declared twice', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec(
+      'FOO',
+      '**FOO-1** — A rule.',
+      '**FOO-1** — The same number again.'
+    ),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:8: FOO-1 is already declared at docs\/specs\/foo\/spec\.md:7$/m
+  );
+});
+
+test("fails on a requirement declared under another spec's prefix", (t) => {
+  const root = repo(t, {
+    'docs/specs/bar/spec.md': spec('BAR'),
+    'docs/specs/foo/spec.md': spec('FOO', '**BAR-1** — Filed in FOO.'),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:7: BAR-1 is declared in a spec whose prefix is FOO$/m
+  );
+});
+
+test('fails on a spec with no Prefix line', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': '# Foo\n\n**FOO-1** — A rule.\n',
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:1: has no Prefix header line$/m
+  );
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:3: FOO-1 is declared in a spec whose prefix is \(none\)$/m
+  );
+});
