@@ -1185,7 +1185,7 @@ async function writeContent(
   const idByLogin = new Map(
     plan.accounts.map((account, index) => [
       account.spec.login,
-      accountIds[index],
+      itemAt(accountIds, index, 'account id'),
     ])
   );
 
@@ -1243,7 +1243,9 @@ async function writeContent(
       const fields = createBookSchema.parse({
         ...book,
         seriesId:
-          book.seriesIndex === null ? null : seriesIds[book.seriesIndex],
+          book.seriesIndex === null
+            ? null
+            : itemAt(seriesIds, book.seriesIndex, 'series id'),
       });
       const row = await Book.create(
         {
@@ -1455,7 +1457,7 @@ async function writeThreads(
       });
       return {
         ...parsed,
-        userId: accountIds[comment.accountIndex],
+        userId: itemAt(accountIds, comment.accountIndex, 'account id'),
         tombstone: plan.tombstones.get(comment) ?? null,
         createdAt: comment.createdAt,
         updatedAt: comment.createdAt,
@@ -1483,7 +1485,7 @@ async function writeThreads(
     });
     return {
       ...parsed,
-      userId: accountIds[like.accountIndex],
+      userId: itemAt(accountIds, like.accountIndex, 'account id'),
       createdAt: like.createdAt,
     };
   });
