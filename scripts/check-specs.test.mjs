@@ -5,13 +5,49 @@
 // therefore never matches here.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const SCRIPT = fileURLToPath(new URL('./check-specs.mjs', import.meta.url));
+
+// An empty file for GIT_CONFIG_GLOBAL below: it must exist and parse as a
+// (empty) config, which the platform null device does not reliably do.
+const EMPTY_GIT_CONFIG = path.join(
+  mkdtempSync(path.join(tmpdir(), 'check-specs-gitconfig-')),
+  'empty.gitconfig'
+);
+writeFileSync(EMPTY_GIT_CONFIG, '');
+
+// This process may itself be running under git — from a hook, with GIT_DIR,
+// GIT_INDEX_FILE and friends already set — or simply have a populated
+// global/system gitconfig. None of that may leak into the throwaway repos
+// below, or a `git add` in one could write into the caller's own index. Used
+// for every git call and for the CLI subprocess, which makes its own.
+function gitEnv() {
+  const env = { ...process.env };
+  for (const key of [
+    'GIT_DIR',
+    'GIT_WORK_TREE',
+    'GIT_INDEX_FILE',
+    'GIT_OBJECT_DIRECTORY',
+    'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_PREFIX',
+  ]) {
+    delete env[key];
+  }
+  env.GIT_CONFIG_NOSYSTEM = '1';
+  env.GIT_CONFIG_GLOBAL = EMPTY_GIT_CONFIG;
+  return env;
+}
 
 // Writes one file under root, creating its directories.
 function write(root, file, content) {
@@ -28,8 +64,16 @@ function repo(t, files) {
   for (const [file, content] of Object.entries(files)) {
     write(root, file, content);
   }
-  execFileSync('git', ['init', '--quiet'], { cwd: root, stdio: 'ignore' });
-  execFileSync('git', ['add', '--all'], { cwd: root, stdio: 'ignore' });
+  execFileSync('git', ['init', '--quiet'], {
+    cwd: root,
+    stdio: 'ignore',
+    env: gitEnv(),
+  });
+  execFileSync('git', ['add', '--all'], {
+    cwd: root,
+    stdio: 'ignore',
+    env: gitEnv(),
+  });
   return root;
 }
 
@@ -38,7 +82,7 @@ function check(root) {
   const { status, stdout, stderr } = spawnSync(
     process.execPath,
     [SCRIPT, root],
-    { encoding: 'utf8' }
+    { encoding: 'utf8', env: gitEnv() }
   );
   return { status, stdout, stderr };
 }
@@ -56,6 +100,28 @@ function spec(prefix, ...requirements) {
     '',
   ].join('\n');
 }
+
+test("the test repo's git calls ignore an inherited GIT_INDEX_FILE", (t) => {
+  const outside = mkdtempSync(path.join(tmpdir(), 'check-specs-outside-'));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  const leaked = path.join(outside, 'index');
+
+  const had = Object.hasOwn(process.env, 'GIT_INDEX_FILE');
+  const previous = process.env.GIT_INDEX_FILE;
+  process.env.GIT_INDEX_FILE = leaked;
+  t.after(() => {
+    if (had) process.env.GIT_INDEX_FILE = previous;
+    else delete process.env.GIT_INDEX_FILE;
+  });
+
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+  });
+  const result = check(root);
+
+  assert.equal(result.status, 0);
+  assert.equal(existsSync(leaked), false);
+});
 
 test('passes a repository with no specs, whatever IDs its files mention', (t) => {
   const root = repo(t, { 'README.md': 'See FOO-1 and BAR-2.\n' });
@@ -229,6 +295,91 @@ test('a Retired ID may be cited inside docs/specs/ but nowhere else', (t) => {
   assert.match(result.stdout, /1 live requirement\(s\), 1 error\(s\)/);
 });
 
+test('fails on a near-miss Retired line: en dash instead of em dash', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec(
+      'FOO',
+      '**FOO-1** – _Retired 2026-10-01: replaced by FOO-2._',
+      '**FOO-2** — The rule now.'
+    ),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:7: FOO-1 looks Retired but does not match "\*\*FOO-1\*\* — _Retired …_"$/m
+  );
+});
+
+test('fails on a near-miss Retired line: missing italics', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec(
+      'FOO',
+      '**FOO-1** — Retired 2026-10-01: replaced by FOO-2.',
+      '**FOO-2** — The rule now.'
+    ),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:7: FOO-1 looks Retired but does not match "\*\*FOO-1\*\* — _Retired …_"$/m
+  );
+});
+
+test('fails on a spec file misplaced under docs/specs/', (t) => {
+  const root = repo(t, {
+    'docs/specs/README.md': '# Living specs\n',
+    'docs/specs/books.md': '# Books\n',
+    'docs/specs/books/api/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/books\.md:1: is not a spec: specs live at docs\/specs\/<capability>\/spec\.md$/m
+  );
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/books\/api\/spec\.md:1: is not a spec: specs live at docs\/specs\/<capability>\/spec\.md$/m
+  );
+  assert.doesNotMatch(result.stderr, /docs\/specs\/README\.md/);
+});
+
+test('fails on a declaration number with a leading zero', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-01** — A rule.'),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:7: FOO-01 has a leading zero$/m
+  );
+});
+
+test('fails on a spec declaring the reserved EX prefix', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('EX', '**EX-1** — A rule.'),
+  });
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.match(
+    result.stderr,
+    /^docs\/specs\/foo\/spec\.md:3: prefix EX is reserved for examples$/m
+  );
+});
+
 test('skips ignored files, the two lockfiles and binary files, but reads untracked ones', (t) => {
   const root = repo(t, {
     'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
@@ -252,6 +403,20 @@ test('skips a tracked file deleted from the working tree', (t) => {
     'gone.md': 'FOO-9\n',
   });
   rmSync(path.join(root, 'gone.md'));
+
+  const result = check(root);
+
+  assert.equal(result.stderr, '');
+  assert.equal(result.status, 0);
+});
+
+test('skips a tracked path that is a directory in the working tree', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+    'dir.md': 'FOO-9\n',
+  });
+  rmSync(path.join(root, 'dir.md'));
+  mkdirSync(path.join(root, 'dir.md'));
 
   const result = check(root);
 

@@ -5,7 +5,7 @@
 //
 // Plain Node ESM with no dependencies, so it runs before `npm install` too.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,7 @@ const SPEC_FILE = /^docs\/specs\/[^/]+\/spec\.md$/;
 const PREFIX_LINE = /^Prefix: `([A-Z]+)`/;
 const DECLARATION = /^\*\*([A-Z]+)-(\d+)\*\*/;
 const RETIRED = /^\*\*[A-Z]+-\d+\*\*\s*—\s*_Retired\b/;
+const LOOKS_RETIRED = /(?<![A-Za-z])Retired(?![A-Za-z])/;
 const TEST_FILE = /\.(?:spec\.ts|test\.tsx?|testkit\.ts)$/;
 const SKIPPED = new Set(['package-lock.json', 'skills-lock.json']);
 
@@ -31,11 +32,17 @@ function listFiles(root) {
 }
 
 // A text file's lines, or null for a file that is missing from the working
-// tree, is not a regular file, or is binary.
+// tree, is not a regular file, or is binary. Reads once, rather than
+// stat-then-read, so nothing can change the path in between.
 function readLines(root, file) {
   const full = path.join(root, file);
-  if (!statSync(full, { throwIfNoEntry: false })?.isFile()) return null;
-  const bytes = readFileSync(full);
+  let bytes;
+  try {
+    bytes = readFileSync(full);
+  } catch (err) {
+    if (['ENOENT', 'EISDIR', 'ENOTDIR'].includes(err.code)) return null;
+    throw err;
+  }
   // git's own test: a NUL byte in the first 8000 bytes means binary.
   if (bytes.subarray(0, 8000).includes(0)) return null;
   return bytes.toString('utf8').split(/\r?\n/);
@@ -50,15 +57,24 @@ function readSpecs(specs, errors) {
     const prefix = index === -1 ? null : PREFIX_LINE.exec(lines[index])[1];
     if (prefix === null) {
       errors.push({ file, line: 1, message: 'has no Prefix header line' });
-    } else if (prefixes.has(prefix)) {
-      const first = prefixes.get(prefix);
-      errors.push({
-        file,
-        line: index + 1,
-        message: `prefix ${prefix} is already declared by ${first.file}:${first.line}`,
-      });
     } else {
-      prefixes.set(prefix, { file, line: index + 1 });
+      if (prefix === 'EX') {
+        errors.push({
+          file,
+          line: index + 1,
+          message: 'prefix EX is reserved for examples',
+        });
+      }
+      if (prefixes.has(prefix)) {
+        const first = prefixes.get(prefix);
+        errors.push({
+          file,
+          line: index + 1,
+          message: `prefix ${prefix} is already declared by ${first.file}:${first.line}`,
+        });
+      } else {
+        prefixes.set(prefix, { file, line: index + 1 });
+      }
     }
     lines.forEach((text, i) => {
       const match = DECLARATION.exec(text);
@@ -72,6 +88,17 @@ function readSpecs(specs, errors) {
           message: `${id} is declared in a spec whose prefix is ${prefix ?? '(none)'}`,
         });
       }
+      if (match[2].length > 1 && match[2].startsWith('0')) {
+        errors.push({ file, line, message: `${id} has a leading zero` });
+      }
+      const retired = RETIRED.test(text);
+      if (!retired && LOOKS_RETIRED.test(text)) {
+        errors.push({
+          file,
+          line,
+          message: `${id} looks Retired but does not match "**${id}** — _Retired …_"`,
+        });
+      }
       const first = declared.get(id);
       if (first) {
         errors.push({
@@ -80,7 +107,7 @@ function readSpecs(specs, errors) {
           message: `${id} is already declared at ${first.file}:${first.line}`,
         });
       } else {
-        declared.set(id, { file, line, retired: RETIRED.test(text) });
+        declared.set(id, { file, line, retired });
       }
     });
   }
@@ -128,11 +155,32 @@ function checkReferences(files, prefixes, declared, errors) {
   return cited;
 }
 
+// A spec lives at docs/specs/<capability>/spec.md; docs/specs/README.md is
+// the only other file allowed there. Anything else misplaces a spec
+// silently, so it is an error rather than a skip.
+function checkMisplaced(files, errors) {
+  for (const { file } of files) {
+    if (
+      file.startsWith('docs/specs/') &&
+      file.endsWith('.md') &&
+      file !== 'docs/specs/README.md' &&
+      !SPEC_FILE.test(file)
+    ) {
+      errors.push({
+        file,
+        line: 1,
+        message: 'is not a spec: specs live at docs/specs/<capability>/spec.md',
+      });
+    }
+  }
+}
+
 function checkSpecs(root) {
   const errors = [];
   const files = listFiles(root)
     .map((file) => ({ file, lines: readLines(root, file) }))
     .filter(({ lines }) => lines !== null);
+  checkMisplaced(files, errors);
   const specs = files.filter(({ file }) => SPEC_FILE.test(file));
   const { prefixes, declared } = readSpecs(specs, errors);
   const cited = checkReferences(files, prefixes, declared, errors);
