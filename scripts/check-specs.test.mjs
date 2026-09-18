@@ -228,3 +228,33 @@ test('a Retired ID may be cited inside docs/specs/ but nowhere else', (t) => {
   assert.doesNotMatch(result.stderr, /README/);
   assert.match(result.stdout, /1 live requirement\(s\), 1 error\(s\)/);
 });
+
+test('skips ignored files, the two lockfiles and binary files, but reads untracked ones', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+    '.gitignore': 'ignored.md\n',
+    'ignored.md': 'FOO-9\n',
+    'package-lock.json': '{ "note": "FOO-9" }\n',
+    'skills-lock.json': '{ "note": "FOO-9" }\n',
+    'image.bin': Buffer.from('FOO-9\0'),
+  });
+  write(root, 'new.md', 'FOO-9\n');
+
+  const result = check(root);
+
+  assert.equal(result.status, 1);
+  assert.equal(result.stderr, 'new.md:1: FOO-9 is not declared in any spec\n');
+});
+
+test('skips a tracked file deleted from the working tree', (t) => {
+  const root = repo(t, {
+    'docs/specs/foo/spec.md': spec('FOO', '**FOO-1** — A rule.'),
+    'gone.md': 'FOO-9\n',
+  });
+  rmSync(path.join(root, 'gone.md'));
+
+  const result = check(root);
+
+  assert.equal(result.stderr, '');
+  assert.equal(result.status, 0);
+});

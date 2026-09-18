@@ -5,7 +5,7 @@
 //
 // Plain Node ESM with no dependencies, so it runs before `npm install` too.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,17 +14,31 @@ const PREFIX_LINE = /^Prefix: `([A-Z]+)`/;
 const DECLARATION = /^\*\*([A-Z]+)-(\d+)\*\*/;
 const RETIRED = /^\*\*[A-Z]+-\d+\*\*\s*—\s*_Retired\b/;
 const TEST_FILE = /\.(?:spec\.ts|test\.tsx?|testkit\.ts)$/;
+const SKIPPED = new Set(['package-lock.json', 'skills-lock.json']);
 
+// Every file git tracks, plus new ones it does not ignore, so a spec written
+// but not yet staged is already checked.
 function listFiles(root) {
-  const out = execFileSync('git', ['ls-files', '-z'], {
-    cwd: root,
-    encoding: 'utf8',
-  });
-  return out.split('\0').filter((file) => file !== '');
+  const out = execFileSync(
+    'git',
+    ['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+    { cwd: root, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter((file) => file !== '');
+  return [...new Set(files)]
+    .filter((file) => !SKIPPED.has(path.posix.basename(file)))
+    .sort();
 }
 
+// A text file's lines, or null for a file that is missing from the working
+// tree, is not a regular file, or is binary.
 function readLines(root, file) {
-  return readFileSync(path.join(root, file), 'utf8').split(/\r?\n/);
+  const full = path.join(root, file);
+  if (!statSync(full, { throwIfNoEntry: false })?.isFile()) return null;
+  const bytes = readFileSync(full);
+  // git's own test: a NUL byte in the first 8000 bytes means binary.
+  if (bytes.subarray(0, 8000).includes(0)) return null;
+  return bytes.toString('utf8').split(/\r?\n/);
 }
 
 // Reads each spec's prefix and its requirement declarations.
