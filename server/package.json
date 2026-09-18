@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "node --watch ./src/index.ts",
     "start": "node ./src/index.ts",
     "seed": "node --env-file-if-exists=.env.local ./src/db/seed.ts",
     "build": "tsc -p tsconfig.build.json",
@@ -27,7 +27,6 @@
   "devDependencies": {
     "@types/cookie-parser": "1.4.10",
     "@types/express": "5.0.6",
-    "@types/node": "26.5.1",
-    "nodemon": "3.1.14"
+    "@types/node": "26.5.1"
   }
 }

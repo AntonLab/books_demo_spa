@@ -39,7 +39,7 @@ of them read. Early scaffold — most feature directories exist but are empty.
 
 One `npm install` at the repo root installs every workspace into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
-declared in the package that uses them — webpack and jest in `client`, nodemon
+declared in the package that uses them — webpack and jest in `client`, `sharp`
 in `server`, `shared` in both — so each `package.json` still says what that
 package needs. `node_modules/shared` is a link to `shared/`, not a copy, and
 that matters: Node strips types only from a file whose real path lies outside
