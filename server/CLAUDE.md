@@ -182,7 +182,7 @@ row's own 404/403 (`assertMayTouch`, the same Co-author/rank check `PATCH`
 uses); only then `sharp`'s 400 ("Not a valid image") when the bytes will
 not decode, including bytes over `sharp`'s input-pixel limit. A body over 2
 MiB is a 413, mapped through the existing `errorHandler`, the same generic
-body-parser path `express.json()`'s own limit uses. Both `GET`s answer
+path `express.json()`'s own limit takes. Both `GET`s answer
 `Content-Type: image/webp`, `X-Content-Type-Options: nosniff` and
 `Cache-Control: private, max-age=31536000, immutable` — safe because
 `PublicBook.coverUrl` and `PublicUser`/`AuthorSummary.avatarUrl` are
