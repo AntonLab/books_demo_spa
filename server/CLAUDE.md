@@ -198,11 +198,12 @@ This package is an npm workspace. Install from the repo root, not here; the
 scripts below still run from this directory, or from the root with `-w server`.
 
 - `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.18)
-- `npm run dev` — run under nodemon, which restarts on changes to
-  `src/**/*.{ts,json}` and to `../shared/src`, the API types this package
-  loads as source. The script is bare `nodemon`: `nodemon.json` supplies
-  both the watch settings and `exec: node ./src/index.ts`, so the entry point
-  is named once rather than in both places
+- `npm run dev` — `node --watch ./src/index.ts`: Node's own watch mode
+  restarts the process when the entry point or any module it imports
+  changes. That includes `../shared/src`, the API types this package loads
+  as source through the workspace link at their real path. Spec files are
+  never imported, so editing one restarts nothing. Do not add
+  `--watch-path`: it throws `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` on Linux
 - `npm run build` — compile with `tsc -p tsconfig.build.json` to `dist/`; that
   config extends `tsconfig.json` (which in turn extends the repo-root
   `tsconfig.base.json`) but excludes `src/**/*.spec.ts`, so test files
@@ -986,7 +987,7 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   strips types without `--experimental-strip-types`. `tsconfig.json` uses
   `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `dev` run the `.ts` entry directly via Node (native TS
-  type-stripping); nodemon only adds watch/restart on top.
+  type-stripping); `dev` only adds `--watch` on top.
 - Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
   because Node's native TS mode resolves modules exactly as written — it does
   no extension rewriting itself. `tsconfig.json` sets

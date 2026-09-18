@@ -114,8 +114,8 @@ root deliberately defines no single-package aliases, so `-w` is the one way to
 narrow any script. Prettier is root-only because its config is repo-wide — the
 packages define no `format` script.
 
-The API alone, without nodemon, is `npm run start -w server`. `client` also has
-`npm run test:watch`.
+The API alone, without the file watcher, is `npm run start -w server`. `client`
+also has `npm run test:watch`.
 
 The server's test suite talks to a real MySQL database, so `.env.local` must be
 configured before `npm test` there.
