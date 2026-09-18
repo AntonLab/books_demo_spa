@@ -240,8 +240,14 @@ scripts below still run from this directory, or from the root with `-w server`.
   nothing.
 - `npm run typecheck` — `tsc --noEmit` (type-check only)
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`,
-  which calls `createConfig` in the repo-root `eslint.config.base.mjs`; the
-  Node globals block is all that is local)
+  which calls `createConfig` in the repo-root `eslint.config.base.mjs` with
+  `tsconfigRootDir: import.meta.dirname`; the Node globals block is all that
+  is local). TypeScript is linted with type information for three rules —
+  `no-floating-promises`, `no-misused-promises`, `await-thenable` — and
+  `node:test`'s `test`/`describe`/`it`/`suite` are exempt from the first,
+  since the runner tracks the promises they return. Await a promise, or mark
+  a deliberate fire-and-forget `void` with the reason beside it; never an
+  `eslint-disable`
 
 Prettier has no script here: it is root-only, because `.prettierrc.json` and
 `.prettierignore` are repo-wide. Run `npm run format` from the repo root.
