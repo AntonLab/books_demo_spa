@@ -465,8 +465,13 @@ test('a refusal leaves no count behind on either budget, including the one that 
       (response) => response.status
     );
     assert.deepEqual(inFlightStatuses, Array<number>(50).fill(400));
-    // Give every 'finish' handler a moment to run before inspecting state.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // Every 'finish' handler has settled its request once neither budget
+    // holds a window any longer.
+    await waitUntil(
+      () =>
+        limits.loginByIp.size() === 0 && limits.loginByIpAndLogin.size() === 0,
+      'both budgets to hold no window once every held request has settled'
+    );
 
     // None of the 50 in-flight requests was a 401, so settling them as 400
     // must free the per-IP budget completely — back to no window at all,
