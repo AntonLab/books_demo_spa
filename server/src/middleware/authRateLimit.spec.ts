@@ -287,6 +287,26 @@ test('the message never promises less than a minute, and one minute is singular'
   });
 });
 
+test('when both login budgets refuse, the refusal names the longer wait', async () => {
+  await withLimitedApp(async (client, clock) => {
+    // The address's window opens at 0 and bob's at 10 minutes. Once the
+    // address's window has closed, 50 fresh failures open a new one at 15
+    // minutes, so the address's window now ends after bob's: bob has 10
+    // minutes left, the address 15. The longer wait is the second of the
+    // two budgets checked, so neither the first refusal nor the shorter wait
+    // would give it.
+    await failTimes(client, 'x', 1);
+    clock.now = 10 * 60 * 1000;
+    await failTimes(client, 'bob', 10);
+    clock.now = FIFTEEN_MINUTES_MS;
+    for (const name of ['a', 'b', 'c', 'd', 'e']) {
+      await failTimes(client, name, 10);
+    }
+
+    await assertRefused(await client.login('bob', 401), '900', 15);
+  });
+});
+
 test('the budget returns when the window ends', async () => {
   await withLimitedApp(async (client, clock) => {
     await failTimes(client, 'bob', 10);
