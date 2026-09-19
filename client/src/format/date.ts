@@ -11,8 +11,13 @@ const dateTimeFormat = new Intl.DateTimeFormat('en', {
 });
 
 // Dates cross the wire as ISO strings (Wire<T>), so both take one.
-export const formatDate = (iso: string): string =>
-  dateFormat.format(new Date(iso));
+const formatIso =
+  (format: Intl.DateTimeFormat) =>
+  (iso: string): string => {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? '' : format.format(date);
+  };
 
-export const formatDateTime = (iso: string): string =>
-  dateTimeFormat.format(new Date(iso));
+export const formatDate = formatIso(dateFormat);
+
+export const formatDateTime = formatIso(dateTimeFormat);
