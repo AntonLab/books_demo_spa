@@ -318,10 +318,13 @@ Each layer answers a question the others cannot:
 - `src/expiryPurge.ts` — `startExpiryPurge`: the hourly delete of expired
   sessions and old reset tokens (see **Operations**)
 - `src/rateLimit.ts` — `createRateLimiter`: a fixed-window, in-memory
-  limiter (`hit`/`peek`/`release`/`reset`/`stop`) with lazy expiry and an
-  `unref()`ed sweep. `release` gives back one `hit` that turned out not to
-  count, deleting the key once its count reaches 0 rather than leaving an
-  empty window behind — see **Sign-in rate limiting** under Operations.
+  limiter (`hit`/`peek`/`release`/`reset`/`size`/`stop`) with lazy expiry
+  and an `unref()`ed sweep. `release` gives back one `hit` that turned out
+  not to count, deleting the key once its count reaches 0 rather than
+  leaving an empty window behind — see **Sign-in rate limiting** under
+  Operations. `size` returns how many keys hold an open window, the number
+  the sweep keeps bounded; only the specs read it, to check that nothing is
+  left behind.
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
