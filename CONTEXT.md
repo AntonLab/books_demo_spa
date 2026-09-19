@@ -41,8 +41,8 @@ has at least one.
 _Avoid_: Primary author, creator, "author" for a credit
 
 **Admin**:
-The Role that moderates other people's content and manages User and Author
-Accounts.
+The Role that moderates other people's content, manages User and Author
+Accounts, and keeps the Genre list.
 
 **Superadmin**:
 The top Role, and the only one that reaches Admin and Superadmin Accounts.
@@ -136,6 +136,17 @@ _Avoid_: Collection
 **Series order**:
 The explicit position of each Book within its Series, independent of when a
 Book was created or filed into it.
+
+**Genre**:
+A category of the catalogue, from a list Admins and Superadmins keep. A Book
+has at most one. A Series may carry its own, set independently of its Books':
+a Book never takes its Genre from its Series.
+_Avoid_: Category, Tag (for a Genre)
+
+**Tag**:
+A free-form label a Book's or Series' Co-authors attach to it, any number of
+them and from no list.
+_Avoid_: Genre (for a Tag), keyword
 
 ### Comments
 
