@@ -6,6 +6,8 @@ export interface ListBooksParams {
   q?: string;
   // Naming the caller's own id is the one list that includes their drafts.
   userId?: number;
+  // The series' books in its Series order, rather than newest first.
+  seriesId?: number;
   limit?: number;
   offset?: number;
 }
@@ -23,8 +25,9 @@ export type UpdateBookPayload = Partial<CreateBookPayload> & {
   status?: BookStatus;
 };
 
-// One function, two callers: `useBooks` fetches the unfiltered first page and
-// `useSearchBooks` passes a `q`. The server's schema rejects an empty `q`
+// One function, several callers: `useBooks` fetches the unfiltered first page,
+// `useSearchBooks` passes a `q` and `useBooksInSeries` a `seriesId`. The
+// server's schema rejects an empty `q`
 // (`z.string().min(1)`), so a blank term is omitted rather than sent —
 // `useSearchBooks` also disables itself on one, which stops the request
 // happening at all rather than merely shaping the URL.
@@ -34,6 +37,9 @@ export const listBooks = (
   const search = new URLSearchParams();
   if (params.q) search.set('q', params.q);
   if (params.userId !== undefined) search.set('userId', String(params.userId));
+  if (params.seriesId !== undefined) {
+    search.set('seriesId', String(params.seriesId));
+  }
   if (params.limit !== undefined) search.set('limit', String(params.limit));
   if (params.offset !== undefined) search.set('offset', String(params.offset));
 

@@ -39,6 +39,16 @@ export const useSearchBooks = (q: string) => {
   });
 };
 
+// A series' books, in its Series order: the server sorts a `seriesId` list by
+// position rather than newest first, and leaves out what the viewer may not
+// read. One page, since a series runs to a handful of books.
+export const useBooksInSeries = (seriesId: number) => {
+  return useQuery({
+    queryKey: queryKeys.books({ seriesId, limit: BOOKS_PAGE_SIZE }),
+    queryFn: () => listBooks({ seriesId, limit: BOOKS_PAGE_SIZE }),
+  });
+};
+
 export const useBook = (id: number) => {
   return useQuery({
     queryKey: queryKeys.book(id),
