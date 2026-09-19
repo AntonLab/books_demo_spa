@@ -12,14 +12,14 @@ UI components follow Brad Frost's Atomic Design levels, extended with
 `organisms/`. A level with nothing in it has no directory — create one when
 the first component needs it rather than leaving empty folders around.
 
-| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                                          |
-| --------- | --------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus three custom quarks — `appSearchBarMaxWidth`, `appNotificationPanelWidth` and `appBookCoverWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`       |
-| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                                             |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`, `BookCover`, `AccountAvatar`, `ImageUploadButton`                                                                                                                        |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
-| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                    |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                                       |
+| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                                                        |
+| --------- | --------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus three custom quarks — `appSearchBarMaxWidth`, `appNotificationPanelWidth` and `appBookCoverWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                     |
+| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                                                           |
+| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`, `BookCover`, `AccountAvatar`, `ImageUploadButton`                                                                                                                                      |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `SeriesCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
+| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                                  |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The fourteen routed pages                                                                                                                                                                                                    |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 39 (24 components, 15 pages) follow this layout, and the `@/` alias is
+All 39 (25 components, 14 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -212,8 +212,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
   `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
-  auth mutations), `books.ts` (`useBooks`, `useSearchBooks`, `useBook`,
-  `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
+  auth mutations), `books.ts` (`useBooks`, `useSearchBooks`,
+  `useBooksInSeries` — `?seriesId=`, which the server returns in Series
+  order — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
   list that includes their drafts — and five book mutations, the
   create/update/delete trio plus `useUploadBookCover`/`useDeleteBookCover`,
   that all invalidate the whole `books` prefix, since one write can move a
@@ -306,10 +307,13 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     `onReject` — purely presentational, with no `src/api`/`src/queries` call
     of its own, so `EditBookPage`'s Cover block and `ProfilePage` each wire it
     to their own upload/delete mutation).
-  - `organisms/` — `AppHeader` (nav menu — "My Books" only for the `author`
-    Role — `SearchBar`, and the three auth states — signed out / loading /
-    signed in, the trigger naming the account beside its `AccountAvatar`, and
-    the last with a `NotificationBell`); `NotificationBell` (a
+  - `organisms/` — `AppHeader` (nav menu — "Home", plus "My Books" only for
+    the `author` Role — `SearchBar`, and the three auth states — signed out /
+    loading / signed in. Signed out, "Log in" is a one-item menu of its own
+    in the corner the account trigger takes once signed in, and there is no
+    Register: the login modal's "Create an account" is the way in. Signed in,
+    the trigger names the account beside its `AccountAvatar`, with a
+    `NotificationBell` beside it); `NotificationBell` (a
     badge with the unread count, also in the button's name, over a `Popover`
     of the newest notifications in words, the work's title linked while the
     work exists — a book to its page, a series to its editor. Opening it marks
@@ -334,12 +338,14 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     reachable from this checkbox), `ResetRequestModal` and
     `ResetConfirmModal`; `BookCard` (leads with the book's `BookCover`, names
     every Co-author under the title beside their own `AccountAvatar`,
-    from the `authors` the list response embeds, and tags the book's status)
-    and the
+    from the `authors` the list response embeds, and tags the book's status);
+    `SeriesCard` (the same for a series — title, Co-authors with their
+    `AccountAvatar`, blurb and tags — heading `SearchPage`'s results for one
+    series, and leaving its books to whoever renders it) and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
-    `SearchPage` (from `useSearchBooks(q)`) can feed it, each from its own
-    `src/queries/books.ts` hook); the presentational `ChapterList` (the reader's list, dated by
+    `SearchPage` (from `useSearchBooks(q)` or `useBooksInSeries(id)`) can
+    feed it, each from its own `src/queries/books.ts` hook); the presentational `ChapterList` (the reader's list, dated by
     `publishedAt`, in the order it is given); `SortableList` (a list put in
     order by drag and drop, used for a book's chapters and a series' books:
     each item is `{ id, label, content }`, the page rendering `content`.
@@ -381,8 +387,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     server's rules — the server refuses each with a 403 regardless, so this
     only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
-  `SearchPage`, `BookPage` (`/books/:id`: the book's `BookCover` beside its
-  title, and each Co-author's `AccountAvatar` in the byline), `ChapterPage`
+  `SearchPage` (`/search`, one filter per visit: `?q=` searches, and
+  `?series=` lists a series' books under its `SeriesCard` instead — there is
+  no series page, and a series that no longer exists, or an id that is not
+  one, says "This series no longer exists."), `BookPage` (`/books/:id`: the
+  book's `BookCover` beside its title, each Co-author's `AccountAvatar` in
+  the byline, and its series linked to `/search?series=`), `ChapterPage`
   (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
   author's own books, drafts included, and "Create book", and a Series tab of
   the series they co-author, each linked to its editor, with "Create
@@ -409,8 +419,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (a heading alone while the session is pending, an error `Alert` if the
   session fetch fails, `Empty` when signed out, otherwise a large
   `AccountAvatar`, "Upload avatar" and "Remove avatar" behind a
-  `Popconfirm`), `SeriesPage` (still a stub — series UI is an explicit
-  non-goal of the spec), `NotFoundPage`, and `ResetPasswordRoute` (reads the reset
+  `Popconfirm`), `NotFoundPage` (also what `/series` gets: there is no
+  series page), and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
   `/reset-password` to the confirm modal without naming the component that
@@ -656,9 +666,12 @@ Test the inputs and the outputs: props in, rendered DOM and fired callbacks
 out. Do not assert on internal state — a test that knows how a component
 stores something breaks on every refactor that changes nothing a user sees.
 
-Every component and page has a test file. The stub page (`SeriesPage`) takes
-no props and has nothing to click, so its test covers only the heading and
-the placeholder — that is the whole contract, not a shortcut.
+Every component and page has a test file.
+
+An antd `Menu` item cannot be activated from the keyboard in a test: the
+menu's handler checks `event.which === 13`, and user-event never sets
+`which`. Its keyboard support is antd's, so test a menu item by clicking it
+and do not synthesise a `which` to force the keyboard path.
 
 ## Conventions
 
