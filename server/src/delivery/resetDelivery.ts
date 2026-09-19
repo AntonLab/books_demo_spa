@@ -26,3 +26,25 @@ export function createLoggerResetDelivery(
     },
   };
 }
+
+// What RESET_DELIVERY may name. One entry today; real mail would be a second
+// kind here and a second ResetDelivery implementation above.
+export const RESET_DELIVERY_KINDS = ['log'] as const;
+export type ResetDeliveryKind = (typeof RESET_DELIVERY_KINDS)[number];
+
+const DELIVERIES: Record<
+  ResetDeliveryKind,
+  (logger: Logger, baseUrl: string) => ResetDelivery
+> = {
+  log: createLoggerResetDelivery,
+};
+
+// The delivery RESET_DELIVERY names; index.ts builds it from the config
+// rather than hard-wiring the log.
+export function createResetDelivery(
+  kind: ResetDeliveryKind,
+  logger: Logger,
+  baseUrl: string
+): ResetDelivery {
+  return DELIVERIES[kind](logger, baseUrl);
+}

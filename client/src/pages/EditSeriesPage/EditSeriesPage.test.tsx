@@ -153,7 +153,7 @@ describe('EditSeriesPage', () => {
 
     await booksLoaded();
     await userEvent.click(
-      screen.getAllByRole('button', { name: 'Remove from series' })[1]
+      screen.getAllByRole('button', { name: 'Remove from series' })[1]!
     );
     expect(mockedSeries.removeBookFromSeries).not.toHaveBeenCalled();
 

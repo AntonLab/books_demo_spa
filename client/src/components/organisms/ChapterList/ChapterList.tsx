@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Alert, Empty, List, Skeleton, Typography } from 'antd';
 import { Link } from 'react-router';
+import { formatDate } from '@/format/date';
 import type { ChapterSummary } from '@/types/chapter';
 
 interface ChapterListProps {
@@ -9,8 +10,6 @@ interface ChapterListProps {
   isPending: boolean;
   isError: boolean;
 }
-
-const formatDate = (iso: string): string => new Date(iso).toLocaleDateString();
 
 // Presentational, like BookList: the page owns the query and hands the states
 // down, so this renders in a test with no network layer at all. The reader's

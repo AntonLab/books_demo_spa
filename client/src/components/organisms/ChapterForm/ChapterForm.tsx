@@ -13,6 +13,7 @@ import {
 } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import type { PublishedAtPayload } from '@/api/chapters';
+import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';
 
 export interface ChapterFormValues {
@@ -172,9 +173,13 @@ export const ChapterForm: FC<ChapterFormProps> = ({
 
         {state === 'published' ? (
           <>
-            <Typography.Paragraph type="secondary">
-              {`Published on ${new Date(publishedAt ?? '').toLocaleString()}`}
-            </Typography.Paragraph>
+            {/* A Published chapter always has a moment; the check narrows
+                the type, and keeps Intl from throwing on an empty string. */}
+            {publishedAt !== null && (
+              <Typography.Paragraph type="secondary">
+                {`Published on ${formatDateTime(publishedAt)}`}
+              </Typography.Paragraph>
+            )}
             <Space>
               <Button
                 type="primary"

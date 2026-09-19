@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
 import type { PublicNotification } from '@/types/notification';
 
@@ -212,6 +213,21 @@ describe('NotificationBell', () => {
 
     expect(
       await screen.findByText('No notifications yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('dates each notification with the app date-time helper', async () => {
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([notification({ id: 1 })])
+    );
+    renderWithProviders(<NotificationBell userId={3} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Notifications/ })
+    );
+
+    expect(
+      await screen.findByText(formatDateTime('2026-09-12T10:00:00.000Z'))
     ).toBeInTheDocument();
   });
 });

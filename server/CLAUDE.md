@@ -182,7 +182,7 @@ row's own 404/403 (`assertMayTouch`, the same Co-author/rank check `PATCH`
 uses); only then `sharp`'s 400 ("Not a valid image") when the bytes will
 not decode, including bytes over `sharp`'s input-pixel limit. A body over 2
 MiB is a 413, mapped through the existing `errorHandler`, the same generic
-body-parser path `express.json()`'s own limit uses. Both `GET`s answer
+path `express.json()`'s own limit takes. Both `GET`s answer
 `Content-Type: image/webp`, `X-Content-Type-Options: nosniff` and
 `Cache-Control: private, max-age=31536000, immutable` — safe because
 `PublicBook.coverUrl` and `PublicUser`/`AuthorSummary.avatarUrl` are
@@ -197,12 +197,13 @@ raised.
 This package is an npm workspace. Install from the repo root, not here; the
 scripts below still run from this directory, or from the root with `-w server`.
 
-- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 22.18)
-- `npm run dev` — run under nodemon, which restarts on changes to
-  `src/**/*.{ts,json}` and to `../shared/src`, the API types this package
-  loads as source. The script is bare `nodemon`: `nodemon.json` supplies
-  both the watch settings and `exec: node ./src/index.ts`, so the entry point
-  is named once rather than in both places
+- `npm start` — run the server: `node ./src/index.ts` (native TS, Node >= 24)
+- `npm run dev` — `node --watch ./src/index.ts`: Node's own watch mode
+  restarts the process when the entry point or any module it imports
+  changes. That includes `../shared/src`, the API types this package loads
+  as source through the workspace link at their real path. Spec files are
+  never imported, so editing one restarts nothing. Do not add
+  `--watch-path`: it throws `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` on Linux
 - `npm run build` — compile with `tsc -p tsconfig.build.json` to `dist/`; that
   config extends `tsconfig.json` (which in turn extends the repo-root
   `tsconfig.base.json`) but excludes `src/**/*.spec.ts`, so test files
@@ -239,8 +240,14 @@ scripts below still run from this directory, or from the root with `-w server`.
   nothing.
 - `npm run typecheck` — `tsc --noEmit` (type-check only)
 - `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`,
-  which calls `createConfig` in the repo-root `eslint.config.base.mjs`; the
-  Node globals block is all that is local)
+  which calls `createConfig` in the repo-root `eslint.config.base.mjs` with
+  `tsconfigRootDir: import.meta.dirname`; the Node globals block is all that
+  is local). TypeScript is linted with type information for three rules —
+  `no-floating-promises`, `no-misused-promises`, `await-thenable` — and
+  `node:test`'s `test`/`describe`/`it`/`suite` are exempt from the first,
+  since the runner tracks the promises they return. Await a promise, or mark
+  a deliberate fire-and-forget `void` with the reason beside it; never an
+  `eslint-disable`
 
 Prettier has no script here: it is root-only, because `.prettierrc.json` and
 `.prettierignore` are repo-wide. Run `npm run format` from the repo root.
@@ -298,19 +305,37 @@ Each layer answers a question the others cannot:
 ## Layout
 
 - `src/index.ts` — process entry point: loads `.env.local`, ensures the schema,
-  connects Sequelize, authenticates, and starts listening
+  connects Sequelize, authenticates, starts listening, and registers the
+  graceful shutdown (`src/shutdown.ts`, see **Operations**)
 - `src/app.ts` — builds the Express app (`createApp`), wiring routes and the
   error-handling middleware
 - `src/logger.ts` — the sanctioned console boundary; every other module logs
   through this instead of calling `console.*` directly
-- `src/password.ts` — argon2id password hashing and verification
+- `src/shutdown.ts` — `createShutdown` and `registerShutdownSignals`: the
+  graceful shutdown on `SIGTERM`/`SIGINT` (see **Operations**)
+- `src/listen.ts` — `listen(app, port, deps)`: `app.listen` with Express 5's
+  bind error reported instead of ignored (see **Operations**)
+- `src/expiryPurge.ts` — `startExpiryPurge`: the hourly delete of expired
+  sessions and old reset tokens (see **Operations**)
+- `src/rateLimit.ts` — `createRateLimiter`: a fixed-window, in-memory
+  limiter (`hit`/`peek`/`release`/`reset`/`size`/`stop`) with lazy expiry
+  and an `unref()`ed sweep. `release` gives back one `hit` that turned out
+  not to count, deleting the key once its count reaches 0 rather than
+  leaving an empty window behind — see **Sign-in rate limiting** under
+  Operations. `size` returns how many keys the map still holds, an ended
+  window included until a touch or the sweep drops it — the number the sweep
+  keeps bounded; only the specs read it, to check that nothing is left behind.
+- `src/password.ts` — argon2id password hashing and verification; argon2id
+  is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
   `hashToken()` (SHA-256) for session and reset tokens, and `xsrfTokenFor()`,
   a session's XSRF token
 - `src/sessionCookie.ts` — the `sid` cookie's name, TTL, and the shared
   set/clear helpers, which set and clear the `xsrfToken` cookie beside it
-- `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface, `resetUrl()`,
-  and the logger-backed implementation that is the only sink so far
+- `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface,
+  `resetUrl()`, the logger-backed implementation that is the only sink so
+  far, and `createResetDelivery(kind, …)`, which builds the one
+  `RESET_DELIVERY` names (`RESET_DELIVERY_KINDS`)
 - `src/images.ts` — the one module every `sharp` call lives in:
   `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
@@ -319,10 +344,14 @@ Each layer answers a question the others cannot:
   `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
   `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
-  `withAuthenticatedApp`, `AUTH_COOKIE`, `json`); `tsconfig.build.json`
+  `withAuthenticatedApp`, `AUTH_COOKIE`, `json`, `defaultDeps`,
+  `unlimitedAuthRateLimits`); `tsconfig.build.json`
   excludes `*.testkit.ts` alongside `*.spec.ts`, so neither is emitted to
   `dist/`. See **Test layers** for which fakes the route specs run on.
 - `src/app.spec.ts` — the full-stack smoke suite; see **Test layers**
+- `src/createApp.spec.ts` — `createApp`'s own settings, on the route test
+  kit's unreachable repositories (`defaultDeps()`): `trust proxy` from
+  `AppDeps.trustProxy`, and the security headers
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
@@ -366,9 +395,11 @@ Each layer answers a question the others cannot:
   the same reason: only the seed and its specs use it.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
-  `requirePermission.ts`, `optionalAuth.ts` (unmounted —
-  see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
-  three build on), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
+  `requirePermission.ts`, `optionalAuth.ts` (unmounted — see **Auth**),
+  `sessionUser.ts` (the shared `resolveSessionUser` the other three build
+  on), `securityHeaders.ts` (`noSniff`, see **Security headers** under
+  Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**),
+  `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
@@ -389,14 +420,16 @@ Each layer answers a question the others cannot:
 with zod and throws on anything malformed rather than starting with a broken
 value.
 
-| Variable                  | Default                 | Notes                                                                                                                                                            |
-| ------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.           |
-| `PORT`                    | `4000`                  | The API's own port.                                                                                                                                              |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                                                                                                  |
-| `DB_NAME`                 | `books_demo_spa`        |                                                                                                                                                                  |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not. |
-| `APP_BASE_URL`            | `http://localhost:3000` | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.             |
+| Variable                  | Default                   | Notes                                                                                                                                                                                                                                                                       |
+| ------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`             | `development` \| `test` \| `production`. Also picks the argon2 cost — `test` uses deliberately weak parameters — and gates the cookie's `secure` flag.                                                                                                                      |
+| `PORT`                    | `4000`                    | The API's own port.                                                                                                                                                                                                                                                         |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                                                                                                                                                                                             |
+| `DB_NAME`                 | `books_demo_spa`          |                                                                                                                                                                                                                                                                             |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default on purpose: a root/root fallback would silently start the server against an unintended database. An empty password is accepted, a missing one is not.                                                                                                            |
+| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin a password-reset link points at. Validated as a URL, so a malformed value fails at startup rather than in an email nobody can fix.                                                                                                                        |
+| `TRUST_PROXY`             | `0`                       | How many reverse-proxy hops in front of the API may name the client in `X-Forwarded-For` (Express's `trust proxy`). `0` trusts none, so `req.ip` is the socket's peer. A whole, non-negative count only. The sign-in rate limits key on `req.ip`, so set it behind a proxy. |
+| `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.                                                                        |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
 (default `books_demo_spa_test`, the prefix of the twelve test schemas) and
@@ -575,10 +608,12 @@ The child inherits the runner's V8 coverage, so a coverage report lists
 - **Login always opens a new session** rather than reusing an existing row,
   which is what rules out session fixation.
 - **Reset requests always answer 202**, whether or not the address exists —
-  branching would make the endpoint an account-enumeration oracle. A new
-  request invalidates any outstanding token first, so two live links never
-  coexist. Tokens last one hour, far less than a session's seven days, because
-  a link sits in a mailbox.
+  branching would make the endpoint an account-enumeration oracle. (Past the
+  address's hourly limit it is refused with 429 before anything is looked
+  up — see **Sign-in rate limiting** under Operations — which says nothing
+  about any account either.) A new request invalidates any outstanding token
+  first, so two live links never coexist. Tokens last one hour, far less than
+  a session's seven days, because a link sits in a mailbox.
 - **Reset confirmation revokes every session** for that user, in the same
   transaction that stores the new password and stamps the token used — a
   partial apply would leave a redeemed token beside a live pre-reset session,
@@ -980,19 +1015,151 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   no `create` on `books`/`series`/`chapters`, and `update: own` rather than
   `any` on `comments` and `likes`.
 
+## Operations
+
+### Security headers
+
+`createApp` turns off Express's `X-Powered-By` and, as its first middleware
+(`middleware/securityHeaders.ts`), sets `X-Content-Type-Options: nosniff` on
+every response — a success, an error, a `notFound` 404 and a body
+`express.json()` refuses to parse alike. The Cover and Avatar `GET`s still
+set `nosniff` themselves beside their `Content-Type`; the two agree.
+`createApp.spec.ts` checks this on `createApp`'s own app: Express 5 sets
+`X-Powered-By` in `app.handle`, so a wrapping `express()`, like the route
+test kit's `withApp`, would add it back.
+
+### Graceful shutdown
+
+`index.ts` registers `src/shutdown.ts` for `SIGTERM` and `SIGINT`
+(`process.once`). On either it logs, stops every interval the process hands
+it (`stoppables`), closes the HTTP server and its idle connections, waits
+for the server to finish, then awaits `sequelize.close()`. It leaves
+`process.exitCode` alone, so a clean shutdown ends with 0 once nothing holds
+the event loop. The other signal, arriving mid-shutdown, joins the one already
+under way rather than starting another. The same signal a second time does
+not: `process.once` removed its listener before the first ran, so Node's
+default action is back and the process ends at once — a second Ctrl+C is a
+hard kill, and a second `SIGTERM` skips whatever is left of the shutdown, the
+pool close included. A 10-second deadline (`SHUTDOWN_TIMEOUT_MS`, on an
+`unref()`ed timer) forces the rest: it drops every open connection, logs, and
+exits 1; so does a pool that fails to close. `node --watch` (`npm run dev`)
+restarts with `SIGTERM`, so every dev restart takes this path.
+`shutdown.spec.ts` drives it with fakes for the server, the pool and the timer
+rather than real signals.
+
+### A port that cannot be bound
+
+Express 5 hands `app.listen`'s callback the error when binding fails —
+`EADDRINUSE`, say — which Express 4 never did. `src/listen.ts` checks it: on
+an error it logs `Could not start the HTTP server` with the message and
+never "listening"; `index.ts` then sets `process.exitCode = 1` and runs the
+graceful shutdown, so the database pool closes and the process exits. Only a
+bound server logs `server listening on …`.
+
+### Expiry purge
+
+`src/expiryPurge.ts` deletes the rows nothing will read again: sessions
+whose `expiresAt` has passed (`sessionRepository.deleteExpired`, the same
+rows `findValidByTokenHash` already refuses) and password-reset tokens more
+than 30 days past their own expiry, used or not
+(`passwordResetRepository.deleteExpiredBefore`, `RESET_TOKEN_RETENTION_MS`)
+— the month keeps the evidence that a reset was requested. `index.ts` starts
+it after `syncPermissions()`: one pass at boot, then one an hour on an
+`unref()`ed interval, which the graceful shutdown stops. A pass logs its
+counts at `info` only when it deleted something, and a failure at `error`;
+it never rejects, so a database hiccup costs one pass, not the process.
+
+### Sign-in rate limiting
+
+Three auth routes carry an in-memory, fixed-window limit
+(`middleware/authRateLimit.ts`, built on `src/rateLimit.ts`), mounted ahead
+of `validate` so a refused request costs no parsing, no lookup and no argon2:
+
+| Route                                   | Key        | Limit         | What counts                |
+| --------------------------------------- | ---------- | ------------- | -------------------------- |
+| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed or aborted attempts |
+| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed or aborted attempts |
+| `POST /api/auth/register`               | IP         | 5 per hour    | every request              |
+| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request              |
+
+- **Login counts against both budgets the moment it arrives, and settles the
+  claims when it answers or the connection closes.** A check that ran first
+  and recorded only later would let unlimited parallel attempts each read
+  the same unspent count while they all wait on the lookup and argon2, so
+  both budgets are `hit` up front instead. A request either budget refuses
+  is turned away before the handler ever runs, and **both** claims are
+  released regardless of which budget did the refusing — `hit` always
+  increments even on the budget that refuses, so leaving that one
+  un-released would let a burst of refused attempts keep inflating the very
+  count that refused them, locking the address or the name out for longer
+  than its own limit ever earned. A refusal this way leaves nothing behind
+  on either budget. Once the request runs, a 401 keeps both claims, and so
+  does an abort — the connection closing before any answer goes out. The
+  handler still runs the lookup and argon2 after the client has gone, so
+  giving an abort's claims back would let a client abort and repeat for
+  unlimited argon2 work per address without ever being refused. Any other
+  answer — a 400, a 403 (a blocked account) or a 2xx — releases both claims:
+  each `release` gives back that one claim, and a count that reaches 0 drops
+  its key outright rather than leaving an empty window behind (see
+  `src/rateLimit.ts` under **Layout**). A 2xx also clears the rest of the
+  IP + login budget's own history, which an abort never does. The per-IP
+  budget survives a success on its own, or signing in to one real account
+  would buy fresh guesses at every other.
+- **The login is trimmed, lower-cased and hashed** (SHA-256, hex) before it
+  becomes the name half of the IP + login key, so a change of case or stray
+  whitespace buys no fresh budget, and the key stays a fixed size whatever
+  the body carries — `loginSchema` puts no cap on `login`, this middleware
+  runs ahead of `validate`, and `express.json()` alone allows up to 100 KB;
+  without hashing, an unbounded login would leave an unbounded key sitting in
+  the limiter's map until the sweep drops it. `login` itself is
+  case-sensitive (`utf8mb4_0900_as_cs`), so two accounts that differ only in
+  case share one budget per address — the limit errs toward refusing.
+- **Register and the reset request count every request**, up front, so
+  malformed spam spends the budget too. A body that is not JSON at all never
+  reaches the route: `express.json()` refuses it first.
+- **A refusal is 429**, with `Retry-After` in whole seconds, rounded up, and
+  `{ "error": "Too many attempts. Try again in N minutes." }` — singular,
+  `"...in 1 minute."`, when N is exactly 1 — N rounded up and at least 1
+  (`TooManyRequestsError`, rendered by `errorHandler`). The client's auth
+  modals already show `error.message`.
+- **Keyed on `req.ip`**, which `TRUST_PROXY` governs: behind a proxy, set it,
+  or every client shares the proxy's budget.
+- **Memory, not the database.** Nothing is written, and a limited Account is
+  not Blocked — the two are unrelated. Expired windows are dropped when their
+  key is next touched and swept once a window by an `unref()`ed interval,
+  which the graceful shutdown stops. Each process keeps its own counts, and a
+  restart forgets them.
+- `createApp` requires the set (`AppDeps.authRateLimits`); `index.ts` builds
+  the real one with `createAuthRateLimits()`. Every test harness passes
+  `unlimitedAuthRateLimits()` from `routes/routeTestKit.testkit.ts` instead,
+  since the suites sign in far more often than the limits allow;
+  `middleware/authRateLimit.spec.ts` and the rate-limit cases in
+  `routes/authRoutes.spec.ts` pass the real one.
+
 ## Runtime notes
 
-- ESM package (`"type": "module"`), Node >= 22.18 — the first release that
-  strips types without `--experimental-strip-types`. `tsconfig.json` uses
+- ESM package (`"type": "module"`), Node >= 24 — the repo's `engines` floor.
+  Every 24.x strips types without `--experimental-strip-types`, so nothing
+  here needs a flag. `tsconfig.json` uses
   `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `dev` run the `.ts` entry directly via Node (native TS
-  type-stripping); nodemon only adds watch/restart on top.
+  type-stripping); `dev` only adds `--watch` on top.
 - Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
   because Node's native TS mode resolves modules exactly as written — it does
   no extension rewriting itself. `tsconfig.json` sets
   `rewriteRelativeImportExtensions: true`, so `npm run build` rewrites those
   same imports to `.js` when compiling to `dist/`, and the same source runs
   unmodified in both modes.
+- `tsconfig.json` sets `erasableSyntaxOnly` and `verbatimModuleSyntax`, as
+  `shared/tsconfig.json` does: Node strips types rather than compiling them,
+  so no enum, namespace or parameter property may appear, and a type-only
+  import must say `type`. An ambient `const enum` from a dependency is
+  refused as well — which is why `password.ts` names no argon2 `algorithm`
+  and relies on `@node-rs/argon2`'s argon2id default, pinned by
+  `password.spec.ts` through the hash's PHC prefix
+  (`$argon2id$v=19$m=19456,t=2,p=1$` outside tests).
+- `target` and `lib` are `ES2024`, which Node 24 runs in full. The client and
+  `shared` stay on ES2020.
 
 ## Express 5 notes
 
@@ -1028,6 +1195,12 @@ snippets — still get wrong. Verified against the 5.x router and request source
 - No synchronous filesystem calls in request handlers; no `console.log` for logging
   in production code — use a logger. ESLint flags `console` (`no-console`) and
   `any` (`@typescript-eslint/no-explicit-any`).
+- **Index reads are checked**: `noUncheckedIndexedAccess` (root
+  `tsconfig.base.json`) types `items[i]` as `T | undefined`. Application
+  code — `seed.ts` included — handles the miss with an early return, a throw
+  that names what was missing (`itemAt` in `seed.ts`), or `?.`/`??` where
+  absence is legitimate. Only test files (`*.spec.ts`, `*.testkit.ts`) may
+  assert it away with `!`.
 
 ## Sequelize & MySQL conventions
 

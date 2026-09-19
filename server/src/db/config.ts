@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  RESET_DELIVERY_KINDS,
+  type ResetDeliveryKind,
+} from '../delivery/resetDelivery.ts';
 
 const port = z.coerce.number().int().min(1).max(65535);
 
@@ -19,6 +23,15 @@ const envSchema = z.object({
   // not surface until a reset link was built from it, in an email nobody can
   // fix. The default is the webpack dev server the client runs on.
   APP_BASE_URL: z.url().default('http://localhost:3000'),
+  // How many reverse-proxy hops in front of the API may name the client in
+  // X-Forwarded-For — Express's 'trust proxy'. 0 trusts none, so req.ip is
+  // the socket's peer. Only a whole, non-negative count is accepted: a hop
+  // count is the form that cannot silently trust every address.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  // Where a password-reset link goes. No default in the schema: development
+  // and test fall back to `log` in parseConfig, and production must choose,
+  // because `log` writes live reset links into the server log.
+  RESET_DELIVERY: z.enum(RESET_DELIVERY_KINDS).optional(),
 });
 
 export interface DbConfig {
@@ -33,6 +46,8 @@ export interface AppConfig {
   env: 'development' | 'test' | 'production';
   port: number;
   appBaseUrl: string;
+  trustProxy: number;
+  resetDelivery: ResetDeliveryKind;
   db: DbConfig;
 }
 
@@ -47,10 +62,20 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
   }
 
   const env = result.data;
+  const resetDelivery =
+    env.RESET_DELIVERY ?? (env.NODE_ENV === 'production' ? undefined : 'log');
+  if (resetDelivery === undefined) {
+    throw new Error(
+      'Invalid environment configuration — RESET_DELIVERY: production must set RESET_DELIVERY explicitly; `log` writes password-reset links to the server log'
+    );
+  }
+
   return {
     env: env.NODE_ENV,
     port: env.PORT,
     appBaseUrl: env.APP_BASE_URL,
+    trustProxy: env.TRUST_PROXY,
+    resetDelivery,
     db: {
       host: env.DB_HOST,
       port: env.DB_PORT,

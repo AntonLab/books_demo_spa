@@ -9,11 +9,11 @@ npm workspaces.
 
 ## Stack
 
-| Layer    | Technology                                                                 |
-| -------- | -------------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5     |
-| Backend  | Node.js >= 22.18, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
-| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)      |
+| Layer    | Technology                                                              |
+| -------- | ----------------------------------------------------------------------- |
+| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5  |
+| Backend  | Node.js >= 24, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
+| Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)   |
 
 ## Layout
 
@@ -27,9 +27,8 @@ One root `package.json` declares both as npm workspaces, so a single
 
 ## Prerequisites
 
-- Node.js >= 22.18 (the server runs TypeScript directly via Node's native
-  type-stripping, which runs unflagged only from 22.18); `.nvmrc` names the
-  version CI uses
+- Node.js >= 24 — the LTS line `.nvmrc` names and CI runs; the server runs
+  TypeScript directly through Node's native type stripping
 - A running MySQL server
 
 ## Getting started
@@ -57,14 +56,16 @@ clean MySQL install needs no manual migration step.
 with zod at start-up, so a malformed value fails loudly instead of booting a
 broken server.
 
-| Variable                  | Default                 | Notes                                                                                   |
-| ------------------------- | ----------------------- | --------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`           | `development` \| `test` \| `production`                                                 |
-| `PORT`                    | `4000`                  | The API's port                                                                          |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`    |                                                                                         |
-| `DB_NAME`                 | `books_demo_spa`        |                                                                                         |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                | Required — no default, on purpose. An empty password is accepted, a missing one is not. |
-| `APP_BASE_URL`            | `http://localhost:3000` | Client origin used to build password-reset links                                        |
+| Variable                  | Default                    | Notes                                                                                                 |
+| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`              | `development` \| `test` \| `production`                                                               |
+| `PORT`                    | `4000`                     | The API's port                                                                                        |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`       |                                                                                                       |
+| `DB_NAME`                 | `books_demo_spa`           |                                                                                                       |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.               |
+| `APP_BASE_URL`            | `http://localhost:3000`    | Client origin used to build password-reset links                                                      |
+| `TRUST_PROXY`             | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none               |
+| `RESET_DELIVERY`          | `log` (none in production) | Where password-reset links go; `log` writes them to the server log. Production must set it explicitly |
 
 ## API
 
@@ -90,8 +91,11 @@ on books, series, chapters, comments and likes — only a row's owner, or an
 `server/CLAUDE.md` for the full matrix, account blocking, and the tombstone
 rules on deleted comments.
 
-Password-reset links are not emailed: the only delivery implemented writes the
-link to the server log, so copy it from there when exercising the flow.
+Password-reset links are not emailed: the only delivery implemented
+(`RESET_DELIVERY=log`) writes the link to the server log, so copy it from
+there when exercising the flow. Production refuses to start unless
+`RESET_DELIVERY` is set explicitly, so link-logging is never shipped by
+accident.
 
 ## Scripts
 
@@ -114,8 +118,8 @@ root deliberately defines no single-package aliases, so `-w` is the one way to
 narrow any script. Prettier is root-only because its config is repo-wide — the
 packages define no `format` script.
 
-The API alone, without nodemon, is `npm run start -w server`. `client` also has
-`npm run test:watch`.
+The API alone, without the file watcher, is `npm run start -w server`. `client`
+also has `npm run test:watch`.
 
 The server's test suite talks to a real MySQL database, so `.env.local` must be
 configured before `npm test` there.

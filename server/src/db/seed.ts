@@ -90,6 +90,18 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+// The plan indexes arrays it has just built, so a miss is a bug in the plan,
+// not a state to tolerate. Under noUncheckedIndexedAccess every such read is
+// `T | undefined`; this turns a miss into an error naming what was missing,
+// instead of an undefined field that fails later, inside the transaction.
+function itemAt<T>(items: readonly T[], index: number, what: string): T {
+  const item = items[index];
+  if (item === undefined) {
+    throw new Error(`Seed plan has no ${what} at index ${index}`);
+  }
+  return item;
+}
+
 interface Rng {
   float(min: number, max: number): number;
   // Inclusive at both ends: the ranges in the brief are written that way
@@ -110,7 +122,10 @@ function createRng(seed: number): Rng {
     const copy = [...items];
     for (let i = copy.length - 1; i > 0; i -= 1) {
       const j = Math.floor(next() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
+      const atI = itemAt(copy, i, 'item to shuffle');
+      const atJ = itemAt(copy, j, 'item to shuffle');
+      copy[i] = atJ;
+      copy[j] = atI;
     }
     return copy;
   };
@@ -118,7 +133,8 @@ function createRng(seed: number): Rng {
   return {
     float: (min, max) => min + next() * (max - min),
     int: (min, max) => min + Math.floor(next() * (max - min + 1)),
-    pick: (items) => items[Math.floor(next() * items.length)],
+    pick: (items) =>
+      itemAt(items, Math.floor(next() * items.length), 'item to pick'),
     sample: (items, count) => shuffle(items).slice(0, count),
     shuffle,
     chance: (probability) => next() < probability,
@@ -716,13 +732,13 @@ function layOutTimeline(rng: Rng, chapterCounts: readonly number[]): Date[][] {
 
   return chapterCounts.map((count, bookIndex) => {
     if (bookIndex > 0) {
-      cursor += weights[step] * msPerWeight;
+      cursor += itemAt(weights, step, 'timeline weight') * msPerWeight;
       step += 1;
     }
 
     const dates = [new Date(cursor)];
     for (let i = 1; i < count; i += 1) {
-      cursor += weights[step] * msPerWeight;
+      cursor += itemAt(weights, step, 'timeline weight') * msPerWeight;
       step += 1;
       dates.push(new Date(cursor));
     }
@@ -800,30 +816,36 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   };
 
   const books: PlannedBook[] = slots.map((seriesIndex, index) => {
-    const dates = timeline[index];
+    const dates = itemAt(timeline, index, 'chapter timeline');
     const chapters = chapterTitles(rng, genre, dates.length).map(
-      (title, chapterIndex) => ({
-        title,
-        text: chapterText(rng, genre),
-        createdAt: dates[chapterIndex],
-        publishedAt: publicationOf(
-          index,
-          chapterIndex,
-          dates.length,
-          dates[chapterIndex]
-        ),
-      })
+      (title, chapterIndex) => {
+        const writtenAt = itemAt(dates, chapterIndex, 'chapter date');
+        return {
+          title,
+          text: chapterText(rng, genre),
+          createdAt: writtenAt,
+          publishedAt: publicationOf(
+            index,
+            chapterIndex,
+            dates.length,
+            writtenAt
+          ),
+        };
+      }
     );
 
     return {
-      title: titles[index],
+      title: itemAt(titles, index, 'book title'),
       description: description(rng, genre, rng.int(3, 4)),
       tags: rng.sample(genre.tags, rng.int(3, 5)),
       coAuthorLogins: [spec.login],
       seriesIndex,
       status: statusOf(index),
       // The record exists a few days before chapter one does.
-      createdAt: new Date(dates[0].getTime() - rng.int(1, 5) * DAY_MS),
+      createdAt: new Date(
+        itemAt(dates, 0, 'first chapter date').getTime() -
+          rng.int(1, 5) * DAY_MS
+      ),
       chapters,
     };
   });
@@ -833,9 +855,10 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
     { length: seriesCount },
     (_, index) => {
       const first =
-        books.find((book) => book.seriesIndex === index) ?? books[0];
+        books.find((book) => book.seriesIndex === index) ??
+        itemAt(books, 0, 'book');
       return {
-        title: genre.seriesTitles[index],
+        title: itemAt(genre.seriesTitles, index, 'series title'),
         description: description(rng, genre, rng.int(3, 4)),
         tags: rng.sample(genre.tags, rng.int(3, 5)),
         coAuthorLogins: [spec.login],
@@ -861,7 +884,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
 // the books in it keep independent Co-author lists.
 function shareSeries(authors: readonly PlannedAuthor[]): PlannedAuthor[] {
   const last = authors.length - 1;
-  const partner = authors[0].spec.login;
+  const partner = itemAt(authors, 0, 'author').spec.login;
 
   return authors.map((author, index) =>
     index !== last
@@ -884,7 +907,8 @@ function shareBooks(authors: readonly PlannedAuthor[]): PlannedAuthor[] {
   return authors.map((author, index) => {
     if (index >= SHARED_BOOK_COUNT) return author;
 
-    const partner = authors[(index + 1) % authors.length].spec.login;
+    const partner = itemAt(authors, (index + 1) % authors.length, 'author').spec
+      .login;
     const shared = author.books
       .filter((book) => book.seriesIndex === null)
       .at(-1);
@@ -909,13 +933,18 @@ function planThreads(
   const now = Date.now();
   const accountIndexes = accounts.map((_, i) => i);
   const registeredBy = (time: number): number[] =>
-    accountIndexes.filter((i) => accounts[i].createdAt.getTime() <= time);
+    accountIndexes.filter(
+      (i) => itemAt(accounts, i, 'account').createdAt.getTime() <= time
+    );
   // Nobody reacts before their account exists: a reader who registered last
   // month likes a two-year-old book last month, not two years ago.
   const reactionTime = (accountIndex: number, earliest: number): Date =>
     new Date(
       rng.float(
-        Math.max(earliest, accounts[accountIndex].createdAt.getTime()),
+        Math.max(
+          earliest,
+          itemAt(accounts, accountIndex, 'account').createdAt.getTime()
+        ),
         now
       )
     );
@@ -926,8 +955,11 @@ function planThreads(
 
     // Readers arrive once there is something to read; the third chapter is a
     // reasonable stand-in for "this book has started".
-    const from =
-      book.chapters[Math.min(2, book.chapters.length - 1)].createdAt.getTime();
+    const from = itemAt(
+      book.chapters,
+      Math.min(2, book.chapters.length - 1),
+      'chapter'
+    ).createdAt.getTime();
     const to = now - 6 * 60 * 60 * 1000;
 
     // Sorted, so a reply is only ever chosen from comments that already exist —
@@ -964,8 +996,12 @@ function planThreads(
         // 15 comments a book can hold.
         text:
           parent === null
-            ? topLevel[nextTopLevel++ % topLevel.length]
-            : replies[nextReply++ % replies.length],
+            ? itemAt(
+                topLevel,
+                nextTopLevel++ % topLevel.length,
+                'top-level comment'
+              )
+            : itemAt(replies, nextReply++ % replies.length, 'reply'),
         createdAt: new Date(time),
         depth: parent === null ? 0 : parent.depth + 1,
         parent,
@@ -980,7 +1016,10 @@ function planThreads(
     // a duplicate. No Co-author may like their own book, and the API would
     // refuse it, so the seed does not write one either.
     const likers = accountIndexes.filter(
-      (index) => !book.coAuthorLogins.includes(accounts[index].spec.login)
+      (index) =>
+        !book.coAuthorLogins.includes(
+          itemAt(accounts, index, 'account').spec.login
+        )
     );
     for (const accountIndex of rng.sample(likers, rng.int(3, 7))) {
       likes.push({
@@ -1146,7 +1185,7 @@ async function writeContent(
   const idByLogin = new Map(
     plan.accounts.map((account, index) => [
       account.spec.login,
-      accountIds[index],
+      itemAt(accountIds, index, 'account id'),
     ])
   );
 
@@ -1204,7 +1243,9 @@ async function writeContent(
       const fields = createBookSchema.parse({
         ...book,
         seriesId:
-          book.seriesIndex === null ? null : seriesIds[book.seriesIndex],
+          book.seriesIndex === null
+            ? null
+            : itemAt(seriesIds, book.seriesIndex, 'series id'),
       });
       const row = await Book.create(
         {
@@ -1301,7 +1342,7 @@ async function writeNotifications(
       (account) => account.spec.login === login
     );
     if (index === -1) throw new Error(`No account was planned for ${login}`);
-    return accountIds[index];
+    return itemAt(accountIds, index, 'account id');
   };
   const nameOf = (author: PlannedAuthor): string =>
     `${author.spec.firstName} ${author.spec.lastName}`;
@@ -1351,7 +1392,11 @@ async function writeNotifications(
       }
     }
 
-    const leaver = plan.authors[(index + 1) % plan.authors.length];
+    const leaver = itemAt(
+      plan.authors,
+      (index + 1) % plan.authors.length,
+      'author'
+    );
     const left = author.books.find(
       (book) => book.coAuthorLogins.length === 1 && book.status !== 'draft'
     );
@@ -1412,7 +1457,7 @@ async function writeThreads(
       });
       return {
         ...parsed,
-        userId: accountIds[comment.accountIndex],
+        userId: itemAt(accountIds, comment.accountIndex, 'account id'),
         tombstone: plan.tombstones.get(comment) ?? null,
         createdAt: comment.createdAt,
         updatedAt: comment.createdAt,
@@ -1428,7 +1473,7 @@ async function writeThreads(
           'bulkCreate returned no comment id; replies cannot be linked'
         );
       }
-      commentIds.set(level[index], row.id);
+      commentIds.set(itemAt(level, index, 'comment'), row.id);
     });
   }
 
@@ -1440,7 +1485,7 @@ async function writeThreads(
     });
     return {
       ...parsed,
-      userId: accountIds[like.accountIndex],
+      userId: itemAt(accountIds, like.accountIndex, 'account id'),
       createdAt: like.createdAt,
     };
   });

@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { ChapterList } from './ChapterList';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { formatDate } from '@/format/date';
 import type { ChapterSummary } from '@/types/chapter';
 
 const chapter: ChapterSummary = {
@@ -56,14 +57,10 @@ describe('ChapterList dates and states', () => {
     renderWithProviders(<ChapterList {...baseProps} />);
 
     expect(
-      screen.getByText(
-        new Date('2026-09-03T00:00:00.000Z').toLocaleDateString()
-      )
+      screen.getByText(formatDate('2026-09-03T00:00:00.000Z'))
     ).toBeInTheDocument();
     expect(
-      screen.queryByText(
-        new Date('2026-09-01T00:00:00.000Z').toLocaleDateString()
-      )
+      screen.queryByText(formatDate('2026-09-01T00:00:00.000Z'))
     ).toBeNull();
   });
 

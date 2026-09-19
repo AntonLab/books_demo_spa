@@ -37,6 +37,9 @@ export interface SessionRepository {
   findValidByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   deleteByTokenHash(tokenHash: string): Promise<boolean>;
   deleteAllForUser(userId: number): Promise<number>;
+  // The expiry purge's: deletes every session whose expiresAt is at or
+  // before `now` — exactly the rows findValidByTokenHash already refuses.
+  deleteExpired(now: Date): Promise<number>;
 }
 
 function toRecord(session: Session): SessionRecord {
@@ -113,6 +116,10 @@ export function createSequelizeSessionRepository(): SessionRepository {
 
     async deleteAllForUser(userId) {
       return Session.destroy({ where: { userId } });
+    },
+
+    async deleteExpired(now) {
+      return Session.destroy({ where: { expiresAt: { [Op.lte]: now } } });
     },
   };
 }

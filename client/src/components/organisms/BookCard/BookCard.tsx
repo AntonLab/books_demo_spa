@@ -3,13 +3,8 @@ import { Card, Flex, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover';
+import { formatDate } from '@/format/date';
 import { BOOK_STATUS_LABELS, type PublicBook } from '@/types/book';
-
-// `createdAt` is an ISO string on the wire, so it is parsed here rather than
-// assumed to be a Date.
-const formatDate = (iso: string): string => {
-  return new Date(iso).toLocaleDateString();
-};
 
 interface BookCardProps {
   book: PublicBook;

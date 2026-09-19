@@ -244,9 +244,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 
   Five things worth knowing before editing it:
 
-  - **`retry` is off** and `staleTime` is 30s. Every error this API
-    surfaces is a 4xx to show at once — a 401 from `/auth/me` is the
+  - **A query retries only what may pass on its own**, and `staleTime` is
+    30s. `shouldRetryQuery` retries at most twice, with TanStack's default
+    backoff, and only a failure that is no `ApiError` (fetch rejected: the
+    network, a dropped connection) or an `ApiError` with a 5xx status.
+    Every other answer shows at once — a 401 from `/auth/me` is the
     _normal_ answer for an anonymous visitor, not a failure to retry.
+    Mutations never retry: a repeated write that did land the first time
+    would land twice. The test client (`src/test/queryClient.ts`) keeps
+    `retry: false`.
   - **The session is `PublicUser | null`**, never `undefined`: `null` means
     "asked, nobody is signed in". `useSession` maps the 401 to it inside
     the `queryFn`. TanStack rejects an `undefined` return outright, which
@@ -265,6 +271,15 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     means "delete that row". It takes the key to invalidate as an argument,
     because a book like refreshes the book and a comment like refreshes the
     thread.
+
+- `src/format/` — `date.ts`: `formatDate` ("Sep 18, 2026") and
+  `formatDateTime` ("Sep 18, 2026, 3:30 PM"), the one way the client writes
+  a date. Both take the ISO string a date arrives as and format it in the
+  fixed `en` locale — the UI is English, so the browser's locale would give
+  it a second language — and in the browser's own time zone, each through
+  one `Intl.DateTimeFormat` built at module scope. A test asserting a
+  rendered date builds its expectation with the same helper, so it holds in
+  any time zone. Flat, like `src/api/`, and outside the Atomic Design levels.
 
 - `src/components/` — grouped by Atomic Design level (see above), not by
   feature. Each component becomes its own folder (see Component folders).
@@ -454,7 +469,12 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `sortable.ts` (`layOutSortableRows` and `moveWithKeyboard`, see Testing) and
   `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
-- `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays, merged via `webpack-merge`
+- `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays. Each
+  spreads `common(isDevelopment)` into a plain object and extends it by hand:
+  its own `module.rules` and `plugins` appended after the shared ones, its
+  file-name patterns added to `output`, and the keys only it sets (`mode`,
+  `devtool`, and `devServer` or `optimization`). There is no merge helper:
+  those three are the only keys both files set
 - `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
   `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
   `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,
@@ -462,10 +482,10 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   for `shared`, not for this package: `shared` is type-checked as part of this
   program, and its relative imports end in `.ts` because Node loads it too.
   This package's own imports stay extensionless
-- `eslint.config.mjs` — calls `createConfig` from the repo-root
-  `eslint.config.base.mjs`, which supplies the recommended sets, the repo-wide
-  rules and the Prettier tail. This file adds only the
-  React + hooks + jsx-a11y block (including
+- `eslint.config.mjs` — calls `createConfig` (passing its own directory as
+  `tsconfigRootDir`) from the repo-root `eslint.config.base.mjs`, which
+  supplies the recommended sets, the repo-wide rules and the Prettier tail.
+  This file adds only the React + hooks + jsx-a11y block (including
   `react/function-component-definition` set to `arrow-function`) and the
   webpack-config override
 
@@ -512,6 +532,21 @@ off `@typescript-eslint/no-require-imports`.
 - `tsconfig` is `noEmit` — webpack produces the build; `tsc` only checks types.
 - `no-console` is a warning here, inherited from `eslint.config.base.mjs`. Client
   code has none today; use a proper logger rather than silencing it.
+- **Three typed lint rules** run over every `.ts`/`.tsx` file with type
+  information from this package's `tsconfig.json` (`projectService`, rooted
+  at `import.meta.dirname` in `eslint.config.mjs`): `no-floating-promises`,
+  `no-misused-promises` and `await-thenable`, all errors. The only hits were
+  the four auth modals handing an async `onFinish` straight to antd's
+  `Form`; they now read `onFinish={(values) => void handleFinish(values)}` —
+  `void` because `handleFinish` reports its own failure in the form. Mark a
+  deliberate fire-and-forget the same way, with the reason beside it; never
+  with an `eslint-disable`. The webpack configs, `jest.config.mjs` and
+  `eslint.config.mjs` are JavaScript and are linted without types.
+- `noUncheckedIndexedAccess` is on (root `tsconfig.base.json`), so
+  `items[0]` is `T | undefined`. Component code handles the miss — `?.`/`??`
+  where absence is legitimate, an early return otherwise; tests
+  (`*.test.ts(x)` and `src/test/`) may write `items[0]!`, since a miss fails
+  the test anyway.
 
 ## Testing
 

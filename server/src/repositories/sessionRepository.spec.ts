@@ -333,4 +333,31 @@ describe('sessionRepository against real MySQL', { skip }, () => {
     await change;
     assert.equal(await sessionCount(userId), 0);
   });
+
+  test('deleteExpired removes the sessions expired at or before the moment given and keeps the rest', async () => {
+    const userId = await makeUser('PurgeOwner');
+    // A moment long past, so no other test's rows are old enough to count.
+    const moment = new Date('2000-01-01T00:00:00.000Z').getTime();
+    // expiresAt is a DATETIME: whole seconds.
+    const second = 1000;
+    await repository.create(
+      userId,
+      hashToken('purge-before'),
+      new Date(moment - second)
+    );
+    await repository.create(userId, hashToken('purge-at'), new Date(moment));
+    await repository.create(
+      userId,
+      hashToken('purge-after'),
+      new Date(moment + second)
+    );
+
+    assert.equal(await repository.deleteExpired(new Date(moment)), 2);
+
+    const left = (token: string) =>
+      Session.count({ where: { tokenHash: hashToken(token) } });
+    assert.equal(await left('purge-before'), 0);
+    assert.equal(await left('purge-at'), 0);
+    assert.equal(await left('purge-after'), 1);
+  });
 });

@@ -1,4 +1,4 @@
-import { Algorithm, hash, verify } from '@node-rs/argon2';
+import { hash, verify } from '@node-rs/argon2';
 
 export interface PasswordParams {
   memoryCost: number;
@@ -29,10 +29,11 @@ export async function hashPassword(
   plaintext: string,
   env: string = process.env.NODE_ENV ?? 'development'
 ): Promise<string> {
-  return hash(plaintext, {
-    algorithm: Algorithm.Argon2id,
-    ...passwordParams(env),
-  });
+  // No `algorithm` option. Argon2id is @node-rs/argon2's default, and naming
+  // it would take the package's `Algorithm`, an ambient const enum, which
+  // `verbatimModuleSyntax` refuses to import. password.spec.ts pins the
+  // variant and the cost through the hash's PHC prefix.
+  return hash(plaintext, passwordParams(env));
 }
 
 export async function verifyPassword(

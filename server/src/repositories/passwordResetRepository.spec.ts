@@ -7,11 +7,14 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import { initModels, User } from '../models/index.ts';
+import { initModels, PasswordResetToken, User } from '../models/index.ts';
 import { hashToken } from '../tokens.ts';
 import { verifyPassword } from '../password.ts';
 import { createSequelizeSessionRepository } from './sessionRepository.ts';
-import { createSequelizePasswordResetRepository } from './passwordResetRepository.ts';
+import {
+  createSequelizePasswordResetRepository,
+  RESET_TOKEN_RETENTION_MS,
+} from './passwordResetRepository.ts';
 
 // A schema of its own rather than the sessions or users suite's: node:test
 // runs spec files in parallel processes, and two suites calling
@@ -171,5 +174,42 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
       await repository.redeem(hashToken('r6'), 'newpassword123'),
       false
     );
+  });
+
+  test('deleteExpiredBefore removes tokens expired past the retention, used or not, and keeps younger ones', async () => {
+    const userId = await makeUser('PurgeResetOwner');
+    // A moment long past, so no other test's rows are old enough to count.
+    const moment = new Date('2000-03-01T00:00:00.000Z').getTime();
+    const day = 24 * hour;
+    await repository.create(
+      userId,
+      hashToken('p-31-used'),
+      new Date(moment - 31 * day)
+    );
+    // Stamps usedAt on p-31-used: a used row is purged all the same.
+    await repository.invalidateAllForUser(userId);
+    await repository.create(
+      userId,
+      hashToken('p-31'),
+      new Date(moment - 31 * day)
+    );
+    await repository.create(
+      userId,
+      hashToken('p-29'),
+      new Date(moment - 29 * day)
+    );
+
+    assert.equal(
+      await repository.deleteExpiredBefore(
+        new Date(moment - RESET_TOKEN_RETENTION_MS)
+      ),
+      2
+    );
+
+    const left = (token: string) =>
+      PasswordResetToken.count({ where: { tokenHash: hashToken(token) } });
+    assert.equal(await left('p-31-used'), 0);
+    assert.equal(await left('p-31'), 0);
+    assert.equal(await left('p-29'), 1);
   });
 });

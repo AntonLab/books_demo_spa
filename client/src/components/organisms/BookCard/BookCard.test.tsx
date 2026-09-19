@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { BookCard } from './BookCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { formatDate } from '@/format/date';
 import type { PublicBook } from '@/types/book';
 
 const book: PublicBook = {
@@ -76,8 +77,8 @@ describe('BookCard', () => {
         book={{
           ...book,
           authors: [
-            { ...book.authors[0], avatarUrl: '/api/users/3/avatar?v=1' },
-            book.authors[1],
+            { ...book.authors[0]!, avatarUrl: '/api/users/3/avatar?v=1' },
+            book.authors[1]!,
           ],
         }}
       />
@@ -120,14 +121,10 @@ describe('BookCard', () => {
     expect(screen.queryByText('epic')).not.toBeInTheDocument();
   });
 
-  it('formats createdAt as a local date, not the raw ISO string', () => {
+  it('formats createdAt with the app date helper, not the raw ISO string', () => {
     renderWithProviders(<BookCard book={book} />);
 
-    // The exact string is locale-dependent, so assert on what must be true:
-    // the ISO timestamp is gone, and a rendered date took its place.
     expect(screen.queryByText(book.createdAt)).not.toBeInTheDocument();
-    expect(
-      screen.getByText(new Date(book.createdAt).toLocaleDateString())
-    ).toBeInTheDocument();
+    expect(screen.getByText(formatDate(book.createdAt))).toBeInTheDocument();
   });
 });
