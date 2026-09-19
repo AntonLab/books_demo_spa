@@ -22,7 +22,7 @@
     "sequelize": "6.37.8",
     "shared": "*",
     "sharp": "0.35.4",
-    "zod": "4.6.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/cookie-parser": "1.4.10",
