@@ -151,12 +151,12 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('links the series', async () => {
+  it('links the series to its books', async () => {
     renderPage();
 
     expect(
       await screen.findByRole('link', { name: 'The Scale Cycle' })
-    ).toBeInTheDocument();
+    ).toHaveAttribute('href', '/search?series=2');
   });
 
   it('omits the series link on a standalone book', async () => {
