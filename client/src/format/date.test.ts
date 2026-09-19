@@ -7,6 +7,10 @@ describe('formatDate', () => {
   it('writes a medium English date', () => {
     expect(formatDate('2026-09-18T12:00:00')).toBe('Sep 18, 2026');
   });
+
+  it('writes nothing for a date that does not parse', () => {
+    expect(formatDate('not a date')).toBe('');
+  });
 });
 
 describe('formatDateTime', () => {
@@ -15,5 +19,9 @@ describe('formatDateTime', () => {
     expect(formatDateTime('2026-09-18T15:30:00')).toMatch(
       /^Sep 18, 2026, 3:30\sPM$/
     );
+  });
+
+  it('writes nothing for a date that does not parse', () => {
+    expect(formatDateTime('not a date')).toBe('');
   });
 });
