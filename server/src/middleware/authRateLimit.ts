@@ -114,18 +114,19 @@ export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
   };
 }
 
-// Login: only a failure counts, but both budgets are counted the moment the
+// Login: only a failure counts — a 401, or an abort (the connection closing
+// before any answer goes out) — but both budgets are counted the moment the
 // request arrives, before validate, the lookup or argon2 run — never on a
 // later check-then-record path. A request is counted, provisionally, against
-// both the instant it is seen; the reservation is given back unless the
-// answer turns out to be a 401. Counting up front is what closes the race a
-// peek-then-record design leaves open: with the count written only when the
-// response finishes, every request still waiting on argon2 reads the same
-// unspent budget, so C requests fired at once cost only about one slot
-// between them instead of C. Hitting first means each arrival claims its own
-// slot as it is seen — Node runs one request's synchronous middleware to
-// completion before starting the next's, so there is no window for two
-// arrivals to read the same count.
+// both the instant it is seen; the reservation is given back only when an
+// answer other than a 401 goes out. Counting up front is what closes the
+// race a peek-then-record design leaves open: with the count written only
+// when the response finishes, every request still waiting on argon2 reads
+// the same unspent budget, so C requests fired at once cost only about one
+// slot between them instead of C. Hitting first means each arrival claims
+// its own slot as it is seen — Node runs one request's synchronous
+// middleware to completion before starting the next's, so there is no window
+// for two arrivals to read the same count.
 export function limitFailedLogins(
   limits: Pick<AuthRateLimits, 'loginByIpAndLogin' | 'loginByIp'>
 ): RequestHandler {
@@ -153,9 +154,9 @@ export function limitFailedLogins(
       return;
     }
 
-    // Settled exactly once: on finish, or — if the connection closes first,
-    // an abort that never fires 'finish' — on close instead, so a request
-    // that never got an answer never leaves its claim spent either.
+    // Settled exactly once, by whichever of 'finish' and 'close' comes
+    // first. 'close' follows every 'finish'; one that comes first is an
+    // abort, which never fires 'finish'.
     let settled = false;
     res.on('finish', () => {
       if (settled) return;
@@ -164,8 +165,8 @@ export function limitFailedLogins(
         // A genuine failure: both claims stay spent.
         return;
       }
-      // Anything else gives both claims back — only a 401 is an attempt
-      // worth counting.
+      // Any other answer gives both claims back: of the answers, only a 401
+      // is an attempt worth counting.
       limits.loginByIpAndLogin.release(nameKey);
       limits.loginByIp.release(address);
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -176,12 +177,12 @@ export function limitFailedLogins(
       }
     });
     res.on('close', () => {
-      if (settled) return;
+      // An abort keeps both claims spent, as a 401 does, and never earns
+      // the success reset, even should a late 'finish' follow. The handler
+      // goes on to run the lookup and argon2 after the client has gone, so
+      // giving the claims back would let a client abort and repeat for
+      // unlimited argon2 work per address without ever being refused.
       settled = true;
-      // No answer ever went out, so this proves nothing about the password:
-      // give both claims back, never the success reset above.
-      limits.loginByIpAndLogin.release(nameKey);
-      limits.loginByIp.release(address);
     });
     next();
   };
