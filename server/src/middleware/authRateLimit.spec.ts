@@ -372,7 +372,7 @@ test('parallel attempts cannot bypass the budget: 20 at once gets exactly 10 thr
 
 test('a refusal leaves no count behind on either budget, including the one that did not refuse it', async () => {
   // Built directly, not through withGatedLoginApp, so the test can inspect
-  // loginByIp's own state afterward rather than inferring it indirectly
+  // both budgets' own state afterward rather than inferring it indirectly
   // through more HTTP responses.
   const limits = createAuthRateLimits();
   let handled = 0;
@@ -457,6 +457,10 @@ test('a refusal leaves no count behind on either budget, including the one that 
       allowed: true,
       retryAfterMs: 0,
     });
+    // The per-name budget, which refused none of them, keeps nothing either:
+    // each of the 5 refused names gave its claim back with the refusal, and
+    // each of the 50 held names with its 400, so not one window is left.
+    assert.equal(limits.loginByIpAndLogin.size(), 0);
   } finally {
     limits.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
