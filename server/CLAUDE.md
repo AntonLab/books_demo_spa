@@ -322,9 +322,9 @@ Each layer answers a question the others cannot:
   and an `unref()`ed sweep. `release` gives back one `hit` that turned out
   not to count, deleting the key once its count reaches 0 rather than
   leaving an empty window behind — see **Sign-in rate limiting** under
-  Operations. `size` returns how many keys hold an open window, the number
-  the sweep keeps bounded; only the specs read it, to check that nothing is
-  left behind.
+  Operations. `size` returns how many keys the map still holds, an ended
+  window included until a touch or the sweep drops it — the number the sweep
+  keeps bounded; only the specs read it, to check that nothing is left behind.
 - `src/password.ts` — argon2id password hashing and verification; argon2id
   is the library default, not named (see Runtime notes)
 - `src/tokens.ts` — `createToken()` (32 random bytes, base64url),
@@ -1035,17 +1035,17 @@ test kit's `withApp`, would add it back.
 it (`stoppables`), closes the HTTP server and its idle connections, waits
 for the server to finish, then awaits `sequelize.close()`. It leaves
 `process.exitCode` alone, so a clean shutdown ends with 0 once nothing holds
-the event loop. The other signal, arriving mid-shutdown, joins the one
-already under way rather than starting another. The same signal a second
-time does not: `process.once` removed its listener before the first ran, so
-Node's default action is back and the process ends at once — a second
-Ctrl+C is a hard kill, and a second `SIGTERM` skips whatever is left of the
-shutdown, the pool close included. A 10-second deadline
-(`SHUTDOWN_TIMEOUT_MS`, on an `unref()`ed timer) forces the rest: it drops
-every open connection, logs, and exits 1; so does a pool that fails to
-close. `node --watch` (`npm run dev`) restarts with `SIGTERM`, so every dev
-restart takes this path. `shutdown.spec.ts` drives it with fakes for the
-server, the pool and the timer rather than real signals.
+the event loop. The other signal, arriving mid-shutdown, joins the one already
+under way rather than starting another. The same signal a second time does
+not: `process.once` removed its listener before the first ran, so Node's
+default action is back and the process ends at once — a second Ctrl+C is a
+hard kill, and a second `SIGTERM` skips whatever is left of the shutdown, the
+pool close included. A 10-second deadline (`SHUTDOWN_TIMEOUT_MS`, on an
+`unref()`ed timer) forces the rest: it drops every open connection, logs, and
+exits 1; so does a pool that fails to close. `node --watch` (`npm run dev`)
+restarts with `SIGTERM`, so every dev restart takes this path.
+`shutdown.spec.ts` drives it with fakes for the server, the pool and the timer
+rather than real signals.
 
 ### A port that cannot be bound
 
