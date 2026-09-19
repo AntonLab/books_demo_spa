@@ -81,8 +81,10 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
     }
   };
 
-  // One shutdown per process: a second signal, or the other one, joins the
-  // shutdown already under way instead of starting another.
+  // One shutdown per process: the other signal joins the shutdown already
+  // under way instead of starting another. A repeat of the same signal never
+  // gets here — process.once has removed that listener, so Node's default
+  // action takes it and ends the process at once.
   return (reason) => {
     running ??= run(reason);
     return running;
