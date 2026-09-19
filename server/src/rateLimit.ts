@@ -24,7 +24,8 @@ export interface RateLimiter {
   release(key: string): void;
   // Forgets the key's window.
   reset(key: string): void;
-  // How many keys hold an open window — what the sweep keeps bounded.
+  // How many keys the map still holds, an ended window included until a
+  // touch or the sweep drops it — what the sweep keeps bounded.
   size(): number;
   // Clears the sweep's interval.
   stop(): void;
