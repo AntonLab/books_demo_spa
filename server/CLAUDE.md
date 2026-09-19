@@ -392,9 +392,11 @@ Each layer answers a question the others cannot:
   the same reason: only the seed and its specs use it.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
-  `requirePermission.ts`, `optionalAuth.ts` (unmounted —
-  see **Auth**), `sessionUser.ts` (the shared `resolveSessionUser` the other
-  three build on), `securityHeaders.ts` (`noSniff`, see **Security headers** under Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**), `errorHandler.ts`, `notFound.ts`, `validate.ts`)
+  `requirePermission.ts`, `optionalAuth.ts` (unmounted — see **Auth**),
+  `sessionUser.ts` (the shared `resolveSessionUser` the other three build
+  on), `securityHeaders.ts` (`noSniff`, see **Security headers** under
+  Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**),
+  `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
@@ -607,9 +609,8 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   address's hourly limit it is refused with 429 before anything is looked
   up — see **Sign-in rate limiting** under Operations — which says nothing
   about any account either.) A new request invalidates any outstanding token
-  first, so two live links never
-  coexist. Tokens last one hour, far less than a session's seven days, because
-  a link sits in a mailbox.
+  first, so two live links never coexist. Tokens last one hour, far less than
+  a session's seven days, because a link sits in a mailbox.
 - **Reset confirmation revokes every session** for that user, in the same
   transaction that stores the new password and stamps the token used — a
   partial apply would leave a redeemed token beside a live pre-reset session,
@@ -1031,8 +1032,12 @@ test kit's `withApp`, would add it back.
 it (`stoppables`), closes the HTTP server and its idle connections, waits
 for the server to finish, then awaits `sequelize.close()`. It leaves
 `process.exitCode` alone, so a clean shutdown ends with 0 once nothing holds
-the event loop. A second signal, or the other one, joins the shutdown
-already under way rather than starting another. A 10-second deadline
+the event loop. The other signal, arriving mid-shutdown, joins the one
+already under way rather than starting another. The same signal a second
+time does not: `process.once` removed its listener before the first ran, so
+Node's default action is back and the process ends at once — a second
+Ctrl+C is a hard kill, and a second `SIGTERM` skips whatever is left of the
+shutdown, the pool close included. A 10-second deadline
 (`SHUTDOWN_TIMEOUT_MS`, on an `unref()`ed timer) forces the rest: it drops
 every open connection, logs, and exits 1; so does a pool that fails to
 close. `node --watch` (`npm run dev`) restarts with `SIGTERM`, so every dev
@@ -1132,8 +1137,8 @@ of `validate` so a refused request costs no parsing, no lookup and no argon2:
 
 - ESM package (`"type": "module"`), Node >= 24 — the repo's `engines` floor.
   Every 24.x strips types without `--experimental-strip-types`, so nothing
-  here needs a flag. `tsconfig.json` uses `module`/`moduleResolution:
-NodeNext` to match, and emits ESM to `dist/`.
+  here needs a flag. `tsconfig.json` uses
+  `module`/`moduleResolution: NodeNext` to match, and emits ESM to `dist/`.
 - Both `start` and `dev` run the `.ts` entry directly via Node (native TS
   type-stripping); `dev` only adds `--watch` on top.
 - Every relative import must carry the `.ts` extension (e.g. `from './app.ts'`),
