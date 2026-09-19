@@ -77,7 +77,7 @@ const SeriesResults: FC<{ seriesId: number }> = ({ seriesId }) => {
     return series.error instanceof ApiError && series.error.status === 404 ? (
       <Empty description={SERIES_GONE} />
     ) : (
-      <Alert type="error" message="Could not load this series." />
+      <Alert type="error" title="Could not load this series." />
     );
   }
   if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
