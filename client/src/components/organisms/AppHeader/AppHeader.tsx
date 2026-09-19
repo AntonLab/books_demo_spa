@@ -20,7 +20,6 @@ export const AppHeader: FC = () => {
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
-    { key: '/series', label: 'Series' },
     // Only for an account holding the author Role: that is who can be credited
     // on a book, so nobody else has anything to find there.
     ...(user?.role === 'author'
@@ -87,15 +86,29 @@ export const AppHeader: FC = () => {
           </Dropdown>
         </Space>
       ) : (
-        <Space>
-          <Button onClick={() => dispatch(openModal('login'))}>Log in</Button>
-          <Button
-            type="primary"
-            onClick={() => dispatch(openModal('register'))}
-          >
-            Register
-          </Button>
-        </Space>
+        // A menu of its own rather than an item in the one on the left: it
+        // keeps Log in in the corner the account menu takes once signed in.
+        // Not selectable, because it opens a modal instead of naming a route.
+        // Registering is offered inside the login modal.
+        //
+        // Two things only a real browser shows, since jsdom lays nothing out
+        // and fires no default actions:
+        // - `disabledOverflow`: a horizontal menu sized by its content has no
+        //   width to measure, so without it the one item collapses into "…".
+        // - `preventDefault`: the menu opens the modal on Enter's keydown,
+        //   the modal moves focus to its close button, and the same keypress
+        //   would then activate that button and shut the modal at once.
+        <Menu
+          theme="dark"
+          mode="horizontal"
+          selectable={false}
+          disabledOverflow
+          items={[{ key: 'login', label: 'Log in' }]}
+          onClick={({ domEvent }) => {
+            domEvent.preventDefault();
+            dispatch(openModal('login'));
+          }}
+        />
       )}
     </Layout.Header>
   );
