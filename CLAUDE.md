@@ -94,7 +94,7 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   listing books, a header with nav, search, auth state and a notification
   bell, four auth modals
   against `/api/auth` (login, register, forgot/reset password), a `/search`
-  page, a `/books/:id` book page (title, author, series, annotation, chapters,
+  page (a term, or one series' books — there is no series page), a `/books/:id` book page (title, author, series, annotation, chapters,
   comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
   first authoring pages — `/my-books`, `/books/new`, `/books/:id/edit`
   (fields, status, chapters in a drag-and-drop Reading order, Co-authors,

@@ -70,6 +70,14 @@ describe('listBooks', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/books?userId=3&limit=100');
   });
 
+  it('narrows the list to one series with seriesId', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ seriesId: 12, limit: 20 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?seriesId=12&limit=20');
+  });
+
   it('is a plain read: no body and no headers, the XSRF token included', async () => {
     const fetchMock = mockFetch(envelope);
 

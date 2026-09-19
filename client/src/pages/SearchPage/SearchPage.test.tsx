@@ -4,11 +4,16 @@ import { useNavigate } from 'react-router';
 import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
+import * as seriesApi from '@/api/series';
+import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
+import type { PublicSeries } from '@/types/series';
 
 jest.mock('@/api/books');
+jest.mock('@/api/series');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const book: PublicBook = {
   id: 1,
@@ -197,5 +202,104 @@ describe('SearchPage', () => {
       q: 'elf',
       limit: 20,
     });
+  });
+});
+
+describe('SearchPage for one series', () => {
+  const series: PublicSeries = {
+    id: 12,
+    authors: book.authors,
+    title: 'The Ashgrove Chronicles',
+    description: 'Letters found in a manor that should have stayed shut.',
+    tags: ['gothic'],
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  };
+
+  it('heads the page with the series and lists its books', async () => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?series=12' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Letters found in a manor that should have stayed shut.')
+    ).toBeInTheDocument();
+    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(mockedSeries.getSeries).toHaveBeenCalledWith(12);
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      seriesId: 12,
+      limit: 20,
+    });
+  });
+
+  it('says so when none of its books is out yet', async () => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?series=12' });
+
+    expect(
+      await screen.findByText('No book in this series has been published yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('says so when the series no longer exists', async () => {
+    mockedSeries.getSeries.mockRejectedValue(
+      new ApiError(404, 'Series not found')
+    );
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?series=99' });
+
+    expect(
+      await screen.findByText('This series no longer exists.')
+    ).toBeInTheDocument();
+  });
+
+  it('reports any other failure to load the series', async () => {
+    mockedSeries.getSeries.mockRejectedValue(
+      new ApiError(500, 'Internal Server Error')
+    );
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?series=12' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load this series.'
+    );
+  });
+
+  it('asks the server nothing for an id that is not one', () => {
+    renderWithProviders(<SearchPage />, { route: '/search?series=abc' });
+
+    expect(
+      screen.getByText('This series no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedSeries.getSeries).not.toHaveBeenCalled();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 });

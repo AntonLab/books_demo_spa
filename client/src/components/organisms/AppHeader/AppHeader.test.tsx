@@ -53,19 +53,30 @@ describe('AppHeader while the session is loading', () => {
 
     renderWithProviders(<AppHeader />);
 
-    expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Log in' })).toBeNull();
     expect(screen.queryByText('bob')).toBeNull();
   });
 });
 
-describe('AppHeader when logged out', () => {
-  it('offers Log in and Register', () => {
+describe('AppHeader navigation', () => {
+  it('has no Series item, since there is no series page to go to', () => {
     renderWithProviders(<AppHeader />, withSession(null));
 
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Series' })).toBeNull();
+  });
+});
+
+describe('AppHeader when logged out', () => {
+  it('offers Log in as a menu item, and no Register', () => {
+    renderWithProviders(<AppHeader />, withSession(null));
+
     expect(
-      screen.getByRole('button', { name: 'Register' })
+      screen.getByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
+    // Registration stays one click further on, through the login modal's
+    // "Create an account".
+    expect(screen.queryByText('Register')).toBeNull();
   });
 
   it('hides My Books', () => {
@@ -84,17 +95,9 @@ describe('AppHeader when logged out', () => {
   it('opens the login modal in the store when Log in is clicked', async () => {
     const { store } = renderWithProviders(<AppHeader />, withSession(null));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
 
     expect(store.getState().auth.activeModal).toBe('login');
-  });
-
-  it('opens the register modal when Register is clicked', async () => {
-    const { store } = renderWithProviders(<AppHeader />, withSession(null));
-
-    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
-
-    expect(store.getState().auth.activeModal).toBe('register');
   });
 });
 
@@ -114,11 +117,11 @@ describe('AppHeader when logged in', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the login name instead of the auth buttons', () => {
+  it('shows the login name instead of Log in', () => {
     renderWithProviders(<AppHeader />, withSession(user));
 
     expect(screen.getByText('bob')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Log in' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Log in' })).toBeNull();
   });
 
   it('shows the avatar image once the account has one', () => {
@@ -168,7 +171,7 @@ describe('AppHeader when logged in', () => {
     });
     expect(mockedAuth.logout).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByRole('button', { name: 'Log in' })
+      await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 

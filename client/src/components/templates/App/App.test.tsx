@@ -181,11 +181,11 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the series stub at /series', async () => {
+  it('has no page at /series: a series is found through its books', async () => {
     renderWithProviders(<AppShell />, { route: '/series' });
 
     expect(
-      await screen.findByRole('heading', { name: 'Series' })
+      await screen.findByRole('heading', { name: 'Page not found' })
     ).toBeInTheDocument();
   });
 
@@ -228,7 +228,7 @@ describe('AppShell session bootstrap', () => {
     renderWithProviders(<AppShell />);
 
     expect(
-      await screen.findByRole('button', { name: 'Log in' })
+      await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 });
@@ -247,7 +247,7 @@ describe('App', () => {
       await screen.findByRole('heading', { name: /books/i })
     ).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Log in' })
+      await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Search books')).toBeInTheDocument();
   });
