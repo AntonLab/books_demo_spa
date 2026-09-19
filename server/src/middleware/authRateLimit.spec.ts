@@ -84,18 +84,39 @@ async function withLimitedApp(
   }
 }
 
+// Polls until `condition` holds, failing with what it was waiting for once
+// the deadline passes. A fixed sleep only guesses how long the server needs,
+// and under load — the server suite runs its spec files in parallel — the
+// guess runs out first.
+async function waitUntil(
+  condition: () => boolean,
+  description: string,
+  timeoutMs = 5_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() >= deadline) {
+      assert.fail(`Waited ${timeoutMs} ms for ${description}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+interface GatedClient extends Pick<Client, 'login' | 'handled'> {
+  // How many requests have reached the limiter, allowed or not.
+  arrived(): number;
+}
+
 // A gated variant of the /login stand-in: the handler waits on a promise the
 // test controls before it answers, so many concurrent requests can be made
 // to arrive — and pass or fail the limiter — before any of them is allowed
 // to respond. That is what makes a check-then-record race observable on
 // demand rather than by luck of scheduling.
 async function withGatedLoginApp(
-  fn: (
-    client: Pick<Client, 'login' | 'handled'>,
-    release: () => void
-  ) => Promise<void>
+  fn: (client: GatedClient, release: () => void) => Promise<void>
 ): Promise<void> {
   const limits = createAuthRateLimits();
+  let arrived = 0;
   let handled = 0;
   let releaseGate: () => void = () => {};
   const gate = new Promise<void>((resolve) => {
@@ -105,6 +126,13 @@ async function withGatedLoginApp(
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json());
+  // Counted just ahead of the limiter. Nothing between here and the handler
+  // waits on anything, so once a request is counted here the limiter has
+  // already decided it, and a request it let through has reached the handler.
+  app.use((_req, _res, next) => {
+    arrived += 1;
+    next();
+  });
   app.post('/login', limitFailedLogins(limits), (req, res) => {
     handled += 1;
     void gate.then(() => {
@@ -119,7 +147,7 @@ async function withGatedLoginApp(
   const { port } = server.address() as AddressInfo;
   const base = `http://127.0.0.1:${port}`;
 
-  const client: Pick<Client, 'login' | 'handled'> = {
+  const client: GatedClient = {
     login: (login, status, from = CLIENT) =>
       fetch(`${base}/login`, {
         method: 'POST',
@@ -129,6 +157,7 @@ async function withGatedLoginApp(
         },
         body: JSON.stringify({ login, password: 'irrelevant', status }),
       }),
+    arrived: () => arrived,
     handled: () => handled,
   };
 
@@ -316,12 +345,15 @@ test('parallel attempts cannot bypass the budget: 20 at once gets exactly 10 thr
     // starves the budget below what it should allow.
     const attempts = Array.from({ length: 20 }, () => client.login('bob', 401));
     try {
-      // Give every request time to reach the server and run the limiter
-      // before any of them is allowed to respond.
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Every request reaches the limiter before any of them is allowed to
+      // respond.
+      await waitUntil(
+        () => client.arrived() === 20,
+        'all 20 attempts to reach the limiter'
+      );
 
-      // Decided already, before a single response has gone out: exactly 10
-      // were let through to the handler.
+      // Decided already, before a single allowed attempt has answered:
+      // exactly 10 were let through to the handler.
       assert.equal(client.handled(), 10);
     } finally {
       // However the assertion above comes out, every gated request is still
@@ -383,23 +415,32 @@ test('a refusal leaves no count behind on either budget, including the one that 
     const inFlight = Array.from({ length: 50 }, (_, index) =>
       loginAs(`held-${index}`, 400)
     );
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    assert.equal(handled, 50);
+    try {
+      await waitUntil(
+        () => handled === 50,
+        'all 50 held attempts to reach the handler'
+      );
+      assert.equal(handled, 50);
 
-    // Five more attempts, each a fresh name, arrive and are refused by the
-    // per-IP budget alone (their own name budget has room). If a refusal
-    // left its count behind — on either budget — each of these would push
-    // the address further over 50, on top of the 50 already claimed.
-    const refused = await Promise.all(
-      Array.from({ length: 5 }, (_, index) => loginAs(`late-${index}`, 400))
-    );
-    for (const response of refused) {
-      assert.equal(response.status, 429);
+      // Five more attempts, each a fresh name, arrive and are refused by the
+      // per-IP budget alone (their own name budget has room). If a refusal
+      // left its count behind — on either budget — each of these would push
+      // the address further over 50, on top of the 50 already claimed.
+      const refused = await Promise.all(
+        Array.from({ length: 5 }, (_, index) => loginAs(`late-${index}`, 400))
+      );
+      for (const response of refused) {
+        assert.equal(response.status, 429);
+      }
+      // None of the refused attempts ever reached the handler.
+      assert.equal(handled, 50);
+    } finally {
+      // However the assertions above come out, the 50 held requests are
+      // still waiting on this: release them, or a failure here leaves 50
+      // open connections that keep the server from closing.
+      releaseGate();
     }
-    // None of the refused attempts ever reached the handler.
-    assert.equal(handled, 50);
 
-    releaseGate();
     const inFlightStatuses = (await Promise.all(inFlight)).map(
       (response) => response.status
     );
