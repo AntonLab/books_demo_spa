@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { ChapterForm } from './ChapterForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { formatDateTime } from '@/format/date';
 
 const filled = { title: 'Chapter One', text: 'It was a dark night.' };
 
@@ -184,7 +185,7 @@ describe('ChapterForm', () => {
     );
 
     expect(
-      screen.getByText(`Published on ${new Date(published).toLocaleString()}`)
+      screen.getByText(`Published on ${formatDateTime(published)}`)
     ).toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull();

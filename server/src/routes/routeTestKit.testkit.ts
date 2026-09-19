@@ -2,11 +2,13 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import express, { type RequestHandler } from 'express';
 import { createApp, type AppDeps } from '../app.ts';
+import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import {
   XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
   xsrfTokenFor,
 } from '../middleware/csrfProtection.ts';
+import type { RateLimiter } from '../rateLimit.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
@@ -44,10 +46,37 @@ export function createUnusedRepository<T>(name: string): T {
     listAuthors: unreachable,
     findByEmail: unreachable,
     findPasswordHashById: unreachable,
+    // The expiry purge's. Unreachable from any route, like the rest.
+    deleteExpired: unreachable,
+    deleteExpiredBefore: unreachable,
   } as T;
 }
 
-function defaultDeps(): AppDeps {
+// Never refuses: the route specs sign in far more often than the real limits
+// allow. Those limits have their own specs — middleware/authRateLimit.spec.ts,
+// and the rate-limit cases in authRoutes.spec.ts, which pass
+// createAuthRateLimits() instead.
+export function unlimitedAuthRateLimits(): AuthRateLimits {
+  const unlimited = (): RateLimiter => ({
+    hit: () => ({ allowed: true, retryAfterMs: 0 }),
+    peek: () => ({ allowed: true, retryAfterMs: 0 }),
+    release: () => {},
+    reset: () => {},
+    size: () => 0,
+    stop: () => {},
+  });
+  return {
+    loginByIpAndLogin: unlimited(),
+    loginByIp: unlimited(),
+    register: unlimited(),
+    resetRequest: unlimited(),
+    stop: () => {},
+  };
+}
+
+// Every repository an unreachable stub. Exported for createApp.spec.ts, which
+// listens on createApp's own app rather than through withApp's wrapper.
+export function defaultDeps(): AppDeps {
   return {
     userRepository: createUnusedRepository('user'),
     seriesRepository: createUnusedRepository('series'),
@@ -64,6 +93,8 @@ function defaultDeps(): AppDeps {
       },
     },
     trustedOrigin: 'http://localhost:3000',
+    trustProxy: 0,
+    authRateLimits: unlimitedAuthRateLimits(),
   };
 }
 

@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Button, Space, theme, Typography } from 'antd';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { LikeButton } from '@/components/molecules/LikeButton';
+import { formatDate } from '@/format/date';
 import type { CommentWithAuthor, Tombstone } from '@/types/comment';
 
 const TOMBSTONE_LABELS: Record<Tombstone, string> = {
@@ -67,7 +68,7 @@ export const Comment: FC<CommentProps> = ({
             : ''}
         </Typography.Text>
         <Typography.Text type="secondary">
-          {new Date(comment.createdAt).toLocaleDateString()}
+          {formatDate(comment.createdAt)}
         </Typography.Text>
       </Space>
 

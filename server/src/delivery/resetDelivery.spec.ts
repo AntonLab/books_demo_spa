@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLoggerResetDelivery, resetUrl } from './resetDelivery.ts';
+import {
+  createLoggerResetDelivery,
+  createResetDelivery,
+  resetUrl,
+} from './resetDelivery.ts';
 import type { Logger } from '../logger.ts';
 
 function recordingLogger(): { logger: Logger; lines: string[] } {
@@ -42,4 +46,18 @@ test('the logger delivery emits the link', async () => {
 
   assert.equal(lines.length, 1);
   assert.match(lines[0] ?? '', /reset-password\?token=abc/);
+});
+
+test('createResetDelivery builds the log delivery for RESET_DELIVERY=log', async () => {
+  const { logger, lines } = recordingLogger();
+  await createResetDelivery('log', logger, 'http://localhost:3000').send(
+    'bob@example.com',
+    'abc'
+  );
+
+  assert.equal(lines.length, 1);
+  assert.match(
+    lines[0] ?? '',
+    /^Password reset for bob@example\.com: .*reset-password\?token=abc$/
+  );
 });

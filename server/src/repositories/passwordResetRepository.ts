@@ -3,10 +3,17 @@ import { PasswordResetToken } from '../models/PasswordResetToken.ts';
 import { Session } from '../models/Session.ts';
 import { User } from '../models/User.ts';
 
+// How long a reset token outlives its own expiry before the expiry purge
+// deletes it, used or not: a month of evidence that a reset was requested.
+export const RESET_TOKEN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface PasswordResetRepository {
   create(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
   invalidateAllForUser(userId: number): Promise<number>;
   redeem(tokenHash: string, newPassword: string): Promise<boolean>;
+  // The expiry purge's: deletes every token, used or not, whose expiresAt is
+  // before `cutoff` — the purge passes now minus RESET_TOKEN_RETENTION_MS.
+  deleteExpiredBefore(cutoff: Date): Promise<number>;
 }
 
 export function createSequelizePasswordResetRepository(): PasswordResetRepository {
@@ -16,7 +23,9 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
     },
 
     // Stamping usedAt rather than deleting: the row stays as evidence that a
-    // reset was requested, and the same single-use check covers both.
+    // reset was requested, and the same single-use check covers both. The
+    // evidence is kept until 30 days past the token's expiry
+    // (RESET_TOKEN_RETENTION_MS), when the hourly expiry purge deletes it.
     async invalidateAllForUser(userId) {
       const [affected] = await PasswordResetToken.update(
         { usedAt: new Date() },
@@ -67,6 +76,12 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
         });
 
         return true;
+      });
+    },
+
+    async deleteExpiredBefore(cutoff) {
+      return PasswordResetToken.destroy({
+        where: { expiresAt: { [Op.lt]: cutoff } },
       });
     },
   };

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withApp, json } from './routeTestKit.testkit.ts';
+import { createAuthRateLimits } from '../middleware/authRateLimit.ts';
 import { hashToken } from '../tokens.ts';
 import { xsrfTokenFor } from '../middleware/csrfProtection.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
@@ -75,6 +76,10 @@ function createFakeSessions(users: UserRepository) {
       }
       return removed;
     },
+    // The expiry purge runs on a timer, never through a route.
+    async deleteExpired() {
+      throw new Error('the expiry purge is not reachable from a route');
+    },
   };
 
   return { repository, rows };
@@ -116,6 +121,10 @@ function createFakeResets(
       await sessions.repository.deleteAllForUser(row.userId);
       return true;
     },
+    // The expiry purge runs on a timer, never through a route.
+    async deleteExpiredBefore() {
+      throw new Error('the expiry purge is not reachable from a route');
+    },
   };
 
   return { repository, rows };
@@ -151,6 +160,21 @@ const post = (base: string, path: string, body: unknown, cookie?: string) =>
     headers: {
       'content-type': 'application/json',
       ...(cookie ? { cookie } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+const postFrom = (
+  base: string,
+  path: string,
+  body: unknown,
+  forwardedFor: string
+) =>
+  fetch(`${base}/api/auth/${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-forwarded-for': forwardedFor,
     },
     body: JSON.stringify(body),
   });
@@ -541,4 +565,136 @@ test('opening a session also hands the client its XSRF token, which a script can
     assert.doesNotMatch(xsrf, /HttpOnly/i);
     assert.match(xsrf, /SameSite=Lax/i);
   });
+});
+
+// The sign-in limits wired into the routes. Every other test here runs on the
+// test kit's unlimited set; these pass the real one.
+
+test('POST /login refuses the 11th failed attempt on one login with 429, before any password check', async () => {
+  const { deps, users } = authDeps();
+  let lookups = 0;
+  const counted: UserRepository = {
+    ...users,
+    async findByLoginWithPassword(login) {
+      lookups += 1;
+      return users.findByLoginWithPassword(login);
+    },
+  };
+  const limits = createAuthRateLimits();
+  try {
+    await withApp(
+      { ...deps, userRepository: counted, authRateLimits: limits },
+      async (base) => {
+        await post(base, 'register', registration);
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const wrong = await post(base, 'login', {
+            login: 'Bob',
+            password: 'wrongpassword',
+          });
+          assert.equal(wrong.status, 401);
+        }
+
+        // The right password, too late: refused before the lookup and argon2.
+        const refused = await post(base, 'login', {
+          login: 'Bob',
+          password: 'hunter2hunter2',
+        });
+        assert.equal(refused.status, 429);
+        assert.match(refused.headers.get('retry-after') ?? '', /^\d+$/);
+        assert.equal(lookups, 10);
+      }
+    );
+  } finally {
+    limits.stop();
+  }
+});
+
+test('POST /register refuses the 6th request from one address within the hour, malformed or not', async () => {
+  const { deps } = authDeps();
+  const limits = createAuthRateLimits();
+  try {
+    await withApp({ ...deps, authRateLimits: limits }, async (base) => {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        assert.equal((await post(base, 'register', {})).status, 400);
+      }
+
+      assert.equal((await post(base, 'register', registration)).status, 429);
+    });
+  } finally {
+    limits.stop();
+  }
+});
+
+test('POST /password-reset/request refuses the 6th request from one address within the hour', async () => {
+  const { deps } = authDeps();
+  const limits = createAuthRateLimits();
+  try {
+    await withApp({ ...deps, authRateLimits: limits }, async (base) => {
+      const request = { email: 'nobody@example.com' };
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        assert.equal(
+          (await post(base, 'password-reset/request', request)).status,
+          202
+        );
+      }
+
+      assert.equal(
+        (await post(base, 'password-reset/request', request)).status,
+        429
+      );
+    });
+  } finally {
+    limits.stop();
+  }
+});
+
+test('behind one trusted proxy, each client X-Forwarded-For names keeps its own budget', async () => {
+  const { deps } = authDeps();
+  const limits = createAuthRateLimits();
+  try {
+    await withApp(
+      { ...deps, authRateLimits: limits, trustProxy: 1 },
+      async (base) => {
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          assert.equal(
+            (await postFrom(base, 'register', {}, '203.0.113.1')).status,
+            400
+          );
+        }
+
+        assert.equal(
+          (await postFrom(base, 'register', {}, '203.0.113.1')).status,
+          429
+        );
+        assert.equal(
+          (await postFrom(base, 'register', {}, '203.0.113.2')).status,
+          400
+        );
+      }
+    );
+  } finally {
+    limits.stop();
+  }
+});
+
+test('with no trusted proxy, X-Forwarded-For is ignored and every client shares the address budget', async () => {
+  const { deps } = authDeps();
+  const limits = createAuthRateLimits();
+  try {
+    await withApp({ ...deps, authRateLimits: limits }, async (base) => {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        assert.equal(
+          (await postFrom(base, 'register', {}, '203.0.113.1')).status,
+          400
+        );
+      }
+
+      assert.equal(
+        (await postFrom(base, 'register', {}, '203.0.113.2')).status,
+        429
+      );
+    });
+  } finally {
+    limits.stop();
+  }
 });

@@ -21,14 +21,24 @@ of them read. Early scaffold — most feature directories exist but are empty.
   `typecheck`, `lint` and `lint:fix` only; `wire.typetest.ts` pins `Wire<T>`
   with type-level assertions that `typecheck` checks.
 - `tsconfig.base.json` — compiler options shared by every package; each
-  `tsconfig.json` extends it with a relative path. Keep `include`, `exclude` and
-  `paths` out of it: TypeScript resolves those against the file that declares
-  them, so they would point at the repo root instead of the package.
-- `eslint.config.base.mjs` — the shared flat-config core, exported as
-  `createConfig(ignores, ...packageConfigs)`. ESLint does not search parent
-  directories, so each package keeps its own `eslint.config.mjs` that calls
-  this. It imports its own plugins: the root `package.json` declares them and
-  npm hoists them into the root `node_modules`, so bare specifiers resolve.
+  `tsconfig.json` extends it with a relative path. It sets
+  `noUncheckedIndexedAccess` for all three: an index read is `T | undefined`,
+  application code handles the miss explicitly, and only test files assert
+  it away with `!`. Keep `include`, `exclude` and `paths` out of it:
+  TypeScript resolves those against the file that declares them, so they
+  would point at the repo root instead of the package.
+- `eslint.config.base.mjs` — the shared flat-config core, built with ESLint's
+  `defineConfig` and exported as
+  `createConfig({ ignores, tsconfigRootDir }, ...packageConfigs)`. Each
+  package passes its own directory (`import.meta.dirname`) as
+  `tsconfigRootDir`: the `**/*.{ts,tsx}` block turns on typed linting
+  (`projectService`) against that package's tsconfig for three rules —
+  `no-floating-promises` (node:test's `test`/`describe`/`it`/`suite`
+  exempt), `no-misused-promises` and `await-thenable` — while JavaScript
+  files stay untyped. ESLint does not search parent directories, so each
+  package keeps its own `eslint.config.mjs` that calls this. It imports its
+  own plugins: the root `package.json` declares them and npm hoists them into
+  the root `node_modules`, so bare specifiers resolve.
 - `package.json` — the workspace root. It declares `client`, `server` and
   `shared` as workspaces, owns the seven devDependencies every package needs (eslint,
   @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
@@ -42,7 +52,7 @@ of them read. Early scaffold — most feature directories exist but are empty.
 
 One `npm install` at the repo root installs every workspace into a single
 hoisted `node_modules` with one lockfile. Package-specific dependencies stay
-declared in the package that uses them — webpack and jest in `client`, nodemon
+declared in the package that uses them — webpack and jest in `client`, `sharp`
 in `server`, `shared` in both — so each `package.json` still says what that
 package needs. `node_modules/shared` is a link to `shared/`, not a copy, and
 that matters: Node strips types only from a file whose real path lies outside
@@ -50,12 +60,14 @@ that matters: Node strips types only from a file whose real path lies outside
 
 ## Stack
 
-- Node.js >= 22.18, TypeScript. The floor is set by the server, which runs
-  `.ts` files with no flag (type stripping is unflagged from 22.18) and loads
-  `.env.local` through `--env-file-if-exists` (22.9). `.nvmrc` pins the
-  version CI runs, the current LTS line. The floor holds for the built server
-  too: `server/dist/` still imports `shared` as `.ts`, so a deployment needs
-  the workspace link and a type-stripping Node (ADR-0006).
+- Node.js >= 24, TypeScript. The floor is the LTS line `.nvmrc` pins and CI
+  runs, and `@types/node` follows its major (`.github/dependabot.yml` holds
+  it there), so the types never describe an API the runtime lacks. The
+  server's own needs sit below it: running `.ts` files with no flag and
+  loading `.env.local` through `--env-file-if-exists` both work unflagged in
+  every 24.x. The floor holds for the built server too: `server/dist/` still
+  imports `shared` as `.ts`, so a deployment needs the workspace link and a
+  type-stripping Node (ADR-0006).
 - Frontend: React 19
 - Backend: Express 5, Sequelize 6 (MySQL via `mysql2`)
 
@@ -230,11 +242,12 @@ Target one with npm's `-w` flag (`npm test -w client`):
 staged files only, re-stages whatever they rewrote, and blocks the commit if an
 ESLint **error** survives the autofix. Warnings (`no-console`) print but pass.
 ESLint runs once per package, from inside it, because flat config does not
-cascade — a staged path is routed by its `client/`, `server/` or `shared/` prefix. Prettier
-runs once from the repo root over every staged file, including the root-level
-configs and markdown no package's ESLint config reaches. Both binaries come from
-the single hoisted `node_modules/.bin`; if it is missing the hook warns and lets
-the commit through rather than failing it.
+cascade — which is also what points typed linting at that package's tsconfig.
+A staged path is routed by its `client/`, `server/` or `shared/` prefix.
+Prettier runs once from the repo root over every staged file, including the
+root-level configs and markdown no package's ESLint config reaches. Both
+binaries come from the single hoisted `node_modules/.bin`; if it is missing
+the hook warns and lets the commit through rather than failing it.
 
 `core.hooksPath` lives in `.git/config` and is therefore per-clone. The root
 `package.json`'s `prepare` script sets it, so `npm install` enables the hook;

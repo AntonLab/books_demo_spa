@@ -8,7 +8,7 @@ import { createConfig } from '../eslint.config.base.mjs';
 // live in the root eslint.config.base.mjs. Only the React and browser
 // specifics are below.
 export default createConfig(
-  ['build'],
+  { ignores: ['build'], tsconfigRootDir: import.meta.dirname },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {

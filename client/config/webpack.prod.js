@@ -1,18 +1,27 @@
-const { merge } = require('webpack-merge');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const common = require('./webpack.common.js');
 
+const base = common(false);
+
+// Composed by hand, with no merge helper: the shared `module.rules` and
+// `plugins` come first and this file's are appended, and `output` gains the
+// file-name patterns — the only three keys both files set. Everything else
+// here is this file's alone.
 /** @type {import('webpack').Configuration} */
-module.exports = merge(common(false), {
+module.exports = {
+  ...base,
   mode: 'production',
   devtool: 'source-map',
   output: {
+    ...base.output,
     filename: 'static/js/[name].[contenthash:8].js',
     chunkFilename: 'static/js/[name].[contenthash:8].chunk.js',
   },
   module: {
+    ...base.module,
     rules: [
+      ...base.module.rules,
       // `*.module.css` is scoped per component (see CLAUDE.md, Component
       // folders); every other stylesheet stays global, which is what
       // `antd/dist/reset.css` in src/index.tsx relies on. The plain rule
@@ -37,6 +46,7 @@ module.exports = merge(common(false), {
     ],
   },
   plugins: [
+    ...base.plugins,
     new MiniCssExtractPlugin({
       filename: 'static/css/[name].[contenthash:8].css',
       chunkFilename: 'static/css/[name].[contenthash:8].chunk.css',
@@ -58,4 +68,4 @@ module.exports = merge(common(false), {
       },
     },
   },
-});
+};
