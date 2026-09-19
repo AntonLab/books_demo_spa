@@ -1067,32 +1067,36 @@ Three auth routes carry an in-memory, fixed-window limit
 (`middleware/authRateLimit.ts`, built on `src/rateLimit.ts`), mounted ahead
 of `validate` so a refused request costs no parsing, no lookup and no argon2:
 
-| Route                                   | Key        | Limit         | What counts          |
-| --------------------------------------- | ---------- | ------------- | -------------------- |
-| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed attempts only |
-| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed attempts only |
-| `POST /api/auth/register`               | IP         | 5 per hour    | every request        |
-| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request        |
+| Route                                   | Key        | Limit         | What counts                |
+| --------------------------------------- | ---------- | ------------- | -------------------------- |
+| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed or aborted attempts |
+| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed or aborted attempts |
+| `POST /api/auth/register`               | IP         | 5 per hour    | every request              |
+| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request              |
 
 - **Login counts against both budgets the moment it arrives, and settles the
-  claim when the response finishes.** A check that ran first and recorded
-  only later would let unlimited parallel attempts each read the same
-  unspent count while they all wait on the lookup and argon2, so both
-  budgets are `hit` up front instead. A request either budget refuses is
-  turned away before the handler ever runs, and **both** claims are released
-  regardless of which budget did the refusing — `hit` always increments even
-  on the budget that refuses, so leaving that one un-released would let a
-  burst of refused attempts keep inflating the very count that refused them,
-  locking the address or the name out for longer than its own limit ever
-  earned. A refusal this way leaves nothing behind on either budget. Once the
-  request runs, a 401 is the only outcome that keeps the claim; anything
-  else — a 400, a 403 (a blocked account), a 2xx, or the connection closing
-  before either — frees both claims **entirely**, not merely decrements them
-  (a released count that reaches 0 drops the key outright rather than
-  leaving an empty window behind — see `src/rateLimit.ts` below), and a 2xx
-  additionally clears the rest of the IP + login budget's own history. The
-  per-IP budget survives a success on its own, or signing in to one real
-  account would buy fresh guesses at every other.
+  claims when it answers or the connection closes.** A check that ran first
+  and recorded only later would let unlimited parallel attempts each read
+  the same unspent count while they all wait on the lookup and argon2, so
+  both budgets are `hit` up front instead. A request either budget refuses
+  is turned away before the handler ever runs, and **both** claims are
+  released regardless of which budget did the refusing — `hit` always
+  increments even on the budget that refuses, so leaving that one
+  un-released would let a burst of refused attempts keep inflating the very
+  count that refused them, locking the address or the name out for longer
+  than its own limit ever earned. A refusal this way leaves nothing behind
+  on either budget. Once the request runs, a 401 keeps both claims, and so
+  does an abort — the connection closing before any answer goes out. The
+  handler still runs the lookup and argon2 after the client has gone, so
+  giving an abort's claims back would let a client abort and repeat for
+  unlimited argon2 work per address without ever being refused. Any other
+  answer — a 400, a 403 (a blocked account) or a 2xx — releases both claims:
+  each `release` gives back that one claim, and a count that reaches 0 drops
+  its key outright rather than leaving an empty window behind (see
+  `src/rateLimit.ts` under **Layout**). A 2xx also clears the rest of the
+  IP + login budget's own history, which an abort never does. The per-IP
+  budget survives a success on its own, or signing in to one real account
+  would buy fresh guesses at every other.
 - **The login is trimmed, lower-cased and hashed** (SHA-256, hex) before it
   becomes the name half of the IP + login key, so a change of case or stray
   whitespace buys no fresh budget, and the key stays a fixed size whatever

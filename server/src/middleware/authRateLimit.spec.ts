@@ -214,7 +214,7 @@ test('the 11th failed login for one name from one address is refused before the 
   });
 });
 
-test('only a 401 spends the login budget', async () => {
+test('of the answers, only a 401 spends the login budget', async () => {
   await withLimitedApp(async (client) => {
     for (let attempt = 0; attempt < 15; attempt += 1) {
       assert.equal((await client.login('bob', 400)).status, 400);
@@ -487,30 +487,42 @@ test('a refusal leaves no count behind on either budget, including the one that 
   }
 });
 
-test('an aborted connection releases its claim, even though finish never fires', async () => {
+test('an aborted login keeps both claims, as a 401 would, and never earns the success reset', async () => {
   const limits = createAuthRateLimits();
   let destroy: (() => void) | undefined;
   let notifyReady: () => void = () => {};
   const ready = new Promise<void>((resolve) => {
     notifyReady = resolve;
   });
+  let notifyClosed: () => void = () => {};
+  const closed = new Promise<void>((resolve) => {
+    notifyClosed = resolve;
+  });
   // Only the very first request is left hanging; every one after it answers
-  // normally, so the 10 follow-up probes below get a real response.
+  // normally, so the follow-up probes below get a real response.
   let captured = false;
 
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json());
   app.post('/login', limitFailedLogins(limits), (req, res) => {
+    const { status } = req.body as { status: number };
     if (!captured) {
       captured = true;
-      // Left open rather than answered: only 'close' ever fires for this
-      // one, never 'finish' — the abort path release-on-close exists for.
+      // Left open until the connection is gone: only 'close' fires for this
+      // one, never 'finish'. The limiter's own 'close' listener was added
+      // before this one, so by the time this runs it has already settled.
+      res.on('close', () => {
+        // The real handler carries on after a reset while the lookup and
+        // argon2 run, then answers — here the 200 the body asked for, which
+        // reaches nobody.
+        res.status(status).end();
+        notifyClosed();
+      });
       destroy = () => res.socket?.destroy();
       notifyReady();
       return;
     }
-    const { status } = req.body as { status: number };
     res.status(status).end();
   });
   app.use(errorHandler);
@@ -534,12 +546,15 @@ test('an aborted connection releases its claim, even though finish never fires',
     const aborted = login(200).catch(() => undefined);
     await ready;
     destroy?.();
-    await aborted;
+    await Promise.all([aborted, closed]);
 
-    // The claim is gone, not merely capped: the full ten-per-name budget is
-    // still there for genuine failures, proving nothing was left spent by
-    // the aborted attempt.
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    // Both budgets still hold the aborted attempt's claim.
+    assert.equal(limits.loginByIpAndLogin.size(), 1);
+    assert.equal(limits.loginByIp.size(), 1);
+
+    // It spent one of bob's ten, as a failure would, and the 200 it asked
+    // for cleared nothing: nine genuine failures later the budget is spent.
+    for (let attempt = 0; attempt < 9; attempt += 1) {
       assert.equal((await login(401)).status, 401);
     }
     assert.equal((await login(401)).status, 429);
