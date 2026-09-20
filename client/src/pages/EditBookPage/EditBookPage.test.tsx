@@ -132,6 +132,29 @@ describe('EditBookPage', () => {
     expect(await screen.findByText('Saved.')).toBeInTheDocument();
   });
 
+  it('keeps an existing genre on an unrelated save', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      genre: { id: 4, name: 'Gothic' },
+    });
+    mockedBooks.updateBook.mockResolvedValue(book);
+    renderPage();
+
+    const title = await screen.findByLabelText('Title');
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Dragons, Revised');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedBooks.updateBook).toHaveBeenCalledWith(1, {
+      title: 'Dragons, Revised',
+      description: 'Long ago.',
+      tags: ['epic'],
+      seriesId: null,
+      genreId: 4,
+      status: 'draft',
+    });
+  });
+
   it('manages the co-authors from the same page', async () => {
     renderPage();
 
