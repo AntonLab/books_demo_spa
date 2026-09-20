@@ -62,6 +62,14 @@ test('Series.hasMany(Book) unlinks rather than deletes, since seriesId is option
   );
 });
 
+test('Genre.hasMany(Book) unlinks rather than deletes, since genreId is optional', () => {
+  assert.match(createTableSql, /`genreId` INTEGER UNSIGNED(?! NOT NULL)/);
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`genreId`\) REFERENCES `genres` \(`id`\) ON DELETE SET NULL ON UPDATE CASCADE/
+  );
+});
+
 test('description is TEXT and the timestamps are NOT NULL', () => {
   assert.match(createTableSql, /`description` TEXT NOT NULL/);
   assert.match(createTableSql, /`createdAt` DATETIME NOT NULL/);

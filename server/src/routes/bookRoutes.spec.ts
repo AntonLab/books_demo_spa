@@ -370,10 +370,12 @@ test('a genreId that names no genre is 400 on create and on update', async () =>
 
       assert.equal(onCreate.status, 400);
       assert.equal(onUpdate.status, 400);
-      assert.match(
-        (await json<{ error: string }>(onUpdate)).error,
-        /does not exist/
-      );
+      const createBody = await json<{ error: string }>(onCreate);
+      assert.match(createBody.error, /does not exist/);
+      assert.ok(!('details' in createBody));
+      const updateBody = await json<{ error: string }>(onUpdate);
+      assert.match(updateBody.error, /does not exist/);
+      assert.ok(!('details' in updateBody));
     }
   );
 });
