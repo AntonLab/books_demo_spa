@@ -11,6 +11,8 @@ import type { ListSeriesParams } from '../api/series';
 // give that structurally, since neither can write the other's entry.
 export const queryKeys = {
   session: ['auth', 'me'] as const,
+  // A constant key, like `session`: the list takes no parameters at all.
+  genres: ['genres'] as const,
   books: (params: ListBooksParams) => ['books', params] as const,
   // Keyed by a bare id, so it cannot collide with `books`, which is always
   // keyed by a params object.
