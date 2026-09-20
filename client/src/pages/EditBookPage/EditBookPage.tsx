@@ -28,6 +28,7 @@ import {
   useUploadBookCover,
 } from '@/queries/books';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
+import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
 import { formatDate } from '@/format/date';
 import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
@@ -65,6 +66,7 @@ export const EditBookPage: FC = () => {
   const series = useMySeries(
     session?.role === 'author' ? session.id : undefined
   );
+  const genres = useGenres();
   const update = useUpdateBook(bookId);
   const remove = useDeleteBook(bookId);
   const chapters = useChapters(bookId);
@@ -155,6 +157,7 @@ export const EditBookPage: FC = () => {
           // stored rather than keeping a stale copy of the loaded book.
           key={book.updatedAt}
           seriesOptions={seriesOptions}
+          genreOptions={genres.data?.items ?? []}
           submitLabel="Save"
           showStatus
           initialValues={{
@@ -162,6 +165,7 @@ export const EditBookPage: FC = () => {
             description: book.description,
             tags: book.tags,
             seriesId: book.seriesId,
+            genreId: book.genre?.id ?? null,
             status: book.status,
           }}
           isSubmitting={update.isPending}
