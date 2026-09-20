@@ -510,6 +510,8 @@ describe('SearchPage for one genre', () => {
       seriesId: 12,
       limit: 20,
     });
+    expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
+    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
 
     unmount();
     jest.clearAllMocks();
@@ -536,5 +538,7 @@ describe('SearchPage for one genre', () => {
       genreId: 4,
       limit: 20,
     });
+    expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
+    expect(mockedSeries.listSeries).toHaveBeenCalledTimes(1);
   });
 });
