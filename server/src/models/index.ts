@@ -4,6 +4,7 @@ import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
 import { initBookCoverModel, BookCover } from './BookCover.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
+import { initGenreModel, Genre } from './Genre.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
 import {
@@ -26,6 +27,7 @@ export interface Models {
   BookCover: typeof BookCover;
   BookAuthor: typeof BookAuthor;
   Chapter: typeof Chapter;
+  Genre: typeof Genre;
   Comment: typeof Comment;
   Like: typeof Like;
   Notification: typeof Notification;
@@ -39,6 +41,9 @@ export function initModels(sequelize: Sequelize): Models {
   initUserAvatarModel(sequelize);
   // Reference data, unrelated to any row — no association block follows it.
   initPermissionModel(sequelize);
+  // The catalogue's Genres. Initialised before series and books, which
+  // reference it (M2).
+  initGenreModel(sequelize);
   initSeriesModel(sequelize);
   initSeriesAuthorModel(sequelize);
   initBookModel(sequelize);
@@ -288,6 +293,7 @@ export function initModels(sequelize: Sequelize): Models {
     BookCover,
     BookAuthor,
     Chapter,
+    Genre,
     Comment,
     Like,
     Notification,
@@ -305,6 +311,7 @@ export { Book, toPublicBook } from './Book.ts';
 export { BookCover } from './BookCover.ts';
 export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
+export { Genre, toPublicGenre } from './Genre.ts';
 export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';
 export { Notification, toPublicNotification } from './Notification.ts';
