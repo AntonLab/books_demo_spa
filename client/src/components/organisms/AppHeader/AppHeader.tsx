@@ -68,8 +68,7 @@ export const AppHeader: FC = () => {
     <Layout.Header
       style={{ display: 'flex', alignItems: 'center', gap: token.margin }}
     >
-      {/* Two props the submenu needs, both explained in CLAUDE.md's Testing
-          notes as well:
+      {/* Two props the submenu needs:
           - `disabledOverflow`: rc-menu puts every child past the first into an
             overflowDisabled context unless this is set, and such a SubMenu
             can never open. The visible-item count comes from ResizeObserver
