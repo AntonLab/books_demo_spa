@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AppHeader } from './AppHeader';
@@ -216,16 +216,28 @@ describe('AppHeader genres submenu', () => {
   it('opens the submenu and lists every genre in the order given', async () => {
     renderWithProviders(<AppHeader />, withSession(null));
 
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: /Genres/ })
-    );
+    const genresTrigger = await screen.findByRole('menuitem', {
+      name: /Genres/,
+    });
+    await userEvent.click(genresTrigger);
+    await screen.findByRole('menuitem', { name: 'Gothic' });
 
-    expect(
-      await screen.findByRole('menuitem', { name: 'Gothic' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: 'Hard SF' })
-    ).toBeInTheDocument();
+    // Scoped to the submenu's own popup — found through the ARIA relationship
+    // the trigger already declares via `aria-controls` — rather than the
+    // whole document, so this pins the render order rather than membership:
+    // an accidental alphabetical sort would still satisfy two separate
+    // toBeInTheDocument assertions.
+    const popupId = genresTrigger.getAttribute('aria-controls');
+    const popup = popupId ? document.getElementById(popupId) : null;
+    if (!popup) {
+      throw new Error('Genres submenu popup not found');
+    }
+    const items = within(popup).getAllByRole('menuitem');
+
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Gothic',
+      'Hard SF',
+    ]);
   });
 
   it('navigates to the genre its item names', async () => {
@@ -298,8 +310,23 @@ describe('AppHeader account menu', () => {
     renderWithProviders(<AppHeader />, withSession(admin));
 
     await userEvent.click(screen.getByText('bob'));
+    await screen.findByText('Manage genres');
 
-    expect(await screen.findByText('Manage genres')).toBeInTheDocument();
+    // Scoped to the account dropdown's own popup — its rendered class, not
+    // an index or the nav menu on the left, which is also role="menu" — so
+    // this pins Manage genres landing right after Profile rather than merely
+    // existing somewhere in the menu.
+    const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
+    if (!dropdown) {
+      throw new Error('account dropdown popup not found');
+    }
+    const items = within(dropdown).getAllByRole('menuitem');
+
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Profile',
+      'Manage genres',
+      'Log out',
+    ]);
   });
 
   it('offers Manage genres to a superadmin', async () => {
