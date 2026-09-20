@@ -8,6 +8,7 @@ import {
   type NonAttribute,
   type Sequelize,
 } from 'sequelize';
+import type { Genre } from './Genre.ts';
 import type { Series } from './Series.ts';
 import { toTagArray } from './tagArray.ts';
 import {
@@ -15,6 +16,7 @@ import {
   type BookStatus,
   type PublicBook,
 } from '../types/book.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { AuthorSummary } from '../types/user.ts';
 
 export class Book extends Model<
@@ -27,6 +29,10 @@ export class Book extends Model<
   //
   // Nullable and creation-optional: a book can stand alone, outside any series.
   declare seriesId: CreationOptional<ForeignKey<Series['id']> | null>;
+  // The Book's Genre (CONTEXT.md, ADR-0008): one or none, set independently of
+  // its Series'. Nullable, which is what makes the association's
+  // ON DELETE SET NULL legal — MySQL refuses SET NULL on a NOT NULL column.
+  declare genreId: CreationOptional<ForeignKey<Genre['id']> | null>;
   // The book's place in its series' Series order (CONTEXT.md): 1-based,
   // gapped after a book leaves, and null outside a series. It orders a
   // series' book lists and is never sent to a client.
@@ -64,6 +70,13 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       // Set by bookRepository whenever a book is filed into a series, which
       // appends it; cleared when it leaves.
       seriesPosition: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+      },
+      // Must match genres.id exactly (INTEGER UNSIGNED), as seriesId matches
+      // series.id, or MySQL rejects the foreign key with errno 3780 on
+      // incompatible column types (M2).
+      genreId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
       },
@@ -115,6 +128,14 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
           name: 'books_series_id_series_position',
           fields: ['seriesId', 'seriesPosition'],
         },
+        // Serves the `?genreId=` filter (A5), and is the leftmost prefix of the
+        // foreign key's column, so InnoDB reuses it instead of creating a
+        // second index for the constraint. Not unique: any number of books
+        // share a Genre.
+        {
+          name: 'books_genre_id',
+          fields: ['genreId'],
+        },
       ],
     }
   );
@@ -128,7 +149,8 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
 export function toPublicBook(
   book: Book,
   authors: AuthorSummary[],
-  coverUrl: string | null
+  coverUrl: string | null,
+  genre: PublicGenre | null
 ): PublicBook {
   return {
     id: book.id,
@@ -138,6 +160,7 @@ export function toPublicBook(
     description: book.description,
     tags: toTagArray(book.tags),
     status: book.status,
+    genre,
     coverUrl,
     createdAt: book.createdAt,
     updatedAt: book.updatedAt,

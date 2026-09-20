@@ -31,6 +31,7 @@ const book: PublicBook = {
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
+  genre: null,
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
