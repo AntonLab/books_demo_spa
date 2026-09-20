@@ -16,6 +16,7 @@ import {
   BookAuthor,
   Chapter,
   Comment,
+  Genre,
   Like,
   Notification,
   Series,
@@ -35,7 +36,7 @@ const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../..');
 
-// The nine tables the seed deletes from under --force. Listed again here
+// The ten tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
@@ -46,6 +47,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Book,
   SeriesAuthor,
   Series,
+  Genre,
   User,
 ];
 
@@ -163,6 +165,9 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     );
     assert.match(run.stdout, /users: 1\b/);
     assert.match(run.stdout, /books: 1\b/);
+    // The tenth content table, reported like the other nine: this is what
+    // would catch the seed's own CONTENT_MODELS not knowing about genres.
+    assert.match(run.stdout, /genres: 0\b/);
     assert.doesNotMatch(run.stdout, /Seeded /);
     // Not stderr === '': a Node release may print its own warnings there. Only
     // the seed's are in question — no --force warning, no failure.
@@ -264,6 +269,61 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
       await offending(
         `SELECT title FROM chapters
          WHERE title COLLATE utf8mb4_bin REGEXP '^A ([AEIOU]|Honest )'`
+      ),
+      []
+    );
+  });
+
+  test('creates the five genres, and only those', async () => {
+    const names = (await Genre.findAll({ order: [['name', 'ASC']] })).map(
+      (row) => row.name
+    );
+
+    assert.deepEqual(names, [
+      'Gothic',
+      'Hard SF',
+      'Horror',
+      'Romance',
+      'Urban Fantasy',
+    ]);
+  });
+
+  test('files every book and series under its author’s genre, and leaves two genres empty', async () => {
+    assert.deepEqual(
+      await offending('SELECT id, title FROM books WHERE genreId IS NULL'),
+      []
+    );
+    assert.deepEqual(
+      await offending('SELECT id, title FROM series WHERE genreId IS NULL'),
+      []
+    );
+
+    // Three content banks, three genres in use: no two authors share one.
+    assert.equal(
+      (await offending('SELECT DISTINCT genreId FROM books')).length,
+      3
+    );
+
+    // Every other genre holds both books and series...
+    assert.deepEqual(
+      await offending(
+        `SELECT g.name FROM genres g
+         LEFT JOIN books b ON b.genreId = g.id
+         LEFT JOIN series s ON s.genreId = g.id
+         WHERE b.id IS NULL AND s.id IS NULL
+           AND g.name NOT IN ('Horror', 'Romance')`
+      ),
+      []
+    );
+    // ...and these two hold neither, on purpose: a demo with no empty genre
+    // never shows what one looks like.
+    assert.deepEqual(
+      await offending(
+        `SELECT g.name FROM genres g
+         LEFT JOIN books b ON b.genreId = g.id
+         LEFT JOIN series s ON s.genreId = g.id
+         WHERE g.name IN ('Horror', 'Romance')
+           AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
       ),
       []
     );

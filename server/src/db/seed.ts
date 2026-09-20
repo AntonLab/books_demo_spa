@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the nine content
+// Destructive by design: with --force it deletes every row in the ten content
 // tables before inserting. Without --force it reports what it found and exits
 // without writing.
 
@@ -28,6 +28,7 @@ import {
   BookAuthor,
   Chapter,
   Comment,
+  Genre,
   Like,
   Notification,
   Series,
@@ -145,7 +146,24 @@ function createRng(seed: number): Rng {
 /* Content banks                                                              */
 /* -------------------------------------------------------------------------- */
 
+// The Genre list the demo is browsed by, in the alphabetical order every list
+// shows it in anyway. Three of the five are a content bank's; Horror and
+// Romance are nobody's on purpose — a demo with no empty Genre never shows what
+// one looks like in the header's submenu or on /search?genre=.
+const GENRE_NAMES = [
+  'Gothic',
+  'Hard SF',
+  'Horror',
+  'Romance',
+  'Urban Fantasy',
+] as const;
+
 interface ContentBank {
+  // The Genre every Book and Series drawn from this bank is filed under. A name
+  // rather than an id: the rows do not exist while the plan is being built, so
+  // writeContent resolves it through the map writeGenres returns. Typed as the
+  // union, so a bank cannot name a Genre the seed never creates.
+  genreName: (typeof GENRE_NAMES)[number];
   // A pool; each book and series takes 3-5. Two tags appear in more than one
   // bank on purpose, so ?tag= returns more than one author's work.
   tags: readonly string[];
@@ -159,6 +177,7 @@ interface ContentBank {
 }
 
 const GOTHIC: ContentBank = {
+  genreName: 'Gothic',
   tags: ['gothic', 'victorian', 'mystery', 'slow-burn', 'manor', 'epistolary'],
   seriesTitles: ['The Ashgrove Chronicles', 'Letters from Blackmoor'],
   bookTitles: [
@@ -252,6 +271,7 @@ const GOTHIC: ContentBank = {
 };
 
 const HARD_SF: ContentBank = {
+  genreName: 'Hard SF',
   tags: [
     'hard-sf',
     'space',
@@ -352,6 +372,7 @@ const HARD_SF: ContentBank = {
 };
 
 const URBAN_FANTASY: ContentBank = {
+  genreName: 'Urban Fantasy',
   tags: ['urban-fantasy', 'magic', 'detective', 'slow-burn', 'city', 'wards'],
   seriesTitles: ['The Nightbus Files', 'Wardens of the Third Ward'],
   bookTitles: [
@@ -1115,8 +1136,10 @@ function buildPlan(rng: Rng): Plan {
 // to the cascades. Deleting `users` alone would currently take everything with
 // it, but that is a property of the schema's ON DELETE clauses, not of this
 // script: the day one of them changes, a seed relying on it would start leaving
-// rows behind silently. `permissions` is deliberately absent — it is reference
-// data syncPermissions() derives from code, not demo content.
+// rows behind silently. `genres` sits after `books` and `series` for the same
+// reason — both point at it, and its ON DELETE SET NULL is not this script's to
+// lean on. `permissions` is deliberately absent — it is reference data
+// syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
   Like,
@@ -1126,6 +1149,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Book,
   SeriesAuthor,
   Series,
+  Genre,
   User,
 ];
 
@@ -1172,9 +1196,31 @@ async function writeAccounts(
   return ids;
 }
 
+// The Genre list, written before any content so writeContent can file each work
+// under one. Returned as a name → id map, which is how a content bank's
+// genreName becomes a genreId.
+//
+// create() in a loop rather than bulkCreate: five rows are nothing, and the ids
+// have to come back — a loop gets them without depending on MySQL back-filling
+// them from the insert's first id (see writeThreads, where that assumption does
+// live and is checked).
+async function writeGenres(
+  transaction: Transaction
+): Promise<Map<string, number>> {
+  const ids = new Map<string, number>();
+
+  for (const name of GENRE_NAMES) {
+    const row = await Genre.create({ name }, { transaction });
+    ids.set(name, row.id);
+  }
+
+  return ids;
+}
+
 async function writeContent(
   plan: Plan,
   accountIds: readonly number[],
+  genreIds: ReadonlyMap<string, number>,
   transaction: Transaction
 ): Promise<{
   bookIds: Map<PlannedBook, number>;
@@ -1193,6 +1239,14 @@ async function writeContent(
     const id = idByLogin.get(login);
     if (id === undefined) {
       throw new Error(`No account was created for ${login}`);
+    }
+    return id;
+  };
+
+  const genreIdOf = (name: string): number => {
+    const id = genreIds.get(name);
+    if (id === undefined) {
+      throw new Error(`No genre row was created for ${name}`);
     }
     return id;
   };
@@ -1217,9 +1271,13 @@ async function writeContent(
   let seriesCount = 0;
 
   for (const author of plan.authors) {
+    // Every Book and Series drawn from this author's bank is filed under the
+    // bank's Genre. A co-authored work keeps the Genre of the author it was
+    // planned under — the only author whose bank it came from.
+    const genreId = genreIdOf(author.spec.bank.genreName);
     const seriesIds: number[] = [];
     for (const entry of author.series) {
-      const fields = createSeriesSchema.parse(entry);
+      const fields = createSeriesSchema.parse({ ...entry, genreId });
       const row = await Series.create(
         { ...fields, createdAt: entry.createdAt, updatedAt: entry.createdAt },
         { transaction, silent: true }
@@ -1242,6 +1300,7 @@ async function writeContent(
     for (const book of author.books) {
       const fields = createBookSchema.parse({
         ...book,
+        genreId,
         seriesId:
           book.seriesIndex === null
             ? null
@@ -1543,7 +1602,13 @@ async function main(): Promise<void> {
       }
 
       const accountIds = await writeAccounts(plan, transaction);
-      const content = await writeContent(plan, accountIds, transaction);
+      const genreIds = await writeGenres(transaction);
+      const content = await writeContent(
+        plan,
+        accountIds,
+        genreIds,
+        transaction
+      );
       const threads = await writeThreads(
         plan,
         accountIds,
@@ -1560,6 +1625,7 @@ async function main(): Promise<void> {
 
       return {
         accounts: accountIds.length,
+        genres: genreIds.size,
         series: content.series,
         books: content.bookIds.size,
         chapters: content.chapters,
