@@ -8,14 +8,17 @@ import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicSeries, SeriesBookSummary } from '@/types/series';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/authors');
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
 const mockedAuthors = jest.mocked(authorsApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const ann = {
@@ -111,6 +114,9 @@ beforeEach(() => {
     items: [first, second, coraDraft],
   });
   mockedAuthors.searchAuthors.mockResolvedValue([]);
+  mockedGenres.listGenres.mockResolvedValue({
+    items: [{ id: 4, name: 'Gothic' }],
+  });
 });
 
 describe('EditSeriesPage', () => {
@@ -129,8 +135,42 @@ describe('EditSeriesPage', () => {
       title: 'The Scale Saga',
       description: 'Dragons, in four parts.',
       tags: ['epic'],
+      genreId: null,
     });
     expect(await screen.findByText('Saved.')).toBeInTheDocument();
+  });
+
+  it('shows the series’ own genre in the select', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      genre: { id: 4, name: 'Gothic' },
+    });
+
+    renderPage();
+
+    // The select's chosen label, rendered beside the combobox.
+    expect(await screen.findByText('Gothic')).toBeInTheDocument();
+  });
+
+  it('keeps an existing genre on an unrelated save', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      genre: { id: 4, name: 'Gothic' },
+    });
+    mockedSeries.updateSeries.mockResolvedValue(series);
+    renderPage();
+
+    const title = await screen.findByLabelText('Title');
+    await userEvent.clear(title);
+    await userEvent.type(title, 'The Scale Saga');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedSeries.updateSeries).toHaveBeenCalledWith(12, {
+      title: 'The Scale Saga',
+      description: 'Dragons, in four parts.',
+      tags: ['epic'],
+      genreId: 4,
+    });
   });
 
   it('lists every book in Series order with its status, a co-author’s draft included', async () => {

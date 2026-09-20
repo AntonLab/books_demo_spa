@@ -6,12 +6,15 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicSeries } from '@/types/series';
 import type { PublicUser } from '@/types/user';
 
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const author: PublicUser = {
@@ -73,6 +76,9 @@ const fillAndSubmit = async () => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedGenres.listGenres.mockResolvedValue({
+    items: [{ id: 4, name: 'Gothic' }],
+  });
 });
 
 describe('NewSeriesPage', () => {
@@ -86,6 +92,7 @@ describe('NewSeriesPage', () => {
       title: 'The Scale Cycle',
       description: 'Dragons, in four parts.',
       tags: [],
+      genreId: null,
     });
     expect(await screen.findByText('Editing series 12')).toBeInTheDocument();
   });
