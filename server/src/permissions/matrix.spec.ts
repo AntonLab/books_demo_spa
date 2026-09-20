@@ -115,3 +115,21 @@ test('no role is granted own on read, which no read handler would honour', () =>
 
   assert.deepEqual(ownReads, []);
 });
+
+// R1. A Genre has no Owner, so no grant here is `own`: either a role may keep
+// the list or it may not. Everyone reads it, guests included, because the
+// header's Genres menu renders before anyone signs in.
+test('everyone reads genres and only admins keep the list', () => {
+  for (const role of ['guest', 'user', 'author']) {
+    assert.equal(scope(role, 'genres', 'read'), 'any', `${role} read`);
+    for (const action of ['create', 'update', 'delete']) {
+      assert.equal(scope(role, 'genres', action), 'none', `${role} ${action}`);
+    }
+  }
+
+  for (const role of ['admin', 'superadmin']) {
+    for (const action of ACTIONS) {
+      assert.equal(scope(role, 'genres', action), 'any', `${role} ${action}`);
+    }
+  }
+});

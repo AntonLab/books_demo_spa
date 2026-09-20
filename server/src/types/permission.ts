@@ -26,6 +26,7 @@ export const MODULES = [
   'chapters',
   'comments',
   'likes',
+  'genres',
   'reports',
 ] as const;
 export type Module = (typeof MODULES)[number];
