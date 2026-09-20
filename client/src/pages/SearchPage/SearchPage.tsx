@@ -37,6 +37,8 @@ export const SearchPage: FC = () => {
 
   if (genreParam !== null) {
     const genreId = Number(genreParam);
+    // A malformed id matches no Genre's id either, so nothing downstream —
+    // the list, the books, or the series — is worth asking about it.
     return Number.isInteger(genreId) && genreId > 0 ? (
       <GenreResults genreId={genreId} />
     ) : (
