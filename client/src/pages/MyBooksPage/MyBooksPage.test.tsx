@@ -94,6 +94,7 @@ beforeEach(() => {
         title: 'The Scale Cycle',
         description: 'Dragons.',
         tags: [],
+        genre: null,
         createdAt: '2026-09-01T00:00:00.000Z',
         updatedAt: '2026-09-01T00:00:00.000Z',
       },

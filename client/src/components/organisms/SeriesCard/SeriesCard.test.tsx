@@ -24,6 +24,7 @@ const series: PublicSeries = {
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor that should have stayed shut.',
   tags: ['gothic', 'mystery'],
+  genre: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
