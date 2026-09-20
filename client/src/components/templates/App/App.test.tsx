@@ -6,6 +6,7 @@ import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as seriesApi from '@/api/series';
+import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 
 jest.mock('@/api/auth');
@@ -14,12 +15,14 @@ jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
+jest.mock('@/api/genres');
 
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedSeries = jest.mocked(seriesApi);
+const mockedGenres = jest.mocked(genresApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
@@ -61,6 +64,7 @@ beforeEach(() => {
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);
   mockedComments.listComments.mockResolvedValue(emptyEnvelope);
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
   mockedSeries.getSeries.mockResolvedValue({
     id: 12,
     authors: [
