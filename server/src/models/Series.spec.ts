@@ -50,6 +50,14 @@ test('series carries no owner column — its Co-authors live in series_authors',
   assert.match(createTableSql, /`id` INTEGER UNSIGNED auto_increment/);
 });
 
+test('Genre.hasMany(Series) unlinks rather than deletes, since genreId is optional', () => {
+  assert.match(createTableSql, /`genreId` INTEGER UNSIGNED(?! NOT NULL)/);
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`genreId`\) REFERENCES `genres` \(`id`\) ON DELETE SET NULL ON UPDATE CASCADE/
+  );
+});
+
 test('description is TEXT and the timestamps are NOT NULL', () => {
   assert.match(createTableSql, /`description` TEXT NOT NULL/);
   assert.match(createTableSql, /`createdAt` DATETIME NOT NULL/);
@@ -77,7 +85,7 @@ test('toPublicSeries copies the tag array rather than aliasing the model', () =>
     tags: ['sci-fi'],
   });
 
-  const output = toPublicSeries(series, []);
+  const output = toPublicSeries(series, [], null);
   output.tags.push('mutated');
 
   assert.deepEqual(series.tags, ['sci-fi']);
@@ -94,5 +102,26 @@ test('toPublicSeries parses a JSON string, should a driver return one raw', () =
   // normalisation it would be spread character by character.
   series.setDataValue('tags', '["sci-fi","epic"]' as unknown as string[]);
 
-  assert.deepEqual(toPublicSeries(series, []).tags, ['sci-fi', 'epic']);
+  assert.deepEqual(toPublicSeries(series, [], null).tags, ['sci-fi', 'epic']);
+});
+
+test('the genre filter is indexed, so `?genreId=` needs no scan', () => {
+  assert.deepEqual(
+    Series.options.indexes?.map((index) => index.fields),
+    [['genreId']]
+  );
+});
+
+test('toPublicSeries reports a series with no Genre as genre: null', () => {
+  const series = Series.build({
+    id: 1,
+    title: 'Test Series',
+    description: 'A trilogy',
+    tags: [],
+  });
+
+  const output = toPublicSeries(series, [], null);
+
+  assert.equal(output.genre, null);
+  assert.ok('genre' in output);
 });

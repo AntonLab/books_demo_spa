@@ -146,6 +146,16 @@ export function initModels(sequelize: Sequelize): Models {
   });
   Book.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
 
+  // A Series' own Genre (ADR-0008), on the same terms as a Book's: SET NULL,
+  // so deleting the Genre leaves the Series without one (A4).
+  Genre.hasMany(Series, {
+    as: 'series',
+    foreignKey: { name: 'genreId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Series.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
+
   Book.hasMany(Chapter, {
     as: 'chapters',
     foreignKey: 'bookId',

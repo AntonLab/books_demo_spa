@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { PublicSeries } from '../types/series.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import {
@@ -22,6 +23,13 @@ const UNOWNED_USER_ID = 999997;
 // A book filed under the first series each fake creates, so the unlink route
 // has something to take out.
 const FILED_BOOK_ID = 40;
+
+const KNOWN_GENRE_ID = 5;
+const MISSING_GENRE_ID = 999996;
+
+const GENRES = new Map<number, PublicGenre>([
+  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic' }],
+]);
 
 // Every persona a fake credit can name, so a response's `authors` carries real
 // summaries rather than ids.
@@ -44,6 +52,7 @@ const createFakeRepository = (
   createFakeSeriesRepository({
     accounts: SUMMARIES,
     books: new Map([[FILED_BOOK_ID, 1]]),
+    genres: GENRES,
     actors,
   });
 
@@ -166,6 +175,97 @@ test('POST rejects a missing description with 400', async () => {
 // is not client-controlled, and authStubs only ever resolves known personas.
 // The repository-level mapping from a rejected FK to NotFoundError is still
 // covered directly in seriesRepository.spec.ts.
+
+// R2, as in bookRoutes.spec.ts: the caller is the `author` persona, which
+// holds `none` on every genres action — choosing a Genre rides on the series'
+// own create grant.
+test('POST files a series under a genre, and leaves it without one when genreId is absent', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const filed = await post(base, { ...valid, genreId: KNOWN_GENRE_ID });
+      const without = await post(base, valid);
+
+      assert.equal(filed.status, 201);
+      assert.deepEqual((await json<PublicSeries>(filed)).genre, {
+        id: KNOWN_GENRE_ID,
+        name: 'Gothic',
+      });
+      assert.equal((await json<PublicSeries>(without)).genre, null);
+    }
+  );
+});
+
+// A6: choosing a Genre rides on the series' own create/update grant (R2), so
+// nothing extra is checked — but an id that names no Genre is a 400. The
+// create path's body is asserted, not just its status: that is where it
+// differs from a zod ValidationError, which carries `details`.
+test('a genreId that names no genre is 400 on create and on update', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(await post(base, valid));
+
+      const onCreate = await post(base, {
+        ...valid,
+        genreId: MISSING_GENRE_ID,
+      });
+      const onUpdate = await patch(base, created.id, {
+        genreId: MISSING_GENRE_ID,
+      });
+
+      assert.equal(onCreate.status, 400);
+      assert.equal(onUpdate.status, 400);
+      const createBody = await json<{ error: string }>(onCreate);
+      assert.match(createBody.error, /does not exist/);
+      assert.ok(!('details' in createBody));
+      const updateBody = await json<{ error: string }>(onUpdate);
+      assert.match(updateBody.error, /does not exist/);
+      assert.ok(!('details' in updateBody));
+    }
+  );
+});
+
+test('PATCH without genreId keeps the genre, and an explicit null clears it', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicSeries>(
+        await post(base, { ...valid, genreId: KNOWN_GENRE_ID })
+      );
+
+      const renamed = await json<PublicSeries>(
+        await patch(base, created.id, { title: 'Renamed' })
+      );
+      assert.equal(renamed.genre?.id, KNOWN_GENRE_ID);
+
+      const cleared = await json<PublicSeries>(
+        await patch(base, created.id, { genreId: null })
+      );
+      assert.equal(cleared.genre, null);
+    }
+  );
+});
+
+test('GET list filters by genre', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, { ...valid, genreId: KNOWN_GENRE_ID });
+      await post(base, valid);
+
+      const inGenre = await json<{ total: number }>(
+        await fetch(`${base}/api/series?genreId=${KNOWN_GENRE_ID}`)
+      );
+      const inMissing = await json<{ total: number }>(
+        await fetch(`${base}/api/series?genreId=${MISSING_GENRE_ID}`)
+      );
+
+      assert.equal(inGenre.total, 1);
+      assert.equal(inMissing.total, 0);
+    }
+  );
+});
 
 test('GET list returns items with the paging envelope', async () => {
   await withAuthenticatedApp(
