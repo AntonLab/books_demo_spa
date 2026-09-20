@@ -211,6 +211,15 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders AdminGenresPage at /admin/genres', async () => {
+    renderWithProviders(<AppShell />, { route: '/admin/genres' });
+
+    // An anonymous visitor: the page explains itself instead of the manager.
+    expect(
+      await screen.findByText('Genres are kept by admins.')
+    ).toBeInTheDocument();
+  });
+
   it('renders the not-found page for an unknown route', async () => {
     renderWithProviders(<AppShell />, { route: '/nowhere' });
 
