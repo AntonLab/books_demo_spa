@@ -10,6 +10,7 @@ import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
+import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
@@ -210,14 +211,16 @@ async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const [authors, coverUrls] = await Promise.all([
+  const [authors, coverUrls, genres] = await Promise.all([
     loadAuthors([book.id], transaction),
     loadCoverUrls([book.id], transaction),
+    loadGenres([book.genreId], transaction),
   ]);
   return toPublicBook(
     book,
     authors.get(book.id) ?? [],
-    coverUrls.get(book.id) ?? null
+    coverUrls.get(book.id) ?? null,
+    genreOf(book.genreId, genres)
   );
 }
 
@@ -247,6 +250,12 @@ function buildWhere(
 
   if (query.seriesId !== undefined) {
     clauses.push({ seriesId: query.seriesId });
+  }
+
+  // A5: combined with the other filters by AND. An id that names no Genre
+  // matches nothing and yields an empty list, as an unknown `?tag=` does.
+  if (query.genreId !== undefined) {
+    clauses.push({ genreId: query.genreId });
   }
 
   if (query.tag) {
@@ -286,6 +295,7 @@ export function createSequelizeBookRepository(): BookRepository {
         // One transaction, so a book never exists without its first credit.
         return await sequelizeOf().transaction(async (transaction) => {
           const { userId, ...attributes } = input;
+          await assertGenreExists(attributes.genreId, transaction);
           const seriesPosition =
             attributes.seriesId === null
               ? null
@@ -327,16 +337,18 @@ export function createSequelizeBookRepository(): BookRepository {
               ],
       });
 
-      const [authors, coverUrls] = await Promise.all([
+      const [authors, coverUrls, genres] = await Promise.all([
         loadAuthors(rows.map((row) => row.id)),
         loadCoverUrls(rows.map((row) => row.id)),
+        loadGenres(rows.map((row) => row.genreId)),
       ]);
       return {
         items: rows.map((row) =>
           toPublicBook(
             row,
             authors.get(row.id) ?? [],
-            coverUrls.get(row.id) ?? null
+            coverUrls.get(row.id) ?? null,
+            genreOf(row.genreId, genres)
           )
         ),
         total: count,
@@ -389,6 +401,8 @@ export function createSequelizeBookRepository(): BookRepository {
           lock: transaction.LOCK.UPDATE,
         });
         if (!book) return null;
+
+        await assertGenreExists(input.genreId, transaction);
 
         // `update` writes only the keys present, so an omitted seriesId
         // leaves the link — and the book's place — alone, while an explicit

@@ -130,6 +130,22 @@ export function initModels(sequelize: Sequelize): Models {
   });
   BookCover.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
+  // A Book's Genre (ADR-0008). SET NULL rather than CASCADE: a Genre is a
+  // label on the Book, not part of it, so deleting the Genre leaves the Book
+  // without one instead of destroying a record nobody asked to delete (A4).
+  // The alias is unread — nothing eager-loads a Genre, because
+  // genreRepository.loadGenres batches them — but declaring both sides is what
+  // creates the foreign key.
+  Genre.hasMany(Book, {
+    as: 'books',
+    // allowNull is restated here so Sequelize does not infer NOT NULL from the
+    // association and quietly make SET NULL illegal.
+    foreignKey: { name: 'genreId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Book.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
+
   Book.hasMany(Chapter, {
     as: 'chapters',
     foreignKey: 'bookId',

@@ -44,6 +44,12 @@ export const createBookSchema = z.object({
   // Defaulted here rather than in the column: MySQL forbids a literal DEFAULT
   // on a JSON column, so the empty array has to come from the application.
   tags: tagListSchema.default([]),
+  // A Genre is optional, and an absent key means the same as an explicit null:
+  // no Genre (A6). `.optional()` rather than the `.default(null)` seriesId
+  // above carries, so the parsed input holds the key only when the caller
+  // named one — the column is nullable, so an absent key already lands as
+  // NULL, and the repository has one less value to tell apart.
+  genreId: idSchema.nullable().optional(),
 });
 
 // Spelled out rather than derived from createBookSchema with
@@ -64,6 +70,9 @@ export const updateBookSchema = z
     // Any status to any other. Not on the create schema: every book starts as a
     // draft, whatever the body says.
     status: z.enum(BOOK_STATUSES),
+    // As seriesId: an explicit null clears the Genre, and an absent key leaves
+    // it alone, because `.partial()` adds no default (A6).
+    genreId: idSchema.nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
@@ -75,6 +84,7 @@ export const listBooksQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   userId: idSchema.optional(),
   seriesId: idSchema.optional(),
+  genreId: idSchema.optional(),
   tag: z.string().min(1).max(BOOK_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),
 });
