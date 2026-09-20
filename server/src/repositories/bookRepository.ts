@@ -116,12 +116,20 @@ export interface BookRepository {
 // that is gone. Reporting that as a 404 is more useful than the generic 500 an
 // unmapped SequelizeForeignKeyConstraintError would produce.
 //
-// book_authors.userId is the only foreign key that can fail here.
-// books.seriesId cannot: every write that sets it to a new series goes through
+// book_authors.userId is the only foreign key this maps. books.seriesId
+// cannot fail here: every write that sets it to a new series goes through
 // nextSeriesPosition first, which holds that series row under a lock for the
 // rest of the transaction and answers a missing one with NotFoundError itself,
 // and a write that keeps the series holds a lock on a book row already
-// pointing at it, which deleting the series would have to change.
+// pointing at it, which deleting the series would have to change. books.genreId
+// has no such lock — assertGenreExists (genreRepository.ts) reads the parent
+// row unlocked, so a Genre deleted in the gap between that check and this
+// insert still trips the FK. On create that race is misreported by this
+// function as NotFoundError('User', userId), naming the wrong resource; the
+// same race on update (which never calls this function) reaches the caller as
+// an unmapped 500. Narrow and accepted: closing it would mean locking every
+// Genre a create or update names, which is Task 4's code to change, not this
+// task's.
 function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
     throw new NotFoundError('User', userId);
