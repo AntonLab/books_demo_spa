@@ -4,6 +4,8 @@ import type { PublicSeries, SeriesBookSummary } from '../types/series';
 
 export interface ListSeriesParams {
   userId?: number;
+  // One Genre's series, as on the book list.
+  genreId?: number;
   limit?: number;
 }
 
@@ -14,6 +16,8 @@ export const listSeries = (
 ): Promise<ListResponse<PublicSeries>> => {
   const search = new URLSearchParams();
   if (params.userId !== undefined) search.set('userId', String(params.userId));
+  if (params.genreId !== undefined)
+    search.set('genreId', String(params.genreId));
   if (params.limit !== undefined) search.set('limit', String(params.limit));
 
   const query = search.toString();
@@ -30,6 +34,9 @@ export interface SeriesPayload {
   title: string;
   description: string;
   tags: string[];
+  // Optional for the same reason as on a book: absent means `null` on create
+  // and "leave it alone" on PATCH.
+  genreId?: number | null;
 }
 
 export const createSeries = (payload: SeriesPayload): Promise<PublicSeries> => {

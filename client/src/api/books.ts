@@ -8,6 +8,9 @@ export interface ListBooksParams {
   userId?: number;
   // The series' books in its Series order, rather than newest first.
   seriesId?: number;
+  // One Genre's books. Combined with the filters above by AND; an id that names
+  // no Genre yields an empty list rather than an error.
+  genreId?: number;
   limit?: number;
   offset?: number;
 }
@@ -17,6 +20,10 @@ export interface CreateBookPayload {
   description: string;
   tags: string[];
   seriesId: number | null;
+  // Optional, because the wire contract is: absent means `null` on create and
+  // "leave the Genre as it is" on PATCH. JSON.stringify drops an undefined key,
+  // so omitting it here is what sends nothing.
+  genreId?: number | null;
 }
 
 // Every field optional, as the server's PATCH schema is. `status` is here and
@@ -39,6 +46,9 @@ export const listBooks = (
   if (params.userId !== undefined) search.set('userId', String(params.userId));
   if (params.seriesId !== undefined) {
     search.set('seriesId', String(params.seriesId));
+  }
+  if (params.genreId !== undefined) {
+    search.set('genreId', String(params.genreId));
   }
   if (params.limit !== undefined) search.set('limit', String(params.limit));
   if (params.offset !== undefined) search.set('offset', String(params.offset));
