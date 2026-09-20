@@ -249,7 +249,7 @@ scripts below still run from this directory, or from the root with `-w server`.
   that link and a type-stripping Node like `npm start` does (ADR-0006)
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
-  **It deletes every row in the nine content tables**, and every uploaded
+  **It deletes every row in the ten content tables**, and every uploaded
   Cover and Avatar with them, so it does nothing without `--force`:
   `npm run seed -w server -- --force` from the repo root, or
   `npm run seed -- --force` from here. Without the flag it prints the row
@@ -257,7 +257,7 @@ scripts below still run from this directory, or from the root with `-w server`.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
-  silently skip that suite instead of failing loudly). Each of those twelve
+  silently skip that suite instead of failing loudly). Each of those thirteen
   specs asks `skipWithoutMysql()` (`src/db/mysqlProbe.testkit.ts`) whether to
   run: with `DB_USER` unset or MySQL unreachable it skips the suite, and the
   run still exits 0. Set `REQUIRE_MYSQL=1` and the same two conditions throw
@@ -473,7 +473,7 @@ value.
 | `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.                                                                        |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
-(default `books_demo_spa_test`, the prefix of the twelve test schemas) and
+(default `books_demo_spa_test`, the prefix of the thirteen test schemas) and
 `REQUIRE_MYSQL`, which CI sets to `1` so the MySQL-backed suites fail rather
 than skip without a database (see `npm test` above).
 
@@ -487,23 +487,26 @@ likes that make the reader-facing pages look lived-in. Run it with
 **Accounts** — all ten `active`, all sharing the password `Password123!`, each
 with `<login>@example.com`:
 
-| Login           | Name                                | Role         |
-| --------------- | ----------------------------------- | ------------ |
-| `superadmin`    | Olga Ivanova                        | `superadmin` |
-| `admin`         | Daniel Reeves                       | `admin`      |
-| `mhale`         | Margaret Hale — gothic / historical | `author`     |
-| `ipetrov`       | Ivan Petrov — hard SF               | `author`     |
-| `nquinn`        | Nora Quinn — urban fantasy          | `author`     |
-| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory  | `user`       |
+| Login           | Name                               | Role         |
+| --------------- | ---------------------------------- | ------------ |
+| `superadmin`    | Olga Ivanova                       | `superadmin` |
+| `admin`         | Daniel Reeves                      | `admin`      |
+| `mhale`         | Margaret Hale — Gothic             | `author`     |
+| `ipetrov`       | Ivan Petrov — Hard SF              | `author`     |
+| `nquinn`        | Nora Quinn — Urban Fantasy         | `author`     |
+| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory | `user`       |
 
 Logins are functional but the names are real ones, because the name is what the
 UI shows: an `AuthorSummary` beside every book and every live comment. A thread
 where "User Two" answers "User Four" reads as a test run, not a demo.
 
 **Content** — each author gets 1-2 series of 4-5 books plus 1-3 standalone
-books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Tags come
-from a per-genre pool, with `mystery` and `slow-burn` deliberately shared
-across two authors each, so `?tag=` returns more than one author's work.
+books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Titles,
+tags and prose come from a per-author **content bank** (`ContentBank` in
+`seed.ts` — `GOTHIC`, `HARD_SF`, `URBAN_FANTASY`; it was called `Genre` until
+that word came to mean a row in `genres`), with `mystery` and `slow-burn`
+deliberately shared across two authors each, so `?tag=` returns more than one
+author's work.
 Two standalone books are co-authored (`shareBooks`, `SHARED_BOOK_COUNT`): each
 of the first two authors' last standalone book also credits the next author in
 `AUTHORS`, so `mhale` and `ipetrov` share one and `ipetrov` and `nquinn` another.
@@ -529,6 +532,19 @@ drawn from those credits, so none contradicts a byline
 first is told the first added them, and each author is told the next author
 in `AUTHORS` left one of their unshared books.
 
+**Genres** — five rows, written by `writeGenres` from `GENRE_NAMES` before any
+content: Gothic, Hard SF and Urban Fantasy, one per content bank, so each
+author's books and series are filed under their bank's Genre (a co-authored work
+keeps the Genre of the author it was planned under, the only author whose bank
+it came from); plus Horror and Romance, which nothing is filed under, so the
+demo has an empty Genre to show in the header's submenu and on
+`/search?genre=`. A bank's `genreName` is typed as the union of `GENRE_NAMES`,
+so it cannot name a Genre the seed never creates, and `writeContent` turns it
+into a `genreId` through the name → id map `writeGenres` returns — the rows do
+not exist while the plan is being built. The `genreId` goes through
+`createBookSchema` / `createSeriesSchema` with the rest of the fields, not
+attached afterwards like the status and the Co-authors.
+
 Three things about it are worth knowing before changing it:
 
 - **It writes through the models, not the API.** `POST /api/auth/register` can
@@ -552,8 +568,10 @@ Three things about it are worth knowing before changing it:
   overwriting the backdated `updatedAt`.
 
 It deletes `notifications` → `likes` → `comments` → `chapters` → `book_authors` → `books` →
-`series_authors` → `series` → `users` by explicit enumeration rather than leaning on the cascades, which would work
-today and start leaving rows behind the day an `onDelete` changes.
+`series_authors` → `series` → `genres` → `users` by explicit enumeration rather than leaning on the cascades, which would work
+today and start leaving rows behind the day an `onDelete` changes. `genres`
+comes after `books` and `series` because both point at it: its
+`ON DELETE SET NULL` is not this script's to lean on either.
 `book_covers` and `user_avatars` are not in that list — nothing seeds a
 Cover or an Avatar — but they are not spared either: both cascade from
 `books`/`users` (`ON DELETE CASCADE`, S1/S3), so deleting those two rows
@@ -572,7 +590,11 @@ dry run without `--force` against a `_seed` test schema, asserting every
 content table's row count is unchanged; and then a `--force` run into that
 same schema, which queries what landed for rows the API would have refused
 (a like on one's own book or comment, on a tombstone or on a Draft book),
-comments and likes dated before their account, and malformed chapter titles.
+comments and likes dated before their account, malformed chapter titles, and
+the five Genres — every book and series filed under one, exactly three of them
+in use, and Horror and Romance under nothing. The dry run additionally asserts
+that `genres` is among the row counts it reports, which is what would catch the
+seed's own `CONTENT_MODELS` losing the tenth table.
 The child inherits the runner's V8 coverage, so a coverage report lists
 `seed.ts` at the fraction the forced run reaches.
 
@@ -1431,8 +1453,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   that destroyed `User` first would leave orphaned `Comment` rows behind
   instead of clearing them, so every suite that touches comments clears
   `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
-  own schema — twelve of them, `books_demo_spa_test` plus
-  `books_demo_spa_test_` and the suite's name (`series`, `books`, `chapters`,
+  own schema — thirteen of them, `books_demo_spa_test` plus
+  `books_demo_spa_test_` and the suite's name (`series`, `books`, `genres`,
+  `chapters`,
   `likes`, `comments`, `notifications`, `sessions`, `password_resets`,
   `permissions`, `app`, `seed`) —
   because `node:test`
@@ -1448,7 +1471,7 @@ snippets — still get wrong. Verified against the 5.x router and request source
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
   That per-suite naming is also what the `posttest` cleanup keys on: those
-  twelve names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
+  thirteen names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
   `dropTestDatabases.testkit.ts` drops whatever `SHOW DATABASES` reports under
   that prefix rather than a list it would have to be told to update. Name a
   new suite's schema the same way and it is cleaned up for free; name it
