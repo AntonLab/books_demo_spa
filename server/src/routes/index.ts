@@ -4,6 +4,7 @@ import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
+import type { GenreRepository } from '../repositories/genreRepository.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
 import type { NotificationRepository } from '../repositories/notificationRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
@@ -16,6 +17,7 @@ import { createBookRoutes } from './bookRoutes.ts';
 import { createChapterOrderRoutes } from './chapterOrderRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
+import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
 import { createSeriesBookRoutes } from './seriesBookRoutes.ts';
@@ -28,6 +30,7 @@ export interface RouteDeps {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  genreRepository: GenreRepository;
   commentRepository: CommentRepository;
   likeRepository: LikeRepository;
   notificationRepository: NotificationRepository;
@@ -59,6 +62,8 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/books', createChapterOrderRoutes(deps));
   router.use('/books', createBookRoutes(deps));
   router.use('/chapters', createChapterRoutes(deps));
+  // Reference data for the catalogue: no path here collides with any above.
+  router.use('/genres', createGenreRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
   router.use('/notifications', createNotificationRoutes(deps));
