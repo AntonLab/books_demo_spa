@@ -61,6 +61,7 @@ describe('AdminGenresPage for everyone else', () => {
 
     expect(screen.getByText('Genres are kept by admins.')).toBeInTheDocument();
     expect(screen.queryByLabelText('Genre name')).toBeNull();
+    expect(mockedGenres.listGenres).not.toHaveBeenCalled();
   });
 });
 
@@ -159,6 +160,9 @@ describe('AdminGenresPage for a moderator', () => {
     await userEvent.click(
       screen.getAllByRole('button', { name: 'Rename' })[0]!
     );
+    const input = screen.getByLabelText('New name for Gothic');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Something else');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(screen.getByText('Gothic')).toBeInTheDocument();
@@ -184,6 +188,39 @@ describe('AdminGenresPage for a moderator', () => {
     expect(
       await screen.findByText('A genre with that name already exists.')
     ).toBeInTheDocument();
+    expect(screen.getByLabelText('New name for Gothic')).toHaveValue('Hard SF');
+  });
+
+  it('clears a stale rename error on cancel and on reopening the editor', async () => {
+    mockedGenres.renameGenre.mockRejectedValue(
+      new ApiError(409, 'A genre with that name already exists')
+    );
+    renderPage(admin);
+
+    await screen.findByText('Gothic');
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Rename' })[0]!
+    );
+    const input = screen.getByLabelText('New name for Gothic');
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Hard SF');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByText('A genre with that name already exists.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(
+      screen.queryByText('A genre with that name already exists.')
+    ).toBeNull();
+
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Rename' })[0]!
+    );
+
+    expect(
+      screen.queryByText('A genre with that name already exists.')
+    ).toBeNull();
   });
 
   it('deletes behind a confirmation that warns about the works', async () => {
@@ -232,5 +269,12 @@ describe('AdminGenresPage for a moderator', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not load the genres.'
     );
+  });
+
+  it('shows an empty state when there are no genres yet', async () => {
+    mockedGenres.listGenres.mockResolvedValue({ items: [] });
+    renderPage(admin);
+
+    expect(await screen.findByText('No genres yet.')).toBeInTheDocument();
   });
 });
