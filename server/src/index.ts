@@ -12,6 +12,7 @@ import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
 import { createSequelizeCommentRepository } from './repositories/commentRepository.ts';
+import { createSequelizeGenreRepository } from './repositories/genreRepository.ts';
 import { createSequelizeLikeRepository } from './repositories/likeRepository.ts';
 import { createSequelizeNotificationRepository } from './repositories/notificationRepository.ts';
 import { createSequelizePasswordResetRepository } from './repositories/passwordResetRepository.ts';
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),
+    genreRepository: createSequelizeGenreRepository(),
     commentRepository: createSequelizeCommentRepository(),
     likeRepository: createSequelizeLikeRepository(),
     notificationRepository: createSequelizeNotificationRepository(),
