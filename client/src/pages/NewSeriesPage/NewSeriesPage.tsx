@@ -3,6 +3,7 @@ import { Alert, Typography } from 'antd';
 import { useNavigate } from 'react-router';
 import { SeriesForm } from '@/components/organisms/SeriesForm';
 import { useSession } from '@/queries/auth';
+import { useGenres } from '@/queries/genres';
 import { useCreateSeries } from '@/queries/series';
 
 // Creating collects only the series' own fields. It has no books and no other
@@ -11,6 +12,7 @@ import { useCreateSeries } from '@/queries/series';
 export const NewSeriesPage: FC = () => {
   const navigate = useNavigate();
   const { data: session } = useSession();
+  const genres = useGenres();
   const create = useCreateSeries();
 
   if (session?.role !== 'author') {
@@ -26,6 +28,7 @@ export const NewSeriesPage: FC = () => {
     <>
       <Typography.Title level={2}>New series</Typography.Title>
       <SeriesForm
+        genreOptions={genres.data?.items ?? []}
         submitLabel="Create series"
         isSubmitting={create.isPending}
         error={create.error?.message ?? null}

@@ -16,6 +16,7 @@ import { SeriesForm } from '@/components/organisms/SeriesForm';
 import { SortableList } from '@/components/organisms/SortableList';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
+import { useGenres } from '@/queries/genres';
 import {
   useDeleteSeries,
   useRemoveBookFromSeries,
@@ -42,6 +43,7 @@ export const EditSeriesPage: FC = () => {
     session?.role === 'admin' || session?.role === 'superadmin';
   const mayEdit = Boolean(session) && (isCoAuthor || isModerator);
 
+  const genres = useGenres();
   const update = useUpdateSeries(seriesId);
   const remove = useDeleteSeries(seriesId);
   const books = useSeriesBooks(seriesId, mayEdit);
@@ -125,11 +127,13 @@ export const EditSeriesPage: FC = () => {
         // Keyed by the last save, so the fields reset to what the server
         // stored rather than keeping a stale copy of the loaded series.
         key={series.updatedAt}
+        genreOptions={genres.data?.items ?? []}
         submitLabel="Save"
         initialValues={{
           title: series.title,
           description: series.description,
           tags: series.tags,
+          genreId: series.genre?.id ?? null,
         }}
         isSubmitting={update.isPending}
         error={update.error?.message ?? null}
