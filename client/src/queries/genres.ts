@@ -31,7 +31,7 @@ const useGenreMutation = <TVariables, TResult>(
     mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['genres'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.genres }),
         queryClient.invalidateQueries({ queryKey: ['books'] }),
         queryClient.invalidateQueries({ queryKey: ['series'] }),
       ]),
