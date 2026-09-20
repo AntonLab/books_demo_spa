@@ -1,12 +1,14 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
+import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import { Genre, initModels } from '../models/index.ts';
+import { Book, Genre, initModels, Series } from '../models/index.ts';
+import { createSequelizeBookRepository } from './bookRepository.ts';
 import { createSequelizeGenreRepository } from './genreRepository.ts';
 import { genreRepositoryContract } from './genreRepository.contract.testkit.ts';
 
@@ -47,7 +49,40 @@ describe('genreRepository against real MySQL', { skip }, () => {
   });
 
   beforeEach(async () => {
+    await Book.destroy({ where: {}, truncate: false });
+    await Series.destroy({ where: {}, truncate: false });
     await Genre.destroy({ where: {}, truncate: false });
+  });
+
+  // A4, and the one rule here that only MySQL can prove: the deletion and the
+  // unlinking are the same statement, so no Book or Series is ever left
+  // pointing at a Genre that is gone.
+  test('a deleted Genre leaves its books and series without one, in the same statement', async () => {
+    const genre = await Genre.create({ name: 'Gothic' });
+    const book = await Book.create({
+      title: 'In Gothic',
+      description: 'A',
+      tags: [],
+      genreId: genre.id,
+    });
+    const series = await Series.create({
+      title: 'Also Gothic',
+      description: 'B',
+      tags: [],
+      genreId: genre.id,
+    });
+
+    assert.equal(await repository.remove(genre.id), true);
+
+    await book.reload();
+    await series.reload();
+    assert.equal(book.genreId, null);
+    assert.equal(series.genreId, null);
+    // And through the response shape a client actually reads.
+    assert.equal(
+      (await createSequelizeBookRepository().findById(book.id))?.genre,
+      null
+    );
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
