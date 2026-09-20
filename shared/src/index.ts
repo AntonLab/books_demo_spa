@@ -6,6 +6,7 @@ export * from './api.ts';
 export * from './book.ts';
 export * from './chapter.ts';
 export * from './comment.ts';
+export * from './genre.ts';
 export * from './like.ts';
 export * from './notification.ts';
 export * from './role.ts';
