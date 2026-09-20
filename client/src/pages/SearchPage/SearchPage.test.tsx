@@ -5,15 +5,18 @@ import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
+import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
 import type { PublicSeries } from '@/types/series';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
+jest.mock('@/api/genres');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedSeries = jest.mocked(seriesApi);
+const mockedGenres = jest.mocked(genresApi);
 
 const book: PublicBook = {
   id: 1,
@@ -31,7 +34,7 @@ const book: PublicBook = {
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
-  genre: null,
+  genre: { id: 4, name: 'Gothic' },
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -303,5 +306,235 @@ describe('SearchPage for one series', () => {
     ).toBeInTheDocument();
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+});
+
+describe('SearchPage for one genre', () => {
+  const gothicSeries: PublicSeries = {
+    id: 12,
+    authors: book.authors,
+    title: 'The Ashgrove Chronicles',
+    description: 'Letters found in a manor that should have stayed shut.',
+    tags: ['gothic'],
+    genre: { id: 4, name: 'Gothic' },
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  };
+
+  const withGenres = () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [
+        { id: 4, name: 'Gothic' },
+        { id: 5, name: 'Hard SF' },
+      ],
+    });
+  };
+
+  it('heads the page with the genre and lists its books', async () => {
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Gothic' })
+    ).toBeInTheDocument();
+    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      genreId: 4,
+      limit: 20,
+    });
+    expect(mockedSeries.listSeries).toHaveBeenCalledWith({
+      genreId: 4,
+      limit: 20,
+    });
+  });
+
+  it('lists the genre’s series under a Series heading, each one linked', async () => {
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [gothicSeries],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    expect(
+      await screen.findByRole('heading', { level: 3, name: 'Series' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
+    ).toHaveAttribute('href', '/search?series=12');
+  });
+
+  it('leaves the Series block out when the genre holds none', async () => {
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    await screen.findByText('A tale of dragons');
+    expect(screen.queryByRole('heading', { name: 'Series' })).toBeNull();
+  });
+
+  it('reports a failure to load the series without hiding the books', async () => {
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockRejectedValue(new Error('Network down'));
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load the series in this genre.'
+    );
+    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+  });
+
+  it('says so when the genre holds no books yet', async () => {
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    expect(
+      await screen.findByText('No books in this genre yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('says the genre is gone when the list does not hold it, and asks for nothing', async () => {
+    withGenres();
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=99' });
+
+    expect(
+      await screen.findByText('This genre no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+  });
+
+  it('asks the server nothing for an id that is not one', () => {
+    renderWithProviders(<SearchPage />, { route: '/search?genre=abc' });
+
+    expect(
+      screen.getByText('This genre no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedGenres.listGenres).not.toHaveBeenCalled();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+  });
+
+  it('reports a failure to load the genre list', async () => {
+    mockedGenres.listGenres.mockRejectedValue(new Error('Network down'));
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load the genres.'
+    );
+  });
+
+  it('lets series win over genre, and genre over a term', async () => {
+    withGenres();
+    mockedSeries.getSeries.mockResolvedValue(gothicSeries);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { unmount } = renderWithProviders(<SearchPage />, {
+      route: '/search?series=12&genre=4&q=dragon',
+    });
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 2,
+        name: 'The Ashgrove Chronicles',
+      })
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      seriesId: 12,
+      limit: 20,
+    });
+
+    unmount();
+    jest.clearAllMocks();
+    withGenres();
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    renderWithProviders(<SearchPage />, { route: '/search?genre=4&q=dragon' });
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Gothic' })
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      genreId: 4,
+      limit: 20,
+    });
   });
 });
