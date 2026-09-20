@@ -192,6 +192,43 @@ of the Book under `books × update` and an Avatar a field of the Account
 under `users × update`, both writes last-write-wins with no Notification
 raised.
 
+A Book and a Series each carry at most one **Genre** (CONTEXT.md, ADR-0008).
+`genres` is a table of its own — `id`, `name` (`VARCHAR(50) NOT NULL`, trimmed,
+1-50 characters, unique **regardless of case**, which MySQL's default
+`utf8mb4_0900_ai_ci` collation already gives the unique index),
+`createdAt`, `updatedAt` — and `books.genreId` / `series.genreId` are nullable
+`INTEGER UNSIGNED` foreign keys to it with `ON DELETE SET NULL`, each indexed
+for the filter below and typed to match `genres.id` exactly, as `books.seriesId`
+matches `series.id`. Deleting a Genre therefore leaves its books and series with
+`genre: null` in the same statement, and raises no Notification: a Notification
+covers who is credited on a work and its deletion, nothing else. A Series' Genre
+is its own — nothing is inherited in either direction, so a Book never takes its
+Genre from its Series.
+
+Four routes (`routes/genreRoutes.ts`, `controllers/genreController.ts`,
+`repositories/genreRepository.ts`), every one of them on the matrix's new
+`genres` module: `GET /api/genres` answers `{ items: PublicGenre[] }` — every
+Genre, sorted by name, no paging — and is open to Guests;
+`POST /api/genres` (`{ name }`) answers 201 with the `PublicGenre`, 409 when the
+name is taken case-insensitively, and 400 for a blank name or one over
+`GENRE_NAME_MAX_LENGTH` (50) after trimming; `PATCH /api/genres/:id` renames
+under the same rules, answers 404 for an unknown id, and allows a rename to
+another casing of the same name; `DELETE /api/genres/:id` answers 204, or 404.
+The in-memory fake compares lower-cased names, because the collation is not
+there to do it.
+
+`GET /api/books` and `GET /api/series` take `genreId`, ANDed with their other
+filters; an id that names no Genre yields an empty list rather than an error,
+exactly as an unknown `?tag=` does. `POST` and `PATCH` on both take
+`genreId: number | null` — absent on a create means `null`, absent on a `PATCH`
+leaves the Genre alone (the update schemas are spelled out rather than
+`.partial()`ed, for the same reason `tags` already is), and an id that names no
+Genre is a 400 in the ordinary validation-error shape. `PublicBook` and
+`PublicSeries` carry `genre: PublicGenre | null`, so `BookDetail` does too;
+`SeriesBookSummary` does not. `PublicGenre` and `GENRE_NAME_MAX_LENGTH` live in
+`shared/src/genre.ts` (ADR-0006) and reach this package through
+`types/genre.ts`.
+
 ## Development Commands
 
 This package is an npm workspace. Install from the repo root, not here; the
@@ -274,13 +311,13 @@ Each layer answers a question the others cannot:
   here and nowhere else.
 - **Route specs** run `createApp` on in-memory fakes and assert the HTTP
   mapping and the permission checks. The fakes for book, series, chapter,
-  comment, like and user live in
+  comment, like, genre and user live in
   `repositories/<name>Repository.fake.testkit.ts`; each takes its seeds and the
   spies a route spec reads (`viewers`, `actors`, …) as one options object, and
   none may grow a domain rule. The users, auth and authors specs share the one
   user fake. The session, password-reset and notification fakes stay inline in
   their route specs.
-- **Contracts** keep those six fakes honest.
+- **Contracts** keep those seven fakes honest.
   `<name>Repository.contract.testkit.ts` registers cases against a harness —
   the repository plus arrange helpers such as `anAuthor()` or
   `aSeries(coAuthorIds)` — and runs twice: from `<name>Repository.spec.ts` on
@@ -341,7 +378,8 @@ Each layer answers a question the others cannot:
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
 - `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
   `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`, `seriesBookRoutes.ts`,
-  `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
+  `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`,
+  `genreRoutes.ts`, mounted under
   `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`, `defaultDeps`,
@@ -355,21 +393,23 @@ Each layer answers a question the others cannot:
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
-  `notificationController.ts`)
+  `notificationController.ts`, `genreController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  `commentRepository.ts`, `likeRepository.ts`, `sessionRepository.ts`,
+  `commentRepository.ts`, `likeRepository.ts`, `genreRepository.ts`,
+  `sessionRepository.ts`,
   `passwordResetRepository.ts`, `notificationRepository.ts` (the list and
   mark-read reads, plus `notify`, which the book, series and user
   repositories call inside their own transactions), Sequelize-backed; `likePattern.ts` holds the
   LIKE escaping they share; `visibility.ts` holds the Draft book rule every
   read goes through — see **Draft books** under Auth; the
   `*.fake.testkit.ts`, `*.contract.testkit.ts` and `*.fake.spec.ts` files
-  beside six of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
+  beside seven of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `UserAvatar.ts`,
-  `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`, `BookAuthor.ts`,
+  `Genre.ts`, `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`,
+  `BookAuthor.ts`,
   `Chapter.ts`, `Comment.ts`, `Like.ts`, `Notification.ts`, `Session.ts`,
   `PasswordResetToken.ts`, `Permission.ts`,
   `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation `Series`
@@ -401,6 +441,7 @@ Each layer answers a question the others cannot:
   Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**),
   `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
+  `genre.ts`,
   `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
   (`Role`, `Module`,
   `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
@@ -886,8 +927,9 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   `chapters`. Admins moderate; they do not author, and that stays true even
   for the role that is `any` on literally everything else.
 - **The matrix is a `role × module × action → scope` table**
-  (`permissions/matrix.ts`, `models/Permission.ts`): seven modules (`users`,
-  `series`, `books`, `chapters`, `comments`, `likes`, `reports` — `reports`
+  (`permissions/matrix.ts`, `models/Permission.ts`): eight modules (`users`,
+  `series`, `books`, `chapters`, `comments`, `likes`, `genres`, `reports` —
+  `reports`
   is reserved for a moderation feature that has no model, controller or
   route yet, so today it grants access to nothing), four actions (`create`,
   `read`, `update`, `delete`), and a scope of `none` / `own` / `any` rather
@@ -907,6 +949,15 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   everything else expands to `none` when `buildMatrixRows()` produces one
   row per role/module/action for the table, so a missing row can never be
   mistaken for an accidental grant.
+- **`genres` is the one module with no `own` anywhere.** A Genre has no Owner,
+  so the scope is the whole grant: `guest`, `user` and `author` hold
+  `read: any` and nothing else; `admin` holds all four actions as `any`; and
+  `superadmin` reaches it through its blanket `any`, since the no-`create`
+  carve-out names `books`, `series` and `chapters` only. Keeping the
+  catalogue's categories is moderation, not authoring (ADR-0008). Setting
+  `genreId` on a Book or a Series needs no grant here at all: it rides on that
+  work's own `create`/`update` grant and ownership check, and any existing
+  Genre may be chosen.
 - **Seeded wholesale at startup, read into memory once.** `permissionStore.ts`
   keeps an in-process `Map` that answers `scopeFor(role, module, action)`.
   The module seeds that map from `buildMatrixRows()` at import time — before
