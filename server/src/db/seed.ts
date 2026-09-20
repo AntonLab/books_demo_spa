@@ -145,9 +145,9 @@ function createRng(seed: number): Rng {
 /* Content banks                                                              */
 /* -------------------------------------------------------------------------- */
 
-interface Genre {
+interface ContentBank {
   // A pool; each book and series takes 3-5. Two tags appear in more than one
-  // genre on purpose, so ?tag= returns more than one author's work.
+  // bank on purpose, so ?tag= returns more than one author's work.
   tags: readonly string[];
   seriesTitles: readonly string[];
   // Long enough for the maximum an author can reach: 2 series x 5 books plus
@@ -158,7 +158,7 @@ interface Genre {
   sentences: readonly string[];
 }
 
-const GOTHIC: Genre = {
+const GOTHIC: ContentBank = {
   tags: ['gothic', 'victorian', 'mystery', 'slow-burn', 'manor', 'epistolary'],
   seriesTitles: ['The Ashgrove Chronicles', 'Letters from Blackmoor'],
   bookTitles: [
@@ -251,7 +251,7 @@ const GOTHIC: Genre = {
   ],
 };
 
-const HARD_SF: Genre = {
+const HARD_SF: ContentBank = {
   tags: [
     'hard-sf',
     'space',
@@ -351,7 +351,7 @@ const HARD_SF: Genre = {
   ],
 };
 
-const URBAN_FANTASY: Genre = {
+const URBAN_FANTASY: ContentBank = {
   tags: ['urban-fantasy', 'magic', 'detective', 'slow-burn', 'city', 'wards'],
   seriesTitles: ['The Nightbus Files', 'Wardens of the Third Ward'],
   bookTitles: [
@@ -447,13 +447,13 @@ const URBAN_FANTASY: Genre = {
 // A book's annotation and a series' blurb are drawn from the same banks as the
 // prose: the point is that a book page reads coherently, not that the blurb is
 // separately authored.
-function description(rng: Rng, genre: Genre, count: number): string {
-  return rng.sample(genre.sentences, count).join(' ');
+function description(rng: Rng, bank: ContentBank, count: number): string {
+  return rng.sample(bank.sentences, count).join(' ');
 }
 
-function chapterTitle(rng: Rng, genre: Genre): string {
-  const adjective = rng.pick(genre.chapterAdjectives);
-  const noun = rng.pick(genre.chapterNouns);
+function chapterTitle(rng: Rng, bank: ContentBank): string {
+  const adjective = rng.pick(bank.chapterAdjectives);
+  const noun = rng.pick(bank.chapterNouns);
 
   // Three shapes rather than one, so twenty-odd titles in a row do not all
   // scan identically.
@@ -462,7 +462,7 @@ function chapterTitle(rng: Rng, genre: Genre): string {
       return `The ${adjective} ${noun}`;
     case 1:
       // A different noun, or "Rain and Rain" turns up.
-      return `${noun} and ${rng.pick(genre.chapterNouns.filter((other) => other !== noun))}`;
+      return `${noun} and ${rng.pick(bank.chapterNouns.filter((other) => other !== noun))}`;
     default:
       return `${indefiniteArticle(adjective)} ${adjective} ${noun}`;
   }
@@ -477,14 +477,14 @@ function indefiniteArticle(word: string): 'A' | 'An' {
 // Deduplicated within one book only: a repeat across two books of a
 // thirteen-book catalogue is plausible, a repeat inside one book is a bug. The
 // attempt cap is what stops a small noun pool from looping forever.
-function chapterTitles(rng: Rng, genre: Genre, count: number): string[] {
+function chapterTitles(rng: Rng, bank: ContentBank, count: number): string[] {
   const titles: string[] = [];
   const seen = new Set<string>();
 
   while (titles.length < count) {
-    let candidate = chapterTitle(rng, genre);
+    let candidate = chapterTitle(rng, bank);
     for (let attempt = 0; seen.has(candidate) && attempt < 20; attempt += 1) {
-      candidate = chapterTitle(rng, genre);
+      candidate = chapterTitle(rng, bank);
     }
     seen.add(candidate);
     titles.push(candidate);
@@ -501,13 +501,13 @@ function chapterTitles(rng: Rng, genre: Genre, count: number): string[] {
 // paragraph: a sentence appearing twice in the same chapter is the kind of
 // thing a reader notices immediately. Six paragraphs of five stays inside a
 // 32-sentence bank; the loop only refills if a bank shrinks or the ranges grow.
-function chapterText(rng: Rng, genre: Genre): string {
+function chapterText(rng: Rng, bank: ContentBank): string {
   const sizes = Array.from({ length: rng.int(4, 6) }, () => rng.int(4, 5));
   const needed = sizes.reduce((sum, size) => sum + size, 0);
 
   const deck: string[] = [];
   while (deck.length < needed) {
-    deck.push(...rng.shuffle(genre.sentences));
+    deck.push(...rng.shuffle(bank.sentences));
   }
 
   let taken = 0;
@@ -578,7 +578,7 @@ interface AccountSpec {
 }
 
 interface AuthorSpec extends AccountSpec {
-  genre: Genre;
+  bank: ContentBank;
 }
 
 // Functional logins with real names: the login is what a person types to sign
@@ -600,21 +600,21 @@ const AUTHORS: readonly AuthorSpec[] = [
     firstName: 'Margaret',
     lastName: 'Hale',
     role: 'author',
-    genre: GOTHIC,
+    bank: GOTHIC,
   },
   {
     login: 'ipetrov',
     firstName: 'Ivan',
     lastName: 'Petrov',
     role: 'author',
-    genre: HARD_SF,
+    bank: HARD_SF,
   },
   {
     login: 'nquinn',
     firstName: 'Nora',
     lastName: 'Quinn',
     role: 'author',
-    genre: URBAN_FANTASY,
+    bank: URBAN_FANTASY,
   },
 ];
 
@@ -747,7 +747,7 @@ function layOutTimeline(rng: Rng, chapterCounts: readonly number[]): Date[][] {
 }
 
 function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
-  const { genre } = spec;
+  const { bank } = spec;
   const seriesCount = rng.int(1, 2);
   const standaloneCount = rng.int(1, 3);
 
@@ -772,7 +772,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   const chapterCounts = slots.map(() => rng.int(20, 24));
   const timeline = layOutTimeline(rng, chapterCounts);
   // One shuffled deck per author, so no author repeats a book title.
-  const titles = rng.shuffle(genre.bookTitles);
+  const titles = rng.shuffle(bank.bookTitles);
 
   // The newest book is still a Draft; the one before it, and every book of the
   // series the draft belongs to, is In progress; everything older is Complete.
@@ -817,12 +817,12 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
 
   const books: PlannedBook[] = slots.map((seriesIndex, index) => {
     const dates = itemAt(timeline, index, 'chapter timeline');
-    const chapters = chapterTitles(rng, genre, dates.length).map(
+    const chapters = chapterTitles(rng, bank, dates.length).map(
       (title, chapterIndex) => {
         const writtenAt = itemAt(dates, chapterIndex, 'chapter date');
         return {
           title,
-          text: chapterText(rng, genre),
+          text: chapterText(rng, bank),
           createdAt: writtenAt,
           publishedAt: publicationOf(
             index,
@@ -836,8 +836,8 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
 
     return {
       title: itemAt(titles, index, 'book title'),
-      description: description(rng, genre, rng.int(3, 4)),
-      tags: rng.sample(genre.tags, rng.int(3, 5)),
+      description: description(rng, bank, rng.int(3, 4)),
+      tags: rng.sample(bank.tags, rng.int(3, 5)),
       coAuthorLogins: [spec.login],
       seriesIndex,
       status: statusOf(index),
@@ -858,9 +858,9 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
         books.find((book) => book.seriesIndex === index) ??
         itemAt(books, 0, 'book');
       return {
-        title: itemAt(genre.seriesTitles, index, 'series title'),
-        description: description(rng, genre, rng.int(3, 4)),
-        tags: rng.sample(genre.tags, rng.int(3, 5)),
+        title: itemAt(bank.seriesTitles, index, 'series title'),
+        description: description(rng, bank, rng.int(3, 4)),
+        tags: rng.sample(bank.tags, rng.int(3, 5)),
         coAuthorLogins: [spec.login],
         createdAt: new Date(
           first.createdAt.getTime() - rng.int(2, 10) * DAY_MS
