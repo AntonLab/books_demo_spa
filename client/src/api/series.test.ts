@@ -139,7 +139,7 @@ describe('createSeries', () => {
     ).resolves.toEqual({ id: 2, title: 'Saga', authors: [{ id: 3 }] });
   });
 
-  it('sends the chosen genre, and null for none', async () => {
+  it('sends the chosen genre', async () => {
     const fetchMock = mockFetch({ id: 2 }, 201);
 
     await createSeries({
@@ -186,6 +186,17 @@ describe('updateSeries', () => {
     await updateSeries(2, { genreId: null });
 
     expect(callOf(fetchMock)[1].body).toBe('{"genreId":null}');
+  });
+
+  // Guards the safety-critical case: a payload that turned an absent key
+  // into `null` would silently clear a Genre on a title-only save.
+  it('leaves genreId off the wire when patching an unrelated field', async () => {
+    const fetchMock = mockFetch({ id: 2 });
+
+    await updateSeries(2, { title: 'x' });
+
+    const body = JSON.parse(String(callOf(fetchMock)[1].body));
+    expect('genreId' in body).toBe(false);
   });
 });
 
