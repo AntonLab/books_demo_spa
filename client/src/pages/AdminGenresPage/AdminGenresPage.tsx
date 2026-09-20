@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import {
   Alert,
   Button,
+  Empty,
   Form,
   Input,
   List,
@@ -110,6 +111,8 @@ const GenreManager: FC = () => {
         <Alert type="error" title="Could not load the genres." />
       ) : genres.isPending ? (
         <Skeleton active paragraph={{ rows: 4 }} />
+      ) : genres.data.items.length === 0 ? (
+        <Empty description="No genres yet." />
       ) : (
         <List
           dataSource={genres.data.items}
@@ -124,13 +127,31 @@ const GenreManager: FC = () => {
 // One row, with its own rename state: `draft` is null while the name is only
 // being shown, and the string being typed once Rename opens the editor.
 const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
+  const { token } = theme.useToken();
   const [draft, setDraft] = useState<string | null>(null);
   const rename = useRenameGenre(genre.id);
   const remove = useDeleteGenre(genre.id);
+  const renameTaken = rename.error !== null && isTaken(rename.error);
+  const renameErrorId = `genre-${genre.id}-rename-error`;
+
+  // Opening the editor, or backing out of it, leaves this row's mutations
+  // behind: without resetting them here, a 409 from a previous Save (or a
+  // failed Delete) would keep rendering under a row nobody is editing.
+  const handleRename = () => {
+    rename.reset();
+    remove.reset();
+    setDraft(genre.name);
+  };
+
+  const handleCancel = () => {
+    rename.reset();
+    remove.reset();
+    setDraft(null);
+  };
 
   const handleSave = () => {
     const name = (draft ?? '').trim();
-    if (name.length === 0) return;
+    if (name.length === 0 || name === genre.name) return;
     rename.mutate({ name }, { onSuccess: () => setDraft(null) });
   };
 
@@ -138,11 +159,15 @@ const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
     <List.Item>
       {/* `orientation`, not the deprecated `direction`, which antd 6 still
           accepts but warns about. */}
-      <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+      <Space
+        orientation="vertical"
+        size={token.marginXXS}
+        style={{ width: '100%' }}
+      >
         {draft === null ? (
           <Space wrap>
             <Typography.Text>{genre.name}</Typography.Text>
-            <Button size="small" onClick={() => setDraft(genre.name)}>
+            <Button size="small" onClick={handleRename}>
               Rename
             </Button>
             <Popconfirm
@@ -161,6 +186,8 @@ const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
           <Space wrap>
             <Input
               aria-label={`New name for ${genre.name}`}
+              aria-invalid={renameTaken}
+              aria-describedby={renameTaken ? renameErrorId : undefined}
               value={draft}
               maxLength={GENRE_NAME_MAX_LENGTH}
               onChange={(event) => setDraft(event.target.value)}
@@ -168,22 +195,26 @@ const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
             <Button
               type="primary"
               size="small"
-              disabled={draft.trim().length === 0}
+              disabled={
+                draft.trim().length === 0 || draft.trim() === genre.name
+              }
               loading={rename.isPending}
               onClick={handleSave}
             >
               Save
             </Button>
-            <Button size="small" onClick={() => setDraft(null)}>
+            <Button size="small" onClick={handleCancel}>
               Cancel
             </Button>
           </Space>
         )}
 
-        {rename.error && isTaken(rename.error) && (
-          <Typography.Text type="danger">{TAKEN}</Typography.Text>
+        {renameTaken && (
+          <Typography.Text id={renameErrorId} type="danger" role="alert">
+            {TAKEN}
+          </Typography.Text>
         )}
-        {rename.error && !isTaken(rename.error) && (
+        {rename.error && !renameTaken && (
           <Alert type="error" title={rename.error.message} />
         )}
         {remove.error && <Alert type="error" title={remove.error.message} />}
