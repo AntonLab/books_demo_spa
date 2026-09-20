@@ -1,18 +1,22 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
+import * as genresApi from '@/api/genres';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/notifications');
+jest.mock('@/api/genres');
 
 const mockedAuth = jest.mocked(authApi);
 const mockedNotifications = jest.mocked(notificationsApi);
+const mockedGenres = jest.mocked(genresApi);
 
 const user: PublicUser = {
   id: 1,
@@ -44,7 +48,21 @@ beforeEach(() => {
     limit: 20,
     offset: 0,
   });
+  mockedGenres.listGenres.mockResolvedValue({
+    items: [
+      { id: 3, name: 'Gothic' },
+      { id: 4, name: 'Hard SF' },
+    ],
+  });
 });
+
+// Renders the current URL so a test can assert where a menu item navigated to.
+const LocationProbe = () => {
+  const location = useLocation();
+  return (
+    <div data-testid="location">{location.pathname + location.search}</div>
+  );
+};
 
 describe('AppHeader while the session is loading', () => {
   it('shows neither Log in nor an avatar', () => {
@@ -191,5 +209,135 @@ describe('AppHeader when logged in', () => {
     await userEvent.keyboard('{Enter}');
 
     expect(await screen.findByText('Log out')).toBeInTheDocument();
+  });
+});
+
+describe('AppHeader genres submenu', () => {
+  it('opens the submenu and lists every genre in the order given', async () => {
+    renderWithProviders(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /Genres/ })
+    );
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Gothic' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Hard SF' })
+    ).toBeInTheDocument();
+  });
+
+  it('navigates to the genre its item names', async () => {
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(null)
+    );
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /Genres/ })
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Gothic' })
+    );
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
+  });
+
+  it('highlights the genre the page is showing', async () => {
+    renderWithProviders(<AppHeader />, {
+      ...withSession(null),
+      route: '/search?genre=3',
+    });
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /Genres/ })
+    );
+
+    // Selection is a class, not aria-selected: rc-menu sets that only for
+    // role="option".
+    expect(await screen.findByRole('menuitem', { name: 'Gothic' })).toHaveClass(
+      'ant-menu-item-selected'
+    );
+  });
+
+  it('still highlights Home at /', async () => {
+    renderWithProviders(<AppHeader />, { ...withSession(null), route: '/' });
+
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toHaveClass(
+      'ant-menu-item-selected'
+    );
+  });
+
+  it('leaves the submenu out entirely when there are no genres', async () => {
+    mockedGenres.listGenres.mockResolvedValue({ items: [] });
+
+    renderWithProviders(<AppHeader />, withSession(null));
+
+    await screen.findByRole('menuitem', { name: 'Home' });
+    expect(screen.queryByRole('menuitem', { name: /Genres/ })).toBeNull();
+  });
+
+  it('leaves the submenu out when the list will not load', async () => {
+    mockedGenres.listGenres.mockRejectedValue(new Error('Network down'));
+
+    renderWithProviders(<AppHeader />, withSession(null));
+
+    await screen.findByRole('menuitem', { name: 'Home' });
+    expect(screen.queryByRole('menuitem', { name: /Genres/ })).toBeNull();
+  });
+});
+
+describe('AppHeader account menu', () => {
+  const admin: PublicUser = { ...user, role: 'admin' };
+
+  it('offers Manage genres to an admin, after Profile', async () => {
+    renderWithProviders(<AppHeader />, withSession(admin));
+
+    await userEvent.click(screen.getByText('bob'));
+
+    expect(await screen.findByText('Manage genres')).toBeInTheDocument();
+  });
+
+  it('offers Manage genres to a superadmin', async () => {
+    renderWithProviders(
+      <AppHeader />,
+      withSession({ ...user, role: 'superadmin' })
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+
+    expect(await screen.findByText('Manage genres')).toBeInTheDocument();
+  });
+
+  it('hides Manage genres from every other role', async () => {
+    renderWithProviders(
+      <AppHeader />,
+      withSession({ ...user, role: 'author' })
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+
+    // Profile is there, so the menu really did open before this claim.
+    expect(await screen.findByText('Profile')).toBeInTheDocument();
+    expect(screen.queryByText('Manage genres')).toBeNull();
+  });
+
+  it('navigates to the management page when Manage genres is clicked', async () => {
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(admin)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Manage genres'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
   });
 });

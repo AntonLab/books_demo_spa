@@ -5,6 +5,7 @@ import type { MenuProps } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { openModal } from '@/store/authSlice';
 import { useLogout, useSession } from '@/queries/auth';
+import { useGenres } from '@/queries/genres';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { NotificationBell } from '@/components/organisms/NotificationBell';
@@ -18,8 +19,28 @@ export const AppHeader: FC = () => {
   const logout = useLogout();
   const user = session.data;
 
+  const genres = useGenres();
+  // Empty covers all three cases the submenu must not appear in: loading,
+  // failed, and a genuinely empty list.
+  const genreItems = genres.data?.items ?? [];
+  const isModerator = user?.role === 'admin' || user?.role === 'superadmin';
+
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
+    ...(genreItems.length > 0
+      ? [
+          {
+            key: 'genres',
+            label: 'Genres',
+            // Each child is keyed by its own target path, so the menu's
+            // onClick navigates to the key like every other item.
+            children: genreItems.map((genre) => ({
+              key: `/search?genre=${genre.id}`,
+              label: genre.name,
+            })),
+          },
+        ]
+      : []),
     // Only for an account holding the author Role: that is who can be credited
     // on a book, so nobody else has anything to find there.
     ...(user?.role === 'author'
@@ -29,6 +50,8 @@ export const AppHeader: FC = () => {
 
   const accountItems: MenuProps['items'] = [
     { key: '/profile', label: 'Profile' },
+    // Keeping the Genre list is a Moderator's job; no other Role is offered it.
+    ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
     { type: 'divider' },
     { key: 'logout', label: 'Log out' },
   ];
@@ -45,11 +68,27 @@ export const AppHeader: FC = () => {
     <Layout.Header
       style={{ display: 'flex', alignItems: 'center', gap: token.margin }}
     >
+      {/* Two props the submenu needs, both explained in CLAUDE.md's Testing
+          notes as well:
+          - `disabledOverflow`: rc-menu puts every child past the first into an
+            overflowDisabled context unless this is set, and such a SubMenu
+            can never open. The visible-item count comes from ResizeObserver
+            measurements jsdom never reports, so without this the submenu is
+            unopenable in every test — and a content-measured horizontal menu
+            collapses its items into "…" in a real browser, the same reason the
+            Log in menu carries it.
+          - `triggerSubMenuAction="click"`: the default is hover, which a touch
+            device has no way to perform and which a test can only drive
+            through rc-menu's open delay. */}
       <Menu
         theme="dark"
         mode="horizontal"
+        disabledOverflow
+        triggerSubMenuAction="click"
         items={navItems}
-        selectedKeys={[location.pathname]}
+        // pathname + search, so a genre item whose key carries a query string
+        // is highlighted on its own page while / and /my-books keep working.
+        selectedKeys={[`${location.pathname}${location.search}`]}
         onClick={({ key }) => void navigate(key)}
         style={{ flex: 1, minWidth: 0 }}
       />
