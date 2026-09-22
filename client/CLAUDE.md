@@ -217,8 +217,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
   auth mutations), `books.ts` (`useBooks`, `useSearchBooks`,
   `useBooksInSeries` — `?seriesId=`, which the server returns in Series
-  order — `useBooksInGenre` — `?genreId=`, the server's own newest-first
-  order — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
+  order — `useBooksInGenre` — `?genreId=`, the server's default order (oldest
+  first, by id) — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
   list that includes their drafts — and five book mutations, the
   create/update/delete trio plus `useUploadBookCover`/`useDeleteBookCover`,
   that all invalidate the whole `books` prefix, since one write can move a
@@ -332,22 +332,29 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     `NotificationBell` beside it, and an `admin` or `superadmin` also gets
     "Manage genres" (→ `/admin/genres`) after Profile — no other Role sees it).
     The nav `Menu` carries `disabledOverflow` and `triggerSubMenuAction="click"`.
-    rc-menu puts every child past the first into an `overflowDisabled` context
-    in which a `SubMenu` can never open, and jsdom reports no width to
-    `ResizeObserver`, so without `disabledOverflow` the Genres submenu is dead
-    and untestable — the accepted trade is that the left nav menu no longer
-    collapses into a "…" overflow item at phone width.
+    rc-menu starts every child past the first in an `overflowDisabled` context
+    that lifts only once `ResizeObserver` measurement advances
+    `lastVisibleIndex` past it; jsdom's stub reports no width, so that
+    boundary sticks at index 0 and, without `disabledOverflow`, the Genres
+    `SubMenu` is dead and untestable — the accepted trade is that the left
+    nav menu no longer collapses into a "…" overflow item at phone width.
     `triggerSubMenuAction="click"` swaps the default hover trigger, which a
     touch device has no way to perform and a test can only drive through
-    rc-menu's open delay. `NotificationBell` (a
+    rc-menu's open delay. The signed-out "Log in" `Menu` carries
+    `disabledOverflow` too, but for a reason of its own: it holds no
+    `SubMenu` to open, and a menu sized by its own single item's content
+    collapses into "…" without it regardless of environment; `NotificationBell` (a
     badge with the unread count, also in the button's name, over a `Popover`
     of the newest notifications in words, the work's title linked while the
     work exists — a book to its page, a series to its editor. Opening it marks
     the unread ones read at once but keeps them highlighted until it closes); `BookForm` (presentational fields for creating and editing a
     book; `showStatus` adds the status radios, which creating leaves out
-    because every new book is a draft, and "No series" travels as 0 inside the
-    form and leaves as `null`); `SeriesForm` (BookForm's fields
-    minus series and status — title, description, tags); `CoAuthorManager`
+    because every new book is a draft; "No series" travels as 0 inside the
+    form and leaves as `null`, and a required `genreOptions: PublicGenre[]`
+    prop's Genre select follows the same convention through its own "No
+    genre" option); `SeriesForm` (BookForm's fields minus series and status —
+    title, description, tags and Genre, the last through the same select as
+    `BookForm`'s); `CoAuthorManager`
     (the byline of the `work` it is given, a book or a series, each Co-author's
     `AccountAvatar` beside their name, with an
     immediate Remove, a Leave behind a `Popconfirm`, and a search-as-you-type
@@ -370,8 +377,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     `AccountAvatar`, blurb, its Genre linked the same way, and tags — heading
     `SearchPage`'s results for one series, and leaving its books to whoever
     renders it; with `linked`, the title becomes a level-4 heading holding a
-    `Link` to `/search?series=<id>` instead of that level-2 page heading, which
-    is the form the Genre results list) and the
+    `Link` to `/search?series=<id>` instead of that level-2 page heading — the
+    form the Genre results list renders each series card in) and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
     `SearchPage` (from `useSearchBooks(q)`, `useBooksInSeries(id)` or `useBooksInGenre(id)`) can
@@ -423,12 +430,14 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   one, says "This series no longer exists." — and `?genre=` lists the Genre's
   books under a level-2 heading naming it, then its series as linked
   `SeriesCard`s under a level-3 "Series" heading, that block left out while it
-  loads and when it is empty. With more than one parameter present `series`
+  loads and when it is empty, plus an error `Alert` if the series request
+  fails. With more than one parameter present `series`
   wins, then `genre`, then `q`; an id that is not a positive integer, or one
   the loaded Genre list does not hold, says "This genre no longer exists." and
   asks for no books or series), `BookPage` (`/books/:id`: the
   book's `BookCover` beside its title, each Co-author's `AccountAvatar` in
-  the byline, and its series linked to `/search?series=`), `ChapterPage`
+  the byline, and its series linked to `/search?series=` and its Genre to
+  `/search?genre=`), `ChapterPage`
   (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
   author's own books, drafts included, and "Create book", and a Series tab of
   the series they co-author, each linked to its editor, with "Create
@@ -463,7 +472,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   already exists." beside the field that caused it. For `admin` and
   `superadmin` only — every other Role, Guests included, gets the "Genres"
   heading and an info `Alert` saying Genres are kept by admins, the way
-  `MyBooksPage` answers a non-author),
+  `MyBooksPage` answers a non-author; like `MyBooksPage`'s own gate, it reads
+  the session with no `isPending` branch, so that `Alert` shows for a
+  moderator too until the session resolves),
   `NotFoundPage` (also what `/series` gets: there is no
   series page), and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
@@ -496,7 +507,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   editor's row, carrying a book's title, status and authors but not its
   text),
   `genre.ts` (`PublicGenre` and `GENRE_NAME_MAX_LENGTH`, both from `shared`, the
-  second being what the add and rename forms validate against),
+  second being the cap the add and rename inputs enforce as their
+  `maxLength`, not a validation rule),
   `chapter.ts` (`PublicChapter` with `publishedAt`, plus `chapterStateOf`
   and `publishedChapters` — the public `BookPage` and the reader's
   previous/next show only chapters that are out, even to a Co-author, whose
