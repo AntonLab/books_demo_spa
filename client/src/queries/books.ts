@@ -49,7 +49,7 @@ export const useBooksInSeries = (seriesId: number) => {
   });
 };
 
-// One Genre's books: the server's default order (newest first), drafts excluded
+// One Genre's books: the server's default order (oldest first, by id), drafts excluded
 // as in every public list. One page, like the main page's list — Genre results
 // are capped at a page rather than paged.
 export const useBooksInGenre = (genreId: number) => {
