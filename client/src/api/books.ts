@@ -6,7 +6,7 @@ export interface ListBooksParams {
   q?: string;
   // Naming the caller's own id is the one list that includes their drafts.
   userId?: number;
-  // The series' books in its Series order, rather than newest first.
+  // The series' books in its Series order, rather than the default by id.
   seriesId?: number;
   // One Genre's books. Combined with the filters above by AND; an id that names
   // no Genre yields an empty list rather than an error.
