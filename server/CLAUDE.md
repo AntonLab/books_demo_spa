@@ -192,6 +192,45 @@ of the Book under `books × update` and an Avatar a field of the Account
 under `users × update`, both writes last-write-wins with no Notification
 raised.
 
+A Book and a Series each carry at most one **Genre** (CONTEXT.md, ADR-0008).
+`genres` is a table of its own — `id`, `name` (`VARCHAR(50) NOT NULL`, trimmed,
+1-50 characters, unique **regardless of case**, because the model pins
+`utf8mb4_0900_ai_ci` on the table explicitly rather than relying on the
+server's default), `createdAt`, `updatedAt` — and `books.genreId` /
+`series.genreId` are nullable `INTEGER UNSIGNED` foreign keys to it with
+`ON DELETE SET NULL`, each indexed for the filter below and typed to match
+`genres.id` exactly, as `books.seriesId` matches `series.id`. Deleting a Genre
+therefore leaves its books and series with
+`genre: null` in the same statement, and raises no Notification: a Notification
+covers who is credited on a work and its deletion, nothing else. A Series' Genre
+is its own — nothing is inherited in either direction, so a Book never takes its
+Genre from its Series.
+
+Four routes (`routes/genreRoutes.ts`, `controllers/genreController.ts`,
+`repositories/genreRepository.ts`), every one of them on the matrix's new
+`genres` module: `GET /api/genres` answers `{ items: PublicGenre[] }` — every
+Genre, sorted by name, no paging — and is open to Guests;
+`POST /api/genres` (`{ name }`) answers 201 with the `PublicGenre`, 409 when the
+name is taken case-insensitively, and 400 for a blank name or one over
+`GENRE_NAME_MAX_LENGTH` (50) after trimming; `PATCH /api/genres/:id` renames
+under the same rules, answers 404 for an unknown id, and allows a rename to
+another casing of the same name; `DELETE /api/genres/:id` answers 204, or 404.
+The in-memory fake compares lower-cased names, because the collation is not
+there to do it.
+
+`GET /api/books` and `GET /api/series` take `genreId`, ANDed with their other
+filters; an id that names no Genre yields an empty list rather than an error,
+exactly as an unknown `?tag=` does. `POST` and `PATCH` on both take
+`genreId: number | null` — absent on a create means `null`, absent on a `PATCH`
+leaves the Genre alone (the update schemas are spelled out rather than
+derived, for the same reason `tags` already is), and an id that names no Genre
+is a 400 whose body just names the missing Genre, with no `details` key —
+unlike a zod validation failure, which always carries one. `PublicBook` and
+`PublicSeries` carry `genre: PublicGenre | null`, so `BookDetail` does too;
+`SeriesBookSummary` does not. `PublicGenre` and `GENRE_NAME_MAX_LENGTH` live in
+`shared/src/genre.ts` (ADR-0006) and reach this package through
+`types/genre.ts`.
+
 ## Development Commands
 
 This package is an npm workspace. Install from the repo root, not here; the
@@ -212,7 +251,7 @@ scripts below still run from this directory, or from the root with `-w server`.
   that link and a type-stripping Node like `npm start` does (ADR-0006)
 - `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
-  **It deletes every row in the nine content tables**, and every uploaded
+  **It deletes every row in the ten content tables**, and every uploaded
   Cover and Avatar with them, so it does nothing without `--force`:
   `npm run seed -w server -- --force` from the repo root, or
   `npm run seed -- --force` from here. Without the flag it prints the row
@@ -220,7 +259,7 @@ scripts below still run from this directory, or from the root with `-w server`.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`
   (loads `.env.local` when present, then runs every `node:test` spec, including
   the MySQL-backed integration suite — omitting `--env-file-if-exists` would
-  silently skip that suite instead of failing loudly). Each of those twelve
+  silently skip that suite instead of failing loudly). Each of those thirteen
   specs asks `skipWithoutMysql()` (`src/db/mysqlProbe.testkit.ts`) whether to
   run: with `DB_USER` unset or MySQL unreachable it skips the suite, and the
   run still exits 0. Set `REQUIRE_MYSQL=1` and the same two conditions throw
@@ -271,16 +310,16 @@ Each layer answers a question the others cannot:
   Draft book visibility, the last Co-author, the Author role a credit needs,
   duplicate credits, Notifications, the reorder 409s, tombstones, the role
   hierarchy, a Cover's or Avatar's replace-in-place and cascade — is proven
-  here and nowhere else.
+  here and nowhere else, bar the one exception the **Contracts** bullet names.
 - **Route specs** run `createApp` on in-memory fakes and assert the HTTP
   mapping and the permission checks. The fakes for book, series, chapter,
-  comment, like and user live in
+  comment, like, genre and user live in
   `repositories/<name>Repository.fake.testkit.ts`; each takes its seeds and the
   spies a route spec reads (`viewers`, `actors`, …) as one options object, and
   none may grow a domain rule. The users, auth and authors specs share the one
   user fake. The session, password-reset and notification fakes stay inline in
   their route specs.
-- **Contracts** keep those six fakes honest.
+- **Contracts** keep those seven fakes honest.
   `<name>Repository.contract.testkit.ts` registers cases against a harness —
   the repository plus arrange helpers such as `anAuthor()` or
   `aSeries(coAuthorIds)` — and runs twice: from `<name>Repository.spec.ts` on
@@ -288,8 +327,13 @@ Each layer answers a question the others cannot:
   asserts interface semantics only: `null` or `false` for a missing row, which
   error class is thrown and which resource a `NotFoundError` names, an order a
   controller depends on, an explicit `seriesId: null` unlinking a book. Never
-  the domain rules above. A repository method a controller comes to rely on
-  belongs in its contract, and a fake change must keep its fake spec green.
+  the domain rules above, with one exception: a Genre name's case-insensitive
+  uniqueness sits in `genreRepository.contract.testkit.ts` rather than the MySQL
+  spec alone, because MySQL gets it from the column's collation while the fake
+  has to lower-case names by hand to agree, and a rule the fake must match is a
+  rule the contract has to state (M1). A repository method a controller comes to
+  rely on belongs in its contract, and a fake change must keep its fake spec
+  green.
   `chapterRepository.findBookCoAuthorIds` has no `ORDER BY`, unlike the book
   and series lookups, so its contract compares ids as a set.
 - **`src/app.spec.ts`** is the only suite that goes from HTTP through the real
@@ -339,10 +383,11 @@ Each layer answers a question the others cannot:
 - `src/images.ts` — the one module every `sharp` call lives in:
   `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
-- `src/routes/` — Express route definitions (`authRoutes.ts`, `authorRoutes.ts`,
-  `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`, `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`, `seriesBookRoutes.ts`,
-  `commentRoutes.ts`, `likeRoutes.ts`, `notificationRoutes.ts`, mounted under
-  `/api`).
+- `src/routes/` — Express route definitions (`authRoutes.ts`,
+  `authorRoutes.ts`, `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`,
+  `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`,
+  `seriesBookRoutes.ts`, `commentRoutes.ts`, `likeRoutes.ts`,
+  `notificationRoutes.ts`, `genreRoutes.ts`, mounted under `/api`).
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`, `defaultDeps`,
   `unlimitedAuthRateLimits`); `tsconfig.build.json`
@@ -355,23 +400,24 @@ Each layer answers a question the others cannot:
 - `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
   `userController.ts`, `seriesController.ts`, `bookController.ts`,
   `chapterController.ts`, `commentController.ts`, `likeController.ts`,
-  `notificationController.ts`)
+  `notificationController.ts`, `genreController.ts`)
 - `src/repositories/` — data-access layer (`userRepository.ts`,
   `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  `commentRepository.ts`, `likeRepository.ts`, `sessionRepository.ts`,
-  `passwordResetRepository.ts`, `notificationRepository.ts` (the list and
+  `commentRepository.ts`, `likeRepository.ts`, `genreRepository.ts`,
+  `sessionRepository.ts`, `passwordResetRepository.ts`,
+  `notificationRepository.ts` (the list and
   mark-read reads, plus `notify`, which the book, series and user
   repositories call inside their own transactions), Sequelize-backed; `likePattern.ts` holds the
   LIKE escaping they share; `visibility.ts` holds the Draft book rule every
   read goes through — see **Draft books** under Auth; the
   `*.fake.testkit.ts`, `*.contract.testkit.ts` and `*.fake.spec.ts` files
-  beside six of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
+  beside seven of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
 - `src/models/` — Sequelize models & associations (`User.ts`, `UserAvatar.ts`,
-  `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`, `BookAuthor.ts`,
-  `Chapter.ts`, `Comment.ts`, `Like.ts`, `Notification.ts`, `Session.ts`,
-  `PasswordResetToken.ts`, `Permission.ts`,
+  `Genre.ts`, `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`,
+  `BookAuthor.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `Notification.ts`,
+  `Session.ts`, `PasswordResetToken.ts`, `Permission.ts`,
   `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation `Series`
   and `Book` share; `creditedBook.testkit.ts` is the suites' way to create a
   book or a series with its Co-authors)
@@ -401,8 +447,8 @@ Each layer answers a question the others cannot:
   Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**),
   `errorHandler.ts`, `notFound.ts`, `validate.ts`)
 - `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`, `permission.ts`
-  (`Role`, `Module`,
+  `genre.ts`, `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`,
+  `permission.ts` (`Role`, `Module`,
   `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
   `image.ts`, `errors.ts`, `express.d.ts`). The response types (`Public*`,
   `BookDetail`, …) and the unions the client also uses (`BOOK_STATUSES`,
@@ -432,7 +478,7 @@ value.
 | `RESET_DELIVERY`          | `log`; none in production | Where a password-reset link goes. `log`, the only delivery so far, writes it to the server log. Production has no default and refuses to start without it, so nobody ships link-logging by accident.                                                                        |
 
 Two more are read only by the test suite, never by `config.ts`: `TEST_DB_NAME`
-(default `books_demo_spa_test`, the prefix of the twelve test schemas) and
+(default `books_demo_spa_test`, the prefix of the thirteen test schemas) and
 `REQUIRE_MYSQL`, which CI sets to `1` so the MySQL-backed suites fail rather
 than skip without a database (see `npm test` above).
 
@@ -446,23 +492,26 @@ likes that make the reader-facing pages look lived-in. Run it with
 **Accounts** — all ten `active`, all sharing the password `Password123!`, each
 with `<login>@example.com`:
 
-| Login           | Name                                | Role         |
-| --------------- | ----------------------------------- | ------------ |
-| `superadmin`    | Olga Ivanova                        | `superadmin` |
-| `admin`         | Daniel Reeves                       | `admin`      |
-| `mhale`         | Margaret Hale — gothic / historical | `author`     |
-| `ipetrov`       | Ivan Petrov — hard SF               | `author`     |
-| `nquinn`        | Nora Quinn — urban fantasy          | `author`     |
-| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory  | `user`       |
+| Login           | Name                               | Role         |
+| --------------- | ---------------------------------- | ------------ |
+| `superadmin`    | Olga Ivanova                       | `superadmin` |
+| `admin`         | Daniel Reeves                      | `admin`      |
+| `mhale`         | Margaret Hale — Gothic             | `author`     |
+| `ipetrov`       | Ivan Petrov — Hard SF              | `author`     |
+| `nquinn`        | Nora Quinn — Urban Fantasy         | `author`     |
+| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory | `user`       |
 
 Logins are functional but the names are real ones, because the name is what the
 UI shows: an `AuthorSummary` beside every book and every live comment. A thread
 where "User Two" answers "User Four" reads as a test run, not a demo.
 
 **Content** — each author gets 1-2 series of 4-5 books plus 1-3 standalone
-books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Tags come
-from a per-genre pool, with `mystery` and `slow-burn` deliberately shared
-across two authors each, so `?tag=` returns more than one author's work.
+books, every book 20-24 chapters of ~2 KB, every book 3-15 comments. Titles,
+tags and prose come from a per-author **content bank** (`ContentBank` in
+`seed.ts` — `GOTHIC`, `HARD_SF`, `URBAN_FANTASY`; it was called `Genre` until
+that word came to mean a row in `genres`), with `mystery` and `slow-burn`
+deliberately shared across two authors each, so `?tag=` returns more than one
+author's work.
 Two standalone books are co-authored (`shareBooks`, `SHARED_BOOK_COUNT`): each
 of the first two authors' last standalone book also credits the next author in
 `AUTHORS`, so `mhale` and `ipetrov` share one and `ipetrov` and `nquinn` another.
@@ -488,6 +537,19 @@ drawn from those credits, so none contradicts a byline
 first is told the first added them, and each author is told the next author
 in `AUTHORS` left one of their unshared books.
 
+**Genres** — five rows, written by `writeGenres` from `GENRE_NAMES` before any
+content: Gothic, Hard SF and Urban Fantasy, one per content bank, so each
+author's books and series are filed under their bank's Genre (a co-authored work
+keeps the Genre of the author it was planned under, the only author whose bank
+it came from); plus Horror and Romance, which nothing is filed under, so the
+demo has an empty Genre to show in the header's submenu and on
+`/search?genre=`. A bank's `genreName` is typed as the union of `GENRE_NAMES`,
+so it cannot name a Genre the seed never creates, and `writeContent` turns it
+into a `genreId` through the name → id map `writeGenres` returns — the rows do
+not exist while the plan is being built. The `genreId` goes through
+`createBookSchema` / `createSeriesSchema` with the rest of the fields, not
+attached afterwards like the status and the Co-authors.
+
 Three things about it are worth knowing before changing it:
 
 - **It writes through the models, not the API.** `POST /api/auth/register` can
@@ -511,8 +573,10 @@ Three things about it are worth knowing before changing it:
   overwriting the backdated `updatedAt`.
 
 It deletes `notifications` → `likes` → `comments` → `chapters` → `book_authors` → `books` →
-`series_authors` → `series` → `users` by explicit enumeration rather than leaning on the cascades, which would work
-today and start leaving rows behind the day an `onDelete` changes.
+`series_authors` → `series` → `genres` → `users` by explicit enumeration rather than leaning on the cascades, which would work
+today and start leaving rows behind the day an `onDelete` changes. `genres`
+comes after `books` and `series` because both point at it: its
+`ON DELETE SET NULL` is not this script's to lean on either.
 `book_covers` and `user_avatars` are not in that list — nothing seeds a
 Cover or an Avatar — but they are not spared either: both cascade from
 `books`/`users` (`ON DELETE CASCADE`, S1/S3), so deleting those two rows
@@ -531,7 +595,11 @@ dry run without `--force` against a `_seed` test schema, asserting every
 content table's row count is unchanged; and then a `--force` run into that
 same schema, which queries what landed for rows the API would have refused
 (a like on one's own book or comment, on a tombstone or on a Draft book),
-comments and likes dated before their account, and malformed chapter titles.
+comments and likes dated before their account, malformed chapter titles, and
+the five Genres — every book and series filed under one, exactly three of them
+in use, and Horror and Romance under nothing. The dry run additionally asserts
+that `genres` is among the row counts it reports, which is what would catch the
+seed's own `CONTENT_MODELS` losing the tenth table.
 The child inherits the runner's V8 coverage, so a coverage report lists
 `seed.ts` at the fraction the forced run reaches.
 
@@ -547,13 +615,13 @@ The child inherits the runner's V8 coverage, so a coverage report lists
 - **Tokens are hashed with SHA-256, not argon2** (ADR-0001). Only the hash is
   stored; the plaintext exists in the cookie and the reset link and nowhere
   else.
-- **`requireAuth` guards only `GET /api/auth/me`** now; every write on the six
-  resources below runs through `requirePermission` instead (see **Roles and
-  permissions**). Both run before `validate` on the route they guard, so an
-  unauthenticated or disallowed request is refused without its body being
-  parsed or echoed back in a 400. The visible consequence: a request refused
-  by either middleware with a malformed body or id still comes back 401 or
-  403, never 400.
+- **`requireAuth` guards only `GET /api/auth/me`** now; every write on the
+  seven resources below runs through `requirePermission` instead (see
+  **Roles and permissions**). Both run before `validate` on the route they
+  guard, so an unauthenticated or disallowed request is refused without its
+  body being parsed or echoed back in a 400. The visible consequence: a
+  request refused by either middleware with a malformed body or id still
+  comes back 401 or 403, never 400.
 - **Login gives one answer to two questions.** An unknown login and a wrong
   password both return 401 with an identical body, and the unknown-login path
   deliberately spends an argon2 verify against a cached dummy hash so the two
@@ -886,8 +954,9 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   `chapters`. Admins moderate; they do not author, and that stays true even
   for the role that is `any` on literally everything else.
 - **The matrix is a `role × module × action → scope` table**
-  (`permissions/matrix.ts`, `models/Permission.ts`): seven modules (`users`,
-  `series`, `books`, `chapters`, `comments`, `likes`, `reports` — `reports`
+  (`permissions/matrix.ts`, `models/Permission.ts`): eight modules (`users`,
+  `series`, `books`, `chapters`, `comments`, `likes`, `genres`, `reports` —
+  `reports`
   is reserved for a moderation feature that has no model, controller or
   route yet, so today it grants access to nothing), four actions (`create`,
   `read`, `update`, `delete`), and a scope of `none` / `own` / `any` rather
@@ -907,6 +976,15 @@ The child inherits the runner's V8 coverage, so a coverage report lists
   everything else expands to `none` when `buildMatrixRows()` produces one
   row per role/module/action for the table, so a missing row can never be
   mistaken for an accidental grant.
+- **`genres` is the one routed module with no `own` anywhere.** A Genre has
+  no Owner, so the scope is the whole grant: `guest`, `user` and `author`
+  hold `read: any` and nothing else; `admin` holds all four actions as
+  `any`; and `superadmin` reaches it through its blanket `any`, since the
+  no-`create` carve-out names `books`, `series` and `chapters` only. Keeping
+  the catalogue's categories is moderation, not authoring (ADR-0008).
+  Setting `genreId` on a Book or a Series needs no grant here at all: it
+  rides on that work's own `create`/`update` grant and ownership check, and
+  any existing Genre may be chosen.
 - **Seeded wholesale at startup, read into memory once.** `permissionStore.ts`
   keeps an in-process `Map` that answers `scopeFor(role, module, action)`.
   The module seeds that map from `buildMatrixRows()` at import time — before
@@ -1380,9 +1458,9 @@ snippets — still get wrong. Verified against the 5.x router and request source
   that destroyed `User` first would leave orphaned `Comment` rows behind
   instead of clearing them, so every suite that touches comments clears
   `Comment` explicitly, before `User`. Each MySQL-backed suite also syncs its
-  own schema — twelve of them, `books_demo_spa_test` plus
-  `books_demo_spa_test_` and the suite's name (`series`, `books`, `chapters`,
-  `likes`, `comments`, `notifications`, `sessions`, `password_resets`,
+  own schema — thirteen of them, `books_demo_spa_test` plus
+  `books_demo_spa_test_` and the suite's name (`series`, `books`, `genres`,
+  `chapters`, `likes`, `comments`, `notifications`, `sessions`, `password_resets`,
   `permissions`, `app`, `seed`) —
   because `node:test`
   runs spec files in parallel processes, and two suites calling
@@ -1397,7 +1475,7 @@ snippets — still get wrong. Verified against the 5.x router and request source
   A suite that syncs must call `initModels`, not a single `init*Model`, or
   `sync` cannot work out the drop order.
   That per-suite naming is also what the `posttest` cleanup keys on: those
-  twelve names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
+  thirteen names are `TEST_DB_NAME ?? 'books_demo_spa_test'` plus a suffix, so
   `dropTestDatabases.testkit.ts` drops whatever `SHOW DATABASES` reports under
   that prefix rather than a list it would have to be told to update. Name a
   new suite's schema the same way and it is cleaned up for free; name it
@@ -1428,8 +1506,17 @@ snippets — still get wrong. Verified against the 5.x router and request source
   `(seriesId, seriesPosition)`. The `notifications` table is the exception:
   a table that does not exist yet is exactly what `sync()` does create.
   `book_covers` and `user_avatars` join it: both are new tables too, so
-  `sync()` creates them on the next boot and this branch needs no
-  drop-and-rebuild.
+  `sync()` creates them on the next boot, with no drop needed for either.
+  Genres land differently: `books.genreId` and `series.genreId` are new
+  nullable `INTEGER UNSIGNED` foreign keys with `ON DELETE SET NULL`, plus
+  the indexes that serve `?genreId=`, and `sync()` adds none of that to an
+  existing `books` or `series` table. `permissions.module` is a MySQL
+  `ENUM` built from `MODULES`, now widened to hold `genres`, so until
+  `permissions` itself is recreated the startup permission sync cannot
+  insert the new rows. `genres` itself is the exception again — a table
+  that does not exist yet, so `sync()` does create it — but the two foreign
+  keys and the widened `ENUM` mean this branch needs the drop-and-rebuild
+  after all.
 - **`comments.userId` is nullable with `ON DELETE SET NULL` — the one owner
   reference in this schema that is not `CASCADE`.** A comment outlives its
   owner's account, as a tombstone: `userRepository.remove` marks every one of

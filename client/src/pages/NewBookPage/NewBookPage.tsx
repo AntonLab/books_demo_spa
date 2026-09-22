@@ -5,6 +5,7 @@ import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
 import { useSession } from '@/queries/auth';
 import { useCreateBook } from '@/queries/books';
+import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
 
 // Creating collects only the book's own fields. It has no status to choose —
@@ -15,6 +16,7 @@ export const NewBookPage: FC = () => {
   const { data: session } = useSession();
   const isAuthor = session?.role === 'author';
   const series = useMySeries(isAuthor ? session.id : undefined);
+  const genres = useGenres();
   const create = useCreateBook();
 
   if (!isAuthor) {
@@ -31,9 +33,10 @@ export const NewBookPage: FC = () => {
     description,
     tags,
     seriesId,
+    genreId,
   }: BookFormValues) => {
     create.mutate(
-      { title, description, tags, seriesId },
+      { title, description, tags, seriesId, genreId },
       { onSuccess: (book) => void navigate(`/books/${book.id}/edit`) }
     );
   };
@@ -43,6 +46,7 @@ export const NewBookPage: FC = () => {
       <Typography.Title level={2}>New book</Typography.Title>
       <BookForm
         seriesOptions={series.data?.items ?? []}
+        genreOptions={genres.data?.items ?? []}
         submitLabel="Create book"
         isSubmitting={create.isPending}
         error={create.error?.message ?? null}

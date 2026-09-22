@@ -11,6 +11,7 @@ import {
   type SeriesPayload,
 } from '../api/series';
 import type { SeriesBookSummary } from '../types/series';
+import { BOOKS_PAGE_SIZE } from './books';
 import { queryKeys } from './keys';
 import { useOptimisticReorder } from './reorder';
 
@@ -38,6 +39,16 @@ export const useSeriesBooks = (id: number, enabled: boolean) => {
     queryKey: queryKeys.seriesBooks(id),
     queryFn: () => listSeriesBooks(id),
     enabled,
+  });
+};
+
+// One Genre's series, listed under that Genre's books on the search page. The
+// same page size as the book list beside it, for the same reason: one page
+// stands in for paging.
+export const useSeriesInGenre = (genreId: number) => {
+  return useQuery({
+    queryKey: queryKeys.series({ genreId, limit: BOOKS_PAGE_SIZE }),
+    queryFn: () => listSeries({ genreId, limit: BOOKS_PAGE_SIZE }),
   });
 };
 

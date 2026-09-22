@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { NotFoundError } from '../types/errors.ts';
 import type { CreateBookInput } from '../types/book.ts';
 import type { BookRepository } from './bookRepository.ts';
+import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
 
 // An id no row in either implementation has.
@@ -17,6 +18,9 @@ export interface BookRepositoryContractWorld {
   anAuthor(): Promise<number>;
   // A series credited to these accounts, in this order, exists; answers its id.
   aSeries(coAuthorIds: [number, ...number[]]): Promise<number>;
+  // A Genre exists; answers its id. It has no Owner and no name worth
+  // asserting, so the world picks the name.
+  aGenre(): Promise<number>;
 }
 
 // Registers the cases every BookRepository must pass, each against a world
@@ -331,5 +335,64 @@ export function bookRepositoryContract(
     // A cover that never existed is a no-op, not an error — but a missing
     // book itself is reported, exactly as setCover reports it.
     assert.equal(await repository.removeCover(missingId), false);
+  });
+
+  test('contract: a book with no Genre reports genre: null, never undefined', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+
+    const created = await aBook(repository, authorId);
+
+    assert.equal(created.genre, null);
+    assert.ok('genre' in created);
+  });
+
+  test('contract: a book carries the Genre it was created with, on the detail too', async () => {
+    const { repository, anAuthor, aGenre } = await setUp();
+    const authorId = await anAuthor();
+    const genreId = await aGenre();
+    // `as const` so `role` is a Role rather than a widened string, exactly as
+    // the "every lookup on a missing book" case above builds its viewer.
+    const viewer = { id: authorId, role: 'author' } as const;
+
+    const created = await aBook(repository, authorId, { genreId });
+
+    assert.equal(created.genre?.id, genreId);
+    assert.equal((await repository.findById(created.id))?.genre?.id, genreId);
+    assert.equal(
+      (await repository.findDetailById(created.id, viewer))?.genre?.id,
+      genreId
+    );
+  });
+
+  test('contract: an update leaves the Genre alone when genreId is absent and clears it on an explicit null', async () => {
+    const { repository, anAuthor, aGenre } = await setUp();
+    const authorId = await anAuthor();
+    const genreId = await aGenre();
+    const created = await aBook(repository, authorId, { genreId });
+
+    const renamed = await repository.update(created.id, { title: 'Renamed' });
+    assert.equal(renamed?.genre?.id, genreId);
+
+    const cleared = await repository.update(created.id, { genreId: null });
+    assert.equal(cleared?.genre, null);
+
+    const refiled = await repository.update(created.id, { genreId });
+    assert.equal(refiled?.genre?.id, genreId);
+  });
+
+  test('contract: a genreId that names no Genre is refused on create and on update', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    const created = await aBook(repository, authorId);
+
+    await assert.rejects(
+      aBook(repository, authorId, { genreId: MISSING_ID }),
+      missingGenre(MISSING_ID)
+    );
+    await assert.rejects(
+      repository.update(created.id, { genreId: MISSING_ID }),
+      missingGenre(MISSING_ID)
+    );
   });
 }

@@ -96,6 +96,11 @@ export const BookPage: FC = () => {
                 {book.series.title}
               </Link>
             )}
+            {book.genre !== null && (
+              <Link to={`/search?genre=${book.genre.id}`}>
+                {book.genre.name}
+              </Link>
+            )}
             {canLike && (
               <LikeButton
                 count={book.likeCount}

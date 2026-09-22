@@ -11,6 +11,7 @@ import {
   Book,
   BookAuthor,
   BookCover,
+  Genre,
   initModels,
   Series,
   User,
@@ -95,6 +96,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     // Children first: the foreign keys forbid clearing users out from under
     // them.
     await Book.destroy({ where: {}, truncate: false });
+    await Genre.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
@@ -592,6 +594,52 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(exact.items[0]?.description, 'Tagged epic');
   });
 
+  test('the genre filter returns that genre alone, and an unknown id returns nothing', async () => {
+    const gothic = await Genre.create({ name: 'Filter Gothic' });
+    const hardSf = await Genre.create({ name: 'Filter Hard SF' });
+    const filed = await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'In Gothic',
+      description: 'A',
+      tags: [],
+      genreId: gothic.id,
+    });
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'In Hard SF',
+      description: 'B',
+      tags: [],
+      genreId: hardSf.id,
+    });
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'No Genre',
+      description: 'C',
+      tags: [],
+    });
+
+    const inGothic = await listAsGuest({
+      limit: 20,
+      offset: 0,
+      genreId: gothic.id,
+    });
+    const inMissing = await listAsGuest({
+      limit: 20,
+      offset: 0,
+      genreId: 999_999,
+    });
+
+    assert.deepEqual(
+      inGothic.items.map((item) => item.id),
+      [filed.id]
+    );
+    assert.equal(inGothic.items[0]?.genre?.name, 'Filter Gothic');
+    assert.equal(inMissing.total, 0);
+  });
+
   test('list finds a book by its title', async () => {
     await createPublished({
       userId: ownerId,
@@ -1046,6 +1094,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   let contractAccounts = 0;
+  let contractGenres = 0;
   bookRepositoryContract(async () => ({
     repository,
     async anAuthor() {
@@ -1064,6 +1113,13 @@ describe('bookRepository against real MySQL', { skip }, () => {
         coAuthorIds
       );
       return series.id;
+    },
+    async aGenre() {
+      contractGenres += 1;
+      const genre = await Genre.create({
+        name: `Contract Genre ${contractGenres}`,
+      });
+      return genre.id;
     },
   }));
 });

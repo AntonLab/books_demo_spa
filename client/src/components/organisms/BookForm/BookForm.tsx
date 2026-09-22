@@ -5,18 +5,21 @@ import {
   BOOK_STATUSES,
   type BookStatus,
 } from '@/types/book';
+import type { PublicGenre } from '@/types/genre';
 
 export interface BookFormValues {
   title: string;
   description: string;
   tags: string[];
   seriesId: number | null;
+  genreId: number | null;
   // Present only when the form shows it: a new book has no status to choose.
   status?: BookStatus;
 }
 
 interface BookFormProps {
   seriesOptions: { id: number; title: string }[];
+  genreOptions: PublicGenre[];
   submitLabel: string;
   onSubmit: (values: BookFormValues) => void;
   initialValues?: BookFormValues;
@@ -30,11 +33,14 @@ interface BookFormProps {
 }
 
 // A select cannot hold `null` as an option value and stay clearable, so "No
-// series" travels as 0 inside the form and becomes null on the way out.
+// series" travels as 0 inside the form and becomes null on the way out. "No
+// genre" works the same way.
 const NO_SERIES = 0;
+const NO_GENRE = 0;
 
-interface FieldValues extends Omit<BookFormValues, 'seriesId'> {
+interface FieldValues extends Omit<BookFormValues, 'seriesId' | 'genreId'> {
   seriesId: number;
+  genreId: number;
 }
 
 // Presentational: it neither fetches nor saves. The page that renders it owns
@@ -42,6 +48,7 @@ interface FieldValues extends Omit<BookFormValues, 'seriesId'> {
 // one set of fields.
 export const BookForm: FC<BookFormProps> = ({
   seriesOptions,
+  genreOptions,
   submitLabel,
   onSubmit,
   initialValues,
@@ -51,11 +58,17 @@ export const BookForm: FC<BookFormProps> = ({
 }) => {
   const { token } = theme.useToken();
 
-  const handleFinish = ({ seriesId, status, ...rest }: FieldValues) => {
+  const handleFinish = ({
+    seriesId,
+    genreId,
+    status,
+    ...rest
+  }: FieldValues) => {
     onSubmit({
       ...rest,
       tags: rest.tags ?? [],
       seriesId: seriesId === NO_SERIES ? null : seriesId,
+      genreId: genreId === NO_GENRE ? null : genreId,
       ...(showStatus && status !== undefined ? { status } : {}),
     });
   };
@@ -76,6 +89,7 @@ export const BookForm: FC<BookFormProps> = ({
           tags: [],
           ...initialValues,
           seriesId: initialValues?.seriesId ?? NO_SERIES,
+          genreId: initialValues?.genreId ?? NO_GENRE,
         }}
         onFinish={handleFinish}
       >
@@ -115,6 +129,19 @@ export const BookForm: FC<BookFormProps> = ({
               ...seriesOptions.map((series) => ({
                 value: series.id,
                 label: series.title,
+              })),
+            ]}
+          />
+        </Form.Item>
+
+        <Form.Item name="genreId" label="Genre">
+          <Select
+            aria-label="Genre"
+            options={[
+              { value: NO_GENRE, label: 'No genre' },
+              ...genreOptions.map((genre) => ({
+                value: genre.id,
+                label: genre.name,
               })),
             ]}
           />

@@ -58,6 +58,14 @@ export const BookCard: FC<BookCardProps> = ({ book }) => {
             {book.description}
           </Typography.Paragraph>
 
+          {book.genre !== null && (
+            <div style={{ marginBottom: token.marginXS }}>
+              <Link to={`/search?genre=${book.genre.id}`}>
+                {book.genre.name}
+              </Link>
+            </div>
+          )}
+
           {book.tags.length > 0 && (
             <Space
               wrap

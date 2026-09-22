@@ -2,13 +2,16 @@ import {
   DataTypes,
   Model,
   type CreationOptional,
+  type ForeignKey,
   type InferAttributes,
   type InferCreationAttributes,
   type NonAttribute,
   type Sequelize,
 } from 'sequelize';
 import type { Book } from './Book.ts';
+import type { Genre } from './Genre.ts';
 import { toTagArray } from './tagArray.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { PublicSeries } from '../types/series.ts';
 import type { AuthorSummary } from '../types/user.ts';
 
@@ -22,6 +25,10 @@ export class Series extends Model<
   declare title: string;
   declare description: string;
   declare tags: string[];
+  // The Series' own Genre (CONTEXT.md, ADR-0008): one or none, independent of
+  // its Books'. Nullable, which is what makes the association's
+  // ON DELETE SET NULL legal.
+  declare genreId: CreationOptional<ForeignKey<Genre['id']> | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -56,6 +63,12 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
         type: DataTypes.JSON,
         allowNull: false,
       },
+      // Must match genres.id exactly (INTEGER UNSIGNED), or MySQL rejects the
+      // foreign key with errno 3780 on incompatible column types (M2).
+      genreId: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+      },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
       createdAt: { type: DataTypes.DATE, allowNull: false },
@@ -67,7 +80,15 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
       timestamps: true,
       charset: 'utf8mb4',
       collate: 'utf8mb4_0900_ai_ci',
-      // No secondary index: `?userId=` goes through series_authors_user_id.
+      // `?userId=` goes through series_authors_user_id; this one serves
+      // `?genreId=` (A5), and is the leftmost prefix of the foreign key's
+      // column, so InnoDB reuses it instead of creating a second index.
+      indexes: [
+        {
+          name: 'series_genre_id',
+          fields: ['genreId'],
+        },
+      ],
     }
   );
 
@@ -78,7 +99,8 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
 // credits in one query of its own rather than through an include.
 export function toPublicSeries(
   series: Series,
-  authors: AuthorSummary[]
+  authors: AuthorSummary[],
+  genre: PublicGenre | null
 ): PublicSeries {
   return {
     id: series.id,
@@ -86,6 +108,7 @@ export function toPublicSeries(
     title: series.title,
     description: series.description,
     tags: toTagArray(series.tags),
+    genre,
     createdAt: series.createdAt,
     updatedAt: series.updatedAt,
   };

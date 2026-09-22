@@ -1,3 +1,4 @@
+import type { PublicGenre } from './genre.ts';
 import type { AuthorSummary } from './user.ts';
 
 // No userId: a series has no single owner (ADR-0005).
@@ -8,6 +9,9 @@ export interface PublicSeries {
   title: string;
   description: string;
   tags: string[];
+  // A7: the Series' own Genre, or null. Set independently of its Books' — a
+  // Book never takes its Genre from its Series (CONTEXT.md, ADR-0008).
+  genre: PublicGenre | null;
   createdAt: Date;
   updatedAt: Date;
 }

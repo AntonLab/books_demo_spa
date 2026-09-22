@@ -19,7 +19,7 @@ the first component needs it rather than leaving empty folders around.
 | Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`, `BookCover`, `AccountAvatar`, `ImageUploadButton`                                                                                                                                      |
 | Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `SeriesCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
 | Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                                  |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The fourteen routed pages                                                                                                                                                                                                    |
+| Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                                                     |
 
 ### Rules
 
@@ -88,7 +88,7 @@ src/pages/MainPage/
   `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
   re-exports the same named `MainPage`, so the `default` remap is untouched.
 
-All 39 (25 components, 14 pages) follow this layout, and the `@/` alias is
+All 40 (25 components, 15 pages) follow this layout, and the `@/` alias is
 wired into the three tools that must agree on it: `paths` in
 `tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
 `moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
@@ -184,6 +184,9 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` —
   `deleteChapter` and `reorderChapters`, a `PUT` of the book's whole Reading
   order), `comments.ts`,
+  `genres.ts` (`listGenres`, `createGenre`, `renameGenre` and `deleteGenre`;
+  `listBooks` and `listSeries` also take a `genreId`, and a book's and a series'
+  create/update payloads carry one),
   `likes.ts`, `notifications.ts` (`listNotifications`, the newest page, and
   `markNotificationsRead`) and `series.ts` (`listSeries`, `getSeries`, the create /
   update / delete trio, `addSeriesCoAuthor` and `removeSeriesCoAuthor`, and the
@@ -214,15 +217,22 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (every cache key in one registry), `auth.ts` (`useSession` plus the five
   auth mutations), `books.ts` (`useBooks`, `useSearchBooks`,
   `useBooksInSeries` — `?seriesId=`, which the server returns in Series
-  order — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
+  order — `useBooksInGenre` — `?genreId=`, the server's default order (oldest
+  first, by id) — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
   list that includes their drafts — and five book mutations, the
   create/update/delete trio plus `useUploadBookCover`/`useDeleteBookCover`,
   that all invalidate the whole `books` prefix, since one write can move a
   book in or out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
   term), `series.ts` (`useMySeries`, `useSeries`, `useSeriesBooks` —
-  disabled until the page knows the viewer may edit the series — four series
-  mutations that invalidate both the `series` and `books` prefixes, and
-  `useReorderSeriesBooks`), `coAuthors.ts` (`useAddCoAuthor` and
+  disabled until the page knows the viewer may edit the series —
+  `useSeriesInGenre`, listed under a Genre's books on `SearchPage` — four
+  series mutations that invalidate both the `series` and `books` prefixes, and
+  `useReorderSeriesBooks`),
+  `genres.ts` (`useGenres`, on its own `queryKeys.genres`, plus a create, a
+  rename and a delete mutation, each invalidating the `genres`, `books` and
+  `series` prefixes, because a rename or a deletion changes the `genre`
+  embedded in every list),
+  `coAuthors.ts` (`useAddCoAuthor` and
   `useRemoveCoAuthor`, each taking a `CreditedWork` — `{ kind: 'book' |
 'series', id }` — and calling that kind's endpoints; the book mutations
   also invalidate `series`, since filing a book changes a series' list),
@@ -307,21 +317,44 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     `onReject` — purely presentational, with no `src/api`/`src/queries` call
     of its own, so `EditBookPage`'s Cover block and `ProfilePage` each wire it
     to their own upload/delete mutation).
-  - `organisms/` — `AppHeader` (nav menu — "Home", plus "My Books" only for
-    the `author` Role — `SearchBar`, and the three auth states — signed out /
-    loading / signed in. Signed out, "Log in" is a one-item menu of its own
+  - `organisms/` — `AppHeader` (nav menu — "Home", a "Genres" submenu, plus
+    "My Books" only for the `author` Role — `SearchBar`, and the three auth
+    states — signed out / loading / signed in. The submenu's items are the
+    Genres from `useGenres()` in its order, each keyed by its own target path
+    `/search?genre=<id>`, so a click navigates to its key like every other
+    item; it is left out entirely while the list is loading, if it failed, or
+    if there are no Genres, and `selectedKeys` compares `pathname + search`, so
+    the Genre being browsed is the highlighted item and `/` and `/my-books`
+    keep working. Signed out, "Log in" is a one-item menu of its own
     in the corner the account trigger takes once signed in, and there is no
     Register: the login modal's "Create an account" is the way in. Signed in,
     the trigger names the account beside its `AccountAvatar`, with a
-    `NotificationBell` beside it); `NotificationBell` (a
+    `NotificationBell` beside it, and an `admin` or `superadmin` also gets
+    "Manage genres" (→ `/admin/genres`) after Profile — no other Role sees it).
+    The nav `Menu` carries `disabledOverflow` and `triggerSubMenuAction="click"`.
+    rc-menu starts every child past the first in an `overflowDisabled` context
+    that lifts only once `ResizeObserver` measurement advances
+    `lastVisibleIndex` past it; jsdom's stub reports no width, so that
+    boundary sticks at index 0 and, without `disabledOverflow`, the Genres
+    `SubMenu` is dead and untestable — the accepted trade is that the left
+    nav menu no longer collapses into a "…" overflow item at phone width.
+    `triggerSubMenuAction="click"` swaps the default hover trigger, which a
+    touch device has no way to perform and a test can only drive through
+    rc-menu's open delay. The signed-out "Log in" `Menu` carries
+    `disabledOverflow` too, but for a reason of its own: it holds no
+    `SubMenu` to open, and a menu sized by its own single item's content
+    collapses into "…" without it regardless of environment; `NotificationBell` (a
     badge with the unread count, also in the button's name, over a `Popover`
     of the newest notifications in words, the work's title linked while the
     work exists — a book to its page, a series to its editor. Opening it marks
     the unread ones read at once but keeps them highlighted until it closes); `BookForm` (presentational fields for creating and editing a
     book; `showStatus` adds the status radios, which creating leaves out
-    because every new book is a draft, and "No series" travels as 0 inside the
-    form and leaves as `null`); `SeriesForm` (BookForm's fields
-    minus series and status — title, description, tags); `CoAuthorManager`
+    because every new book is a draft; "No series" travels as 0 inside the
+    form and leaves as `null`, and a required `genreOptions: PublicGenre[]`
+    prop's Genre select follows the same convention through its own "No
+    genre" option); `SeriesForm` (BookForm's fields minus series and status —
+    title, description, tags and Genre, the last through the same select as
+    `BookForm`'s); `CoAuthorManager`
     (the byline of the `work` it is given, a book or a series, each Co-author's
     `AccountAvatar` beside their name, with an
     immediate Remove, a Leave behind a `Popconfirm`, and a search-as-you-type
@@ -338,13 +371,17 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     reachable from this checkbox), `ResetRequestModal` and
     `ResetConfirmModal`; `BookCard` (leads with the book's `BookCover`, names
     every Co-author under the title beside their own `AccountAvatar`,
-    from the `authors` the list response embeds, and tags the book's status);
+    from the `authors` the list response embeds, tags the book's status, and
+    links its Genre to `/search?genre=<id>`);
     `SeriesCard` (the same for a series — title, Co-authors with their
-    `AccountAvatar`, blurb and tags — heading `SearchPage`'s results for one
-    series, and leaving its books to whoever renders it) and the
+    `AccountAvatar`, blurb, its Genre linked the same way, and tags — heading
+    `SearchPage`'s results for one series, and leaving its books to whoever
+    renders it; with `linked`, the title becomes a level-4 heading holding a
+    `Link` to `/search?series=<id>` instead of that level-2 page heading — the
+    form the Genre results list renders each series card in) and the
     presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
     `emptyText` as props so both `MainPage` (from `useBooks()`) and
-    `SearchPage` (from `useSearchBooks(q)` or `useBooksInSeries(id)`) can
+    `SearchPage` (from `useSearchBooks(q)`, `useBooksInSeries(id)` or `useBooksInGenre(id)`) can
     feed it, each from its own `src/queries/books.ts` hook); the presentational `ChapterList` (the reader's list, dated by
     `publishedAt`, in the order it is given); `SortableList` (a list put in
     order by drag and drop, used for a book's chapters and a series' books:
@@ -387,12 +424,20 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
     server's rules — the server refuses each with a 403 regardless, so this
     only avoids offering what would fail.
 - `src/pages/` — one folder per page (see Component folders): `MainPage`,
-  `SearchPage` (`/search`, one filter per visit: `?q=` searches, and
-  `?series=` lists a series' books under its `SeriesCard` instead — there is
+  `SearchPage` (`/search`, one filter per visit: `?q=` searches, `?series=`
+  lists a series' books under its `SeriesCard` instead — there is
   no series page, and a series that no longer exists, or an id that is not
-  one, says "This series no longer exists."), `BookPage` (`/books/:id`: the
+  one, says "This series no longer exists." — and `?genre=` lists the Genre's
+  books under a level-2 heading naming it, then its series as linked
+  `SeriesCard`s under a level-3 "Series" heading, that block left out while it
+  loads and when it is empty, plus an error `Alert` if the series request
+  fails. With more than one parameter present `series`
+  wins, then `genre`, then `q`; an id that is not a positive integer, or one
+  the loaded Genre list does not hold, says "This genre no longer exists." and
+  asks for no books or series), `BookPage` (`/books/:id`: the
   book's `BookCover` beside its title, each Co-author's `AccountAvatar` in
-  the byline, and its series linked to `/search?series=`), `ChapterPage`
+  the byline, and its series linked to `/search?series=` and its Genre to
+  `/search?genre=`), `ChapterPage`
   (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
   author's own books, drafts included, and "Create book", and a Series tab of
   the series they co-author, each linked to its editor, with "Create
@@ -419,7 +464,18 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   (a heading alone while the session is pending, an error `Alert` if the
   session fetch fails, `Empty` when signed out, otherwise a large
   `AccountAvatar`, "Upload avatar" and "Remove avatar" behind a
-  `Popconfirm`), `NotFoundPage` (also what `/series` gets: there is no
+  `Popconfirm`),
+  `AdminGenresPage` (`/admin/genres`: an add form, then the Genres in
+  alphabetical order, each with a Rename that edits the name in place with Save
+  and Cancel and a Delete behind a `Popconfirm` warning that books and series in
+  this genre will be left without one; a 409 says "A genre with that name
+  already exists." beside the field that caused it. For `admin` and
+  `superadmin` only — every other Role, Guests included, gets the "Genres"
+  heading and an info `Alert` saying Genres are kept by admins, the way
+  `MyBooksPage` answers a non-author; like `MyBooksPage`'s own gate, it reads
+  the session with no `isPending` branch, so that `Alert` shows for a
+  moderator too until the session resolves),
+  `NotFoundPage` (also what `/series` gets: there is no
   series page), and `ResetPasswordRoute` (reads the reset
   token off `/reset-password?token=...` and opens the confirm modal — not in
   the original spec's file list, added because the spec routed
@@ -449,7 +505,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   everyone on a Draft book, mirroring the server's 403s),
   `series.ts` (`PublicSeries`, and `SeriesBookSummary` — the series
   editor's row, carrying a book's title, status and authors but not its
-  text), `chapter.ts` (`PublicChapter` with `publishedAt`, plus `chapterStateOf`
+  text),
+  `genre.ts` (`PublicGenre` and `GENRE_NAME_MAX_LENGTH`, both from `shared`, the
+  second being the cap the add and rename inputs enforce as their
+  `maxLength`, not a validation rule),
+  `chapter.ts` (`PublicChapter` with `publishedAt`, plus `chapterStateOf`
   and `publishedChapters` — the public `BookPage` and the reader's
   previous/next show only chapters that are out, even to a Co-author, whose
   list from the server carries the rest), `comment.ts`,

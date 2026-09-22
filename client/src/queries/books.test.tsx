@@ -3,6 +3,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
   useBooks,
+  useBooksInGenre,
   useDeleteBookCover,
   useSearchBooks,
   useUploadBookCover,
@@ -31,6 +32,7 @@ const book: PublicBook = {
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
+  genre: null,
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -142,6 +144,48 @@ describe('useSearchBooks', () => {
 
     // Two entries, not one overwritten twice. searchSlice existed as its own
     // slice to guarantee exactly this; the cache keys guarantee it now.
+    expect(client.getQueryCache().getAll()).toHaveLength(2);
+  });
+});
+
+describe('useBooksInGenre', () => {
+  it('asks for one page of the genre, by id', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { result } = renderHook(() => useBooksInGenre(4), {
+      wrapper: wrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      genreId: 4,
+      limit: 20,
+    });
+  });
+
+  it('keeps its own cache entry, distinct from the unfiltered list', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    const client = createTestQueryClient();
+    const wrap = wrapper(client);
+
+    const list = renderHook(() => useBooks(), { wrapper: wrap });
+    await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
+
+    const genre = renderHook(() => useBooksInGenre(4), { wrapper: wrap });
+    await waitFor(() => expect(genre.result.current.isSuccess).toBe(true));
+
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
 });

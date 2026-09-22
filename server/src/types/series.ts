@@ -17,6 +17,9 @@ const tagListSchema = z
   .transform((tags) => [...new Set(tags)]);
 
 const userIdSchema = z.coerce.number().int().positive();
+// A reference to a Genre. Spelled out beside userIdSchema rather than sharing
+// one `idSchema`, so each name says what it points at.
+const genreIdSchema = z.coerce.number().int().positive();
 const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
 // Trimmed, unlike descriptionSchema and for the reason recorded in
 // types/chapter.ts: a title is echoed in every summary list, where stray
@@ -34,6 +37,10 @@ export const createSeriesSchema = z.object({
   // Defaulted here rather than in the column: MySQL forbids a literal DEFAULT
   // on a JSON column, so the empty array has to come from the application.
   tags: tagListSchema.default([]),
+  // A Genre is optional, and an absent key means the same as an explicit null:
+  // no Genre (A6). A Series' Genre is its own — nothing is inherited in either
+  // direction between a Series and its Books (ADR-0008).
+  genreId: genreIdSchema.nullable().optional(),
 });
 
 // Spelled out rather than derived from createSeriesSchema with
@@ -46,6 +53,9 @@ export const updateSeriesSchema = z
     title: titleSchema,
     description: descriptionSchema,
     tags: tagListSchema,
+    // An explicit null clears the Genre, and an absent key leaves it alone,
+    // because `.partial()` adds no default (A6).
+    genreId: genreIdSchema.nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
@@ -56,6 +66,7 @@ export const listSeriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   userId: userIdSchema.optional(),
+  genreId: genreIdSchema.optional(),
   tag: z.string().min(1).max(SERIES_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),
 });

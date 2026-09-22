@@ -27,6 +27,7 @@ const book: PublicBook = {
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
   status: 'in_progress',
+  genre: { id: 4, name: 'Gothic' },
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -39,6 +40,21 @@ describe('BookCard', () => {
     expect(
       screen.getByRole('link', { name: 'A Tale of Dragons' })
     ).toHaveAttribute('href', '/books/1');
+  });
+
+  it('links the genre to its results', () => {
+    renderWithProviders(<BookCard book={book} />);
+
+    expect(screen.getByRole('link', { name: 'Gothic' })).toHaveAttribute(
+      'href',
+      '/search?genre=4'
+    );
+  });
+
+  it('shows no genre link when the book has none', () => {
+    renderWithProviders(<BookCard book={{ ...book, genre: null }} />);
+
+    expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
   });
 
   it('names every co-author, in credit order', () => {

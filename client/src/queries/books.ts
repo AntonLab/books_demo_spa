@@ -40,12 +40,22 @@ export const useSearchBooks = (q: string) => {
 };
 
 // A series' books, in its Series order: the server sorts a `seriesId` list by
-// position rather than newest first, and leaves out what the viewer may not
-// read. One page, since a series runs to a handful of books.
+// position rather than by id as it does every other list, and leaves out what
+// the viewer may not read. One page, since a series runs to a handful of books.
 export const useBooksInSeries = (seriesId: number) => {
   return useQuery({
     queryKey: queryKeys.books({ seriesId, limit: BOOKS_PAGE_SIZE }),
     queryFn: () => listBooks({ seriesId, limit: BOOKS_PAGE_SIZE }),
+  });
+};
+
+// One Genre's books: the server's default order (oldest first, by id), drafts excluded
+// as in every public list. One page, like the main page's list — Genre results
+// are capped at a page rather than paged.
+export const useBooksInGenre = (genreId: number) => {
+  return useQuery({
+    queryKey: queryKeys.books({ genreId, limit: BOOKS_PAGE_SIZE }),
+    queryFn: () => listBooks({ genreId, limit: BOOKS_PAGE_SIZE }),
   });
 };
 
