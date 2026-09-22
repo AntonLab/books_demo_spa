@@ -309,8 +309,8 @@ Each layer answers a question the others cannot:
 - **Repository specs** run the real repositories on MySQL. Every domain rule —
   Draft book visibility, the last Co-author, the Author role a credit needs,
   duplicate credits, Notifications, the reorder 409s, tombstones, the role
-  hierarchy, a Cover's or Avatar's replace-in-place and cascade, and a
-  Genre name's case-insensitive uniqueness — is proven here and nowhere else.
+  hierarchy, a Cover's or Avatar's replace-in-place and cascade — is proven
+  here and nowhere else, bar the one exception the **Contracts** bullet names.
 - **Route specs** run `createApp` on in-memory fakes and assert the HTTP
   mapping and the permission checks. The fakes for book, series, chapter,
   comment, like, genre and user live in
@@ -327,8 +327,13 @@ Each layer answers a question the others cannot:
   asserts interface semantics only: `null` or `false` for a missing row, which
   error class is thrown and which resource a `NotFoundError` names, an order a
   controller depends on, an explicit `seriesId: null` unlinking a book. Never
-  the domain rules above. A repository method a controller comes to rely on
-  belongs in its contract, and a fake change must keep its fake spec green.
+  the domain rules above, with one exception: a Genre name's case-insensitive
+  uniqueness sits in `genreRepository.contract.testkit.ts` rather than the MySQL
+  spec alone, because MySQL gets it from the column's collation while the fake
+  has to lower-case names by hand to agree, and a rule the fake must match is a
+  rule the contract has to state (M1). A repository method a controller comes to
+  rely on belongs in its contract, and a fake change must keep its fake spec
+  green.
   `chapterRepository.findBookCoAuthorIds` has no `ORDER BY`, unlike the book
   and series lookups, so its contract compares ids as a set.
 - **`src/app.spec.ts`** is the only suite that goes from HTTP through the real
