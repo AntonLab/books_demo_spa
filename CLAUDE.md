@@ -212,17 +212,15 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   `AdminGenresPage` at `/admin/genres` is where the list is kept.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
-- A dev database created before the Co-authors change must be dropped and
-  rebuilt: `books.userId` and `series.userId` are gone, `books.status`,
+- A dev database must be dropped and rebuilt if it predates this branch:
+  `books.userId` and `series.userId` are gone, `books.status`,
   `chapters.publishedAt`, `chapters.position`, `books.seriesPosition`,
-  `books.genreId` and `series.genreId` are
-  new, and `sync()` never
-  alters an existing table. Genres add a second reason to rebuild: the
-  `permissions.module` column is a MySQL `ENUM` built from `MODULES`, which now
-  holds `genres`, so until the table is recreated the startup permission sync
-  cannot insert the new rows. CI and the test schemas are built fresh and are
-  unaffected.
-  See `server/CLAUDE.md`.
+  `books.genreId` and `series.genreId` are all new, and `sync()` never
+  alters an existing table. Genres add a second reason: the
+  `permissions.module` column is a MySQL `ENUM` built from `MODULES`, which
+  now holds `genres`, so until the table is recreated the startup
+  permission sync cannot insert the new rows. CI and the test schemas are
+  built fresh and are unaffected. See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the
   password `Password123!`), each author's 1-2 series of 4-5 books plus 1-3
