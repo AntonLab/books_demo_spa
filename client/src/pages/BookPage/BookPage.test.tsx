@@ -44,6 +44,7 @@ const book: BookDetail = {
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   status: 'in_progress',
+  genre: { id: 4, name: 'Gothic' },
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -166,6 +167,24 @@ describe('BookPage', () => {
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.queryByRole('link', { name: 'The Scale Cycle' })).toBeNull();
+  });
+
+  it('links the genre to its results', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Gothic' })).toHaveAttribute(
+      'href',
+      '/search?genre=4'
+    );
+  });
+
+  it('omits the genre link on a book without one', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, genre: null });
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
   });
 
   it('reports a book that will not load', async () => {

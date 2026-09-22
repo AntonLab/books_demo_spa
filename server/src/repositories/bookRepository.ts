@@ -10,6 +10,7 @@ import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
+import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import { readableBookWhere, type Viewer } from './visibility.ts';
 import { Like } from '../models/Like.ts';
@@ -115,12 +116,20 @@ export interface BookRepository {
 // that is gone. Reporting that as a 404 is more useful than the generic 500 an
 // unmapped SequelizeForeignKeyConstraintError would produce.
 //
-// book_authors.userId is the only foreign key that can fail here.
-// books.seriesId cannot: every write that sets it to a new series goes through
+// book_authors.userId is the only foreign key this maps. books.seriesId
+// cannot fail here: every write that sets it to a new series goes through
 // nextSeriesPosition first, which holds that series row under a lock for the
 // rest of the transaction and answers a missing one with NotFoundError itself,
 // and a write that keeps the series holds a lock on a book row already
-// pointing at it, which deleting the series would have to change.
+// pointing at it, which deleting the series would have to change. books.genreId
+// has no such lock — assertGenreExists (genreRepository.ts) reads the parent
+// row unlocked, so a Genre deleted in the gap between that check and this
+// insert still trips the FK. On create that race is misreported by this
+// function as NotFoundError('User', userId), naming the wrong resource; the
+// same race on update (which never calls this function) reaches the caller as
+// an unmapped 500. Narrow and accepted: closing it would mean locking every
+// Genre a create or update names, which is Task 4's code to change, not this
+// task's.
 function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
     throw new NotFoundError('User', userId);
@@ -210,14 +219,16 @@ async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const [authors, coverUrls] = await Promise.all([
+  const [authors, coverUrls, genres] = await Promise.all([
     loadAuthors([book.id], transaction),
     loadCoverUrls([book.id], transaction),
+    loadGenres([book.genreId], transaction),
   ]);
   return toPublicBook(
     book,
     authors.get(book.id) ?? [],
-    coverUrls.get(book.id) ?? null
+    coverUrls.get(book.id) ?? null,
+    genreOf(book.genreId, genres)
   );
 }
 
@@ -247,6 +258,12 @@ function buildWhere(
 
   if (query.seriesId !== undefined) {
     clauses.push({ seriesId: query.seriesId });
+  }
+
+  // A5: combined with the other filters by AND. An id that names no Genre
+  // matches nothing and yields an empty list, as an unknown `?tag=` does.
+  if (query.genreId !== undefined) {
+    clauses.push({ genreId: query.genreId });
   }
 
   if (query.tag) {
@@ -286,6 +303,7 @@ export function createSequelizeBookRepository(): BookRepository {
         // One transaction, so a book never exists without its first credit.
         return await sequelizeOf().transaction(async (transaction) => {
           const { userId, ...attributes } = input;
+          await assertGenreExists(attributes.genreId, transaction);
           const seriesPosition =
             attributes.seriesId === null
               ? null
@@ -327,16 +345,18 @@ export function createSequelizeBookRepository(): BookRepository {
               ],
       });
 
-      const [authors, coverUrls] = await Promise.all([
+      const [authors, coverUrls, genres] = await Promise.all([
         loadAuthors(rows.map((row) => row.id)),
         loadCoverUrls(rows.map((row) => row.id)),
+        loadGenres(rows.map((row) => row.genreId)),
       ]);
       return {
         items: rows.map((row) =>
           toPublicBook(
             row,
             authors.get(row.id) ?? [],
-            coverUrls.get(row.id) ?? null
+            coverUrls.get(row.id) ?? null,
+            genreOf(row.genreId, genres)
           )
         ),
         total: count,
@@ -389,6 +409,8 @@ export function createSequelizeBookRepository(): BookRepository {
           lock: transaction.LOCK.UPDATE,
         });
         if (!book) return null;
+
+        await assertGenreExists(input.genreId, transaction);
 
         // `update` writes only the keys present, so an omitted seriesId
         // leaves the link — and the book's place — alone, while an explicit

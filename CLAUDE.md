@@ -195,21 +195,41 @@ The scaffold is incomplete — keep the docs honest as you fill it in:
   `client` shows both through three new molecules — `BookCover` and
   `AccountAvatar` display them, `ImageUploadButton` is the shared upload
   picker behind both — and `ProfilePage` is no longer a stub.
+- A Book and a Series each carry at most one **Genre** (CONTEXT.md, ADR-0008) —
+  a row in a new `genres` table that `admin` and `superadmin` add to, rename and
+  delete through four routes at `/api/genres`. `genres` is a module in the
+  permission matrix on which every other Role, Guests included, holds `read` and
+  nothing else; a Genre has no Owner, so no grant on it is `own`. Choosing one
+  needs no Genre permission: `genreId` rides on the book's or series' own
+  create/update grant. `GET /api/books` and `GET /api/series` take `?genreId=`,
+  `PublicBook` and `PublicSeries` embed `genre: PublicGenre | null` (from the new
+  `shared/src/genre.ts`), and deleting a Genre leaves its works with
+  `genre: null` through `ON DELETE SET NULL`, notifying nobody. A Series' Genre
+  is its own: a Book never inherits it. `client` navigates by it — a "Genres"
+  submenu in the header leads to `/search?genre=<id>`, which lists the Genre's
+  books and then its series; the Genre is a link on `BookCard`, `SeriesCard` and
+  `BookPage`; `BookForm` and `SeriesForm` each carry a "Genre" select; and
+  `AdminGenresPage` at `/admin/genres` is where the list is kept.
 - `server` has a test suite using `node:test` (`npm test`). `client` has a
   Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
-- A dev database created before the Co-authors change must be dropped and
-  rebuilt: `books.userId` and `series.userId` are gone, `books.status`,
-  `chapters.publishedAt`, `chapters.position` and `books.seriesPosition` are
-  new, and `sync()` never
-  alters an existing table.
-  See `server/CLAUDE.md`.
+- A dev database must be dropped and rebuilt if it predates this branch:
+  `books.userId` and `series.userId` are gone, `books.status`,
+  `chapters.publishedAt`, `chapters.position`, `books.seriesPosition`,
+  `books.genreId` and `series.genreId` are all new, and `sync()` never
+  alters an existing table. Genres add a second reason: the
+  `permissions.module` column is a MySQL `ENUM` built from `MODULES`, which
+  now holds `genres`, so until the table is recreated the startup
+  permission sync cannot insert the new rows. CI and the test schemas are
+  built fresh and are unaffected. See `server/CLAUDE.md`.
 - `server/src/db/seed.ts` fills the database with the demo data — ten accounts
   (one superadmin, one admin, three authors, five readers, all sharing the
   password `Password123!`), each author's 1-2 series of 4-5 books plus 1-3
   standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
-  with a scattering of tombstones, and likes on both books and comments. Run
+  with a scattering of tombstones, likes on both books and comments, and five
+  Genres — Gothic, Hard SF and Urban Fantasy, one per author, plus Horror and
+  Romance, which stay empty so the demo has an empty Genre to show. Run
   it with `npm run seed -w server -- --force`; **the flag is required because
-  it deletes every row in the nine content tables first** — `book_covers` and
+  it deletes every row in the ten content tables first** — `book_covers` and
   `user_avatars` are not among them, but every Cover and Avatar goes too,
   through the `ON DELETE CASCADE` off the `books` and `users` rows it
   deletes — and without it the script only reports what it found. Counts
@@ -231,7 +251,7 @@ Target one with npm's `-w` flag (`npm test -w client`):
   including a MySQL-backed integration suite (see `server/CLAUDE.md` for the
   exact script); `client` uses Jest against jsdom (see `client/CLAUDE.md` for
   why its script is not plain `jest`). A **green** server run then drops the
-  twelve test schemas it created, through npm's `posttest`; a failed one leaves
+  thirteen test schemas it created, through npm's `posttest`; a failed one leaves
   them for inspection. See `server/CLAUDE.md`.
 
 `npm run lint:fix` and `npm run format` apply fixes.

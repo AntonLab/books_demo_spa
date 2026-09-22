@@ -1,6 +1,8 @@
 import { NotFoundError } from '../types/errors.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { PublicSeries } from '../types/series.ts';
 import type { AuthorSummary } from '../types/user.ts';
+import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
 import type { SeriesListResult, SeriesRepository } from './seriesRepository.ts';
 
@@ -13,6 +15,8 @@ export interface FakeSeriesRepositoryOptions {
   // table, which this repository only unlinks from: removeBook writes to the
   // map, so give each fake a map of its own.
   books?: Map<number, number | null>;
+  // The Genres that exist, by id. Read, never written.
+  genres?: ReadonlyMap<number, PublicGenre>;
   // Who made each credit change or delete.
   actors?: [string, Actor][];
 }
@@ -26,7 +30,12 @@ export interface FakeSeriesRepositoryOptions {
 export function createFakeSeriesRepository(
   options: FakeSeriesRepositoryOptions = {}
 ): SeriesRepository {
-  const { accounts = new Map(), books = new Map(), actors = [] } = options;
+  const {
+    accounts = new Map(),
+    books = new Map(),
+    genres = new Map(),
+    actors = [],
+  } = options;
   const rows = new Map<number, PublicSeries>();
   // seriesId -> co-author ids, in credit order.
   const credits = new Map<number, number[]>();
@@ -39,6 +48,19 @@ export function createFakeSeriesRepository(
     ),
   });
 
+  // Stands in for the genres row the real repository looks up before it
+  // writes, which answers a missing one with this same BadRequestError (A6).
+  const assertGenre = (genreId: number | null | undefined): void => {
+    if (genreId !== null && genreId !== undefined && !genres.has(genreId)) {
+      throw missingGenre(genreId);
+    }
+  };
+
+  const genreAt = (genreId: number | null | undefined): PublicGenre | null =>
+    genreId === null || genreId === undefined
+      ? null
+      : (genres.get(genreId) ?? null);
+
   return {
     async create(input) {
       // Stands in for the foreign key: the real repository maps MySQL's
@@ -46,6 +68,7 @@ export function createFakeSeriesRepository(
       if (!accounts.has(input.userId)) {
         throw new NotFoundError('User', input.userId);
       }
+      assertGenre(input.genreId);
 
       const now = new Date();
       const series: PublicSeries = {
@@ -54,6 +77,7 @@ export function createFakeSeriesRepository(
         title: input.title,
         description: input.description,
         tags: input.tags,
+        genre: genreAt(input.genreId),
         createdAt: now,
         updatedAt: now,
       };
@@ -69,6 +93,7 @@ export function createFakeSeriesRepository(
           (query.userId === undefined ||
             (credits.get(row.id) ?? []).includes(query.userId)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
+          (query.genreId === undefined || row.genre?.id === query.genreId) &&
           (!query.q || row.description.includes(query.q))
       );
       return {
@@ -87,11 +112,16 @@ export function createFakeSeriesRepository(
     async update(id, input) {
       const current = rows.get(id);
       if (!current) return null;
+      assertGenre(input.genreId);
+
       const updated: PublicSeries = {
         ...current,
         title: input.title ?? current.title,
         description: input.description ?? current.description,
         tags: input.tags ?? current.tags,
+        // `in` rather than `??`: an explicit null means "no Genre", which a
+        // nullish fallback would silently turn into "leave it alone".
+        genre: 'genreId' in input ? genreAt(input.genreId) : current.genre,
         updatedAt: new Date(),
       };
       rows.set(id, updated);

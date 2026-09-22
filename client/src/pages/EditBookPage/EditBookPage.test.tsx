@@ -11,6 +11,7 @@ import * as authorsApi from '@/api/authors';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { PublicUser } from '@/types/user';
@@ -18,11 +19,13 @@ import type { PublicUser } from '@/types/user';
 jest.mock('@/api/authors');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
 const mockedAuthors = jest.mocked(authorsApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const ann = {
@@ -48,6 +51,7 @@ const book: BookDetail = {
   description: 'Long ago.',
   tags: ['epic'],
   status: 'draft',
+  genre: null,
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -99,6 +103,9 @@ beforeEach(() => {
     limit: 100,
     offset: 0,
   });
+  mockedGenres.listGenres.mockResolvedValue({
+    items: [{ id: 4, name: 'Gothic' }],
+  });
 });
 
 describe('EditBookPage', () => {
@@ -119,9 +126,33 @@ describe('EditBookPage', () => {
       description: 'Long ago.',
       tags: ['epic'],
       seriesId: null,
+      genreId: null,
       status: 'in_progress',
     });
     expect(await screen.findByText('Saved.')).toBeInTheDocument();
+  });
+
+  it('keeps an existing genre on an unrelated save', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      genre: { id: 4, name: 'Gothic' },
+    });
+    mockedBooks.updateBook.mockResolvedValue(book);
+    renderPage();
+
+    const title = await screen.findByLabelText('Title');
+    await userEvent.clear(title);
+    await userEvent.type(title, 'Dragons, Revised');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(mockedBooks.updateBook).toHaveBeenCalledWith(1, {
+      title: 'Dragons, Revised',
+      description: 'Long ago.',
+      tags: ['epic'],
+      seriesId: null,
+      genreId: 4,
+      status: 'draft',
+    });
   });
 
   it('manages the co-authors from the same page', async () => {

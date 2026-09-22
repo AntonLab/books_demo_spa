@@ -1,4 +1,5 @@
 import { describe } from 'node:test';
+import type { PublicGenre } from '../types/genre.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import { createFakeSeriesRepository } from './seriesRepository.fake.testkit.ts';
@@ -9,9 +10,10 @@ describe('the fake seriesRepository', () => {
   seriesRepositoryContract(async () => {
     const accounts = new Map<number, AuthorSummary>();
     const books = new Map<number, number | null>();
+    const genres = new Map<number, PublicGenre>();
 
     return {
-      repository: createFakeSeriesRepository({ accounts, books }),
+      repository: createFakeSeriesRepository({ accounts, books, genres }),
       async anAuthor() {
         const id = accounts.size + 1;
         accounts.set(id, {
@@ -26,6 +28,11 @@ describe('the fake seriesRepository', () => {
       async aBookIn(seriesId) {
         const id = books.size + 1;
         books.set(id, seriesId);
+        return id;
+      },
+      async aGenre() {
+        const id = genres.size + 1;
+        genres.set(id, { id, name: `Genre ${id}` });
         return id;
       },
     };

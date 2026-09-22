@@ -7,14 +7,17 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/books');
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const author: PublicUser = {
@@ -46,6 +49,7 @@ const created: PublicBook = {
   description: 'Long ago.',
   tags: [],
   status: 'draft',
+  genre: null,
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -81,6 +85,9 @@ beforeEach(() => {
     limit: 100,
     offset: 0,
   });
+  mockedGenres.listGenres.mockResolvedValue({
+    items: [{ id: 4, name: 'Gothic' }],
+  });
 });
 
 describe('NewBookPage', () => {
@@ -95,6 +102,7 @@ describe('NewBookPage', () => {
       description: 'Long ago.',
       tags: [],
       seriesId: null,
+      genreId: null,
     });
     expect(await screen.findByText('Editing book 42')).toBeInTheDocument();
   });
@@ -133,5 +141,15 @@ describe('NewBookPage', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('offers the genres the server keeps', async () => {
+    renderPage();
+
+    // "No genre" is the select's own first option and its value on a new book.
+    expect(await screen.findByText('No genre')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedGenres.listGenres).toHaveBeenCalledTimes(1)
+    );
   });
 });

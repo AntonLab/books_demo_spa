@@ -107,3 +107,36 @@ test('a series reorder refuses an empty list, a repeated id, or an id that is no
     );
   }
 });
+
+test('createSeriesSchema leaves genreId out entirely when it is absent', () => {
+  assert.equal('genreId' in createSeriesSchema.parse(valid), false);
+});
+
+test('createSeriesSchema takes a genreId, coerced, or an explicit null', () => {
+  assert.equal(createSeriesSchema.parse({ ...valid, genreId: '4' }).genreId, 4);
+  assert.equal(
+    createSeriesSchema.parse({ ...valid, genreId: null }).genreId,
+    null
+  );
+  assert.equal(
+    createSeriesSchema.safeParse({ ...valid, genreId: 0 }).success,
+    false
+  );
+});
+
+// A6: .partial() must not turn an absent key into null, or a PATCH that only
+// renames a series would clear its Genre.
+test('updateSeriesSchema keeps an absent genreId absent and an explicit null null', () => {
+  assert.deepEqual(updateSeriesSchema.parse({ title: 'Renamed' }), {
+    title: 'Renamed',
+  });
+  assert.deepEqual(updateSeriesSchema.parse({ genreId: null }), {
+    genreId: null,
+  });
+  assert.deepEqual(updateSeriesSchema.parse({ genreId: '4' }), { genreId: 4 });
+});
+
+test('listSeriesQuerySchema takes genreId as a filter', () => {
+  assert.equal(listSeriesQuerySchema.parse({ genreId: '4' }).genreId, 4);
+  assert.equal(listSeriesQuerySchema.parse({}).genreId, undefined);
+});

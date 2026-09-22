@@ -78,6 +78,24 @@ describe('listBooks', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/books?seriesId=12&limit=20');
   });
 
+  it('narrows the list to one genre with genreId', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ genreId: 4, limit: 20 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?genreId=4&limit=20');
+  });
+
+  it('combines genreId with the other filters, in a fixed order', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ q: 'dragon', seriesId: 12, genreId: 4, limit: 20 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?q=dragon&seriesId=12&genreId=4&limit=20'
+    );
+  });
+
   it('is a plain read: no body and no headers, the XSRF token included', async () => {
     const fetchMock = mockFetch(envelope);
 
@@ -165,6 +183,26 @@ describe('createBook', () => {
       createBook({ title: 'New', description: '', tags: [], seriesId: null })
     ).resolves.toEqual({ id: 9, title: 'New', status: 'draft' });
   });
+
+  it('sends an explicit null genreId when no genre is chosen', async () => {
+    const fetchMock = mockFetch({ id: 7 }, 201);
+
+    await createBook({
+      title: 'New',
+      description: '',
+      tags: [],
+      seriesId: null,
+      genreId: null,
+    });
+
+    expect(JSON.parse(String(callOf(fetchMock)[1].body))).toEqual({
+      title: 'New',
+      description: '',
+      tags: [],
+      seriesId: null,
+      genreId: null,
+    });
+  });
 });
 
 describe('updateBook', () => {
@@ -202,6 +240,25 @@ describe('updateBook', () => {
       status: 403,
       message: 'You may only change books you co-author',
     });
+  });
+
+  it('patches the genre alone, leaving every other field untouched', async () => {
+    const fetchMock = mockFetch({ id: 7 });
+
+    await updateBook(7, { genreId: 4 });
+
+    expect(callOf(fetchMock)[1].body).toBe('{"genreId":4}');
+  });
+
+  // Guards the safety-critical case: a payload that turned an absent key
+  // into `null` would silently clear a Genre on a title-only save.
+  it('leaves genreId off the wire when patching an unrelated field', async () => {
+    const fetchMock = mockFetch({ id: 7 });
+
+    await updateBook(7, { title: 'x' });
+
+    const body = JSON.parse(String(callOf(fetchMock)[1].body));
+    expect('genreId' in body).toBe(false);
   });
 });
 

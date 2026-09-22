@@ -69,6 +69,14 @@ describe('listSeries', () => {
     expect(callOf(fetchMock)[0]).toBe('/api/series?limit=5');
   });
 
+  it('narrows the list to one genre with genreId', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({ genreId: 4, limit: 20 });
+
+    expect(callOf(fetchMock)[0]).toBe('/api/series?genreId=4&limit=20');
+  });
+
   it('returns the list envelope unchanged', async () => {
     const page = {
       items: [{ id: 2, title: 'Saga' }],
@@ -130,6 +138,24 @@ describe('createSeries', () => {
       createSeries({ title: 'Saga', description: '', tags: [] })
     ).resolves.toEqual({ id: 2, title: 'Saga', authors: [{ id: 3 }] });
   });
+
+  it('sends the chosen genre', async () => {
+    const fetchMock = mockFetch({ id: 2 }, 201);
+
+    await createSeries({
+      title: 'Saga',
+      description: 'Long.',
+      tags: [],
+      genreId: 4,
+    });
+
+    expect(JSON.parse(String(callOf(fetchMock)[1].body))).toEqual({
+      title: 'Saga',
+      description: 'Long.',
+      tags: [],
+      genreId: 4,
+    });
+  });
 });
 
 describe('updateSeries', () => {
@@ -152,6 +178,25 @@ describe('updateSeries', () => {
       status: 403,
       message: 'You may only change series you co-author',
     });
+  });
+
+  it('patches the genre alone, and takes null for none', async () => {
+    const fetchMock = mockFetch({ id: 2 });
+
+    await updateSeries(2, { genreId: null });
+
+    expect(callOf(fetchMock)[1].body).toBe('{"genreId":null}');
+  });
+
+  // Guards the safety-critical case: a payload that turned an absent key
+  // into `null` would silently clear a Genre on a title-only save.
+  it('leaves genreId off the wire when patching an unrelated field', async () => {
+    const fetchMock = mockFetch({ id: 2 });
+
+    await updateSeries(2, { title: 'x' });
+
+    const body = JSON.parse(String(callOf(fetchMock)[1].body));
+    expect('genreId' in body).toBe(false);
   });
 });
 

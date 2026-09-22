@@ -4,6 +4,7 @@ import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
 import { initBookCoverModel, BookCover } from './BookCover.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
+import { initGenreModel, Genre } from './Genre.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
 import {
@@ -26,6 +27,7 @@ export interface Models {
   BookCover: typeof BookCover;
   BookAuthor: typeof BookAuthor;
   Chapter: typeof Chapter;
+  Genre: typeof Genre;
   Comment: typeof Comment;
   Like: typeof Like;
   Notification: typeof Notification;
@@ -39,6 +41,9 @@ export function initModels(sequelize: Sequelize): Models {
   initUserAvatarModel(sequelize);
   // Reference data, unrelated to any row — no association block follows it.
   initPermissionModel(sequelize);
+  // The catalogue's Genres. Initialised before series and books, which
+  // reference it (M2).
+  initGenreModel(sequelize);
   initSeriesModel(sequelize);
   initSeriesAuthorModel(sequelize);
   initBookModel(sequelize);
@@ -124,6 +129,32 @@ export function initModels(sequelize: Sequelize): Models {
     onUpdate: 'CASCADE',
   });
   BookCover.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  // A Book's Genre (ADR-0008). SET NULL rather than CASCADE: a Genre is a
+  // label on the Book, not part of it, so deleting the Genre leaves the Book
+  // without one instead of destroying a record nobody asked to delete (A4).
+  // The alias is unread — nothing eager-loads a Genre, because
+  // genreRepository.loadGenres batches them — but declaring both sides is what
+  // creates the foreign key.
+  Genre.hasMany(Book, {
+    as: 'books',
+    // allowNull is restated here so Sequelize does not infer NOT NULL from the
+    // association and quietly make SET NULL illegal.
+    foreignKey: { name: 'genreId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Book.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
+
+  // A Series' own Genre (ADR-0008), on the same terms as a Book's: SET NULL,
+  // so deleting the Genre leaves the Series without one (A4).
+  Genre.hasMany(Series, {
+    as: 'series',
+    foreignKey: { name: 'genreId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Series.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
 
   Book.hasMany(Chapter, {
     as: 'chapters',
@@ -288,6 +319,7 @@ export function initModels(sequelize: Sequelize): Models {
     BookCover,
     BookAuthor,
     Chapter,
+    Genre,
     Comment,
     Like,
     Notification,
@@ -305,6 +337,7 @@ export { Book, toPublicBook } from './Book.ts';
 export { BookCover } from './BookCover.ts';
 export { BookAuthor } from './BookAuthor.ts';
 export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
+export { Genre, toPublicGenre } from './Genre.ts';
 export { Comment, toPublicComment } from './Comment.ts';
 export { Like, toPublicLike } from './Like.ts';
 export { Notification, toPublicNotification } from './Notification.ts';

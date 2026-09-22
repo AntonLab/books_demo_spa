@@ -13,7 +13,7 @@ type ModuleGrants = Partial<Record<Action, PermissionScope>>;
 type RoleGrants = Partial<Record<Module, ModuleGrants>>;
 
 // Only what is granted is spelled out; everything omitted expands to `none`.
-// Writing 140 rows by hand would bury the five decisions that actually matter
+// Writing 160 rows by hand would bury the five decisions that actually matter
 // under a wall of denials.
 //
 // On `create`: a created row is the caller's by construction — its userId
@@ -29,6 +29,9 @@ const PUBLIC_READS: RoleGrants = {
   chapters: { read: 'any' },
   comments: { read: 'any' },
   likes: { read: 'any' },
+  // A Genre list nobody can read would leave the header's Genres menu empty
+  // for a visitor who has not signed in (A1).
+  genres: { read: 'any' },
 };
 
 const USER_GRANTS: RoleGrants = {
@@ -66,6 +69,9 @@ const ADMIN_GRANTS: RoleGrants = {
   // flip someone's like into a dislike. create stays `own` — an admin may
   // still like things as themselves.
   likes: { read: 'any', create: 'own', update: 'own', delete: 'any' },
+  // The Genre list is the Admin's to keep (CONTEXT.md, ADR-0008). All four
+  // are `any`, not `own`: a Genre has no Owner to compare a caller against.
+  genres: { read: 'any', create: 'any', update: 'any', delete: 'any' },
   reports: { read: 'any', create: 'any', update: 'any', delete: 'any' },
 };
 

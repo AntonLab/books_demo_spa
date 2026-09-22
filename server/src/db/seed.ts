@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the nine content
+// Destructive by design: with --force it deletes every row in the ten content
 // tables before inserting. Without --force it reports what it found and exits
 // without writing.
 
@@ -28,6 +28,7 @@ import {
   BookAuthor,
   Chapter,
   Comment,
+  Genre,
   Like,
   Notification,
   Series,
@@ -145,9 +146,26 @@ function createRng(seed: number): Rng {
 /* Content banks                                                              */
 /* -------------------------------------------------------------------------- */
 
-interface Genre {
+// The Genre list the demo is browsed by, in the alphabetical order every list
+// shows it in anyway. Three of the five are a content bank's; Horror and
+// Romance are nobody's on purpose — a demo with no empty Genre never shows what
+// one looks like in the header's submenu or on /search?genre=.
+const GENRE_NAMES = [
+  'Gothic',
+  'Hard SF',
+  'Horror',
+  'Romance',
+  'Urban Fantasy',
+] as const;
+
+interface ContentBank {
+  // The Genre every Book and Series drawn from this bank is filed under. A name
+  // rather than an id: the rows do not exist while the plan is being built, so
+  // writeContent resolves it through the map writeGenres returns. Typed as the
+  // union, so a bank cannot name a Genre the seed never creates.
+  genreName: (typeof GENRE_NAMES)[number];
   // A pool; each book and series takes 3-5. Two tags appear in more than one
-  // genre on purpose, so ?tag= returns more than one author's work.
+  // bank on purpose, so ?tag= returns more than one author's work.
   tags: readonly string[];
   seriesTitles: readonly string[];
   // Long enough for the maximum an author can reach: 2 series x 5 books plus
@@ -158,7 +176,8 @@ interface Genre {
   sentences: readonly string[];
 }
 
-const GOTHIC: Genre = {
+const GOTHIC: ContentBank = {
+  genreName: 'Gothic',
   tags: ['gothic', 'victorian', 'mystery', 'slow-burn', 'manor', 'epistolary'],
   seriesTitles: ['The Ashgrove Chronicles', 'Letters from Blackmoor'],
   bookTitles: [
@@ -251,7 +270,8 @@ const GOTHIC: Genre = {
   ],
 };
 
-const HARD_SF: Genre = {
+const HARD_SF: ContentBank = {
+  genreName: 'Hard SF',
   tags: [
     'hard-sf',
     'space',
@@ -351,7 +371,8 @@ const HARD_SF: Genre = {
   ],
 };
 
-const URBAN_FANTASY: Genre = {
+const URBAN_FANTASY: ContentBank = {
+  genreName: 'Urban Fantasy',
   tags: ['urban-fantasy', 'magic', 'detective', 'slow-burn', 'city', 'wards'],
   seriesTitles: ['The Nightbus Files', 'Wardens of the Third Ward'],
   bookTitles: [
@@ -447,13 +468,13 @@ const URBAN_FANTASY: Genre = {
 // A book's annotation and a series' blurb are drawn from the same banks as the
 // prose: the point is that a book page reads coherently, not that the blurb is
 // separately authored.
-function description(rng: Rng, genre: Genre, count: number): string {
-  return rng.sample(genre.sentences, count).join(' ');
+function description(rng: Rng, bank: ContentBank, count: number): string {
+  return rng.sample(bank.sentences, count).join(' ');
 }
 
-function chapterTitle(rng: Rng, genre: Genre): string {
-  const adjective = rng.pick(genre.chapterAdjectives);
-  const noun = rng.pick(genre.chapterNouns);
+function chapterTitle(rng: Rng, bank: ContentBank): string {
+  const adjective = rng.pick(bank.chapterAdjectives);
+  const noun = rng.pick(bank.chapterNouns);
 
   // Three shapes rather than one, so twenty-odd titles in a row do not all
   // scan identically.
@@ -462,7 +483,7 @@ function chapterTitle(rng: Rng, genre: Genre): string {
       return `The ${adjective} ${noun}`;
     case 1:
       // A different noun, or "Rain and Rain" turns up.
-      return `${noun} and ${rng.pick(genre.chapterNouns.filter((other) => other !== noun))}`;
+      return `${noun} and ${rng.pick(bank.chapterNouns.filter((other) => other !== noun))}`;
     default:
       return `${indefiniteArticle(adjective)} ${adjective} ${noun}`;
   }
@@ -477,14 +498,14 @@ function indefiniteArticle(word: string): 'A' | 'An' {
 // Deduplicated within one book only: a repeat across two books of a
 // thirteen-book catalogue is plausible, a repeat inside one book is a bug. The
 // attempt cap is what stops a small noun pool from looping forever.
-function chapterTitles(rng: Rng, genre: Genre, count: number): string[] {
+function chapterTitles(rng: Rng, bank: ContentBank, count: number): string[] {
   const titles: string[] = [];
   const seen = new Set<string>();
 
   while (titles.length < count) {
-    let candidate = chapterTitle(rng, genre);
+    let candidate = chapterTitle(rng, bank);
     for (let attempt = 0; seen.has(candidate) && attempt < 20; attempt += 1) {
-      candidate = chapterTitle(rng, genre);
+      candidate = chapterTitle(rng, bank);
     }
     seen.add(candidate);
     titles.push(candidate);
@@ -501,13 +522,13 @@ function chapterTitles(rng: Rng, genre: Genre, count: number): string[] {
 // paragraph: a sentence appearing twice in the same chapter is the kind of
 // thing a reader notices immediately. Six paragraphs of five stays inside a
 // 32-sentence bank; the loop only refills if a bank shrinks or the ranges grow.
-function chapterText(rng: Rng, genre: Genre): string {
+function chapterText(rng: Rng, bank: ContentBank): string {
   const sizes = Array.from({ length: rng.int(4, 6) }, () => rng.int(4, 5));
   const needed = sizes.reduce((sum, size) => sum + size, 0);
 
   const deck: string[] = [];
   while (deck.length < needed) {
-    deck.push(...rng.shuffle(genre.sentences));
+    deck.push(...rng.shuffle(bank.sentences));
   }
 
   let taken = 0;
@@ -578,7 +599,7 @@ interface AccountSpec {
 }
 
 interface AuthorSpec extends AccountSpec {
-  genre: Genre;
+  bank: ContentBank;
 }
 
 // Functional logins with real names: the login is what a person types to sign
@@ -600,21 +621,21 @@ const AUTHORS: readonly AuthorSpec[] = [
     firstName: 'Margaret',
     lastName: 'Hale',
     role: 'author',
-    genre: GOTHIC,
+    bank: GOTHIC,
   },
   {
     login: 'ipetrov',
     firstName: 'Ivan',
     lastName: 'Petrov',
     role: 'author',
-    genre: HARD_SF,
+    bank: HARD_SF,
   },
   {
     login: 'nquinn',
     firstName: 'Nora',
     lastName: 'Quinn',
     role: 'author',
-    genre: URBAN_FANTASY,
+    bank: URBAN_FANTASY,
   },
 ];
 
@@ -747,7 +768,7 @@ function layOutTimeline(rng: Rng, chapterCounts: readonly number[]): Date[][] {
 }
 
 function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
-  const { genre } = spec;
+  const { bank } = spec;
   const seriesCount = rng.int(1, 2);
   const standaloneCount = rng.int(1, 3);
 
@@ -772,7 +793,7 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
   const chapterCounts = slots.map(() => rng.int(20, 24));
   const timeline = layOutTimeline(rng, chapterCounts);
   // One shuffled deck per author, so no author repeats a book title.
-  const titles = rng.shuffle(genre.bookTitles);
+  const titles = rng.shuffle(bank.bookTitles);
 
   // The newest book is still a Draft; the one before it, and every book of the
   // series the draft belongs to, is In progress; everything older is Complete.
@@ -817,12 +838,12 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
 
   const books: PlannedBook[] = slots.map((seriesIndex, index) => {
     const dates = itemAt(timeline, index, 'chapter timeline');
-    const chapters = chapterTitles(rng, genre, dates.length).map(
+    const chapters = chapterTitles(rng, bank, dates.length).map(
       (title, chapterIndex) => {
         const writtenAt = itemAt(dates, chapterIndex, 'chapter date');
         return {
           title,
-          text: chapterText(rng, genre),
+          text: chapterText(rng, bank),
           createdAt: writtenAt,
           publishedAt: publicationOf(
             index,
@@ -836,8 +857,8 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
 
     return {
       title: itemAt(titles, index, 'book title'),
-      description: description(rng, genre, rng.int(3, 4)),
-      tags: rng.sample(genre.tags, rng.int(3, 5)),
+      description: description(rng, bank, rng.int(3, 4)),
+      tags: rng.sample(bank.tags, rng.int(3, 5)),
       coAuthorLogins: [spec.login],
       seriesIndex,
       status: statusOf(index),
@@ -858,9 +879,9 @@ function planAuthor(rng: Rng, spec: AuthorSpec): PlannedAuthor {
         books.find((book) => book.seriesIndex === index) ??
         itemAt(books, 0, 'book');
       return {
-        title: itemAt(genre.seriesTitles, index, 'series title'),
-        description: description(rng, genre, rng.int(3, 4)),
-        tags: rng.sample(genre.tags, rng.int(3, 5)),
+        title: itemAt(bank.seriesTitles, index, 'series title'),
+        description: description(rng, bank, rng.int(3, 4)),
+        tags: rng.sample(bank.tags, rng.int(3, 5)),
         coAuthorLogins: [spec.login],
         createdAt: new Date(
           first.createdAt.getTime() - rng.int(2, 10) * DAY_MS
@@ -1115,8 +1136,10 @@ function buildPlan(rng: Rng): Plan {
 // to the cascades. Deleting `users` alone would currently take everything with
 // it, but that is a property of the schema's ON DELETE clauses, not of this
 // script: the day one of them changes, a seed relying on it would start leaving
-// rows behind silently. `permissions` is deliberately absent — it is reference
-// data syncPermissions() derives from code, not demo content.
+// rows behind silently. `genres` sits after `books` and `series` for the same
+// reason — both point at it, and its ON DELETE SET NULL is not this script's to
+// lean on. `permissions` is deliberately absent — it is reference data
+// syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
   Like,
@@ -1126,6 +1149,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Book,
   SeriesAuthor,
   Series,
+  Genre,
   User,
 ];
 
@@ -1172,9 +1196,31 @@ async function writeAccounts(
   return ids;
 }
 
+// The Genre list, written before any content so writeContent can file each work
+// under one. Returned as a name → id map, which is how a content bank's
+// genreName becomes a genreId.
+//
+// create() in a loop rather than bulkCreate: five rows are nothing, and the ids
+// have to come back — a loop gets them without depending on MySQL back-filling
+// them from the insert's first id (see writeThreads, where that assumption does
+// live and is checked).
+async function writeGenres(
+  transaction: Transaction
+): Promise<Map<string, number>> {
+  const ids = new Map<string, number>();
+
+  for (const name of GENRE_NAMES) {
+    const row = await Genre.create({ name }, { transaction });
+    ids.set(name, row.id);
+  }
+
+  return ids;
+}
+
 async function writeContent(
   plan: Plan,
   accountIds: readonly number[],
+  genreIds: ReadonlyMap<string, number>,
   transaction: Transaction
 ): Promise<{
   bookIds: Map<PlannedBook, number>;
@@ -1193,6 +1239,14 @@ async function writeContent(
     const id = idByLogin.get(login);
     if (id === undefined) {
       throw new Error(`No account was created for ${login}`);
+    }
+    return id;
+  };
+
+  const genreIdOf = (name: string): number => {
+    const id = genreIds.get(name);
+    if (id === undefined) {
+      throw new Error(`No genre row was created for ${name}`);
     }
     return id;
   };
@@ -1217,9 +1271,13 @@ async function writeContent(
   let seriesCount = 0;
 
   for (const author of plan.authors) {
+    // Every Book and Series drawn from this author's bank is filed under the
+    // bank's Genre. A co-authored work keeps the Genre of the author it was
+    // planned under — the only author whose bank it came from.
+    const genreId = genreIdOf(author.spec.bank.genreName);
     const seriesIds: number[] = [];
     for (const entry of author.series) {
-      const fields = createSeriesSchema.parse(entry);
+      const fields = createSeriesSchema.parse({ ...entry, genreId });
       const row = await Series.create(
         { ...fields, createdAt: entry.createdAt, updatedAt: entry.createdAt },
         { transaction, silent: true }
@@ -1242,6 +1300,7 @@ async function writeContent(
     for (const book of author.books) {
       const fields = createBookSchema.parse({
         ...book,
+        genreId,
         seriesId:
           book.seriesIndex === null
             ? null
@@ -1543,7 +1602,13 @@ async function main(): Promise<void> {
       }
 
       const accountIds = await writeAccounts(plan, transaction);
-      const content = await writeContent(plan, accountIds, transaction);
+      const genreIds = await writeGenres(transaction);
+      const content = await writeContent(
+        plan,
+        accountIds,
+        genreIds,
+        transaction
+      );
       const threads = await writeThreads(
         plan,
         accountIds,
@@ -1560,6 +1625,7 @@ async function main(): Promise<void> {
 
       return {
         accounts: accountIds.length,
+        genres: genreIds.size,
         series: content.series,
         books: content.bookIds.size,
         chapters: content.chapters,

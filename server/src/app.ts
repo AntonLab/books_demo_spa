@@ -12,6 +12,7 @@ import { noSniff } from './middleware/securityHeaders.ts';
 import type { BookRepository } from './repositories/bookRepository.ts';
 import type { ChapterRepository } from './repositories/chapterRepository.ts';
 import type { CommentRepository } from './repositories/commentRepository.ts';
+import type { GenreRepository } from './repositories/genreRepository.ts';
 import type { LikeRepository } from './repositories/likeRepository.ts';
 import type { NotificationRepository } from './repositories/notificationRepository.ts';
 import type { PasswordResetRepository } from './repositories/passwordResetRepository.ts';
@@ -25,6 +26,7 @@ export interface AppDeps {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  genreRepository: GenreRepository;
   commentRepository: CommentRepository;
   likeRepository: LikeRepository;
   notificationRepository: NotificationRepository;

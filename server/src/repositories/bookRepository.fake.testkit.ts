@@ -1,7 +1,9 @@
 import { NotFoundError } from '../types/errors.ts';
 import type { BookDetail, PublicBook } from '../types/book.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import type { BookListResult, BookRepository } from './bookRepository.ts';
+import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
 import type { Viewer } from './visibility.ts';
 
@@ -20,6 +22,9 @@ export interface FakeBookRepositoryOptions {
   // The series that exist, by id. Read, never written, so a caller may keep
   // adding to the map after the fake is made.
   series?: ReadonlyMap<number, FakeSeries>;
+  // The Genres that exist, by id. Read, never written, so a caller may keep
+  // adding to the map after the fake is made — as with `series` above.
+  genres?: ReadonlyMap<number, PublicGenre>;
   // What a book's detail reports about its likes, which live in another
   // repository: the count, and the id of a signed-in viewer's own like.
   likes?: { count: number; viewerLikeId: number | null };
@@ -43,6 +48,7 @@ export function createFakeBookRepository(
   const {
     accounts = new Map(),
     series = new Map(),
+    genres = new Map(),
     likes = { count: 0, viewerLikeId: null },
     viewers = [],
     reorders = [],
@@ -85,6 +91,19 @@ export function createFakeBookRepository(
     }
   };
 
+  // Stands in for the genres row the real repository looks up before it
+  // writes, which answers a missing one with this same BadRequestError (A6).
+  const assertGenre = (genreId: number | null | undefined): void => {
+    if (genreId !== null && genreId !== undefined && !genres.has(genreId)) {
+      throw missingGenre(genreId);
+    }
+  };
+
+  const genreAt = (genreId: number | null | undefined): PublicGenre | null =>
+    genreId === null || genreId === undefined
+      ? null
+      : (genres.get(genreId) ?? null);
+
   // After the last book in the series, as the real repository appends one.
   const append = (bookId: number, seriesId: number): void => {
     const last = Math.max(
@@ -107,6 +126,7 @@ export function createFakeBookRepository(
   return {
     async create(input) {
       assertSeries(input.seriesId);
+      assertGenre(input.genreId);
       if (!accounts.has(input.userId)) {
         throw new NotFoundError('User', input.userId);
       }
@@ -120,6 +140,7 @@ export function createFakeBookRepository(
         title: input.title,
         description: input.description,
         tags: input.tags,
+        genre: genreAt(input.genreId),
         coverUrl: null,
         createdAt: now,
         updatedAt: now,
@@ -142,6 +163,7 @@ export function createFakeBookRepository(
           (query.userId === undefined ||
             (credits.get(row.id) ?? []).includes(query.userId)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
+          (query.genreId === undefined || row.genre?.id === query.genreId) &&
           (!query.q || row.description.includes(query.q))
       );
       return {
@@ -180,6 +202,7 @@ export function createFakeBookRepository(
       const current = rows.get(id);
       if (!current) return null;
       assertSeries(input.seriesId);
+      assertGenre(input.genreId);
 
       const updated: PublicBook = {
         ...current,
@@ -191,6 +214,9 @@ export function createFakeBookRepository(
         description: input.description ?? current.description,
         tags: input.tags ?? current.tags,
         status: input.status ?? current.status,
+        // `in` rather than `??`, as with seriesId: an explicit null means "no
+        // Genre", which a nullish fallback would turn into "leave it alone".
+        genre: 'genreId' in input ? genreAt(input.genreId) : current.genre,
         updatedAt: new Date(),
       };
       rows.set(id, updated);

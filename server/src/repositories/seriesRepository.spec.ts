@@ -13,6 +13,7 @@ import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import {
   Book,
+  Genre,
   initModels,
   Series,
   SeriesAuthor,
@@ -85,6 +86,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     // them. Books are cleared by hand, since a series only unlinks its books.
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
+    await Genre.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
   });
@@ -501,6 +503,39 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.match(matches.items[0]?.description ?? '', /100% real/);
   });
 
+  test('the genre filter returns that genre alone, and an unknown id returns nothing', async () => {
+    const gothic = await Genre.create({ name: 'Filter Gothic' });
+    const filed = await repository.create({
+      userId: ownerId,
+      title: 'In Gothic',
+      description: 'A',
+      tags: [],
+      genreId: gothic.id,
+    });
+    await repository.create({
+      userId: ownerId,
+      title: 'No Genre',
+      description: 'B',
+      tags: [],
+    });
+
+    const inGothic = await repository.list(
+      { limit: 20, offset: 0, genreId: gothic.id },
+      asModerator
+    );
+    const inMissing = await repository.list(
+      { limit: 20, offset: 0, genreId: 999_999 },
+      asModerator
+    );
+
+    assert.deepEqual(
+      inGothic.items.map((item) => item.id),
+      [filed.id]
+    );
+    assert.equal(inGothic.items[0]?.genre?.name, 'Filter Gothic');
+    assert.equal(inMissing.total, 0);
+  });
+
   test('the co-author filter and paging envelope agree on the total', async () => {
     const otherId = (
       await User.create({
@@ -669,6 +704,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   let contractAccounts = 0;
+  let contractGenres = 0;
   seriesRepositoryContract(async () => ({
     repository,
     async anAuthor() {
@@ -687,6 +723,13 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         [ownerId]
       );
       return book.id;
+    },
+    async aGenre() {
+      contractGenres += 1;
+      const genre = await Genre.create({
+        name: `Contract Genre ${contractGenres}`,
+      });
+      return genre.id;
     },
   }));
 });

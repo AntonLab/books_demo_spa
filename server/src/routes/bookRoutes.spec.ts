@@ -11,6 +11,7 @@ import {
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { Viewer } from '../repositories/visibility.ts';
 import type { BookDetail, PublicBook } from '../types/book.ts';
+import type { PublicGenre } from '../types/genre.ts';
 import type { AuthorSummary } from '../types/user.ts';
 import {
   AUTH_COOKIE,
@@ -37,6 +38,15 @@ const UNOWNED_USER_ID = 999997;
 // Credited to otherAuthor first and the `author` persona second, so filing a
 // book under it proves any Co-author of a series may, not only its first.
 const SHARED_SERIES_ID = 9;
+
+const KNOWN_GENRE_ID = 5;
+const MISSING_GENRE_ID = 999996;
+
+// The Genres that exist. A Genre has no Co-authors and no visibility rule, so
+// one map serves every case here.
+const GENRES = new Map<number, PublicGenre>([
+  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic' }],
+]);
 
 // The series that exist, and who co-authors each.
 const SERIES = new Map<number, FakeSeries>([
@@ -97,6 +107,7 @@ const createFakeRepository = (
   createFakeBookRepository({
     accounts: SUMMARIES,
     series: SERIES,
+    genres: GENRES,
     likes: { count: 4, viewerLikeId: VIEWER_LIKE_ID },
     ...spies,
   });
@@ -316,6 +327,96 @@ test('GET list filters by tag, owner and series', async () => {
       // The standalone book has no series, so only one of the two matches.
       assert.equal(bySeries.total, 1);
       assert.equal(byOther.total, 0);
+    }
+  );
+});
+
+// R2: the caller here is the `author` persona, which holds `none` on every
+// genres action — choosing a Genre rides on the book's own create grant and
+// needs no grant on genres at all. That is why this case asserts 201 as
+// `author` rather than as `admin`.
+test('POST files a book under a genre, and leaves it without one when genreId is absent', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const filed = await post(base, { ...valid, genreId: KNOWN_GENRE_ID });
+      const without = await post(base, valid);
+
+      assert.equal(filed.status, 201);
+      assert.deepEqual((await json<PublicBook>(filed)).genre, {
+        id: KNOWN_GENRE_ID,
+        name: 'Gothic',
+      });
+      assert.equal((await json<PublicBook>(without)).genre, null);
+    }
+  );
+});
+
+// A6: choosing a Genre rides on the book's own create/update grant (R2), so
+// nothing extra is checked — but an id that names no Genre is a 400.
+test('a genreId that names no genre is 400 on create and on update', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(await post(base, valid));
+
+      const onCreate = await post(base, {
+        ...valid,
+        genreId: MISSING_GENRE_ID,
+      });
+      const onUpdate = await patch(base, created.id, {
+        genreId: MISSING_GENRE_ID,
+      });
+
+      assert.equal(onCreate.status, 400);
+      assert.equal(onUpdate.status, 400);
+      const createBody = await json<{ error: string }>(onCreate);
+      assert.match(createBody.error, /does not exist/);
+      assert.ok(!('details' in createBody));
+      const updateBody = await json<{ error: string }>(onUpdate);
+      assert.match(updateBody.error, /does not exist/);
+      assert.ok(!('details' in updateBody));
+    }
+  );
+});
+
+test('PATCH without genreId keeps the genre, and an explicit null clears it', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicBook>(
+        await post(base, { ...valid, genreId: KNOWN_GENRE_ID })
+      );
+
+      const renamed = await json<PublicBook>(
+        await patch(base, created.id, { title: 'Renamed' })
+      );
+      assert.equal(renamed.genre?.id, KNOWN_GENRE_ID);
+
+      const cleared = await json<PublicBook>(
+        await patch(base, created.id, { genreId: null })
+      );
+      assert.equal(cleared.genre, null);
+    }
+  );
+});
+
+test('GET list filters by genre', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, { ...valid, genreId: KNOWN_GENRE_ID });
+      await post(base, valid);
+
+      const inGenre = await json<{ total: number }>(
+        await fetch(`${base}/api/books?genreId=${KNOWN_GENRE_ID}`)
+      );
+      const inMissing = await json<{ total: number }>(
+        await fetch(`${base}/api/books?genreId=${MISSING_GENRE_ID}`)
+      );
+
+      assert.equal(inGenre.total, 1);
+      assert.equal(inMissing.total, 0);
     }
   );
 });

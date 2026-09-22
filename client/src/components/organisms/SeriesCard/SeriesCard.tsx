@@ -1,23 +1,34 @@
 import type { FC } from 'react';
 import { Card, Space, Tag, theme, Typography } from 'antd';
+import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import type { PublicSeries } from '@/types/series';
 
 interface SeriesCardProps {
   series: PublicSeries;
+  // Heading a page of its own results, the card's title *is* that page's
+  // level-2 heading. One of several cards in a list, it is a level-4 link to
+  // its own results instead — there is no series page to send a reader to.
+  linked?: boolean;
 }
 
-// What a reader is told about a series: its title, every Co-author, the blurb
-// and its tags, the way BookCard tells them about a book. Its books are left
-// to whoever renders this, since only they know which of them to list.
-export const SeriesCard: FC<SeriesCardProps> = ({ series }) => {
+// What a reader is told about a series: its title, every Co-author, the blurb,
+// its Genre and its tags, the way BookCard tells them about a book. Its books
+// are left to whoever renders this, since only they know which of them to list.
+export const SeriesCard: FC<SeriesCardProps> = ({ series, linked = false }) => {
   const { token } = theme.useToken();
 
   return (
     <Card size="small" style={{ marginBottom: token.margin }}>
-      <Typography.Title level={2} style={{ marginTop: 0 }}>
-        {series.title}
-      </Typography.Title>
+      {linked ? (
+        <Typography.Title level={4} style={{ marginTop: 0 }}>
+          <Link to={`/search?series=${series.id}`}>{series.title}</Link>
+        </Typography.Title>
+      ) : (
+        <Typography.Title level={2} style={{ marginTop: 0 }}>
+          {series.title}
+        </Typography.Title>
+      )}
 
       <Space
         size={token.marginXS}
@@ -43,6 +54,14 @@ export const SeriesCard: FC<SeriesCardProps> = ({ series }) => {
       <Typography.Paragraph style={{ marginBottom: token.marginSM }}>
         {series.description}
       </Typography.Paragraph>
+
+      {series.genre !== null && (
+        <div style={{ marginBottom: token.marginXS }}>
+          <Link to={`/search?genre=${series.genre.id}`}>
+            {series.genre.name}
+          </Link>
+        </div>
+      )}
 
       {series.tags.length > 0 && (
         <Space wrap size={[0, token.marginXS]}>

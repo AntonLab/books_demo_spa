@@ -8,12 +8,18 @@ const series = [
   { id: 8, title: 'Letters from Blackmoor' },
 ];
 
+const genres = [
+  { id: 4, name: 'Gothic' },
+  { id: 5, name: 'Hard SF' },
+];
+
 describe('BookForm', () => {
   it('submits what was typed, standalone by default', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
       <BookForm
         seriesOptions={series}
+        genreOptions={genres}
         submitLabel="Create book"
         onSubmit={onSubmit}
       />
@@ -31,6 +37,7 @@ describe('BookForm', () => {
       description: 'Long ago, in a kingdom of scales.',
       tags: [],
       seriesId: null,
+      genreId: null,
     });
   });
 
@@ -39,6 +46,7 @@ describe('BookForm', () => {
     renderWithProviders(
       <BookForm
         seriesOptions={[]}
+        genreOptions={[]}
         submitLabel="Create book"
         onSubmit={onSubmit}
       />
@@ -55,6 +63,7 @@ describe('BookForm', () => {
     renderWithProviders(
       <BookForm
         seriesOptions={[]}
+        genreOptions={[]}
         submitLabel="Create book"
         onSubmit={jest.fn()}
       />
@@ -68,6 +77,7 @@ describe('BookForm', () => {
     renderWithProviders(
       <BookForm
         seriesOptions={series}
+        genreOptions={genres}
         submitLabel="Save"
         showStatus
         initialValues={{
@@ -75,6 +85,7 @@ describe('BookForm', () => {
           description: 'Long ago.',
           tags: ['epic'],
           seriesId: 7,
+          genreId: null,
           status: 'draft',
         }}
         onSubmit={onSubmit}
@@ -94,6 +105,7 @@ describe('BookForm', () => {
       description: 'Long ago.',
       tags: ['epic'],
       seriesId: 7,
+      genreId: null,
       status: 'complete',
     });
   });
@@ -102,12 +114,14 @@ describe('BookForm', () => {
     renderWithProviders(
       <BookForm
         seriesOptions={[]}
+        genreOptions={[]}
         submitLabel="Save"
         initialValues={{
           title: 'Kept',
           description: 'Also kept',
           tags: [],
           seriesId: null,
+          genreId: null,
         }}
         error="You may only add books to series you co-author"
         onSubmit={jest.fn()}
@@ -124,6 +138,7 @@ describe('BookForm', () => {
     renderWithProviders(
       <BookForm
         seriesOptions={[]}
+        genreOptions={[]}
         submitLabel="Save"
         isSubmitting
         onSubmit={jest.fn()}
@@ -133,5 +148,66 @@ describe('BookForm', () => {
     expect(screen.getByRole('button', { name: /Save/ })).toHaveClass(
       'ant-btn-loading'
     );
+  });
+
+  it('offers No genre first and submits null for it', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={[]}
+        genreOptions={genres}
+        submitLabel="Create book"
+        onSubmit={onSubmit}
+      />
+    );
+
+    await userEvent.type(screen.getByLabelText('Title'), 'A Tale of Dragons');
+    await userEvent.type(screen.getByLabelText('Description'), 'Long ago.');
+    await userEvent.click(screen.getByRole('button', { name: 'Create book' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      title: 'A Tale of Dragons',
+      description: 'Long ago.',
+      tags: [],
+      seriesId: null,
+      genreId: null,
+    });
+  });
+
+  it('round-trips a chosen genre as its id', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        showStatus
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: ['epic'],
+          seriesId: 7,
+          genreId: 4,
+          status: 'draft',
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    // The loaded genre shows by name, not as a bare id. antd renders the
+    // chosen option's label in a sibling of the combobox, not inside it, so
+    // this is a text query rather than one on getByLabelText('Genre').
+    expect(screen.getByText('Gothic')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      title: 'A Tale of Dragons',
+      description: 'Long ago.',
+      tags: ['epic'],
+      seriesId: 7,
+      genreId: 4,
+      status: 'draft',
+    });
   });
 });
