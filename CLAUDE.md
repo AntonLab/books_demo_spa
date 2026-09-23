@@ -2,7 +2,7 @@
 
 Three npm workspaces under one root `package.json`: a webpack-bundled React
 (TypeScript) frontend, an Express + Sequelize backend, and the API types both
-of them read. Early scaffold — most feature directories exist but are empty.
+of them read.
 
 ## Layout
 
@@ -41,7 +41,7 @@ of them read. Early scaffold — most feature directories exist but are empty.
   the root `node_modules`, so bare specifiers resolve.
 - `package.json` — the workspace root. It declares `client`, `server` and
   `shared` as workspaces, owns the seven devDependencies every package needs (eslint,
-  @eslint/js, typescript-eslint, eslint-config-prettier, globals, prettier,
+  `@eslint/js`, typescript-eslint, eslint-config-prettier, globals, prettier,
   typescript) plus `concurrently` and `skills`, and holds `engines.node`.
   `skills` is the CLI behind `npm run skills` (see **Project skills**); it is
   pinned here rather than run through `npx` so a fresh clone rebuilds the
@@ -71,172 +71,29 @@ that matters: Node strips types only from a file whose real path lies outside
 - Frontend: React 19
 - Backend: Express 5, Sequelize 6 (MySQL via `mysql2`)
 
-## Status / Known Gaps
+## Status
 
-The scaffold is incomplete — keep the docs honest as you fill it in:
+All three packages are past scaffold: the UI, the API and the shared types are
+implemented end to end. What each package holds is its own CLAUDE.md's job —
+this section carries only what neither the code nor the git history tells you.
 
-- All three packages have TypeScript and ESLint (flat config) wired up, exposing
-  `typecheck`, `lint` and `lint:fix`. Prettier is root-only — its config is
-  repo-wide, so `format` and `format:check` live only in the root
-  `package.json` and no package defines them. See each package's CLAUDE.md.
-- The root `package.json` fans `typecheck`, `lint`, `lint:fix`, `test` and
-  `build` out over every workspace — `test` and `build` with `--if-present`,
-  since `shared` has neither to run — and `npm run dev` starts the client dev
-  server and the API together under `concurrently`. It defines no per-package
-  aliases: one workspace is targeted with npm's own `-w` flag
-  (`npm run dev -w client`, `npm test -w server`), uniformly for every script.
-- `client` is bundled with webpack 5 (swc-loader + fork-ts-checker), exposing
-  `npm run dev` (dev server on port 3000, Fast Refresh, `/api` proxied to :4000)
-  and `npm run build` (hashed output into `client/build/`). It also has a
-  Jest test runner (`npm test`, jsdom + `@swc/jest`; see `client/CLAUDE.md`
-  for why the script is not plain `jest`). See `client/CLAUDE.md`.
-- `client` now has a working UI on top of that toolchain: a `MainPage`
-  listing books, a header with nav, search, auth state and a notification
-  bell, four auth modals
-  against `/api/auth` (login, register, forgot/reset password), a `/search`
-  page (a term, or one series' books — there is no series page), a `/books/:id` book page (title, author, series, annotation, chapters,
-  comments) and a `/books/:bookId/chapters/:chapterId` reader, plus the
-  first authoring pages — `/my-books`, `/books/new`, `/books/:id/edit`
-  (fields, status, chapters in a drag-and-drop Reading order, Co-authors,
-  delete), `/series/new` and `/series/:id/edit` (fields, books in a
-  drag-and-drop Series order, Co-authors, delete) and a chapter editor at
-  `/books/:bookId/chapters/new` and `.../:chapterId/edit` (publish now,
-  schedule, or save a draft) — built on antd
-  6, react-router, TanStack Query and Redux
-  Toolkit. The split between the last two is deliberate: **TanStack Query
-  owns everything fetched** (the session, the book list, each search term,
-  each book's detail, its chapters, its comment thread, and the auth, comment
-  and like mutations, all in `src/queries/`), while **Redux holds
-  UI state only** — `authSlice` is down to `activeModal` and `resetToken`.
-  See `client/CLAUDE.md`.
-- `server` is wired to MySQL: Sequelize (via `mysql2`) connects to
-  `books_demo_spa`, and `User`, `Series`, `Book`, `Chapter` and `Like` models
-  — associated by `Series.hasMany(Book)`, `Book.hasMany(Chapter)` and
-  `hasMany(Like)` from each of `User`, `Book` and `Comment`, with the
-  **Co-authors** of a book or a series kept in `book_authors` /
-  `series_authors` rather than an owner column (ADR-0005) — have a full CRUD
-  API, though every
-  write on them now goes through the role-permission matrix (see the auth
-  bullet below). A like points at exactly one of a book or a comment; that
-  XOR is enforced in zod and in a model validator, never by the database (see
-  `server/CLAUDE.md`). `Comment` (owned by a user and a book, with
-  self-referential replies) now has a full CRUD API too, at `/api/comments`.
-  Books and series carry a `title` column alongside their description, and
-  every book and series response embeds its Co-authors as `authors`, in credit
-  order; `GET /api/books/:id` returns a `BookDetail` adding the series name
-  and the like state. Co-authors are added and removed (or leave) through
-  `/api/books/:id/co-authors` and `/api/series/:id/co-authors`, and a
-  series' Co-author can take a book out of it through
-  `DELETE /api/series/:id/books/:bookId`. `npm run build`
-  (`tsc -p tsconfig.build.json`) emits to `dist/`.
-- `server` has session-based auth at `/api/auth` — register, login, logout,
-  me, and a two-step password reset — backed by `Session` and
-  `PasswordResetToken` models and an opaque token in an httpOnly `sid`
-  cookie. `requireAuth` now guards only `GET /api/auth/me`; every write on
-  the six resources above, plus both reads on `/api/users`, instead runs
-  through `requirePermission` and a role-permission matrix — five roles
-  (`guest`, `user`, `author`, `admin`, `superadmin`), each granted `none`,
-  `own` or `any` on every resource × action — so a request with no session
-  gets 401 and a signed-in role with no grant for that action gets 403.
-  `optionalAuth` is no longer mounted anywhere: `requirePermission` resolves
-  the session itself on every route, public reads included, so a like button
-  still renders its state for an anonymous visitor without it. Ownership is
-  enforced on **books, series, chapters, comments and likes** — five
-  resources, not four — with `admin` and `superadmin` bypassing it wherever
-  the matrix grants them `any` rather than `own`. On a book or a series `own`
-  means any of its Co-authors, filing a book into a series takes a Co-author
-  of both, and chapters resolve ownership through their book, since
-  `chapters` carries no `userId`. A Moderator never changes who is credited on
-  a work, a work always keeps at least one Co-author, and deleting an account
-  deletes only the works it was the last Co-author of. A book has a status —
-  `draft` (every new book), `in_progress` or `complete` — and a **Draft book**
-  is readable only by its Co-authors and Moderators: every read of it or its
-  chapters, comments and likes is filtered through `repositories/visibility.ts`,
-  no list shows it except its own Co-author's `?userId=`, and nobody may
-  comment on or like it. Every change to who is credited on a shared book or
-  series, and every deletion of one, writes a **Notification** to the other
-  Co-authors in the same transaction — a snapshot of the work's title and the
-  actor's name, listed and marked read through `/api/notifications`. A chapter has a Publication time — `null` (Draft),
-  future (Scheduled) or past (Published) — and a reader sees only chapters whose
-  time has passed; a save carries the `updatedAt` it was based on and gets a
-  409 if a co-author saved first. A book's chapters follow an explicit
-  Reading order (`chapters.position`), rewritten whole through
-  `PUT /api/books/:id/chapter-order`, which answers 409 if a chapter was added
-  or deleted since the list was loaded. A series' books follow a Series
-  order (`books.seriesPosition`) the same way, through
-  `PUT /api/series/:id/book-order`, and its Co-authors see every book filed
-  in it — drafts by title and status only — through
-  `GET /api/series/:id/books`. Deleting a
-  comment leaves a **tombstone** — `deleted` by its own owner (or when that
-  owner's account is deleted) or `removed` by a moderator — rather than
-  removing the row, so its replies stay and its text and author are withheld
-  in every response; a moderator can undo a `removed` tombstone through
-  `POST /api/comments/:id/restore`. Blocking an account, and any successful
-  password change, both end every session that account holds, in the same
-  transaction as the update. Identity for a comment or a like still comes
-  from the session, never the request body; without that the ownership rules
-  would be trivially defeated. Role changes go through their own door,
-  `PATCH /api/users/:id/role`: a row's owner may switch between `user` and
-  `author`, and only `superadmin` may set any other role on any account. An
-  `admin` may manage only `user` and `author` accounts besides its own —
-  another admin or any superadmin is a 403 — while a `superadmin` reaches
-  every account but may not delete its own or change its own role. See
-  `server/CLAUDE.md` for the full matrix, the cookie flags, the
-  SHA-256-not-argon2 choice for tokens, and the login timing defence.
-- A Book carries an optional **Cover** and an Account of any Role an
-  optional **Avatar** (CONTEXT.md, ADR-0007), re-encoded to a fixed WebP
-  shape by `server`'s `sharp`-based `src/images.ts` and stored in two new
-  MySQL tables, `book_covers` and `user_avatars` — no rebuild needed, since
-  `sync()` creates a missing table. Six routes (`PUT`/`DELETE`/`GET` on
-  each) serve and manage them under `/api/books/:id/cover` and
-  `/api/users/:id/avatar`; see `server/CLAUDE.md` for the guards, the raw
-  body parser and the cache headers. `PublicBook` and
-  `PublicUser`/`AuthorSummary` carry the versioned `coverUrl`/`avatarUrl`.
-  `client` shows both through three new molecules — `BookCover` and
-  `AccountAvatar` display them, `ImageUploadButton` is the shared upload
-  picker behind both — and `ProfilePage` is no longer a stub.
-- A Book and a Series each carry at most one **Genre** (CONTEXT.md, ADR-0008) —
-  a row in a new `genres` table that `admin` and `superadmin` add to, rename and
-  delete through four routes at `/api/genres`. `genres` is a module in the
-  permission matrix on which every other Role, Guests included, holds `read` and
-  nothing else; a Genre has no Owner, so no grant on it is `own`. Choosing one
-  needs no Genre permission: `genreId` rides on the book's or series' own
-  create/update grant. `GET /api/books` and `GET /api/series` take `?genreId=`,
-  `PublicBook` and `PublicSeries` embed `genre: PublicGenre | null` (from the new
-  `shared/src/genre.ts`), and deleting a Genre leaves its works with
-  `genre: null` through `ON DELETE SET NULL`, notifying nobody. A Series' Genre
-  is its own: a Book never inherits it. `client` navigates by it — a "Genres"
-  submenu in the header leads to `/search?genre=<id>`, which lists the Genre's
-  books and then its series; the Genre is a link on `BookCard`, `SeriesCard` and
-  `BookPage`; `BookForm` and `SeriesForm` each carry a "Genre" select; and
-  `AdminGenresPage` at `/admin/genres` is where the list is kept.
-- `server` has a test suite using `node:test` (`npm test`). `client` has a
-  Jest test suite (`npm test`); see `client/CLAUDE.md` for the exact script.
-- A dev database must be dropped and rebuilt if it predates this branch:
-  `books.userId` and `series.userId` are gone, `books.status`,
+- **A dev database older than the current schema must be dropped and rebuilt.**
+  `sync()` creates a missing table but never alters an existing one, so every
+  column added since yours was created is simply absent: `books.status`,
   `chapters.publishedAt`, `chapters.position`, `books.seriesPosition`,
-  `books.genreId` and `series.genreId` are all new, and `sync()` never
-  alters an existing table. Genres add a second reason: the
-  `permissions.module` column is a MySQL `ENUM` built from `MODULES`, which
-  now holds `genres`, so until the table is recreated the startup
-  permission sync cannot insert the new rows. CI and the test schemas are
-  built fresh and are unaffected. See `server/CLAUDE.md`.
-- `server/src/db/seed.ts` fills the database with the demo data — ten accounts
-  (one superadmin, one admin, three authors, five readers, all sharing the
-  password `Password123!`), each author's 1-2 series of 4-5 books plus 1-3
-  standalone ones, 20-24 chapters per book, 3-15 threaded comments per book
-  with a scattering of tombstones, likes on both books and comments, and five
-  Genres — Gothic, Hard SF and Urban Fantasy, one per author, plus Horror and
-  Romance, which stay empty so the demo has an empty Genre to show. Run
-  it with `npm run seed -w server -- --force`; **the flag is required because
-  it deletes every row in the ten content tables first** — `book_covers` and
-  `user_avatars` are not among them, but every Cover and Avatar goes too,
-  through the `ON DELETE CASCADE` off the `books` and `users` rows it
-  deletes — and without it the script only reports what it found. Counts
-  come from a fixed PRNG seed, so the shape is reproducible; the dates are
-  anchored to the run, so the newest chapter is always a few days old. See
-  `server/CLAUDE.md` for the personas, the two safety guards, and why it
-  writes through the models rather than the API.
+  `books.genreId` and `series.genreId` are new, and `books.userId` and
+  `series.userId` are gone. Genres add a second reason — `permissions.module`
+  is a MySQL `ENUM` built from `MODULES`, so until the table is recreated the
+  startup permission sync cannot insert the `genres` rows. CI and the test
+  schemas are built fresh and are unaffected.
+- `npm run seed -w server -- --force` loads the demo data, and **the flag is
+  mandatory**: without it the script only reports what it found, and with it it
+  first deletes every row in the ten content tables — every Cover and Avatar
+  with them, through the `ON DELETE CASCADE` off `books` and `users`. See
+  `server/CLAUDE.md` for the personas and the two safety guards.
+- Prettier is root-only. Its config is repo-wide, so `format` and
+  `format:check` live in the root `package.json` and no package defines them.
+- There is no series page: a series' books are reached through `/search`.
 
 ## Quality Gates
 
@@ -333,6 +190,14 @@ Do not:
   portable across machines.
 - Do not document commands, scripts, or dependencies that do not exist in
   `package.json` — verify before writing them down.
+- Do not turn a CLAUDE.md into a changelog. Write down what does not follow
+  from the code — traps, rationale, conventions that differ from the tool's
+  default — and leave what shipped when to git history. Keep each CLAUDE.md
+  under ~400 lines; past that, cut something before you add.
+- Do not write a comment that says _what_ the code does — rename the code until
+  it says that itself. A comment earns its place by carrying what the code
+  cannot: why it is this way, what breaks otherwise, which upstream bug it
+  works around. Those are worth any length; the rest are worth none.
 - Do not leave `console.log` in production code — use a proper logger.
 - Do not use synchronous filesystem APIs in request handlers.
 - Do not use class components — use functional components with hooks. One
@@ -361,10 +226,13 @@ Do not:
 
 1. Work within the relevant package (`client/` or `server/`) and read its
    CLAUDE.md. A change to what the API returns starts in `shared/`.
-2. Verify any command in these docs actually exists before relying on it.
-3. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
+2. Name domain things the way `CONTEXT.md` names them. Read it before you
+   introduce or rename a concept, and check `docs/adr/` before contradicting a
+   decision it records.
+3. Verify any command in these docs actually exists before relying on it.
+4. Use conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`,
    `ci:`).
-4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
+5. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
 
 ## Agent skills
 
