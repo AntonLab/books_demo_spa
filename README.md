@@ -88,8 +88,8 @@ instead of a blanket session check: a request with no session gets 401, and a
 signed-in role with no grant for that action gets 403. Ownership is enforced
 on books, series, chapters, comments and likes — only a row's owner, or an
 `admin`/`superadmin` acting as moderator, may change it. See
-`server/CLAUDE.md` for the full matrix, account blocking, and the tombstone
-rules on deleted comments.
+`.claude/rules/server/` — `permissions.md` for the full matrix, `auth.md` for
+account blocking, `access.md` for the tombstone rules on deleted comments.
 
 Password-reset links are not emailed: the only delivery implemented
 (`RESET_DELIVERY=log`) writes the link to the server log, so copy it from

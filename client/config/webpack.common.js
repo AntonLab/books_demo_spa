@@ -76,8 +76,9 @@ module.exports = (isDevelopment) => {
           test: /\.(woff2?|eot|ttf|otf)$/i,
           type: 'asset/resource',
         },
-        // `*.module.css` is scoped per component (see CLAUDE.md, Component
-        // folders); every other stylesheet stays global, which is what
+        // `*.module.css` is scoped per component (ADR-0009,
+        // .claude/rules/client/styling.md); every other stylesheet stays
+        // global, which is what
         // src/index.css, which layers antd's reset, relies on. The plain rule
         // excludes `.module.css` explicitly, so the two can never both match.
         {
