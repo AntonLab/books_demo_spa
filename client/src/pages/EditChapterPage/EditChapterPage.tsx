@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import type { FC } from 'react';
-import { Alert, Button, Divider, Popconfirm, Skeleton, Typography } from 'antd';
-import { useQueryClient } from '@tanstack/react-query';
+import {
+  Alert,
+  Button,
+  Divider,
+  Popconfirm,
+  Skeleton,
+  Space,
+  Typography,
+} from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
+import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice';
 import { ChapterForm } from '@/components/organisms/ChapterForm';
 import type { ChapterFormValues } from '@/components/organisms/ChapterForm';
 import { useSession } from '@/queries/auth';
@@ -12,24 +21,59 @@ import {
   useDeleteChapter,
   useUpdateChapter,
 } from '@/queries/chapters';
-import { queryKeys } from '@/queries/keys';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  isBlank,
+  unsavedText,
+  unsavedTextKeys,
+} from '@/store/unsavedTextSlice';
 import styles from './EditChapterPage.module.css';
 
 export const EditChapterPage: FC = () => {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   const params = useParams();
   const bookId = Number(params.bookId);
   const chapterId = Number(params.chapterId);
+  const unsavedKey = unsavedTextKeys.chapter(bookId, chapterId);
 
   const { data: session } = useSession();
   const book = useBook(bookId);
   const chapter = useChapter(chapterId);
   const update = useUpdateChapter(bookId, chapterId);
   const remove = useDeleteChapter(bookId, chapterId);
+  const entry = useAppSelector(
+    (state) => state.unsavedText.entries[unsavedKey]
+  );
+  // Bumped by "Use their version" to remount the form even when the version
+  // on screen has not changed, so it lets go of the discarded text.
+  const [resets, setResets] = useState(0);
+
+  const discardEntry = () => {
+    dispatch(unsavedText.remove(unsavedKey));
+  };
+  const notice =
+    session && entry && !isBlank(entry) ? (
+      <UnsavedTextNotice
+        title={entry.title}
+        text={entry.text}
+        onDiscard={discardEntry}
+      />
+    ) : null;
 
   if (chapter.isError || book.isError) {
-    return <Alert type="error" title="Could not load this chapter." />;
+    const gone =
+      chapter.error instanceof ApiError && chapter.error.status === 404;
+    return (
+      <>
+        <Alert
+          type="error"
+          title="Could not load this chapter."
+          className={styles.alert}
+        />
+        {gone && notice}
+      </>
+    );
   }
   if (chapter.isPending || book.isPending) {
     return <Skeleton active paragraph={{ rows: 10 }} />;
@@ -42,32 +86,88 @@ export const EditChapterPage: FC = () => {
     session?.role === 'admin' || session?.role === 'superadmin';
   if (!isCoAuthor && !isModerator) {
     return (
-      <Alert
-        type="warning"
-        title="Only its co-authors can edit this chapter."
-      />
+      <>
+        <Alert
+          type="warning"
+          title="Only its co-authors can edit this chapter."
+          className={styles.alert}
+        />
+        {notice}
+      </>
     );
   }
 
-  // A 409 is its own state, not an error in the form: the typed text is kept,
-  // and the answer is to reload the chapter rather than to retry the save.
-  const conflict =
+  const saveRefused =
     update.error instanceof ApiError && update.error.status === 409;
+  // The server serialises every `updatedAt` as an ISO string of one format,
+  // so string order is time order.
+  const newest = (a: string, b: string | undefined) =>
+    b !== undefined && b > a ? b : a;
+  // Right after a save lands, `chapter.data` is still the version before it
+  // until the refetch arrives; the save's own answer is the newer one.
+  const latestUpdatedAt = newest(
+    chapter.data.updatedAt,
+    update.data?.updatedAt
+  );
+  // Shown before any save too: after a reload the refetched chapter can be
+  // newer than the version the Unsaved text was typed against. A base newer
+  // than `chapter.data` is the Account's own save awaiting the refetch.
+  const conflict =
+    saveRefused ||
+    (entry?.baseUpdatedAt !== undefined &&
+      chapter.data.updatedAt > entry.baseUpdatedAt);
+  // The version the typing started from. Sending the refetched `updatedAt`
+  // instead would let a save after a reload overwrite a Co-author's newer
+  // version with no 409.
+  const baseUpdatedAt = entry?.baseUpdatedAt ?? latestUpdatedAt;
 
-  const handleSubmit = (values: ChapterFormValues) => {
-    update.mutate({ ...values, expectedUpdatedAt: chapter.data.updatedAt });
+  const handleValuesChange = (values: { title: string; text: string }) => {
+    dispatch(unsavedText.upsert({ key: unsavedKey, ...values, baseUpdatedAt }));
   };
 
-  const reload = async () => {
+  const handleSubmit = (values: ChapterFormValues) => {
+    update.mutate(
+      { ...values, expectedUpdatedAt: baseUpdatedAt },
+      {
+        // Not a plain remove: text typed while the save was in flight stays,
+        // rebased onto the version this save created.
+        onSuccess: (saved) =>
+          dispatch(
+            unsavedText.saved({
+              key: unsavedKey,
+              title: values.title,
+              text: values.text,
+              updatedAt: saved.updatedAt,
+            })
+          ),
+      }
+    );
+  };
+
+  const takeTheirs = async () => {
     update.reset();
-    await queryClient.invalidateQueries({
-      queryKey: queryKeys.chapter(chapterId),
-    });
+    discardEntry();
+    setResets((count) => count + 1);
+    await chapter.refetch();
+  };
+
+  // The next Save is then a deliberate overwrite of their version.
+  const keepMine = async () => {
+    update.reset();
+    const { data } = await chapter.refetch();
+    if (data) {
+      dispatch(
+        unsavedText.rebase({ key: unsavedKey, baseUpdatedAt: data.updatedAt })
+      );
+    }
   };
 
   const handleDelete = () => {
     remove.mutate(undefined, {
-      onSuccess: () => void navigate(`/books/${bookId}/edit`),
+      onSuccess: () => {
+        discardEntry();
+        void navigate(`/books/${bookId}/edit`);
+      },
     });
   };
 
@@ -80,11 +180,16 @@ export const EditChapterPage: FC = () => {
         {conflict && (
           <Alert
             type="warning"
-            title="This chapter was changed by a co-author — reload"
+            title="A co-author changed this chapter since you started editing."
             action={
-              <Button size="small" onClick={() => void reload()}>
-                Reload
-              </Button>
+              <Space>
+                <Button size="small" onClick={() => void takeTheirs()}>
+                  Use their version
+                </Button>
+                <Button size="small" onClick={() => void keepMine()}>
+                  Keep mine
+                </Button>
+              </Space>
             }
             className={styles.alert}
           />
@@ -93,16 +198,19 @@ export const EditChapterPage: FC = () => {
           <Alert type="success" title="Saved." className={styles.alert} />
         )}
         <ChapterForm
-          // Keyed by the version on screen: a reload or a save swaps in what
-          // the server stored, while a refused save keeps the typed text.
-          key={chapter.data.updatedAt}
-          initialValues={{
-            title: chapter.data.title,
-            text: chapter.data.text,
-          }}
+          // Remounts on each new server version and on "Use their version".
+          // It seeds from the Unsaved text when there is one, so a remount
+          // never loses what was typed.
+          key={`${chapter.data.updatedAt}#${resets}`}
+          initialValues={
+            entry
+              ? { title: entry.title ?? '', text: entry.text }
+              : { title: chapter.data.title, text: chapter.data.text }
+          }
           publishedAt={chapter.data.publishedAt}
           isSubmitting={update.isPending}
-          error={conflict ? null : (update.error?.message ?? null)}
+          error={saveRefused ? null : (update.error?.message ?? null)}
+          onValuesChange={handleValuesChange}
           onSubmit={handleSubmit}
         />
       </div>
