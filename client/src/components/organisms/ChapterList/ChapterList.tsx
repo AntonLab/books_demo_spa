@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Alert, Empty, List, Skeleton, Typography } from 'antd';
+import { Alert, Empty, Flex, Listy, Skeleton, Typography } from 'antd';
 import { Link } from 'react-router';
 import { formatDate } from '@/format/date';
 import type { ChapterSummary } from '@/types/chapter';
@@ -28,11 +28,11 @@ export const ChapterList: FC<ChapterListProps> = ({
   if (items.length === 0) return <Empty description="No chapters yet." />;
 
   return (
-    <List
-      dataSource={items}
+    <Listy
+      items={items}
       rowKey="id"
-      renderItem={(chapter) => (
-        <List.Item>
+      itemRender={(chapter) => (
+        <Flex justify="space-between" align="center">
           <Link to={`/books/${bookId}/chapters/${chapter.id}`}>
             {chapter.title}
           </Link>
@@ -42,7 +42,7 @@ export const ChapterList: FC<ChapterListProps> = ({
               {formatDate(chapter.publishedAt)}
             </Typography.Text>
           )}
-        </List.Item>
+        </Flex>
       )}
     />
   );
