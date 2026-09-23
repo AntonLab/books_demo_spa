@@ -1,6 +1,8 @@
 import type { ThemeConfig } from 'antd';
 
-// Quarks: the design tokens the whole app reads through `theme.useToken()`.
+// Quarks: the design tokens the whole app reads — as CSS variables in a
+// `.module.css` (`appBookCoverWidth` is `var(--ant-app-book-cover-width)`),
+// or through `theme.useToken()` where a component prop needs the number.
 //
 // antd 6 ships no token for how wide a control may grow — its size tokens
 // cover spacing, typography, radii and control *height* only (see
