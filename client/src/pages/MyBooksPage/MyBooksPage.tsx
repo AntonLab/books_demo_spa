@@ -4,7 +4,7 @@ import {
   Button,
   Empty,
   Flex,
-  List,
+  Listy,
   Skeleton,
   Space,
   Tabs,
@@ -52,20 +52,18 @@ export const MyBooksPage: FC = () => {
     }
 
     return (
-      <List
-        dataSource={series.data.items}
+      <Listy
+        items={series.data.items}
         rowKey="id"
-        renderItem={(entry) => (
-          <List.Item>
-            <Space direction="vertical" size={0}>
-              <Link to={`/series/${entry.id}/edit`}>{entry.title}</Link>
-              <Typography.Text type="secondary">
-                {entry.authors
-                  .map((author) => `${author.firstName} ${author.lastName}`)
-                  .join(', ')}
-              </Typography.Text>
-            </Space>
-          </List.Item>
+        itemRender={(entry) => (
+          <Space direction="vertical" size={0}>
+            <Link to={`/series/${entry.id}/edit`}>{entry.title}</Link>
+            <Typography.Text type="secondary">
+              {entry.authors
+                .map((author) => `${author.firstName} ${author.lastName}`)
+                .join(', ')}
+            </Typography.Text>
+          </Space>
         )}
       />
     );

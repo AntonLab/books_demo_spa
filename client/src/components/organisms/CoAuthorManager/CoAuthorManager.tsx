@@ -3,7 +3,8 @@ import type { FC } from 'react';
 import {
   Alert,
   Button,
-  List,
+  Flex,
+  Listy,
   Popconfirm,
   Select,
   Space,
@@ -88,10 +89,10 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
         />
       )}
 
-      <List
-        dataSource={authors}
+      <Listy
+        items={authors}
         rowKey="id"
-        renderItem={(author) => {
+        itemRender={(author) => {
           const isViewer = author.id === viewerId;
           const loading = remove.isPending && remove.variables === author.id;
           const actions =
@@ -126,7 +127,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
                   ];
 
           return (
-            <List.Item actions={actions}>
+            <Flex justify="space-between" align="center" gap={token.marginXS}>
               <Space size={token.marginXS}>
                 <AccountAvatar
                   avatarUrl={author.avatarUrl}
@@ -135,7 +136,8 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
                 />
                 {nameOf(author)}
               </Space>
-            </List.Item>
+              {actions}
+            </Flex>
           );
         }}
       />
