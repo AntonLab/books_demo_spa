@@ -43,8 +43,8 @@ export class Like extends Model<
 // directly never passes through zod, and MySQL cannot be given the CHECK
 // constraint that would catch it either: Sequelize 6 has no way to declare one
 // in Model.init, and there is no migration tool here to add it out of band
-// (see server/CLAUDE.md). So this validator is the last line, and a write that
-// bypasses the model can still break the invariant.
+// (see .claude/rules/server/sequelize.md). So this validator is the last
+// line, and a write that bypasses the model can still break the invariant.
 //
 // Declared as a named function with an explicit `this` rather than a method in
 // the options object, which would leave `this` implicitly any under strict
