@@ -126,12 +126,16 @@ export const EditChapterPage: FC = () => {
   };
 
   const handleSubmit = (values: ChapterFormValues) => {
-    update.mutate(
-      { ...values, expectedUpdatedAt: baseUpdatedAt },
-      {
-        // Not a plain remove: text typed while the save was in flight stays,
-        // rebased onto the version this save created.
-        onSuccess: (saved) =>
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the page unmounts before the mutation settles (a click on
+    // "Back to …" right after Save), but mutateAsync's own promise still
+    // settles, so the entry is still cleared or rebased.
+    void update
+      .mutateAsync({ ...values, expectedUpdatedAt: baseUpdatedAt })
+      .then(
+        (saved) =>
+          // Not a plain remove: text typed while the save was in flight
+          // stays, rebased onto the version this save created.
           dispatch(
             unsavedText.saved({
               key: unsavedKey,
@@ -140,8 +144,10 @@ export const EditChapterPage: FC = () => {
               updatedAt: saved.updatedAt,
             })
           ),
-      }
-    );
+        // A rejection is already surfaced through update.error; this handler
+        // exists only so the rejection is not left unhandled.
+        () => {}
+      );
   };
 
   const takeTheirs = async () => {

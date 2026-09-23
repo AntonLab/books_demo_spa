@@ -332,6 +332,37 @@ describe('EditChapterPage', () => {
     expect(screen.queryByText(conflictMessage)).toBeNull();
   });
 
+  it('clears the entry for a save that lands after the page unmounted', async () => {
+    const savedUpdatedAt = '2026-09-13T09:00:00.000Z';
+    let land: (saved: PublicChapter) => void = () => {};
+    mockedChapters.updateChapter.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        })
+    );
+    const { store, unmount } = renderPage();
+
+    const text = await screen.findByLabelText('Text');
+    await userEvent.type(text, '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await waitFor(() =>
+      expect(mockedChapters.updateChapter).toHaveBeenCalled()
+    );
+    unmount();
+    // mutateAsync's promise settles whether or not the page that started it
+    // is still mounted; mutate's per-call onSuccess would not fire here.
+    await act(async () =>
+      land({
+        ...chapter,
+        text: 'It was a dark night.!',
+        updatedAt: savedUpdatedAt,
+      })
+    );
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
   it('bases text typed right after a save on that save, not the stale chapter', async () => {
     const savedUpdatedAt = '2026-09-13T09:00:00.000Z';
     mockedChapters.updateChapter.mockResolvedValue({
