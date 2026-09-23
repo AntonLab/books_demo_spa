@@ -36,7 +36,8 @@ the first component needs it rather than leaving empty folders around.
    render. `useAppSelector`, `useAppDispatch`, `src/api` calls and `src/queries`
    hooks belong in organisms and pages.
 4. **Tokens, not hardcoded values.** No arbitrary hex colours or pixel values
-   in components — read antd's tokens (`theme.useToken()`), or add the value to
+   in components — read antd's tokens (`var(--ant-*)` in a `.module.css`,
+   `theme.useToken()` where a prop needs the number), or add the value to
    the `ConfigProvider` theme so it becomes a real quark. antd's set has gaps
    — it sizes controls by height and has no width token at all — so sometimes
    the quark has to be invented. Declare it in `src/theme/tokens.ts`: give it
@@ -99,16 +100,24 @@ Two caveats:
   deprecated in TypeScript 6 and errors as `TS5101`; without it,
   `moduleResolution: Bundler` resolves `paths` against the tsconfig
   directory, so the mapping value needs a leading `./` (`["./src/*"]`).
-- **`.css` and `.module.css` both work, but nothing uses them yet.** Plain
-  stylesheets always did — that is how `src/index.tsx` pulls in
-  `antd/dist/reset.css`. CSS Modules were added alongside the folder rule:
-  both webpack overlays carry a `/.module.css$/` rule with
-  `css-loader`'s `modules` on (hashed class names in prod, readable ones in
-  dev), the plain `.css` rule now excludes them, and `src/types/css.d.ts`
-  declares `*.module.css` as a class-name map. Jest still maps every `.css`
-  to `styleMock.ts`, so a module's classes come back `undefined` in tests —
-  assert on roles and text, not class names. Atomic Design rule 4 still
-  applies: reach for antd tokens before adding a stylesheet.
+- **Styles go in the component's `.module.css`, not in `style={{…}}`**
+  (ADR-0009). Values come from antd's CSS variables — every token, our `app*`
+  quarks included, is emitted as `--ant-<kebab-name>` in px
+  (`appBookCoverWidth` → `var(--ant-app-book-cover-width)`). Inline `style`
+  is only for values that change continuously at runtime, like dnd-kit's
+  transform; a boolean state is a modifier class
+  (`` `${styles.item} ${fresh ? styles.fresh : ''}` ``). Prefer an antd prop
+  when one exists (`Flex justify`/`gap`) over a class. Three traps:
+  - A class beats antd only because `App.tsx` wraps everything in
+    `<StyleProvider layer>`, which puts antd in `@layer antd`; `reset.css` is
+    in `@layer reset` (`src/index.css`), and `public/index.html` declares the
+    order before antd injects anything. Without the layer, Typography's
+    `div.ant-typography` outranks a lone class and a margin silently reverts.
+  - `css-loader` 7 defaults to `namedExport: true`, which drops the default
+    export `import styles from` needs; the webpack rule turns it off.
+  - Jest maps every `.css` to `styleMock.ts` and renders with `zeroRuntime`,
+    so classes come back `undefined` and no test sees a style. Assert on roles
+    and text; check styling in a browser.
 
 ### Page loading and errors
 
