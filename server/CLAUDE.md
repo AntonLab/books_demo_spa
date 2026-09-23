@@ -3,22 +3,15 @@
 Node.js + TypeScript API built on Express 5, with Sequelize 6 / MySQL available
 for persistence.
 
-## Status
+## Domain and API
 
 The `User`, `Series`, `Book`, `Chapter`, `Comment` and `Like` models and their
-CRUD APIs are implemented end to end, associated by `Series.hasMany(Book)`,
-`Book.hasMany(Chapter)`, and `hasMany(Like)` from each of `User`, `Book` and
-`Comment`. Neither a book nor a series has an owner column: their
-**Co-authors** are rows in `book_authors` (`BookAuthor`, hung off `Book` and
-`User` as `credits` / `bookCredits`) and `series_authors` (`SeriesAuthor`, as
-`credits` / `seriesCredits`), and every Co-author holds the same rights over
-the work (ADR-0005). A series and the books in it keep independent Co-author
-lists.
-Sequelize (via `mysql2`) connects to the `books_demo_spa` MySQL database;
-`src/index.ts` ensures the schema exists, authenticates, and mounts the
-Express app under `/api`. Routes, controllers, repositories, models, and
-middleware are all wired for those six. `node:test` is the test runner
-(`npm test`).
+CRUD APIs are implemented end to end. Neither a book nor a series has an owner
+column: their **Co-authors** are rows in `book_authors` (`BookAuthor`, hung off
+`Book` and `User` as `credits` / `bookCredits`) and `series_authors`
+(`SeriesAuthor`, as `credits` / `seriesCredits`), and every Co-author holds the
+same rights over the work (ADR-0005). A series and the books in it keep
+independent Co-author lists.
 
 A book carries a **Book status** — `books.status`, an ENUM of `draft`,
 `in_progress` and `complete` that defaults to `draft` (`BOOK_STATUSES` in
@@ -112,20 +105,15 @@ refused with 401. It is a route of its own rather than a flag on
 `Session` and `PasswordResetToken` back a full session-based auth API at
 `/api/auth`: `POST /register`, `POST /login`, `POST /logout`, `GET /me`,
 `POST /password-reset/request` and `POST /password-reset/confirm`. Both models
-hang off `User.hasMany(...)` with `ON DELETE CASCADE`. **Every write on the
-five resources above — `POST`, `PATCH`, `DELETE` — and both reads on
-`/api/users` now go through the role-permission matrix** (see **Roles and
-permissions** below) rather than a blanket session check: a request with no
-session is refused with 401, and a signed-in role with no grant for that
-module/action is refused with 403. `/api/users` guards its reads too, because
-`PublicUser` carries an email address and an open list would be a scrapeable
-account directory. Every other `GET` stays public. See **Auth** and **Roles
-and permissions** below.
+hang off `User.hasMany(...)` with `ON DELETE CASCADE`. Every write on the five
+resources above, and both reads on `/api/users`, goes through the
+role-permission matrix rather than a blanket session check; `/api/users` guards
+its reads because `PublicUser` carries an email address and an open list would
+be a scrapeable account directory. Every other `GET` stays public. See **Auth**
+and **Roles and permissions** below for the rules themselves.
 
-`Comment` has a full CRUD API at `/api/comments`, built to the same
-five-file pattern as the others. `User.hasMany(Comment)`,
-`Book.hasMany(Comment)`, `Comment.hasMany(Like)` and the self-referential
-`Comment.hasMany(Comment, { as: 'replies' })` are all wired. Like likes, its
+`Comment` has a full CRUD API at `/api/comments`, built to the same five-file
+pattern as the others, with self-referential replies. Like likes, its
 author comes from the session rather than the body, and `PATCH`/`DELETE`
 check ownership through the permission matrix's `own` scope — the same
 mechanism that now also gates books, series and chapters (see **Auth**). Its
@@ -383,11 +371,8 @@ Each layer answers a question the others cannot:
 - `src/images.ts` — the one module every `sharp` call lives in:
   `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
-- `src/routes/` — Express route definitions (`authRoutes.ts`,
-  `authorRoutes.ts`, `userRoutes.ts`, `userRoleRoutes.ts`, `seriesRoutes.ts`,
-  `bookRoutes.ts`, `chapterRoutes.ts`, `chapterOrderRoutes.ts`,
-  `seriesBookRoutes.ts`, `commentRoutes.ts`, `likeRoutes.ts`,
-  `notificationRoutes.ts`, `genreRoutes.ts`, mounted under `/api`).
+- `src/routes/` — Express route definitions, one file per resource, mounted
+  under `/api`.
   `routeTestKit.testkit.ts` holds the harness the route specs share (`withApp`,
   `withAuthenticatedApp`, `AUTH_COOKIE`, `json`, `defaultDeps`,
   `unlimitedAuthRateLimits`); `tsconfig.build.json`
@@ -397,30 +382,22 @@ Each layer answers a question the others cannot:
 - `src/createApp.spec.ts` — `createApp`'s own settings, on the route test
   kit's unreachable repositories (`defaultDeps()`): `trust proxy` from
   `AppDeps.trustProxy`, and the security headers
-- `src/controllers/` — request handlers / HTTP mapping (`authController.ts`,
-  `userController.ts`, `seriesController.ts`, `bookController.ts`,
-  `chapterController.ts`, `commentController.ts`, `likeController.ts`,
-  `notificationController.ts`, `genreController.ts`)
-- `src/repositories/` — data-access layer (`userRepository.ts`,
-  `seriesRepository.ts`, `bookRepository.ts`, `chapterRepository.ts`,
-  `commentRepository.ts`, `likeRepository.ts`, `genreRepository.ts`,
-  `sessionRepository.ts`, `passwordResetRepository.ts`,
-  `notificationRepository.ts` (the list and
+- `src/controllers/` — request handlers / HTTP mapping, one file per resource
+- `src/repositories/` — the Sequelize-backed data-access layer, one file per
+  resource plus `sessionRepository.ts` and `passwordResetRepository.ts`.
+  `notificationRepository.ts` carries the list and
   mark-read reads, plus `notify`, which the book, series and user
-  repositories call inside their own transactions), Sequelize-backed; `likePattern.ts` holds the
+  repositories call inside their own transactions; `likePattern.ts` holds the
   LIKE escaping they share; `visibility.ts` holds the Draft book rule every
   read goes through — see **Draft books** under Auth; the
   `*.fake.testkit.ts`, `*.contract.testkit.ts` and `*.fake.spec.ts` files
   beside seven of them are described under **Test layers**). Note the collision: `likePattern.ts` is about the
   SQL `LIKE` operator and has nothing to do with `likeRepository.ts` — the two
   sit next to each other and mean different things by the same word.
-- `src/models/` — Sequelize models & associations (`User.ts`, `UserAvatar.ts`,
-  `Genre.ts`, `Series.ts`, `SeriesAuthor.ts`, `Book.ts`, `BookCover.ts`,
-  `BookAuthor.ts`, `Chapter.ts`, `Comment.ts`, `Like.ts`, `Notification.ts`,
-  `Session.ts`, `PasswordResetToken.ts`, `Permission.ts`,
-  `index.ts`; `tagArray.ts` holds the JSON tag-column normalisation `Series`
+- `src/models/` — Sequelize models and associations, one file per table, plus
+  `index.ts`. `tagArray.ts` holds the JSON tag-column normalisation `Series`
   and `Book` share; `creditedBook.testkit.ts` is the suites' way to create a
-  book or a series with its Co-authors)
+  book or a series with its Co-authors
 - `src/permissions/` — `matrix.ts` (the role/module/action → scope
   definition and `buildMatrixRows()`) and `permissionStore.ts` (the
   in-memory cache `scopeFor()` reads and `syncPermissions()` writes); see
@@ -446,16 +423,13 @@ Each layer answers a question the others cannot:
   on), `securityHeaders.ts` (`noSniff`, see **Security headers** under
   Operations), `authRateLimit.ts` (the sign-in limits, see **Operations**),
   `errorHandler.ts`, `notFound.ts`, `validate.ts`)
-- `src/types/` — shared TypeScript types (`user.ts`, `series.ts`, `book.ts`,
-  `genre.ts`, `chapter.ts`, `comment.ts`, `like.ts`, `notification.ts`,
-  `permission.ts` (`Role`, `Module`,
-  `Action`, `PermissionScope` and the `as const` arrays behind them), `auth.ts`,
-  `image.ts`, `errors.ts`, `express.d.ts`). The response types (`Public*`,
-  `BookDetail`, …) and the unions the client also uses (`BOOK_STATUSES`,
-  `USER_ROLES`, `USER_STATUSES`, `REGISTRABLE_ROLES`, …) are re-exported from
-  the `shared` workspace, so a change to what the API returns starts there;
-  the zod schemas and the input types inferred from them stay here.
-  `image.ts` is the one file with nothing of its own — both
+- `src/types/` — the zod schemas, the input types inferred from them, and
+  `express.d.ts`; `permission.ts` holds `Role`, `Module`, `Action`,
+  `PermissionScope` and the `as const` arrays behind them. The response types
+  (`Public*`, `BookDetail`, …) and the unions the client also uses
+  (`BOOK_STATUSES`, `USER_ROLES`, `USER_STATUSES`, `REGISTRABLE_ROLES`, …) are
+  re-exported from the `shared` workspace, so a change to what the API returns
+  starts there. `image.ts` is the one file with nothing of its own — both
   `ACCEPTED_IMAGE_CONTENT_TYPES` and `IMAGE_MAX_BYTES` are the client's
   contract too, so they are re-exported from `shared` rather than declared
   here

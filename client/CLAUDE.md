@@ -164,7 +164,7 @@ Available scripts:
 Prettier has no script here: it is root-only, because `.prettierrc.json` and
 `.prettierignore` are repo-wide. Run `npm run format` from the repo root.
 
-## Layout
+## Modules and their traps
 
 - `public/index.html` — HTML template consumed by `html-webpack-plugin`
 - `src/index.tsx` — app entry, mounts `<App />` into `#root`
@@ -177,24 +177,13 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   which a route test cannot point at an arbitrary path.
 - `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
   every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
-  responses into a typed `ApiError`), plus `auth.ts`, `authors.ts` (`searchAuthors`, the Co-author picker's
-  search), `users.ts` (`uploadAvatar`, `deleteAvatar`), `books.ts` (reads,
-  plus `createBook`, `updateBook`, `deleteBook`, `addCoAuthor`,
-  `removeCoAuthor`, `uploadBookCover` and `deleteBookCover`), `chapters.ts` (reads, plus
-  `createChapter`, `updateChapter` — which carries `expectedUpdatedAt` —
-  `deleteChapter` and `reorderChapters`, a `PUT` of the book's whole Reading
-  order), `comments.ts`,
-  `genres.ts` (`listGenres`, `createGenre`, `renameGenre` and `deleteGenre`;
-  `listBooks` and `listSeries` also take a `genreId`, and a book's and a series'
-  create/update payloads carry one),
-  `likes.ts`, `notifications.ts` (`listNotifications`, the newest page, and
-  `markNotificationsRead`) and `series.ts` (`listSeries`, `getSeries`, the create /
-  update / delete trio, `addSeriesCoAuthor` and `removeSeriesCoAuthor`, and the
-  series editor's `listSeriesBooks`, `reorderSeriesBooks` and
-  `removeBookFromSeries`), the per-resource typed calls
-  built on it. Since the TanStack Query migration
-  these are the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`,
-  not called directly from components.
+  responses into a typed `ApiError`), plus one file per resource holding that
+  resource's typed calls. Two carry something their names do not give away:
+  `updateChapter` sends `expectedUpdatedAt`, the version the save was based on,
+  and a book's and a series' create/update payloads carry a `genreId`, as
+  `listBooks` and `listSeries` do. Since the TanStack Query migration these are
+  the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`, not called
+  directly from components.
 
   One trap: `request()` takes `body` as an **object** and stringifies it
   itself, setting `Content-Type` off whether it is `undefined`. Passing a
