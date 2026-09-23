@@ -4,6 +4,7 @@ import { Alert, Button, Popconfirm, Space, theme, Typography } from 'antd';
 import { BookCover } from '@/components/molecules/BookCover';
 import { ImageUploadButton } from '@/components/molecules/ImageUploadButton';
 import { useDeleteBookCover, useUploadBookCover } from '@/queries/books';
+import styles from './BookCoverManager.module.css';
 
 interface BookCoverManagerProps {
   bookId: number;
@@ -49,11 +50,7 @@ export const BookCoverManager: FC<BookCoverManagerProps> = ({
     <>
       <Typography.Title level={4}>Cover</Typography.Title>
       {coverError && (
-        <Alert
-          type="error"
-          title={coverError}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={coverError} className={styles.error} />
       )}
       <Space align="start" size={token.margin}>
         <BookCover coverUrl={coverUrl} title={title} />

@@ -1,10 +1,11 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Result, theme } from 'antd';
+import { Alert, Button, Form, Input, Modal, Result } from 'antd';
 import { useNavigate } from 'react-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { closeModal } from '@/store/authSlice';
 import { useConfirmReset } from '@/queries/auth';
+import styles from './ResetConfirmModal.module.css';
 
 interface ResetConfirmValues {
   password: string;
@@ -13,8 +14,6 @@ interface ResetConfirmValues {
 }
 
 export const ResetConfirmModal: FC = () => {
-  // Aliased: `token` below is the password-reset token, not a design token.
-  const { token: designToken } = theme.useToken();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const token = useAppSelector((state) => state.auth.resetToken);
@@ -68,11 +67,7 @@ export const ResetConfirmModal: FC = () => {
       ) : (
         <>
           {formError !== null && (
-            <Alert
-              type="error"
-              title={formError}
-              style={{ marginBottom: designToken.margin }}
-            />
+            <Alert type="error" title={formError} className={styles.error} />
           )}
 
           {/* void: handleFinish reports its own failure in the form, so nothing

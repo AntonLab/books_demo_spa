@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Input, Space, theme, Typography } from 'antd';
+import { Alert, Button, Form, Input, Space, Typography } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import {
   PublicationTimeFields,
@@ -8,6 +8,7 @@ import {
 import type { PublishedAtPayload } from '@/api/chapters';
 import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';
+import styles from './ChapterForm.module.css';
 
 export interface ChapterFormValues {
   title: string;
@@ -44,7 +45,6 @@ export const ChapterForm: FC<ChapterFormProps> = ({
   isSubmitting = false,
   error = null,
 }) => {
-  const { token } = theme.useToken();
   const [form] = Form.useForm<FieldValues>();
   const state = chapterStateOf({ publishedAt });
   const scheduledFor = state === 'scheduled' ? dayjs(publishedAt) : null;
@@ -96,11 +96,7 @@ export const ChapterForm: FC<ChapterFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert
-          type="error"
-          title={error}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={error} className={styles.error} />
       )}
 
       <Form<FieldValues>

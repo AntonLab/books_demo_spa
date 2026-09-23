@@ -1,6 +1,7 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Input, Select, theme } from 'antd';
+import { Alert, Button, Form, Input, Select } from 'antd';
 import type { PublicGenre } from '@/types/genre';
+import styles from './SeriesForm.module.css';
 
 interface SeriesFormValues {
   title: string;
@@ -40,8 +41,6 @@ export const SeriesForm: FC<SeriesFormProps> = ({
   isSubmitting = false,
   error = null,
 }) => {
-  const { token } = theme.useToken();
-
   const handleFinish = ({ genreId, ...rest }: FieldValues) => {
     onSubmit({
       ...rest,
@@ -53,11 +52,7 @@ export const SeriesForm: FC<SeriesFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert
-          type="error"
-          title={error}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={error} className={styles.error} />
       )}
 
       <Form<FieldValues>
