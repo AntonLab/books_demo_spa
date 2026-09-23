@@ -25,7 +25,16 @@ work=$(mktemp -d) || exit 1
 trap 'rm -rf "$work"' EXIT INT TERM
 
 status=0
-bin="$repo_root/node_modules/.bin"
+
+# Walk up for node_modules the way Node resolves it. A git worktree nested in
+# the main checkout (.claude/worktrees/…) has no install of its own, and taking
+# $repo_root as-is made the probe below fail and wave every commit through.
+install_root=$repo_root
+while [ ! -x "$install_root/node_modules/.bin/prettier" ] &&
+  [ "$install_root" != "$(dirname "$install_root")" ]; do
+  install_root=$(dirname "$install_root")
+done
+bin="$install_root/node_modules/.bin"
 
 # Deletions are excluded (--diff-filter=ACMR): there is nothing left on disk to
 # lint or format. core.quotepath=false keeps non-ASCII paths unescaped so they
