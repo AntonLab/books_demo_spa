@@ -19,11 +19,17 @@
       "skillPath": "plugins/patterns/atomic-design/skills/atomic-design-fundamentals/SKILL.md",
       "computedHash": "ae644e79c53f1b450aaf5fd662459da1d66402112230e5b8d4881f8deff981ba"
     },
+    "build-modern-redux-apps/redux-dataflow": {
+      "source": "reduxjs/redux-toolkit",
+      "sourceType": "github",
+      "skillPath": "packages/toolkit/skills/build-modern-redux-apps/redux-dataflow/SKILL.md",
+      "computedHash": "c86b4c635b77076adb7480a8ef4bea6fa8e1f77d74627ad67a0b70cda6e4ff50"
+    },
     "fallow": {
       "source": "fallow-rs/fallow-skills",
       "sourceType": "github",
       "skillPath": "fallow/skills/fallow/SKILL.md",
-      "computedHash": "51052d5339bae02c3bb56542382685ebcc6438ba693c837da1d16ec68618a04b"
+      "computedHash": "a034f206a1c0789627a0a20b77c6e9a7ab9e868aef2e4c2c995fb014a05dad74"
     },
     "fallow-review": {
       "source": "fallow-rs/fallow-skills",
