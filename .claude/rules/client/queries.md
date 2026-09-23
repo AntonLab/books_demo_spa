@@ -35,5 +35,8 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   orders: it rewrites the cache before the request, restores it on failure
   and refetches either way, so a 409 brings in the row a Co-author changed.
 - `useNotifications` is the only polling query: every 60 s and on window focus.
+- `@tanstack/react-query-devtools` is pinned to the same version as
+  `@tanstack/react-query`: bump both together, since the devtools read the
+  core's internals.
 - `useSeriesBooks` stays disabled until the page knows the viewer may edit the
   series.
