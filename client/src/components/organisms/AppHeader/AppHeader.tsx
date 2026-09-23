@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
@@ -7,6 +7,7 @@ import { useLogout, useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
+import { unsavedText } from '@/store/unsavedTextSlice';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { AuthModals } from '@/components/organisms/AuthModals';
@@ -25,6 +26,20 @@ export const AppHeader: FC = () => {
   const user = session.data;
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.devicePreferences.theme);
+
+  const unsavedTextAccountId = useAppSelector(
+    (state) => state.unsavedText.accountId
+  );
+  const userId = user?.id;
+
+  // Mounted on every route, so it sees each sign-in. A different Account
+  // discards the previous one's Unsaved text; a lost session (null) is not a
+  // sign out and dispatches nothing, so the same Account gets its text back.
+  useEffect(() => {
+    if (userId !== undefined && userId !== unsavedTextAccountId) {
+      dispatch(unsavedText.accountChanged(userId));
+    }
+  }, [userId, unsavedTextAccountId, dispatch]);
 
   const genres = useGenres();
   // Empty covers all three cases the submenu must not appear in: loading,
@@ -65,7 +80,11 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      logout.mutate();
+      // Only an explicit Log out discards Unsaved text, and only once the
+      // server has ended the session.
+      logout.mutate(undefined, {
+        onSuccess: () => dispatch(unsavedText.discardAll()),
+      });
       return;
     }
     void navigate(key);
