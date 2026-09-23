@@ -10,9 +10,11 @@ import {
   Typography,
 } from 'antd';
 import { Link, useParams } from 'react-router';
+import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover';
 import { LikeButton } from '@/components/molecules/LikeButton';
+import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices';
 import { ChapterList } from '@/components/organisms/ChapterList';
 import { CommentSection } from '@/components/organisms/CommentSection';
 import { useSession } from '@/queries/auth';
@@ -30,14 +32,25 @@ export const BookPage: FC = () => {
   const bookId = Number(id);
 
   const { data: session } = useSession();
-  const { data: book, isPending, isError } = useBook(bookId);
+  const { data: book, isPending, isError, error } = useBook(bookId);
   // Fetched in parallel with the book rather than after it: neither section
   // needs the detail response to know what to ask for.
   const chapters = useChapters(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
 
   if (isError) {
-    return <Alert type="error" message="Could not load this book." />;
+    return (
+      <>
+        <Alert
+          type="error"
+          message="Could not load this book."
+          className={styles.alert}
+        />
+        {error instanceof ApiError && error.status === 404 && (
+          <BookUnsavedTextNotices bookId={bookId} />
+        )}
+      </>
+    );
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
 

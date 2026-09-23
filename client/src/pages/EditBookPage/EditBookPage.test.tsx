@@ -14,6 +14,7 @@ import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
+import type { RootState } from '@/store';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/authors');
@@ -74,7 +75,10 @@ const account = (overrides: Partial<PublicUser>): PublicUser => ({
   ...overrides,
 });
 
-const renderPage = (session: PublicUser | null = account({})) => {
+const renderPage = (
+  session: PublicUser | null = account({}),
+  preloadedState?: Partial<RootState>
+) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
 
@@ -83,7 +87,7 @@ const renderPage = (session: PublicUser | null = account({})) => {
       <Route path="/books/:id/edit" element={<EditBookPage />} />
       <Route path="/my-books" element={<p>My books list</p>} />
     </Routes>,
-    { route: '/books/1/edit', queryClient }
+    { route: '/books/1/edit', queryClient, preloadedState }
   );
 };
 
@@ -216,6 +220,26 @@ describe('EditBookPage', () => {
     expect(
       await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
+  });
+
+  it('offers the Unsaved text of a book that no longer exists', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'Book not found'));
+    renderPage(account({}), {
+      unsavedText: {
+        accountId: null,
+        entries: {
+          'book:1:chapterNew': {
+            title: 'Chapter Two',
+            text: 'Onward.',
+            savedAt: '2026-09-23T10:00:00.000Z',
+          },
+        },
+      },
+    });
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Chapter Two\n\nOnward.');
   });
 });
 
