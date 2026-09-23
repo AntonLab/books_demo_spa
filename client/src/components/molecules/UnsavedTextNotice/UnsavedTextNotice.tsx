@@ -38,7 +38,7 @@ export const UnsavedTextNotice: FC<UnsavedTextNoticeProps> = ({
       description={
         <Input.TextArea
           readOnly
-          autoSize
+          rows={6}
           value={content}
           aria-label="Unsaved text"
         />
