@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AppHeader } from './AppHeader';
@@ -56,6 +56,18 @@ beforeEach(() => {
   });
 });
 
+// rc-menu registers each item in an effect and re-renders on the next
+// microtask (useKeyRecords → nextSlice), after render()'s own act() has
+// returned. Flushing that microtask inside act() keeps the re-render from
+// warning in every test that asserts without awaiting anything.
+const renderHeader = async (
+  ...args: Parameters<typeof renderWithProviders>
+): Promise<ReturnType<typeof renderWithProviders>> => {
+  const result = renderWithProviders(...args);
+  await act(async () => {});
+  return result;
+};
+
 // Renders the current URL so a test can assert where a menu item navigated to.
 const LocationProbe = () => {
   const location = useLocation();
@@ -65,11 +77,11 @@ const LocationProbe = () => {
 };
 
 describe('AppHeader while the session is loading', () => {
-  it('shows neither Log in nor an avatar', () => {
+  it('shows neither Log in nor an avatar', async () => {
     // Never resolves, so the query stays pending for the assertion.
     mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
 
-    renderWithProviders(<AppHeader />);
+    await renderHeader(<AppHeader />);
 
     expect(screen.queryByRole('menuitem', { name: 'Log in' })).toBeNull();
     expect(screen.queryByText('bob')).toBeNull();
@@ -77,8 +89,8 @@ describe('AppHeader while the session is loading', () => {
 });
 
 describe('AppHeader navigation', () => {
-  it('has no Series item, since there is no series page to go to', () => {
-    renderWithProviders(<AppHeader />, withSession(null));
+  it('has no Series item, since there is no series page to go to', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
 
     expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Series' })).toBeNull();
@@ -86,8 +98,8 @@ describe('AppHeader navigation', () => {
 });
 
 describe('AppHeader when logged out', () => {
-  it('offers Log in as a menu item, and no Register', () => {
-    renderWithProviders(<AppHeader />, withSession(null));
+  it('offers Log in as a menu item, and no Register', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
 
     expect(
       screen.getByRole('menuitem', { name: 'Log in' })
@@ -97,21 +109,21 @@ describe('AppHeader when logged out', () => {
     expect(screen.queryByText('Register')).toBeNull();
   });
 
-  it('hides My Books', () => {
-    renderWithProviders(<AppHeader />, withSession(null));
+  it('hides My Books', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
 
     expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
-  it('has no notifications to show and asks for none', () => {
-    renderWithProviders(<AppHeader />, withSession(null));
+  it('has no notifications to show and asks for none', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
 
     expect(screen.queryByRole('button', { name: /^Notifications/ })).toBeNull();
     expect(mockedNotifications.listNotifications).not.toHaveBeenCalled();
   });
 
   it('opens the login modal in the store when Log in is clicked', async () => {
-    const { store } = renderWithProviders(<AppHeader />, withSession(null));
+    const { store } = await renderHeader(<AppHeader />, withSession(null));
 
     await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
 
@@ -128,25 +140,25 @@ describe('AppHeader when logged in', () => {
       limit: 20,
       offset: 0,
     });
-    renderWithProviders(<AppHeader />, withSession(user));
+    await renderHeader(<AppHeader />, withSession(user));
 
     expect(
       await screen.findByRole('button', { name: 'Notifications, 4 unread' })
     ).toBeInTheDocument();
   });
 
-  it('shows the login name instead of Log in', () => {
-    renderWithProviders(<AppHeader />, withSession(user));
+  it('shows the login name instead of Log in', async () => {
+    await renderHeader(<AppHeader />, withSession(user));
 
     expect(screen.getByText('bob')).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Log in' })).toBeNull();
   });
 
-  it('shows the avatar image once the account has one', () => {
+  it('shows the avatar image once the account has one', async () => {
     // Not getByRole('img'): antd's Input.Search and Menu render their own
     // icons as SVGs with role="img", so an actual <img> tag is the
     // unambiguous query here.
-    const { container } = renderWithProviders(
+    const { container } = await renderHeader(
       <AppHeader />,
       withSession({ ...user, avatarUrl: '/api/users/1/avatar?v=1' })
     );
@@ -157,26 +169,23 @@ describe('AppHeader when logged in', () => {
     );
   });
 
-  it('shows My Books to an author', () => {
-    renderWithProviders(
-      <AppHeader />,
-      withSession({ ...user, role: 'author' })
-    );
+  it('shows My Books to an author', async () => {
+    await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     expect(
       screen.getByRole('menuitem', { name: 'My Books' })
     ).toBeInTheDocument();
   });
 
-  it('hides My Books from a reader, who has no books to keep', () => {
-    renderWithProviders(<AppHeader />, withSession(user));
+  it('hides My Books from a reader, who has no books to keep', async () => {
+    await renderHeader(<AppHeader />, withSession(user));
 
     expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
   it('logs out through the dropdown', async () => {
     mockedAuth.logout.mockResolvedValue(undefined);
-    const { queryClient } = renderWithProviders(
+    const { queryClient } = await renderHeader(
       <AppHeader />,
       withSession(user)
     );
@@ -194,7 +203,7 @@ describe('AppHeader when logged in', () => {
   });
 
   it('is reachable by keyboard and opens the dropdown on Enter', async () => {
-    renderWithProviders(<AppHeader />, withSession(user));
+    await renderHeader(<AppHeader />, withSession(user));
 
     // A bare <Space>/<div> trigger would never receive focus via Tab, so
     // this pins the account trigger being a real focusable control rather
@@ -214,7 +223,7 @@ describe('AppHeader when logged in', () => {
 
 describe('AppHeader genres submenu', () => {
   it('opens the submenu and lists every genre in the order given', async () => {
-    renderWithProviders(<AppHeader />, withSession(null));
+    await renderHeader(<AppHeader />, withSession(null));
 
     const genresTrigger = await screen.findByRole('menuitem', {
       name: /Genres/,
@@ -241,7 +250,7 @@ describe('AppHeader genres submenu', () => {
   });
 
   it('navigates to the genre its item names', async () => {
-    renderWithProviders(
+    await renderHeader(
       <>
         <AppHeader />
         <LocationProbe />
@@ -260,7 +269,7 @@ describe('AppHeader genres submenu', () => {
   });
 
   it('highlights the genre the page is showing', async () => {
-    renderWithProviders(<AppHeader />, {
+    await renderHeader(<AppHeader />, {
       ...withSession(null),
       route: '/search?genre=3',
     });
@@ -277,7 +286,7 @@ describe('AppHeader genres submenu', () => {
   });
 
   it('still highlights Home at /', async () => {
-    renderWithProviders(<AppHeader />, { ...withSession(null), route: '/' });
+    await renderHeader(<AppHeader />, { ...withSession(null), route: '/' });
 
     expect(screen.getByRole('menuitem', { name: 'Home' })).toHaveClass(
       'ant-menu-item-selected'
@@ -287,7 +296,7 @@ describe('AppHeader genres submenu', () => {
   it('leaves the submenu out entirely when there are no genres', async () => {
     mockedGenres.listGenres.mockResolvedValue({ items: [] });
 
-    renderWithProviders(<AppHeader />, withSession(null));
+    await renderHeader(<AppHeader />, withSession(null));
 
     await screen.findByRole('menuitem', { name: 'Home' });
     expect(screen.queryByRole('menuitem', { name: /Genres/ })).toBeNull();
@@ -296,7 +305,7 @@ describe('AppHeader genres submenu', () => {
   it('leaves the submenu out when the list will not load', async () => {
     mockedGenres.listGenres.mockRejectedValue(new Error('Network down'));
 
-    renderWithProviders(<AppHeader />, withSession(null));
+    await renderHeader(<AppHeader />, withSession(null));
 
     await screen.findByRole('menuitem', { name: 'Home' });
     expect(screen.queryByRole('menuitem', { name: /Genres/ })).toBeNull();
@@ -307,7 +316,7 @@ describe('AppHeader account menu', () => {
   const admin: PublicUser = { ...user, role: 'admin' };
 
   it('offers Manage genres to an admin, after Profile', async () => {
-    renderWithProviders(<AppHeader />, withSession(admin));
+    await renderHeader(<AppHeader />, withSession(admin));
 
     await userEvent.click(screen.getByText('bob'));
     await screen.findByText('Manage genres');
@@ -330,7 +339,7 @@ describe('AppHeader account menu', () => {
   });
 
   it('offers Manage genres to a superadmin', async () => {
-    renderWithProviders(
+    await renderHeader(
       <AppHeader />,
       withSession({ ...user, role: 'superadmin' })
     );
@@ -341,10 +350,7 @@ describe('AppHeader account menu', () => {
   });
 
   it('hides Manage genres from every other role', async () => {
-    renderWithProviders(
-      <AppHeader />,
-      withSession({ ...user, role: 'author' })
-    );
+    await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     await userEvent.click(screen.getByText('bob'));
 
@@ -354,7 +360,7 @@ describe('AppHeader account menu', () => {
   });
 
   it('navigates to the management page when Manage genres is clicked', async () => {
-    renderWithProviders(
+    await renderHeader(
       <>
         <AppHeader />
         <LocationProbe />
