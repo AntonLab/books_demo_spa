@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
@@ -12,21 +11,14 @@ import {
   Typography,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
-import { BookCover } from '@/components/molecules/BookCover';
-import { ImageUploadButton } from '@/components/molecules/ImageUploadButton';
+import { BookCoverManager } from '@/components/organisms/BookCoverManager';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
 import { SortableList } from '@/components/organisms/SortableList';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
-import {
-  useBook,
-  useDeleteBook,
-  useDeleteBookCover,
-  useUpdateBook,
-  useUploadBookCover,
-} from '@/queries/books';
+import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
@@ -71,9 +63,6 @@ export const EditBookPage: FC = () => {
   const remove = useDeleteBook(bookId);
   const chapters = useChapters(bookId);
   const reorder = useReorderChapters(bookId);
-  const uploadCover = useUploadBookCover(bookId);
-  const deleteCover = useDeleteBookCover(bookId);
-  const [coverError, setCoverError] = useState<string | null>(null);
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -119,26 +108,6 @@ export const EditBookPage: FC = () => {
     });
   };
 
-  // A fresh attempt (a new pick, or another try at Remove) always clears
-  // whatever error the last one left showing; the mutate call's own "pending"
-  // action then carries that same reset into uploadCover/deleteCover's own
-  // `error`, so nothing has to reconcile the two.
-  const handleCoverFile = (file: File) => {
-    setCoverError(null);
-    uploadCover.mutate(file, {
-      onError: (error) => setCoverError(error.message),
-    });
-  };
-
-  const handleCoverReject = (message: string) => setCoverError(message);
-
-  const handleRemoveCover = () => {
-    setCoverError(null);
-    deleteCover.mutate(undefined, {
-      onError: (error) => setCoverError(error.message),
-    });
-  };
-
   return (
     <>
       <Typography.Title level={2}>Edit book</Typography.Title>
@@ -176,37 +145,11 @@ export const EditBookPage: FC = () => {
 
       <Divider />
 
-      <Typography.Title level={4}>Cover</Typography.Title>
-      {coverError && (
-        <Alert
-          type="error"
-          title={coverError}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
-      <Space align="start" size={token.margin}>
-        <BookCover coverUrl={book.coverUrl} title={book.title} />
-        <Space orientation="vertical">
-          <ImageUploadButton
-            label="Upload cover"
-            loading={uploadCover.isPending}
-            onFile={handleCoverFile}
-            onReject={handleCoverReject}
-          />
-          {book.coverUrl !== null && (
-            <Popconfirm
-              title="Remove the cover?"
-              okText="Yes, remove"
-              okButtonProps={{ danger: true }}
-              onConfirm={handleRemoveCover}
-            >
-              <Button danger loading={deleteCover.isPending}>
-                Remove cover
-              </Button>
-            </Popconfirm>
-          )}
-        </Space>
-      </Space>
+      <BookCoverManager
+        bookId={bookId}
+        coverUrl={book.coverUrl}
+        title={book.title}
+      />
 
       <Divider />
 
