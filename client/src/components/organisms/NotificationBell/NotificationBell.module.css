@@ -1,0 +1,24 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: var(--ant-app-notification-panel-width);
+  max-width: 100%;
+}
+
+.item {
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  border-radius: var(--ant-border-radius-sm);
+}
+
+.fresh {
+  background: var(--ant-color-primary-bg);
+}
+
+.text {
+  margin-bottom: 0;
+}
+
+.bell {
+  color: var(--ant-color-text-light-solid);
+}

@@ -1,0 +1,15 @@
+.card {
+  margin-bottom: var(--ant-margin);
+}
+
+.title {
+  margin-top: 0;
+}
+
+.line {
+  margin-bottom: var(--ant-margin-xs);
+}
+
+.description {
+  margin-bottom: var(--ant-margin-sm);
+}

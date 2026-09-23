@@ -1,9 +1,10 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Space, theme } from 'antd';
+import { Alert, Button, Form, Input, Modal, Space } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { closeModal, openModal } from '@/store/authSlice';
 import { useLogin } from '@/queries/auth';
+import styles from './LoginModal.module.css';
 
 interface LoginValues {
   login: string;
@@ -11,7 +12,6 @@ interface LoginValues {
 }
 
 export const LoginModal: FC = () => {
-  const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const [form] = Form.useForm<LoginValues>();
   const login = useLogin();
@@ -41,11 +41,7 @@ export const LoginModal: FC = () => {
       footer={null}
     >
       {formError !== null && (
-        <Alert
-          type="error"
-          title={formError}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={formError} className={styles.error} />
       )}
 
       {/* void: handleFinish reports its own failure in the form, so nothing

@@ -22,6 +22,7 @@ import {
   useRenameGenre,
 } from '@/queries/genres';
 import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from '@/types/genre';
+import styles from './AdminGenresPage.module.css';
 
 // The one refusal the fields explain themselves, rather than an Alert over the
 // whole page: the name is what the server objected to.
@@ -55,7 +56,6 @@ export const AdminGenresPage: FC = () => {
 };
 
 const GenreManager: FC = () => {
-  const { token } = theme.useToken();
   const [form] = Form.useForm<AddValues>();
   const genres = useGenres();
   const create = useCreateGenre();
@@ -83,7 +83,7 @@ const GenreManager: FC = () => {
         <Alert
           type="error"
           title={create.error.message}
-          style={{ marginBottom: token.margin }}
+          className={styles.error}
         />
       )}
 
@@ -161,7 +161,7 @@ const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
     <Space
       orientation="vertical"
       size={token.marginXXS}
-      style={{ width: '100%' }}
+      className={styles.list}
     >
       {draft === null ? (
         <Space wrap>

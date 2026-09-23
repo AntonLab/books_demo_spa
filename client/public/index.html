@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="books_demo_spa" />
     <title>books_demo_spa</title>
+    <!-- Cascade layer order is fixed by the first stylesheet that names a
+         layer. antd's StyleProvider injects its `@layer antd` styles at the
+         top of <head>, ahead of every <link>, so this statement has to beat it
+         there: rc-util queues each antd <style> after the last one marked
+         `data-rc-order="prepend"`, which is why this one carries the mark.
+         Without it `reset` would outrank `antd` and undo component styles. -->
+    <style data-rc-order="prepend">
+      @layer reset, antd;
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

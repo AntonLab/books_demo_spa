@@ -1,11 +1,12 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Input, Radio, Select, theme } from 'antd';
+import { Alert, Button, Form, Input, Radio, Select } from 'antd';
 import {
   BOOK_STATUS_LABELS,
   BOOK_STATUSES,
   type BookStatus,
 } from '@/types/book';
 import type { PublicGenre } from '@/types/genre';
+import styles from './BookForm.module.css';
 
 export interface BookFormValues {
   title: string;
@@ -56,8 +57,6 @@ export const BookForm: FC<BookFormProps> = ({
   isSubmitting = false,
   error = null,
 }) => {
-  const { token } = theme.useToken();
-
   const handleFinish = ({
     seriesId,
     genreId,
@@ -76,11 +75,7 @@ export const BookForm: FC<BookFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert
-          type="error"
-          title={error}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={error} className={styles.error} />
       )}
 
       <Form<FieldValues>

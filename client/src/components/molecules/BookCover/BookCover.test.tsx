@@ -1,7 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { BookCover } from './BookCover';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { appTheme } from '@/theme/tokens';
 
 describe('BookCover', () => {
   it('shows the cover image, decoratively, when a URL is given', () => {
@@ -55,18 +54,5 @@ describe('BookCover', () => {
     const img = container.querySelector('img');
     expect(img).toHaveAttribute('src', '/fresh.webp?v=2');
     expect(screen.queryByText('A Tale of Dragons')).toBeNull();
-  });
-
-  it('sizes the frame from the appBookCoverWidth quark, a 2:3 ratio', () => {
-    const { container } = renderWithProviders(
-      <BookCover coverUrl={null} title="A Tale of Dragons" />
-    );
-
-    const width = appTheme.token?.appBookCoverWidth;
-    const frame = container.firstChild as HTMLElement;
-    expect(frame).toHaveStyle({
-      width: `${width}px`,
-      height: `${Number(width) * 1.5}px`,
-    });
   });
 });

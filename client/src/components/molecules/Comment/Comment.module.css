@@ -1,0 +1,7 @@
+.comment {
+  margin-bottom: var(--ant-margin-sm);
+}
+
+.text {
+  margin-bottom: var(--ant-margin-xs);
+}

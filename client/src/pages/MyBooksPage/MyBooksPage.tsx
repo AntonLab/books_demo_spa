@@ -8,7 +8,6 @@ import {
   Skeleton,
   Space,
   Tabs,
-  theme,
   Typography,
 } from 'antd';
 import { Link, useNavigate } from 'react-router';
@@ -16,6 +15,7 @@ import { BookList } from '@/components/organisms/BookList';
 import { useSession } from '@/queries/auth';
 import { useMyBooks } from '@/queries/books';
 import { useMySeries } from '@/queries/series';
+import styles from './MyBooksPage.module.css';
 
 // Every book the signed-in author co-authors, in any status, and every series
 // they co-author. The books come from `?userId=` naming the caller, which is
@@ -23,7 +23,6 @@ import { useMySeries } from '@/queries/series';
 // filter on /api/series, which shows a Co-author their series even before it
 // holds a published book.
 export const MyBooksPage: FC = () => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const { data: session } = useSession();
   const isAuthor = session?.role === 'author';
@@ -71,15 +70,12 @@ export const MyBooksPage: FC = () => {
 
   return (
     <>
-      <Space
-        align="center"
-        style={{ width: '100%', justifyContent: 'space-between' }}
-      >
+      <Flex justify="space-between" align="center" gap="small">
         <Typography.Title level={2}>My Books</Typography.Title>
         <Button type="primary" onClick={() => void navigate('/books/new')}>
           Create book
         </Button>
-      </Space>
+      </Flex>
 
       <Tabs
         items={[
@@ -101,7 +97,7 @@ export const MyBooksPage: FC = () => {
             label: 'Series',
             children: (
               <>
-                <Flex justify="flex-end" style={{ marginBottom: token.margin }}>
+                <Flex justify="flex-end" className={styles.toolbar}>
                   <Button onClick={() => void navigate('/series/new')}>
                     Create series
                   </Button>

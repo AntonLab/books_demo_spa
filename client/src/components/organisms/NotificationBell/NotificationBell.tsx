@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Badge, Button, Empty, Popover, theme, Typography } from 'antd';
+import { Badge, Button, Empty, Popover, Typography } from 'antd';
 import { Link } from 'react-router';
 import {
   useMarkNotificationsRead,
@@ -8,6 +8,7 @@ import {
 } from '@/queries/notifications';
 import { formatDateTime } from '@/format/date';
 import type { PublicNotification } from '@/types/notification';
+import styles from './NotificationBell.module.css';
 
 interface NotificationBellProps {
   // The signed-in account: its notifications are cached under its own key.
@@ -90,7 +91,6 @@ const describe = (
 // straight away, but keeps those rows highlighted until it closes, so the
 // reader can still tell which ones are new.
 export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
-  const { token } = theme.useToken();
   const notifications = useNotifications(userId);
   const markRead = useMarkNotificationsRead(userId);
   const [open, setOpen] = useState(false);
@@ -125,25 +125,13 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
       description="No notifications yet."
     />
   ) : (
-    <ol
-      style={{
-        listStyle: 'none',
-        margin: 0,
-        padding: 0,
-        width: token.appNotificationPanelWidth,
-        maxWidth: '100%',
-      }}
-    >
+    <ol className={styles.list}>
       {items.map((item) => (
         <li
           key={item.id}
-          style={{
-            padding: `${token.paddingXS}px ${token.paddingSM}px`,
-            borderRadius: token.borderRadiusSM,
-            background: fresh.has(item.id) ? token.colorPrimaryBg : undefined,
-          }}
+          className={`${styles.item} ${fresh.has(item.id) ? styles.fresh : ''}`}
         >
-          <Typography.Paragraph style={{ marginBottom: 0 }}>
+          <Typography.Paragraph className={styles.text}>
             {describe(item, close)}
           </Typography.Paragraph>
           <Typography.Text type="secondary">
@@ -172,7 +160,7 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
           aria-label={
             unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
           }
-          style={{ color: token.colorTextLightSolid }}
+          className={styles.bell}
         >
           🔔
         </Button>

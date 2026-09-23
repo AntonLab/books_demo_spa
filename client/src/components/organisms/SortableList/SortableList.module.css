@@ -1,0 +1,33 @@
+/* An ordered list for its meaning; the markers are hidden because the order
+   is shown by place, never by number. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  position: relative;
+  background: var(--ant-color-bg-container);
+  padding: var(--ant-padding-sm) 0;
+  border-bottom: var(--ant-line-width) var(--ant-line-type)
+    var(--ant-color-split);
+}
+
+.dragging {
+  z-index: 1;
+  box-shadow: var(--ant-box-shadow-secondary);
+}
+
+.handle {
+  cursor: grab;
+}
+
+.dragging .handle {
+  cursor: grabbing;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}

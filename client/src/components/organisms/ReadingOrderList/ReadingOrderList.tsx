@@ -1,11 +1,12 @@
 import type { FC } from 'react';
-import { Alert, Space, Tag, theme, Typography } from 'antd';
+import { Alert, Flex, Space, Tag, Typography } from 'antd';
 import { Link } from 'react-router';
 import { SortableList } from '@/components/organisms/SortableList';
 import { ApiError } from '@/api/client';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { formatDate } from '@/format/date';
 import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
+import styles from './ReadingOrderList.module.css';
 
 // One row of the book's chapter list: a link to the chapter's editor, a badge
 // for what is not out yet, and the date it came out or will.
@@ -13,7 +14,7 @@ const chapterRow = (bookId: number, chapter: ChapterSummary) => {
   const state = chapterStateOf(chapter);
 
   return (
-    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+    <Flex justify="space-between" align="center" gap="small">
       <Space>
         <Link to={`/books/${bookId}/chapters/${chapter.id}/edit`}>
           {chapter.title}
@@ -26,7 +27,7 @@ const chapterRow = (bookId: number, chapter: ChapterSummary) => {
           {formatDate(chapter.publishedAt)}
         </Typography.Text>
       )}
-    </Space>
+    </Flex>
   );
 };
 
@@ -44,7 +45,6 @@ export const ReadingOrderList: FC<ReadingOrderListProps> = ({
   bookId,
   isCoAuthor,
 }) => {
-  const { token } = theme.useToken();
   const chapters = useChapters(bookId);
   const reorder = useReorderChapters(bookId);
 
@@ -53,17 +53,14 @@ export const ReadingOrderList: FC<ReadingOrderListProps> = ({
 
   return (
     <>
-      <Space
-        align="center"
-        style={{ width: '100%', justifyContent: 'space-between' }}
-      >
+      <Flex justify="space-between" align="center" gap="small">
         <Typography.Title level={4}>Chapters</Typography.Title>
         {/* Only a Co-author: a Moderator may edit and delete chapters but has
             no create on them. */}
         {isCoAuthor && (
           <Link to={`/books/${bookId}/chapters/new`}>Add chapter</Link>
         )}
-      </Space>
+      </Flex>
       {/* A 409 has already brought in the current list; this says why the
           order just moved under the author's hands. */}
       {reorder.error && (
@@ -74,7 +71,7 @@ export const ReadingOrderList: FC<ReadingOrderListProps> = ({
               ? 'A co-author changed the chapters while you were reordering them. This is their current order.'
               : 'Could not save the new chapter order.'
           }
-          style={{ marginBottom: token.margin }}
+          className={styles.error}
         />
       )}
       {/* Every chapter, drafts and scheduled ones included: the server returns

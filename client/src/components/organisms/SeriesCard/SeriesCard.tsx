@@ -3,6 +3,7 @@ import { Card, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import type { PublicSeries } from '@/types/series';
+import styles from './SeriesCard.module.css';
 
 interface SeriesCardProps {
   series: PublicSeries;
@@ -19,22 +20,18 @@ export const SeriesCard: FC<SeriesCardProps> = ({ series, linked = false }) => {
   const { token } = theme.useToken();
 
   return (
-    <Card size="small" style={{ marginBottom: token.margin }}>
+    <Card size="small" className={styles.card}>
       {linked ? (
-        <Typography.Title level={4} style={{ marginTop: 0 }}>
+        <Typography.Title level={4} className={styles.title}>
           <Link to={`/search?series=${series.id}`}>{series.title}</Link>
         </Typography.Title>
       ) : (
-        <Typography.Title level={2} style={{ marginTop: 0 }}>
+        <Typography.Title level={2} className={styles.title}>
           {series.title}
         </Typography.Title>
       )}
 
-      <Space
-        size={token.marginXS}
-        wrap
-        style={{ marginBottom: token.marginXS }}
-      >
+      <Space size={token.marginXS} wrap className={styles.line}>
         {series.authors.map((author, index) => (
           <Space key={author.id} size={4}>
             <AccountAvatar
@@ -51,12 +48,12 @@ export const SeriesCard: FC<SeriesCardProps> = ({ series, linked = false }) => {
         ))}
       </Space>
 
-      <Typography.Paragraph style={{ marginBottom: token.marginSM }}>
+      <Typography.Paragraph className={styles.description}>
         {series.description}
       </Typography.Paragraph>
 
       {series.genre !== null && (
-        <div style={{ marginBottom: token.marginXS }}>
+        <div className={styles.line}>
           <Link to={`/search?genre=${series.genre.id}`}>
             {series.genre.name}
           </Link>

@@ -1,14 +1,5 @@
 import { useState, type FC } from 'react';
-import {
-  Alert,
-  Button,
-  Empty,
-  Input,
-  Skeleton,
-  Space,
-  theme,
-  Typography,
-} from 'antd';
+import { Alert, Button, Empty, Input, Skeleton, Space, Typography } from 'antd';
 import { Comment } from '@/components/molecules/Comment';
 import { useSession } from '@/queries/auth';
 import {
@@ -20,6 +11,7 @@ import {
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import type { CommentWithAuthor } from '@/types/comment';
+import styles from './CommentSection.module.css';
 
 interface CommentSectionProps {
   bookId: number;
@@ -33,7 +25,6 @@ export const CommentSection: FC<CommentSectionProps> = ({
   bookId,
   closed = false,
 }) => {
-  const { token } = theme.useToken();
   const { data: session } = useSession();
   const { data, isPending, isError } = useComments(bookId);
 
@@ -161,7 +152,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
       {roots.map((comment) => (
         <div key={comment.id}>
           {renderComment(comment, true)}
-          <div style={{ marginLeft: token.marginXL }}>
+          <div className={styles.replies}>
             {(liveReplies.get(comment.id) ?? []).map((child) =>
               renderComment(child, false)
             )}
@@ -174,7 +165,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
           Comments are closed while this book is a draft.
         </Typography.Text>
       ) : session ? (
-        <Space direction="vertical" style={{ width: '100%' }}>
+        <Space direction="vertical" className={styles.composer}>
           <Input.TextArea
             rows={3}
             value={draft}
