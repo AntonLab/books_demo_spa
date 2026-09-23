@@ -37,12 +37,15 @@ describe('persistence', () => {
     jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('Quota exceeded', 'QuotaExceededError');
     });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     const store = createAppStore();
 
     expect(() =>
       store.dispatch(devicePreferences.themeToggled())
     ).not.toThrow();
     expect(store.getState().devicePreferences.theme).toBe('dark');
+    // eslint-disable-next-line no-console
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('reads back what it wrote under the v1 key', () => {
