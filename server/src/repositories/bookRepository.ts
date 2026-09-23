@@ -121,15 +121,9 @@ export interface BookRepository {
 // nextSeriesPosition first, which holds that series row under a lock for the
 // rest of the transaction and answers a missing one with NotFoundError itself,
 // and a write that keeps the series holds a lock on a book row already
-// pointing at it, which deleting the series would have to change. books.genreId
-// has no such lock — assertGenreExists (genreRepository.ts) reads the parent
-// row unlocked, so a Genre deleted in the gap between that check and this
-// insert still trips the FK. On create that race is misreported by this
-// function as NotFoundError('User', userId), naming the wrong resource; the
-// same race on update (which never calls this function) reaches the caller as
-// an unmapped 500. Narrow and accepted: closing it would mean locking every
-// Genre a create or update names, which is Task 4's code to change, not this
-// task's.
+// pointing at it, which deleting the series would have to change. Nor can
+// books.genreId: assertGenreExists (genreRepository.ts) holds the Genre under
+// a share lock for the rest of the transaction.
 function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
     throw new NotFoundError('User', userId);
@@ -400,8 +394,9 @@ export function createSequelizeBookRepository(): BookRepository {
       };
     },
 
-    // No foreign-key mapping, unlike create: seriesId is the only reference an
-    // update can write, and asMissingUser explains why it cannot be rejected.
+    // No foreign-key mapping, unlike create: seriesId and genreId are the only
+    // references an update can write, and asMissingUser explains why neither
+    // can be rejected.
     async update(id, input) {
       return sequelizeOf().transaction(async (transaction) => {
         const book = await Book.findByPk(id, {

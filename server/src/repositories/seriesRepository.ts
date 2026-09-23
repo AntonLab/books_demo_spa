@@ -79,15 +79,9 @@ export interface SeriesRepository {
 // than the generic 500 an unmapped SequelizeForeignKeyConstraintError would
 // produce.
 //
-// series_authors.userId is the only foreign key this is meant to map.
-// series.genreId has no lock protecting it — assertGenreExists
-// (genreRepository.ts) reads the parent row unlocked, so a Genre deleted in
-// the gap between that check and this insert still trips the FK. On create
-// that race is misreported by this function as NotFoundError('User', userId),
-// naming the wrong resource; the same race on update (which never calls this
-// function) reaches the caller as an unmapped 500. Narrow and accepted:
-// closing it would mean locking every Genre a create or update names, which is
-// Task 4's code to change, not this task's.
+// series_authors.userId is the only foreign key this maps. series.genreId
+// cannot fail here: assertGenreExists (genreRepository.ts) holds the Genre
+// under a share lock for the rest of the transaction.
 function asMissingUser(error: unknown, userId: number): never {
   if (error instanceof ForeignKeyConstraintError) {
     throw new NotFoundError('User', userId);
@@ -281,12 +275,14 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async update(id, input) {
-      const series = await Series.findByPk(id);
-      if (!series) return null;
+      return sequelizeOf().transaction(async (transaction) => {
+        const series = await Series.findByPk(id, { transaction });
+        if (!series) return null;
 
-      await assertGenreExists(input.genreId);
-      await series.update(input);
-      return withAuthors(series);
+        await assertGenreExists(input.genreId, transaction);
+        await series.update(input, { transaction });
+        return withAuthors(series, transaction);
+      });
     },
 
     async remove(id, actor) {
