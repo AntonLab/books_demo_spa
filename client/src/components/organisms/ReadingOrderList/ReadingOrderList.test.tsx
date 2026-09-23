@@ -96,7 +96,12 @@ describe('ReadingOrderList', () => {
     afterEach(() => restoreLayout());
 
     it('shows the new order at once and saves it on drop', async () => {
-      mockedChapters.reorderChapters.mockResolvedValue(undefined);
+      let finishSave: () => void = () => {};
+      mockedChapters.reorderChapters.mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishSave = resolve;
+        })
+      );
       mockedChapters.listChapters
         .mockResolvedValueOnce(page([one, two, three]))
         .mockResolvedValue(page([two, one, three]));
@@ -108,15 +113,24 @@ describe('ReadingOrderList', () => {
       );
 
       expect(mockedChapters.reorderChapters).toHaveBeenCalledWith(1, [2, 1, 3]);
+      expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
+
+      finishSave();
       await waitFor(() =>
-        expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three'])
+        expect(mockedChapters.listChapters).toHaveBeenCalledTimes(2)
       );
+      expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
     });
 
     it('puts the old order back and says so when the save fails', async () => {
-      mockedChapters.reorderChapters.mockRejectedValue(
-        new ApiError(500, 'Internal Server Error')
+      let failSave: (error: Error) => void = () => {};
+      mockedChapters.reorderChapters.mockReturnValue(
+        new Promise<void>((_resolve, reject) => {
+          failSave = reject;
+        })
       );
+      // The list the server would still answer with, so the refetch after the
+      // failure cannot be what restores the order.
       mockedChapters.listChapters
         .mockResolvedValueOnce(page([one, two, three]))
         .mockReturnValue(new Promise(() => {}));
@@ -126,6 +140,9 @@ describe('ReadingOrderList', () => {
         await screen.findByRole('button', { name: 'Reorder One' }),
         'ArrowDown'
       );
+      expect(titlesOnScreen()).toEqual(['Two', 'One', 'Three']);
+
+      failSave(new ApiError(500, 'Internal Server Error'));
 
       expect(
         await screen.findByText('Could not save the new chapter order.')
