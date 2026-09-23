@@ -7,7 +7,10 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import { Book, Genre, initModels, Series } from '../models/index.ts';
+import { initModels } from '../models/index.ts';
+import { Book } from '../models/Book.ts';
+import { Genre } from '../models/Genre.ts';
+import { Series } from '../models/Series.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import {
   assertGenreExists,

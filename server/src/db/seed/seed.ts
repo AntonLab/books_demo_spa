@@ -23,19 +23,17 @@
 
 import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger } from '../../logger.ts';
-import {
-  Book,
-  BookAuthor,
-  Chapter,
-  Comment,
-  Genre,
-  Like,
-  Notification,
-  Series,
-  SeriesAuthor,
-  User,
-  initModels,
-} from '../../models/index.ts';
+import { initModels } from '../../models/index.ts';
+import { Book } from '../../models/Book.ts';
+import { BookAuthor } from '../../models/BookAuthor.ts';
+import { Chapter } from '../../models/Chapter.ts';
+import { Comment } from '../../models/Comment.ts';
+import { Genre } from '../../models/Genre.ts';
+import { Like } from '../../models/Like.ts';
+import { Notification } from '../../models/Notification.ts';
+import { Series } from '../../models/Series.ts';
+import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
+import { User } from '../../models/User.ts';
 import { createBookSchema } from '../../types/book.ts';
 import { createChapterSchema } from '../../types/chapter.ts';
 import { createCommentSchema } from '../../types/comment.ts';

@@ -18,7 +18,8 @@ import {
   XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
 } from './middleware/csrfProtection.ts';
-import { initModels, User } from './models/index.ts';
+import { initModels } from './models/index.ts';
+import { User } from './models/User.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
 import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';

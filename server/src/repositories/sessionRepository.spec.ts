@@ -7,7 +7,9 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import { initModels, Session, User } from '../models/index.ts';
+import { initModels } from '../models/index.ts';
+import { Session } from '../models/Session.ts';
+import { User } from '../models/User.ts';
 import { hashToken } from '../tokens.ts';
 import {
   createSequelizeSessionRepository,

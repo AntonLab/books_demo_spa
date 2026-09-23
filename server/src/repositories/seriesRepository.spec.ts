@@ -11,14 +11,12 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import {
-  Book,
-  Genre,
-  initModels,
-  Series,
-  SeriesAuthor,
-  User,
-} from '../models/index.ts';
+import { initModels } from '../models/index.ts';
+import { Book } from '../models/Book.ts';
+import { Genre } from '../models/Genre.ts';
+import { Series } from '../models/Series.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
