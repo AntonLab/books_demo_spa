@@ -103,7 +103,7 @@ const SUPERADMIN_GRANTS: RoleGrants = Object.fromEntries(
   ])
 );
 
-export const PERMISSION_DEFINITION: Record<Role, RoleGrants> = {
+const PERMISSION_DEFINITION: Record<Role, RoleGrants> = {
   guest: PUBLIC_READS,
   user: USER_GRANTS,
   author: AUTHOR_GRANTS,

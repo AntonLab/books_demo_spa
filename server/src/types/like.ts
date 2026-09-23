@@ -1,10 +1,9 @@
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The response shape is the client's contract too, so it lives in the shared
 // workspace (ADR-0006); the schemas stay here.
 export type { PublicLike } from 'shared';
-
-const idSchema = z.coerce.number().int().positive();
 
 // Nullable *and* defaulted to null, so an omitted key and an explicit null
 // reach the refine below as the same value — otherwise the XOR check would
@@ -64,13 +63,6 @@ export const listLikesQuerySchema = z.object({
   // is true, so ?isLike=false would silently return likes. There is no `?q=`
   // alongside these — a like has no text to search.
   isLike: z.stringbool().optional(),
-});
-
-// A local copy rather than an import, following the same reasoning as
-// types/book.ts: the resources share a shape today, not a reason to change
-// together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
 });
 
 export type CreateLikeInput = z.infer<typeof createLikeSchema>;

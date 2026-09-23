@@ -4,13 +4,15 @@ import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
-  addCoAuthorSchema,
-  coAuthorParamSchema,
   createBookSchema,
-  idParamSchema,
   listBooksQuerySchema,
   updateBookSchema,
 } from '../types/book.ts';
+import {
+  addCoAuthorSchema,
+  coAuthorParamSchema,
+  idParamSchema,
+} from '../types/params.ts';
 import {
   ACCEPTED_IMAGE_CONTENT_TYPES,
   IMAGE_MAX_BYTES,

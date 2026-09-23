@@ -4,10 +4,10 @@ import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createChapterSchema,
-  idParamSchema,
   listChaptersQuerySchema,
   updateChapterSchema,
 } from '../types/chapter.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createChapterRoutes(deps: RouteDeps): Router {

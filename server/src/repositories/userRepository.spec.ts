@@ -8,19 +8,17 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import {
-  Book,
-  BookAuthor,
-  BookCover,
-  Comment,
-  initModels,
-  Like,
-  Series,
-  SeriesAuthor,
-  Session,
-  User,
-  UserAvatar,
-} from '../models/index.ts';
+import { initModels } from '../models/index.ts';
+import { Book } from '../models/Book.ts';
+import { BookAuthor } from '../models/BookAuthor.ts';
+import { BookCover } from '../models/BookCover.ts';
+import { Comment } from '../models/Comment.ts';
+import { Like } from '../models/Like.ts';
+import { Series } from '../models/Series.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { Session } from '../models/Session.ts';
+import { User } from '../models/User.ts';
+import { UserAvatar } from '../models/UserAvatar.ts';
 import {
   createCreditedBook,
   createCreditedSeries,

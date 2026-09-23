@@ -5,8 +5,6 @@ import type { Wire } from 'shared';
 // happened. `work.id` is null once the work is gone: name it, but do not link
 // to it. `actor.name` is set for a Co-author only; a Moderator and a deleted
 // account are never named.
-export type { NotificationKind } from 'shared';
-
 export type PublicNotification = Wire<Shared.PublicNotification>;
 
 export type NotificationList = Wire<Shared.NotificationList>;

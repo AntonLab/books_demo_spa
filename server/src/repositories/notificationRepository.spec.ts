@@ -7,14 +7,12 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
-import {
-  Book,
-  Chapter,
-  initModels,
-  Notification,
-  Series,
-  User,
-} from '../models/index.ts';
+import { initModels } from '../models/index.ts';
+import { Book } from '../models/Book.ts';
+import { Chapter } from '../models/Chapter.ts';
+import { Notification } from '../models/Notification.ts';
+import { Series } from '../models/Series.ts';
+import { User } from '../models/User.ts';
 import type { PublicNotification } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';

@@ -11,19 +11,17 @@ import {
   type Sequelize,
 } from 'sequelize';
 import { createCreditedBook } from '../../models/creditedBook.testkit.ts';
-import {
-  Book,
-  BookAuthor,
-  Chapter,
-  Comment,
-  Genre,
-  Like,
-  Notification,
-  Series,
-  SeriesAuthor,
-  User,
-  initModels,
-} from '../../models/index.ts';
+import { initModels } from '../../models/index.ts';
+import { Book } from '../../models/Book.ts';
+import { BookAuthor } from '../../models/BookAuthor.ts';
+import { Chapter } from '../../models/Chapter.ts';
+import { Comment } from '../../models/Comment.ts';
+import { Genre } from '../../models/Genre.ts';
+import { Like } from '../../models/Like.ts';
+import { Notification } from '../../models/Notification.ts';
+import { Series } from '../../models/Series.ts';
+import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
+import { User } from '../../models/User.ts';
 import { parseConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';

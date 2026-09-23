@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The response shape is the client's contract too, so it lives in the shared
 // workspace (ADR-0006); the schemas stay here.
 export type { PublicSeries } from 'shared';
 
-export const SERIES_TAG_MAX_LENGTH = 32;
-export const SERIES_MAX_TAGS = 20;
-export const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
-export const SERIES_TITLE_MAX_LENGTH = 255;
+const SERIES_TAG_MAX_LENGTH = 32;
+const SERIES_MAX_TAGS = 20;
+const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
+const SERIES_TITLE_MAX_LENGTH = 255;
 
 // Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
 // anyway — collapsing them here keeps what lands in the JSON column canonical.
@@ -16,10 +17,6 @@ const tagListSchema = z
   .max(SERIES_MAX_TAGS)
   .transform((tags) => [...new Set(tags)]);
 
-const userIdSchema = z.coerce.number().int().positive();
-// A reference to a Genre. Spelled out beside userIdSchema rather than sharing
-// one `idSchema`, so each name says what it points at.
-const genreIdSchema = z.coerce.number().int().positive();
 const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
 // Trimmed, unlike descriptionSchema and for the reason recorded in
 // types/chapter.ts: a title is echoed in every summary list, where stray
@@ -40,7 +37,7 @@ export const createSeriesSchema = z.object({
   // A Genre is optional, and an absent key means the same as an explicit null:
   // no Genre (A6). A Series' Genre is its own — nothing is inherited in either
   // direction between a Series and its Books (ADR-0008).
-  genreId: genreIdSchema.nullable().optional(),
+  genreId: idSchema.nullable().optional(),
 });
 
 // Spelled out rather than derived from createSeriesSchema with
@@ -55,7 +52,7 @@ export const updateSeriesSchema = z
     tags: tagListSchema,
     // An explicit null clears the Genre, and an absent key leaves it alone,
     // because `.partial()` adds no default (A6).
-    genreId: genreIdSchema.nullable(),
+    genreId: idSchema.nullable(),
   })
   .partial()
   .refine((value) => Object.keys(value).length > 0, {
@@ -65,32 +62,15 @@ export const updateSeriesSchema = z
 export const listSeriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
-  userId: userIdSchema.optional(),
-  genreId: genreIdSchema.optional(),
+  userId: idSchema.optional(),
+  genreId: idSchema.optional(),
   tag: z.string().min(1).max(SERIES_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),
 });
 
-// Deliberately a local copy of the users' param schema rather than an import:
-// the two resources share a shape today, not a reason to change together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
-
-// Local copies of the books' co-author schemas, for the reason idParamSchema
-// above gives.
-export const addCoAuthorSchema = z.object({
-  userId: userIdSchema,
-});
-
-export const coAuthorParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  userId: z.coerce.number().int().positive(),
-});
-
 export const seriesBookParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  bookId: z.coerce.number().int().positive(),
+  id: idSchema,
+  bookId: idSchema,
 });
 
 // A series' whole Series order, first book first. The whole list rather than
@@ -98,7 +78,7 @@ export const seriesBookParamSchema = z.object({
 // books that has since changed — the same contract as a book's chapter order.
 export const reorderSeriesBooksSchema = z.object({
   bookIds: z
-    .array(z.coerce.number().int().positive())
+    .array(idSchema)
     .min(1)
     .max(1_000)
     .refine((ids) => new Set(ids).size === ids.length, {
@@ -108,6 +88,5 @@ export const reorderSeriesBooksSchema = z.object({
 
 export type ReorderSeriesBooksInput = z.infer<typeof reorderSeriesBooksSchema>;
 export type CreateSeriesInput = z.infer<typeof createSeriesSchema>;
-export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateSeriesInput = z.infer<typeof updateSeriesSchema>;
 export type ListSeriesQuery = z.infer<typeof listSeriesQuerySchema>;
