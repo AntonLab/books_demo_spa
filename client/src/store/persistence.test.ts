@@ -1,6 +1,7 @@
 import { createAppStore } from './index';
 import { devicePreferences } from './devicePreferencesSlice';
-import { STORAGE_KEYS, loadPersistedState } from './persistence';
+import { unsavedText } from './unsavedTextSlice';
+import { STORAGE_KEYS, loadPersistedState, persistNow } from './persistence';
 
 beforeEach(() => {
   localStorage.clear();
@@ -8,6 +9,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 describe('persistence', () => {
@@ -55,5 +57,74 @@ describe('persistence', () => {
       JSON.stringify({ theme: 'dark' })
     );
     expect(createAppStore().getState().devicePreferences.theme).toBe('dark');
+  });
+
+  it('ignores stored Unsaved text of the wrong shape', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.unsavedText,
+      JSON.stringify({ entries: 'nope' })
+    );
+
+    expect(loadPersistedState()).toEqual({});
+  });
+
+  it('writes Unsaved text at most once per 500 ms, with the latest text', async () => {
+    jest.useFakeTimers();
+    const setItem = jest.spyOn(Storage.prototype, 'setItem');
+    const store = createAppStore({});
+    const writes = () =>
+      setItem.mock.calls.filter(([key]) => key === STORAGE_KEYS.unsavedText);
+
+    store.dispatch(unsavedText.upsert({ key: 'book:1:comment', text: 'H' }));
+    store.dispatch(
+      unsavedText.upsert({ key: 'book:1:comment', text: 'Hello' })
+    );
+    expect(writes()).toHaveLength(0);
+
+    await jest.advanceTimersByTimeAsync(500);
+
+    expect(writes()).toHaveLength(1);
+    expect(JSON.parse(writes()[0]![1])).toMatchObject({
+      entries: { 'book:1:comment': { text: 'Hello' } },
+    });
+  });
+
+  it('round-trips Unsaved text under the v1 key', async () => {
+    jest.useFakeTimers();
+    const store = createAppStore({});
+    store.dispatch(unsavedText.accountChanged(3));
+    store.dispatch(
+      unsavedText.upsert({ key: 'book:1:comment', text: 'Hello' })
+    );
+    await jest.advanceTimersByTimeAsync(500);
+
+    expect(localStorage.getItem('books.unsavedText.v1')).not.toBeNull();
+    expect(createAppStore().getState().unsavedText).toEqual(
+      store.getState().unsavedText
+    );
+  });
+
+  it('does not store a whitespace-only entry', () => {
+    const store = createAppStore({});
+    store.dispatch(unsavedText.upsert({ key: 'book:1:comment', text: ' ' }));
+
+    persistNow(store.getState());
+
+    expect(
+      JSON.parse(localStorage.getItem(STORAGE_KEYS.unsavedText)!)
+    ).toMatchObject({ entries: {} });
+  });
+
+  it('writes both slices at once when the page is hidden', () => {
+    const store = createAppStore({});
+    store.dispatch(
+      unsavedText.upsert({ key: 'book:1:comment', text: 'Hello' })
+    );
+
+    persistNow(store.getState());
+
+    expect(
+      JSON.parse(localStorage.getItem(STORAGE_KEYS.unsavedText)!)
+    ).toMatchObject({ entries: { 'book:1:comment': { text: 'Hello' } } });
   });
 });
