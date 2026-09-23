@@ -1,14 +1,14 @@
 import type { FC } from 'react';
-import { Alert, Skeleton, theme, Typography } from 'antd';
+import { Alert, Skeleton, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ChapterForm } from '@/components/organisms/ChapterForm';
 import type { ChapterFormValues } from '@/components/organisms/ChapterForm';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useCreateChapter } from '@/queries/chapters';
+import styles from './NewChapterPage.module.css';
 
 export const NewChapterPage: FC = () => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const bookId = Number(useParams().bookId);
   const { data: session } = useSession();
@@ -42,7 +42,7 @@ export const NewChapterPage: FC = () => {
     <>
       <Typography.Title level={2}>New chapter</Typography.Title>
       <Link to={`/books/${bookId}/edit`}>{`Back to ${book.title}`}</Link>
-      <div style={{ marginTop: token.margin }}>
+      <div className={styles.body}>
         <ChapterForm
           isSubmitting={create.isPending}
           error={create.error?.message ?? null}

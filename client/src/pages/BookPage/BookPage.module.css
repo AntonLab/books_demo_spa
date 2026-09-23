@@ -1,0 +1,20 @@
+.row {
+  width: 100%;
+}
+
+.body {
+  flex: 1px;
+  min-width: 0;
+}
+
+.title {
+  margin-top: 0;
+}
+
+.tags {
+  margin-top: var(--ant-margin-xs);
+}
+
+.description {
+  margin-top: var(--ant-margin-sm);
+}

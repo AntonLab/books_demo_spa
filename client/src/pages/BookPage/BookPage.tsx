@@ -22,6 +22,7 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
+import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
   const { token } = theme.useToken();
@@ -57,14 +58,14 @@ export const BookPage: FC = () => {
           that carries no flex rule of its own, so a flex style on a child
           beneath it does nothing. Flex's children are the flex items
           themselves. */}
-      <Flex align="start" gap={token.margin} style={{ width: '100%' }}>
+      <Flex align="start" gap={token.margin} className={styles.row}>
         <BookCover coverUrl={book.coverUrl} title={book.title} />
         {/* flex: 1 lets this column take the rest of the row; minWidth: 0
             overrides the flex item's default content-based floor, so long
             text wraps instead of forcing horizontal scroll at phone
             width. */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Typography.Title level={2} style={{ marginTop: 0 }}>
+        <div className={styles.body}>
+          <Typography.Title level={2} className={styles.title}>
             {book.title}
           </Typography.Title>
 
@@ -116,14 +117,14 @@ export const BookPage: FC = () => {
           </Space>
 
           {book.tags.length > 0 && (
-            <div style={{ marginTop: token.marginXS }}>
+            <div className={styles.tags}>
               {book.tags.map((tag) => (
                 <Tag key={tag}>{tag}</Tag>
               ))}
             </div>
           )}
 
-          <Typography.Paragraph style={{ marginTop: token.marginSM }}>
+          <Typography.Paragraph className={styles.description}>
             {book.description}
           </Typography.Paragraph>
         </div>
