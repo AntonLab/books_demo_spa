@@ -530,10 +530,11 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
 - `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
 - `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays. Each
   spreads `common(isDevelopment)` into a plain object and extends it by hand:
-  its own `module.rules` and `plugins` appended after the shared ones, its
-  file-name patterns added to `output`, and the keys only it sets (`mode`,
-  `devtool`, and `devServer` or `optimization`). There is no merge helper:
-  those three are the only keys both files set
+  its own `plugins` appended after the shared ones, its file-name patterns
+  added to `output`, and the keys only it sets (`mode`, `devtool`, and
+  `devServer` or `optimization`). There is no merge helper: those two are the
+  only keys both files set. Every loader rule, CSS included, lives in
+  `common` and branches on `isDevelopment`
 - `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
   `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
   `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,

@@ -1,8 +1,4 @@
 import { z } from 'zod';
-import {
-  RESET_DELIVERY_KINDS,
-  type ResetDeliveryKind,
-} from '../delivery/resetDelivery.ts';
 
 const port = z.coerce.number().int().min(1).max(65535);
 
@@ -28,10 +24,10 @@ const envSchema = z.object({
   // the socket's peer. Only a whole, non-negative count is accepted: a hop
   // count is the form that cannot silently trust every address.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
-  // Where a password-reset link goes. No default in the schema: development
-  // and test fall back to `log` in parseConfig, and production must choose,
-  // because `log` writes live reset links into the server log.
-  RESET_DELIVERY: z.enum(RESET_DELIVERY_KINDS).optional(),
+  // Where a password-reset link goes; `log`, the server log, is the only
+  // delivery. Development and test may leave it unset; production must set it
+  // (see parseConfig), because `log` writes live reset links into the log.
+  RESET_DELIVERY: z.literal('log').optional(),
 });
 
 export interface DbConfig {
@@ -47,7 +43,6 @@ export interface AppConfig {
   port: number;
   appBaseUrl: string;
   trustProxy: number;
-  resetDelivery: ResetDeliveryKind;
   db: DbConfig;
 }
 
@@ -62,9 +57,7 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
   }
 
   const env = result.data;
-  const resetDelivery =
-    env.RESET_DELIVERY ?? (env.NODE_ENV === 'production' ? undefined : 'log');
-  if (resetDelivery === undefined) {
+  if (env.NODE_ENV === 'production' && env.RESET_DELIVERY === undefined) {
     throw new Error(
       'Invalid environment configuration — RESET_DELIVERY: production must set RESET_DELIVERY explicitly; `log` writes password-reset links to the server log'
     );
@@ -75,7 +68,6 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
     port: env.PORT,
     appBaseUrl: env.APP_BASE_URL,
     trustProxy: env.TRUST_PROXY,
-    resetDelivery,
     db: {
       host: env.DB_HOST,
       port: env.DB_PORT,

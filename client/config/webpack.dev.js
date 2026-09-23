@@ -3,10 +3,9 @@ const common = require('./webpack.common.js');
 
 const base = common(true);
 
-// Composed by hand, with no merge helper: the shared `module.rules` and
-// `plugins` come first and this file's are appended, and `output` gains the
-// file-name patterns — the only three keys both files set. Everything else
-// here is this file's alone.
+// Composed by hand, with no merge helper: the shared `plugins` come first and
+// this file's are appended, and `output` gains the file-name patterns — the
+// only two keys both files set. Everything else here is this file's alone.
 /** @type {import('webpack').Configuration} */
 module.exports = {
   ...base,
@@ -16,33 +15,6 @@ module.exports = {
     ...base.output,
     filename: 'static/js/[name].bundle.js',
     chunkFilename: 'static/js/[name].chunk.js',
-  },
-  module: {
-    ...base.module,
-    rules: [
-      ...base.module.rules,
-      // `*.module.css` is scoped per component (see CLAUDE.md, Component
-      // folders); every other stylesheet stays global, which is what
-      // `antd/dist/reset.css` in src/index.tsx relies on. The plain rule
-      // excludes `.module.css` explicitly, so the two can never both match.
-      {
-        test: /\.module\.css$/i,
-        use: [
-          'style-loader',
-          {
-            loader: 'css-loader',
-            options: {
-              modules: { localIdentName: '[name]__[local]--[hash:base64:5]' },
-            },
-          },
-        ],
-      },
-      {
-        test: /\.css$/i,
-        exclude: /\.module\.css$/i,
-        use: ['style-loader', 'css-loader'],
-      },
-    ],
   },
   plugins: [...base.plugins, new ReactRefreshWebpackPlugin({ overlay: false })],
   devServer: {
