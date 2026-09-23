@@ -33,18 +33,21 @@ export function missingGenre(genreId: number): BadRequestError {
 // A6: a genreId the caller chose that names no Genre is a 400, not a 404 — the
 // missing row is a field of the request, not the resource it addresses, which
 // is why this is a BadRequestError rather than the NotFoundError a missing
-// series gets. Checked before the write, inside the caller's transaction where
-// there is one, rather than left to the foreign key, whose rejection would
-// surface as an unmapped 500. The foreign key stays the backstop.
+// series gets. Checked before the write rather than left to the foreign key,
+// whose rejection would surface as an unmapped 500. The check takes a share
+// lock inside the caller's transaction, so a Genre deleted concurrently waits
+// for the write to commit and then unlinks it (ON DELETE SET NULL) instead of
+// tripping the foreign key in the gap.
 export async function assertGenreExists(
   genreId: number | null | undefined,
-  transaction?: Transaction
+  transaction: Transaction
 ): Promise<void> {
   if (genreId === null || genreId === undefined) return;
 
   const genre = await Genre.findByPk(genreId, {
     attributes: ['id'],
     transaction,
+    lock: transaction.LOCK.SHARE,
   });
   if (!genre) throw missingGenre(genreId);
 }
