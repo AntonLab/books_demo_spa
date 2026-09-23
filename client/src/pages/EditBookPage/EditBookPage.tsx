@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
@@ -7,54 +6,19 @@ import {
   Popconfirm,
   Skeleton,
   Space,
-  Tag,
   theme,
   Typography,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
-import { BookCover } from '@/components/molecules/BookCover';
-import { ImageUploadButton } from '@/components/molecules/ImageUploadButton';
+import { BookCoverManager } from '@/components/organisms/BookCoverManager';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
-import { SortableList } from '@/components/organisms/SortableList';
-import { ApiError } from '@/api/client';
+import { ReadingOrderList } from '@/components/organisms/ReadingOrderList';
 import { useSession } from '@/queries/auth';
-import {
-  useBook,
-  useDeleteBook,
-  useDeleteBookCover,
-  useUpdateBook,
-  useUploadBookCover,
-} from '@/queries/books';
-import { useChapters, useReorderChapters } from '@/queries/chapters';
+import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
-import { formatDate } from '@/format/date';
-import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
-
-// One row of the book's chapter list: a link to the chapter's editor, a badge
-// for what is not out yet, and the date it came out or will.
-const chapterRow = (bookId: number, chapter: ChapterSummary) => {
-  const state = chapterStateOf(chapter);
-
-  return (
-    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-      <Space>
-        <Link to={`/books/${bookId}/chapters/${chapter.id}/edit`}>
-          {chapter.title}
-        </Link>
-        {state === 'draft' && <Tag>Draft</Tag>}
-        {state === 'scheduled' && <Tag color="blue">Scheduled</Tag>}
-      </Space>
-      {chapter.publishedAt !== null && (
-        <Typography.Text type="secondary">
-          {formatDate(chapter.publishedAt)}
-        </Typography.Text>
-      )}
-    </Space>
-  );
-};
 
 export const EditBookPage: FC = () => {
   const { token } = theme.useToken();
@@ -69,11 +33,6 @@ export const EditBookPage: FC = () => {
   const genres = useGenres();
   const update = useUpdateBook(bookId);
   const remove = useDeleteBook(bookId);
-  const chapters = useChapters(bookId);
-  const reorder = useReorderChapters(bookId);
-  const uploadCover = useUploadBookCover(bookId);
-  const deleteCover = useDeleteBookCover(bookId);
-  const [coverError, setCoverError] = useState<string | null>(null);
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -106,9 +65,6 @@ export const EditBookPage: FC = () => {
       ? [...own, book.series]
       : own;
 
-  const reorderConflict =
-    reorder.error instanceof ApiError && reorder.error.status === 409;
-
   const handleSubmit = (values: BookFormValues) => {
     update.mutate(values);
   };
@@ -116,26 +72,6 @@ export const EditBookPage: FC = () => {
   const handleDelete = () => {
     remove.mutate(undefined, {
       onSuccess: () => void navigate(isCoAuthor ? '/my-books' : '/'),
-    });
-  };
-
-  // A fresh attempt (a new pick, or another try at Remove) always clears
-  // whatever error the last one left showing; the mutate call's own "pending"
-  // action then carries that same reset into uploadCover/deleteCover's own
-  // `error`, so nothing has to reconcile the two.
-  const handleCoverFile = (file: File) => {
-    setCoverError(null);
-    uploadCover.mutate(file, {
-      onError: (error) => setCoverError(error.message),
-    });
-  };
-
-  const handleCoverReject = (message: string) => setCoverError(message);
-
-  const handleRemoveCover = () => {
-    setCoverError(null);
-    deleteCover.mutate(undefined, {
-      onError: (error) => setCoverError(error.message),
     });
   };
 
@@ -176,79 +112,15 @@ export const EditBookPage: FC = () => {
 
       <Divider />
 
-      <Typography.Title level={4}>Cover</Typography.Title>
-      {coverError && (
-        <Alert
-          type="error"
-          title={coverError}
-          style={{ marginBottom: token.margin }}
-        />
-      )}
-      <Space align="start" size={token.margin}>
-        <BookCover coverUrl={book.coverUrl} title={book.title} />
-        <Space orientation="vertical">
-          <ImageUploadButton
-            label="Upload cover"
-            loading={uploadCover.isPending}
-            onFile={handleCoverFile}
-            onReject={handleCoverReject}
-          />
-          {book.coverUrl !== null && (
-            <Popconfirm
-              title="Remove the cover?"
-              okText="Yes, remove"
-              okButtonProps={{ danger: true }}
-              onConfirm={handleRemoveCover}
-            >
-              <Button danger loading={deleteCover.isPending}>
-                Remove cover
-              </Button>
-            </Popconfirm>
-          )}
-        </Space>
-      </Space>
+      <BookCoverManager
+        bookId={bookId}
+        coverUrl={book.coverUrl}
+        title={book.title}
+      />
 
       <Divider />
 
-      <Space
-        align="center"
-        style={{ width: '100%', justifyContent: 'space-between' }}
-      >
-        <Typography.Title level={4}>Chapters</Typography.Title>
-        {/* Only a Co-author: a Moderator may edit and delete chapters but has
-            no create on them. */}
-        {isCoAuthor && (
-          <Link to={`/books/${book.id}/chapters/new`}>Add chapter</Link>
-        )}
-      </Space>
-      {/* A 409 has already brought in the current list; this says why the
-          order just moved under the author's hands. */}
-      {reorder.error && (
-        <Alert
-          type={reorderConflict ? 'warning' : 'error'}
-          title={
-            reorderConflict
-              ? 'A co-author changed the chapters while you were reordering them. This is their current order.'
-              : 'Could not save the new chapter order.'
-          }
-          style={{ marginBottom: token.margin }}
-        />
-      )}
-      {/* Every chapter, drafts and scheduled ones included: the server returns
-          them all to a Co-author or a Moderator, and this is where they are
-          worked on and put in Reading order. */}
-      <SortableList
-        items={(chapters.data?.items ?? []).map((chapter) => ({
-          id: chapter.id,
-          label: chapter.title,
-          content: chapterRow(book.id, chapter),
-        }))}
-        isPending={chapters.isPending}
-        isError={chapters.isError}
-        errorText="Could not load the chapters."
-        emptyText="No chapters yet."
-        onReorder={(chapterIds) => reorder.mutate(chapterIds)}
-      />
+      <ReadingOrderList bookId={bookId} isCoAuthor={isCoAuthor} />
 
       <Divider />
 

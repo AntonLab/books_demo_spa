@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Logger } from '../logger.ts';
-import { parseConfig, type AppConfig } from './config.ts';
+import type { Logger } from '../../logger.ts';
+import { parseConfig, type AppConfig } from '../config.ts';
 import { DEMO_DATABASE, assertSafeTarget } from './seedGuards.ts';
 
 function makeLogger(): {
