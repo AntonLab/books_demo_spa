@@ -9,6 +9,7 @@ import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
 import type { PublicUser } from '@/types/user';
+import type { RootState } from '@/store';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/notifications');
@@ -406,5 +407,66 @@ describe('AppHeader theme button', () => {
     expect(
       screen.getByRole('button', { name: 'Switch to light theme' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('AppHeader and Unsaved text', () => {
+  const entries = {
+    'book:1:comment': {
+      text: 'Half a thought',
+      savedAt: '2026-09-23T10:00:00.000Z',
+    },
+  };
+  const ownedBy = (accountId: number): Partial<RootState> => ({
+    unsavedText: { accountId, entries },
+  });
+
+  it('discards every entry on Log out', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const { store } = await renderHeader(<AppHeader />, {
+      ...withSession(user),
+      preloadedState: ownedBy(1),
+    });
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await waitFor(() => {
+      expect(store.getState().unsavedText).toEqual({
+        accountId: null,
+        entries: {},
+      });
+    });
+  });
+
+  it('discards every entry when another Account is signed in', async () => {
+    const { store } = await renderHeader(<AppHeader />, {
+      ...withSession(user),
+      preloadedState: ownedBy(2),
+    });
+
+    await waitFor(() => {
+      expect(store.getState().unsavedText).toEqual({
+        accountId: 1,
+        entries: {},
+      });
+    });
+  });
+
+  it('keeps the entries when the session is lost without Log out', async () => {
+    const { store, queryClient } = await renderHeader(<AppHeader />, {
+      ...withSession(user),
+      preloadedState: ownedBy(1),
+    });
+
+    // An expiry, a Block or a password reset: the session just becomes null.
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, null);
+    });
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Log in' })
+    ).toBeInTheDocument();
+    expect(store.getState().unsavedText).toEqual({ accountId: 1, entries });
   });
 });
