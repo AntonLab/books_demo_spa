@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { StyleProvider } from '@ant-design/cssinjs';
 import { App as AntdApp, ConfigProvider, Layout, Spin } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
 import { store } from '@/store';
@@ -150,6 +151,7 @@ export const App: FC = () => {
           </ConfigProvider>
         </StyleProvider>
       </Provider>
+      <ReactQueryDevtools />
     </QueryClientProvider>
   );
 };
