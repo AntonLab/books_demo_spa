@@ -1,11 +1,17 @@
 import { combineReducers, configureStore } from '@reduxjs/toolkit';
 import { devicePreferencesReducer } from './devicePreferencesSlice';
-import { createPersistenceMiddleware, loadPersistedState } from './persistence';
+import { unsavedTextReducer } from './unsavedTextSlice';
+import {
+  createPersistenceMiddleware,
+  loadPersistedState,
+  persistNow,
+} from './persistence';
 
 // Client state only (ADR-0010): what outlives the component showing it and
 // never reaches the server. Everything fetched lives in src/queries/.
 const rootReducer = combineReducers({
   devicePreferences: devicePreferencesReducer,
+  unsavedText: unsavedTextReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
@@ -24,6 +30,10 @@ export const createAppStore = (
 };
 
 export const store = createAppStore();
+
+// The Unsaved text write is throttled; a reload inside the window would lose
+// the last keystrokes without this flush.
+window.addEventListener('pagehide', () => persistNow(store.getState()));
 
 export type AppStore = ReturnType<typeof createAppStore>;
 export type AppDispatch = AppStore['dispatch'];
