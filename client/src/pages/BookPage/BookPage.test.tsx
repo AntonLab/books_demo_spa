@@ -4,11 +4,13 @@ import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import type { BookDetail } from '@/types/book';
+import type { RootState } from '@/store';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/books');
@@ -66,7 +68,10 @@ const reader: PublicUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
-const renderPage = (session?: PublicUser) => {
+const renderPage = (
+  session?: PublicUser,
+  preloadedState?: Partial<RootState>
+) => {
   const queryClient = createTestQueryClient();
   if (session) queryClient.setQueryData(queryKeys.session, session);
 
@@ -74,6 +79,7 @@ const renderPage = (session?: PublicUser) => {
     route: '/books/1',
     path: '/books/:id',
     queryClient,
+    preloadedState,
   });
 };
 
@@ -195,6 +201,25 @@ describe('BookPage', () => {
     expect(
       await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
+  });
+
+  it('offers the Unsaved text of a book that no longer exists', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'Book not found'));
+    renderPage(reader, {
+      unsavedText: {
+        accountId: 9,
+        entries: {
+          'book:1:comment': {
+            text: 'About that ending',
+            savedAt: '2026-09-23T10:00:00.000Z',
+          },
+        },
+      },
+    });
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('About that ending');
   });
 
   it('hides the like button from an anonymous visitor', async () => {
