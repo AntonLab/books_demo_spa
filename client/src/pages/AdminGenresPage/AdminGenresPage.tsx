@@ -6,7 +6,7 @@ import {
   Empty,
   Form,
   Input,
-  List,
+  Listy,
   Popconfirm,
   Skeleton,
   Space,
@@ -114,10 +114,10 @@ const GenreManager: FC = () => {
       ) : genres.data.items.length === 0 ? (
         <Empty description="No genres yet." />
       ) : (
-        <List
-          dataSource={genres.data.items}
+        <Listy
+          items={genres.data.items}
           rowKey="id"
-          renderItem={(genre) => <GenreRow genre={genre} />}
+          itemRender={(genre) => <GenreRow genre={genre} />}
         />
       )}
     </>
@@ -155,70 +155,66 @@ const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
     rename.mutate({ name }, { onSuccess: () => setDraft(null) });
   };
 
+  // `orientation`, not the deprecated `direction`, which antd 6 still accepts
+  // but warns about.
   return (
-    <List.Item>
-      {/* `orientation`, not the deprecated `direction`, which antd 6 still
-          accepts but warns about. */}
-      <Space
-        orientation="vertical"
-        size={token.marginXXS}
-        style={{ width: '100%' }}
-      >
-        {draft === null ? (
-          <Space wrap>
-            <Typography.Text>{genre.name}</Typography.Text>
-            <Button size="small" onClick={handleRename}>
-              Rename
+    <Space
+      orientation="vertical"
+      size={token.marginXXS}
+      style={{ width: '100%' }}
+    >
+      {draft === null ? (
+        <Space wrap>
+          <Typography.Text>{genre.name}</Typography.Text>
+          <Button size="small" onClick={handleRename}>
+            Rename
+          </Button>
+          <Popconfirm
+            title={`Delete ${genre.name}?`}
+            description="Books and series in this genre will be left without one."
+            okText="Yes, delete"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => remove.mutate()}
+          >
+            <Button size="small" danger loading={remove.isPending}>
+              Delete
             </Button>
-            <Popconfirm
-              title={`Delete ${genre.name}?`}
-              description="Books and series in this genre will be left without one."
-              okText="Yes, delete"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => remove.mutate()}
-            >
-              <Button size="small" danger loading={remove.isPending}>
-                Delete
-              </Button>
-            </Popconfirm>
-          </Space>
-        ) : (
-          <Space wrap>
-            <Input
-              aria-label={`New name for ${genre.name}`}
-              aria-invalid={renameTaken}
-              aria-describedby={renameTaken ? renameErrorId : undefined}
-              value={draft}
-              maxLength={GENRE_NAME_MAX_LENGTH}
-              onChange={(event) => setDraft(event.target.value)}
-            />
-            <Button
-              type="primary"
-              size="small"
-              disabled={
-                draft.trim().length === 0 || draft.trim() === genre.name
-              }
-              loading={rename.isPending}
-              onClick={handleSave}
-            >
-              Save
-            </Button>
-            <Button size="small" onClick={handleCancel}>
-              Cancel
-            </Button>
-          </Space>
-        )}
+          </Popconfirm>
+        </Space>
+      ) : (
+        <Space wrap>
+          <Input
+            aria-label={`New name for ${genre.name}`}
+            aria-invalid={renameTaken}
+            aria-describedby={renameTaken ? renameErrorId : undefined}
+            value={draft}
+            maxLength={GENRE_NAME_MAX_LENGTH}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <Button
+            type="primary"
+            size="small"
+            disabled={draft.trim().length === 0 || draft.trim() === genre.name}
+            loading={rename.isPending}
+            onClick={handleSave}
+          >
+            Save
+          </Button>
+          <Button size="small" onClick={handleCancel}>
+            Cancel
+          </Button>
+        </Space>
+      )}
 
-        {renameTaken && (
-          <Typography.Text id={renameErrorId} type="danger" role="alert">
-            {TAKEN}
-          </Typography.Text>
-        )}
-        {rename.error && !renameTaken && (
-          <Alert type="error" title={rename.error.message} />
-        )}
-        {remove.error && <Alert type="error" title={remove.error.message} />}
-      </Space>
-    </List.Item>
+      {renameTaken && (
+        <Typography.Text id={renameErrorId} type="danger" role="alert">
+          {TAKEN}
+        </Typography.Text>
+      )}
+      {rename.error && !renameTaken && (
+        <Alert type="error" title={rename.error.message} />
+      )}
+      {remove.error && <Alert type="error" title={remove.error.message} />}
+    </Space>
   );
 };
