@@ -12,3 +12,7 @@
 .account {
   color: var(--ant-color-text-light-solid);
 }
+
+.onDark {
+  color: var(--ant-color-text-light-solid);
+}

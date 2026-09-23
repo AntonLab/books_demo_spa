@@ -393,3 +393,18 @@ describe('AppHeader account menu', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
   });
 });
+
+describe('AppHeader theme button', () => {
+  it('toggles the theme and names what it will do next', async () => {
+    const { store } = await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Switch to dark theme' })
+    );
+
+    expect(store.getState().devicePreferences.theme).toBe('dark');
+    expect(
+      screen.getByRole('button', { name: 'Switch to light theme' })
+    ).toBeInTheDocument();
+  });
+});
