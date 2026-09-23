@@ -1,0 +1,12 @@
+.layout {
+  min-height: 100vh;
+}
+
+.content {
+  padding: var(--ant-padding-lg);
+}
+
+.fallback {
+  display: block;
+  margin: var(--ant-margin-xxl) 0;
+}

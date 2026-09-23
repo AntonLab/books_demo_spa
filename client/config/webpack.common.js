@@ -78,7 +78,7 @@ module.exports = (isDevelopment) => {
         },
         // `*.module.css` is scoped per component (see CLAUDE.md, Component
         // folders); every other stylesheet stays global, which is what
-        // `antd/dist/reset.css` in src/index.tsx relies on. The plain rule
+        // src/index.css, which layers antd's reset, relies on. The plain rule
         // excludes `.module.css` explicitly, so the two can never both match.
         {
           test: /\.module\.css$/i,
@@ -88,6 +88,12 @@ module.exports = (isDevelopment) => {
               loader: 'css-loader',
               options: {
                 modules: {
+                  // css-loader 7 turns `namedExport` on by default, which drops
+                  // the default export `src/types/css.d.ts` and Jest's
+                  // `styleMock.ts` both describe. `as-is` keeps camelCase
+                  // class names reachable as written.
+                  namedExport: false,
+                  exportLocalsConvention: 'as-is',
                   localIdentName: isDevelopment
                     ? '[name]__[local]--[hash:base64:5]'
                     : '[hash:base64:8]',

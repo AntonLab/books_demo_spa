@@ -1,0 +1,5 @@
+/* antd's own styles sit in `@layer antd` (StyleProvider in App.tsx), so any
+   unlayered stylesheet — every `.module.css` — outranks them whatever their
+   specificity. reset.css must be layered too, or it would outrank them as
+   well. The layer order itself is declared in public/index.html. */
+@import url('antd/dist/reset.css') layer(reset);
