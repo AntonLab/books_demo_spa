@@ -1,787 +1,100 @@
 # Client — books_demo_spa
 
-React 19 + TypeScript single-page app, bundled with webpack 5.
+React 19 + TypeScript SPA bundled with webpack 5. Server state lives in
+TanStack Query (`src/queries/`), UI state in Redux Toolkit (`src/store/`,
+`authSlice` only: `activeModal` and `resetToken`).
+
+## Topic rules
+
+The detail lives in `.claude/rules/client/`, one topic per file. Each loads on
+its own when you read a file its `paths:` names. When a change reaches a topic
+whose files you have not opened, read the rule first:
+
+| Rule            | Covers                                                                |
+| --------------- | --------------------------------------------------------------------- |
+| `api.md`        | `request()`, its body and CSRF traps, the per-module request contract |
+| `queries.md`    | retries, the session shape, mutation wrapping, invalidation           |
+| `components.md` | component-level traps: antd menus, comments, sortable lists, images   |
+| `pages.md`      | routing, lazy loading and the error boundary, page-level rules        |
+| `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                |
+| `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover      |
+| `webpack.md`    | the three webpack configs                                             |
+
+## Commands
+
+Install from the repo root. Scripts run here or from the root with `-w client`:
+`npm run dev` (port 3000, `/api` proxied to 4000), `npm run build` (`build/`),
+`npm test` / `npm run test:watch`, `npm run typecheck`, `npm run lint`,
+`npm run lint:fix`. Prettier is root-only.
 
 ## Atomic Design
 
-UI components follow Brad Frost's Atomic Design levels, extended with
-**quarks** (design tokens) below atoms.
+`src/components/` is grouped by level, not by feature. A level with nothing in
+it has no directory.
 
-`src/components/` is grouped by level, not by feature: the former `auth/`,
-`books/` and `layout/` directories are gone, replaced by `molecules/` and
-`organisms/`. A level with nothing in it has no directory — create one when
-the first component needs it rather than leaving empty folders around.
+| Level     | Lives in                    | What it is                                                      |
+| --------- | --------------------------- | --------------------------------------------------------------- |
+| Quarks    | `src/theme/tokens.ts`       | Design tokens: antd 6's defaults plus our `app*` tokens         |
+| Atoms     | antd 6                      | Used directly; write one only where antd has no equivalent      |
+| Molecules | `src/components/molecules/` | A few atoms doing one job; props in, render out                 |
+| Organisms | `src/components/organisms/` | A standalone section; may hold state and call queries           |
+| Templates | `src/components/templates/` | `App`: the composition root and the `Layout` around every route |
+| Pages     | `src/pages/`                | A routed template filled with real data                         |
 
-| Level     | Lives in                    | What it is                                          | Today                                                                                                                                                                                                                        |
-| --------- | --------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quarks    | `src/theme/tokens.ts`       | Colors, spacing, typography, radii, shadows, widths | antd 6's defaults, plus three custom quarks — `appSearchBarMaxWidth`, `appNotificationPanelWidth` and `appBookCoverWidth`. `appTheme` carries them into `<ConfigProvider theme={appTheme}>` in `App.tsx`                     |
-| Atoms     | antd 6                      | Button, Input, Typography, Icon                     | Use antd directly; write an atom only where antd has no equivalent                                                                                                                                                           |
-| Molecules | `src/components/molecules/` | A few atoms doing one job                           | `SearchBar`, `LikeButton`, `Comment`, `BookCover`, `AccountAvatar`, `ImageUploadButton`                                                                                                                                      |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and dispatch   | `AppHeader`, `NotificationBell`, `BookList`, `BookCard`, `SeriesCard`, `BookForm`, `SeriesForm`, `ChapterForm`, `ChapterList`, `SortableList`, `CoAuthorManager`, `CommentSection`, `ErrorBoundary`, `AuthModals` + 4 modals |
-| Templates | `src/components/templates/` | Page skeleton, placeholder content                  | `App` — the composition root and the antd `Layout` shell around every route                                                                                                                                                  |
-| Pages     | `src/pages/`                | A template filled with real data and routed         | The fifteen routed pages                                                                                                                                                                                                     |
+1. **Imports flow downward only.** One exemption: a page may import another
+   page (`ResetPasswordRoute` renders `MainPage`). Checked in review; no lint
+   rule enforces it.
+2. **Search `src/components/` before creating** a component.
+3. **Business logic stays in organisms and pages.** `useAppSelector`,
+   `useAppDispatch` and `src/queries` hooks never appear below organisms.
+4. **Tokens, not hardcoded colours or pixels** (see `styling.md`).
+5. **Wrap antd only to fix an awkward API or a variant used three or more
+   times**; a passthrough is over-atomization.
+6. **Prototype complex work on a throwaway page** before wiring it into a route.
 
-### Rules
+## Component folders
 
-1. **Imports flow downward only** — quarks → atoms → molecules → organisms →
-   templates → pages. A molecule never imports an organism. **One exemption:
-   a page may import another page**, because composing a route out of an
-   existing one is cheaper than extracting a shared organism for a single
-   caller — `ResetPasswordRoute` renders `MainPage` under the reset-confirm
-   modal. Nothing below the page level may import a page. Enforced at review
-   time only: no lint rule checks this.
-2. **Check before creating.** Search `src/components/` first. Never add a
-   second component that does what an existing one already does.
-3. **No business logic below organisms.** Atoms and molecules take props and
-   render. `useAppSelector`, `useAppDispatch`, `src/api` calls and `src/queries`
-   hooks belong in organisms and pages.
-4. **Tokens, not hardcoded values.** No arbitrary hex colours or pixel values
-   in components — read antd's tokens (`var(--ant-*)` in a `.module.css`,
-   `theme.useToken()` where a prop needs the number), or add the value to
-   the `ConfigProvider` theme so it becomes a real quark. antd's set has gaps
-   — it sizes controls by height and has no width token at all — so sometimes
-   the quark has to be invented. Declare it in `src/theme/tokens.ts`: give it
-   an `app` prefix, since antd flattens every token into one object and an
-   unprefixed name could collide with one a later antd version adds, and
-   augment antd's `AliasToken` in the same file so `theme.useToken()` types it
-   at every call site. `src/theme/tokens.test.tsx` pins the pipeline that makes
-   this work: antd derives its own tokens over ours, and nothing in its docs
-   promises an unknown key survives that.
-5. **Do not wrap antd for its own sake.** A passthrough around `<Button>` is
-   over-atomization; wrap only to fix an awkward API or to fix a variant used
-   in three or more places.
-6. **Prototype complex work on a throwaway page** before wiring it into a
-   template or a routed page.
-7. **One folder per component**, PascalCase, tests beside the code — see
-   Component folders below.
-
-### Component folders
-
-Every component is a self-contained directory — under `src/components/`
-and under `src/pages/` alike, since a page is a component too. Tests,
-styles and types sit beside the component, never in a mirrored global
-folder. A component folder lives inside its Atomic Design level, a page
-folder directly under `src/pages/`:
+Every component and page is a PascalCase folder with its tests, styles and
+types beside it:
 
 ```text
 src/components/organisms/BookCard/
-├── BookCard.tsx        # logic and implementation
-├── BookCard.test.tsx   # Jest + React Testing Library
-├── BookCard.types.ts   # interfaces, when they are complex enough to move
-├── BookCard.css        # scoped styles (or .module.css)
-└── index.ts            # barrel: the folder's public API
-
-src/pages/MainPage/
-├── MainPage.tsx
-├── MainPage.test.tsx
-└── index.ts
+├── BookCard.tsx          # named export
+├── BookCard.test.tsx
+├── BookCard.types.ts     # only when the types are worth moving
+├── BookCard.module.css   # only when it has styles
+└── index.ts              # barrel: re-exports only
 ```
 
-- **PascalCase** for the folder, every file inside it, and the types.
-- **Named exports in the component file.** `index.ts` exists only to
-  re-export the public API and holds no logic of its own.
-- **The rest of the app imports the folder, never a file inside it** —
-  `import { BookCard } from '@/components/organisms/BookCard'`, not
-  `.../BookCard/BookCard`. The barrel is what makes the internals private.
-- `.types.ts` and `.css` are optional. Add them when there is something to
-  put in them; do not create empty scaffolding.
-- A page becoming a folder does not change what the `lazy()` calls in
-  `App.tsx` name: `@/pages/MainPage` resolves to the barrel, which
-  re-exports the same named `MainPage`, so the `default` remap is untouched.
-
-All 40 (25 components, 15 pages) follow this layout, and the `@/` alias is
-wired into the three tools that must agree on it: `paths` in
-`tsconfig.json`, `resolve.alias` in `config/webpack.common.js`, and
-`moduleNameMapper` in `jest.config.mjs`. Change one and change all three.
-
-Two caveats:
-
-- **`tsconfig.json` sets `paths` with no `baseUrl`.** `baseUrl` is
-  deprecated in TypeScript 6 and errors as `TS5101`; without it,
-  `moduleResolution: Bundler` resolves `paths` against the tsconfig
-  directory, so the mapping value needs a leading `./` (`["./src/*"]`).
-- **Styles go in the component's `.module.css`, not in `style={{…}}`**
-  (ADR-0009). Values come from antd's CSS variables — every token, our `app*`
-  quarks included, is emitted as `--ant-<kebab-name>` in px
-  (`appBookCoverWidth` → `var(--ant-app-book-cover-width)`). Inline `style`
-  is only for values that change continuously at runtime, like dnd-kit's
-  transform; a boolean state is a modifier class
-  (`` `${styles.item} ${fresh ? styles.fresh : ''}` ``). Prefer an antd prop
-  when one exists (`Flex justify`/`gap`) over a class. Three traps:
-  - A class beats antd only because `App.tsx` wraps everything in
-    `<StyleProvider layer>`, which puts antd in `@layer antd`; `reset.css` is
-    in `@layer reset` (`src/index.css`), and `public/index.html` declares the
-    order before antd injects anything. Without the layer, Typography's
-    `div.ant-typography` outranks a lone class and a margin silently reverts.
-  - `css-loader` 7 defaults to `namedExport: true`, which drops the default
-    export `import styles from` needs; the webpack rule turns it off.
-  - Jest maps every `.css` to `styleMock.ts` and renders with `zeroRuntime`,
-    so classes come back `undefined` and no test sees a style. Assert on roles
-    and text; check styling in a browser.
-
-### Page loading and errors
-
-Every routed page is code-split and guarded against a render error. The
-rules, all of them live in `App.tsx`:
-
-1. **Lazy-load every page**, and only pages. Nothing under `src/pages/` gets a
-   static `import` in `App.tsx`; `AppHeader`, `AuthModals` and the store stay
-   static, since they render on every route and splitting them buys nothing.
-2. **Remap the named export.** `React.lazy` resolves a module's `default`, but
-   pages are named exports (see Conventions), so each one needs
-   `lazy(() => import('@/pages/MainPage').then((m) => ({ default: m.MainPage })))`.
-   Do not add default exports to pages to make `lazy` shorter — the named-export
-   rule is the load-bearing one.
-3. **One `<Suspense>` and one `<ErrorBoundary>` around `<Routes>`**, both inside
-   `Layout.Content`. That wraps all pages at once and keeps the header and auth
-   modals mounted when a chunk is in flight or a page throws. Per-route
-   boundaries are the fallback if a page ever needs its own recovery UI — do
-   not add them pre-emptively.
-4. **Key the boundary by route** (`<ErrorBoundary key={useLocation().pathname}>`)
-   or a caught error persists across every later navigation.
-5. **The error boundary is the one permitted class component.** React exposes
-   no hook for `getDerivedStateFromError`, so `ErrorBoundary` is the documented
-   exception to the functional-components-only rule in the root `CLAUDE.md`.
-   It lives in `src/components/organisms/ErrorBoundary/` and is hand-written
-   rather than pulled from a dependency. It defines `getDerivedStateFromError`
-   only — no `componentDidCatch`, because React already logs an uncaught render
-   error itself and the client has no logger to forward one to.
-
-The route tests in `App.test.tsx` needed no changes for this: they
-already `await screen.findByRole(...)`, which waits out the lazy chunk.
-
-## Status
-
-No longer a scaffold: the client has a working main page, header (nav, search,
-three auth states), four auth modals, and a search page, backed by TanStack
-Query for server state and Redux Toolkit for UI state, talking to the real
-`/api`. The build toolchain and test runner
-are both real: webpack 5 (dev server with React Fast Refresh, hashed
-production build), TypeScript, ESLint and Jest are all wired up.
-
-This package is an npm workspace. Install from the repo root, not here; the
-scripts below still run from this directory, or from the root with `-w client`.
-
-Available scripts:
-
-- `npm run dev` — webpack dev server on <http://localhost:3000> (HMR + Fast Refresh)
-- `npm run build` — production bundle into `build/` (git-ignored)
-- `npm test` / `npm run test:watch` — Jest + React Testing Library (jsdom), transformed by `@swc/jest`
-- `npm run typecheck` — `tsc --noEmit`
-- `npm run lint` / `npm run lint:fix` — ESLint 9 flat config (`eslint.config.mjs`)
-
-Prettier has no script here: it is root-only, because `.prettierrc.json` and
-`.prettierignore` are repo-wide. Run `npm run format` from the repo root.
-
-## Modules and their traps
-
-- `public/index.html` — HTML template consumed by `html-webpack-plugin`
-- `src/index.tsx` — app entry, mounts `<App />` into `#root`
-- `src/components/templates/App/` — `App`, the composition root
-  (`QueryClientProvider` outermost, then the Redux `Provider`, antd's
-  `ConfigProvider`, `AntdApp` and `BrowserRouter`), and `AppShell`, the
-  `Layout` around every route. Holds the `lazy()` call for each page plus the
-  single `<Suspense>`/`<ErrorBoundary>` pair (see Page loading and errors).
-  `AppShell` is exported separately because `App` mounts `BrowserRouter`,
-  which a route test cannot point at an arbitrary path.
-- `src/api/` — `client.ts` (the shared `request<T>()` fetch wrapper: prefixes
-  every path with `/api`, sends `credentials: 'include'`, and turns non-2xx
-  responses into a typed `ApiError`), plus one file per resource holding that
-  resource's typed calls. Two carry something their names do not give away:
-  `updateChapter` sends `expectedUpdatedAt`, the version the save was based on,
-  and a book's and a series' create/update payloads carry a `genreId`, as
-  `listBooks` and `listSeries` do. Since the TanStack Query migration these are
-  the bodies of the `queryFn`s and `mutationFn`s in `src/queries/`, not called
-  directly from components.
-
-  One trap: `request()` takes `body` as an **object** and stringifies it
-  itself, setting `Content-Type` off whether it is `undefined`. Passing a
-  JSON string would double-encode it.
-
-  A second trap in the other direction: when `body` is a `Blob` (a `File` is
-  one — Covers and Avatars upload this way), `request()` sends it as-is with
-  `Content-Type` set to the blob's own type and no `JSON.stringify`; every
-  other body keeps the object/JSON path above. `client.test.ts` pins both.
-
-  `request()` also sends the session's CSRF token on every write (any method
-  but `GET`): it reads the `xsrfToken` cookie the server sets beside the
-  session and echoes it in the `X-XSRF-Token` header, without which the server
-  refuses a write that carries a session with a 403. A call that bypasses
-  `request()` loses that as well as `credentials: 'include'`.
-
-- `src/queries/` — the TanStack Query layer, and the only thing that calls
-  `src/api/`. `queryClient.ts` (the `createQueryClient` factory and the
-  `queryClient` singleton, mirroring `createAppStore`/`store`), `keys.ts`
-  (every cache key in one registry), `auth.ts` (`useSession` plus the five
-  auth mutations), `books.ts` (`useBooks`, `useSearchBooks`,
-  `useBooksInSeries` — `?seriesId=`, which the server returns in Series
-  order — `useBooksInGenre` — `?genreId=`, the server's default order (oldest
-  first, by id) — `useBook`, `BOOKS_PAGE_SIZE`, `useMyBooks` — `?userId=` naming the caller, the one
-  list that includes their drafts — and five book mutations, the
-  create/update/delete trio plus `useUploadBookCover`/`useDeleteBookCover`,
-  that all invalidate the whole `books` prefix, since one write can move a
-  book in or out of any list), `authors.ts` (`useAuthorSearch`, one cache entry per
-  term), `series.ts` (`useMySeries`, `useSeries`, `useSeriesBooks` —
-  disabled until the page knows the viewer may edit the series —
-  `useSeriesInGenre`, listed under a Genre's books on `SearchPage` — four
-  series mutations that invalidate both the `series` and `books` prefixes, and
-  `useReorderSeriesBooks`),
-  `genres.ts` (`useGenres`, on its own `queryKeys.genres`, plus a create, a
-  rename and a delete mutation, each invalidating the `genres`, `books` and
-  `series` prefixes, because a rename or a deletion changes the `genre`
-  embedded in every list),
-  `coAuthors.ts` (`useAddCoAuthor` and
-  `useRemoveCoAuthor`, each taking a `CreditedWork` — `{ kind: 'book' |
-'series', id }` — and calling that kind's endpoints; the book mutations
-  also invalidate `series`, since filing a book changes a series' list),
-  `reorder.ts` (`useOptimisticReorder`, the one save-on-drop both orders use:
-  it rewrites the cached list before the request leaves, puts it back if the
-  request fails, and refetches either way — after a 409 that refetch brings in
-  the row a Co-author added or removed), `chapters.ts` (`useChapters`, `useChapter`, three
-  chapter mutations that invalidate every `chapters` key, and
-  `useReorderChapters`, built on `useOptimisticReorder`),
-  `comments.ts` (`useComments` plus the three comment mutations),
-  `likes.ts` (`useToggleLike`), `notifications.ts` (`useNotifications`,
-  keyed by the account and the one query that polls — every 60 s, and again
-  when the window regains focus — and `useMarkNotificationsRead`, which sets
-  the unread count at once and refetches the list) and `users.ts`
-  (`useUploadAvatar` and `useDeleteAvatar`, which invalidate the session
-  plus the `books`, `series`, `comments` and `authors` prefixes — an Avatar
-  change touches every place a `PublicUser` or `AuthorSummary` is embedded).
-  Flat files, like `src/api/` and `src/store/`,
-  and outside the Atomic Design levels for the same reason.
-
-  Five things worth knowing before editing it:
-
-  - **A query retries only what may pass on its own**, and `staleTime` is
-    30s. `shouldRetryQuery` retries at most twice, with TanStack's default
-    backoff, and only a failure that is no `ApiError` (fetch rejected: the
-    network, a dropped connection) or an `ApiError` with a 5xx status.
-    Every other answer shows at once — a 401 from `/auth/me` is the
-    _normal_ answer for an anonymous visitor, not a failure to retry.
-    Mutations never retry: a repeated write that did land the first time
-    would land twice. The test client (`src/test/queryClient.ts`) keeps
-    `retry: false`.
-  - **The session is `PublicUser | null`**, never `undefined`: `null` means
-    "asked, nobody is signed in". `useSession` maps the 401 to it inside
-    the `queryFn`. TanStack rejects an `undefined` return outright, which
-    is what keeps the two apart.
-  - **`useSearchBooks` is disabled on a blank term**, and a disabled query
-    reports `isPending: true` with `fetchStatus: 'idle'` indefinitely. That
-    is why `SearchPage` returns `<Empty>` before rendering `BookList`.
-  - **A `mutationFn` is wrapped, never passed straight through.** TanStack
-    calls it with a second context argument, which would arrive at an
-    `src/api/` function as a stray parameter it never declared — and shows
-    up in tests as a `toHaveBeenCalledWith` failure naming
-    `{ client, meta, mutationKey }`. `useCommentMutation` wraps for this
-    reason; do the same for any new mutation.
-  - **`useToggleLike` is one hook for both directions**, keyed off the
-    `viewerLikeId` the caller already holds: `null` means "like", a number
-    means "delete that row". It takes the key to invalidate as an argument,
-    because a book like refreshes the book and a comment like refreshes the
-    thread.
-
-- `src/format/` — `date.ts`: `formatDate` ("Sep 18, 2026") and
-  `formatDateTime` ("Sep 18, 2026, 3:30 PM"), the one way the client writes
-  a date. Both take the ISO string a date arrives as and format it in the
-  fixed `en` locale — the UI is English, so the browser's locale would give
-  it a second language — and in the browser's own time zone, each through
-  one `Intl.DateTimeFormat` built at module scope. A test asserting a
-  rendered date builds its expectation with the same helper, so it holds in
-  any time zone. Flat, like `src/api/`, and outside the Atomic Design levels.
-
-- `src/components/` — grouped by Atomic Design level (see above), not by
-  feature. Each component becomes its own folder (see Component folders).
-  - `molecules/` — `SearchBar`; `LikeButton` (takes the viewer's own like id
-    rather than a boolean, so the caller can delete the right row on a second
-    click, and uses a text glyph because `@ant-design/icons` is not a
-    dependency here); `Comment` (presentational — the name is free because
-    antd removed its own `Comment` in v5); `BookCover` (a 2:3 frame sized off
-    the `appBookCoverWidth` quark, showing the book's cover image — `alt=""`,
-    since the title always sits right beside it — or, with none, that title
-    as an `aria-hidden` placeholder; a failed image load falls back to the
-    placeholder too, and a fresh `?v=` URL after an upload gets its own try
-    rather than staying stuck on an earlier, unrelated failure); `AccountAvatar`
-    (decorative throughout — the wrapping `<span>` is `aria-hidden` and the
-    image itself `alt=""`; a name always sits beside it at every call site
-    (header login, bylines, comment author, `CoAuthorManager`) except
-    `ProfilePage`, where it is the signed-in Account's own picture under the
-    "Profile" heading — falling back to the name's first letter with no
-    picture);
-    `ImageUploadButton` (the shared image picker behind an antd `Upload` and
-    `Button`: checks a picked file's type against
-    `ACCEPTED_IMAGE_CONTENT_TYPES` and its size against `IMAGE_MAX_BYTES`
-    before handing it to `onFile`, or explains the rejection through
-    `onReject` — purely presentational, with no `src/api`/`src/queries` call
-    of its own, so `EditBookPage`'s Cover block and `ProfilePage` each wire it
-    to their own upload/delete mutation).
-  - `organisms/` — `AppHeader` (nav menu — "Home", a "Genres" submenu, plus
-    "My Books" only for the `author` Role — `SearchBar`, and the three auth
-    states — signed out / loading / signed in. The submenu's items are the
-    Genres from `useGenres()` in its order, each keyed by its own target path
-    `/search?genre=<id>`, so a click navigates to its key like every other
-    item; it is left out entirely while the list is loading, if it failed, or
-    if there are no Genres, and `selectedKeys` compares `pathname + search`, so
-    the Genre being browsed is the highlighted item and `/` and `/my-books`
-    keep working. Signed out, "Log in" is a one-item menu of its own
-    in the corner the account trigger takes once signed in, and there is no
-    Register: the login modal's "Create an account" is the way in. Signed in,
-    the trigger names the account beside its `AccountAvatar`, with a
-    `NotificationBell` beside it, and an `admin` or `superadmin` also gets
-    "Manage genres" (→ `/admin/genres`) after Profile — no other Role sees it).
-    The nav `Menu` carries `disabledOverflow` and `triggerSubMenuAction="click"`.
-    rc-menu starts every child past the first in an `overflowDisabled` context
-    that lifts only once `ResizeObserver` measurement advances
-    `lastVisibleIndex` past it; jsdom's stub reports no width, so that
-    boundary sticks at index 0 and, without `disabledOverflow`, the Genres
-    `SubMenu` is dead and untestable — the accepted trade is that the left
-    nav menu no longer collapses into a "…" overflow item at phone width.
-    `triggerSubMenuAction="click"` swaps the default hover trigger, which a
-    touch device has no way to perform and a test can only drive through
-    rc-menu's open delay. The signed-out "Log in" `Menu` carries
-    `disabledOverflow` too, but for a reason of its own: it holds no
-    `SubMenu` to open, and a menu sized by its own single item's content
-    collapses into "…" without it regardless of environment; `NotificationBell` (a
-    badge with the unread count, also in the button's name, over a `Popover`
-    of the newest notifications in words, the work's title linked while the
-    work exists — a book to its page, a series to its editor. Opening it marks
-    the unread ones read at once but keeps them highlighted until it closes); `BookForm` (presentational fields for creating and editing a
-    book; `showStatus` adds the status radios, which creating leaves out
-    because every new book is a draft; "No series" travels as 0 inside the
-    form and leaves as `null`, and a required `genreOptions: PublicGenre[]`
-    prop's Genre select follows the same convention through its own "No
-    genre" option); `SeriesForm` (BookForm's fields minus series and status —
-    title, description, tags and Genre, the last through the same select as
-    `BookForm`'s); `CoAuthorManager`
-    (the byline of the `work` it is given, a book or a series, each Co-author's
-    `AccountAvatar` beside their name, with an
-    immediate Remove, a Leave behind a `Popconfirm`, and a search-as-you-type
-    picker over `/api/authors` whose `optionRender` draws the same `AccountAvatar`
-    beside each candidate — the option's `label` itself stays a plain string, so
-    antd's derived tooltip and rc-select's search-filter matching keep working;
-    read-only unless `canManage`, and the last
-    Co-author is never offered Leave); `AuthModals` (reads
-    `activeModal` from `authSlice` and renders only that one, so only one
-    modal is ever mounted at a time) plus `LoginModal`, `RegisterModal` (an
-    "I'm author" checkbox maps to `role: isAuthor ? 'author' : 'user'` on the
-    register call — the two roles `REGISTRABLE_ROLES` lets the public form
-    reach; `admin` and `superadmin` have no signup path and are never
-    reachable from this checkbox), `ResetRequestModal` and
-    `ResetConfirmModal`; `BookCard` (leads with the book's `BookCover`, names
-    every Co-author under the title beside their own `AccountAvatar`,
-    from the `authors` the list response embeds, tags the book's status, and
-    links its Genre to `/search?genre=<id>`);
-    `SeriesCard` (the same for a series — title, Co-authors with their
-    `AccountAvatar`, blurb, its Genre linked the same way, and tags — heading
-    `SearchPage`'s results for one series, and leaving its books to whoever
-    renders it; with `linked`, the title becomes a level-4 heading holding a
-    `Link` to `/search?series=<id>` instead of that level-2 page heading — the
-    form the Genre results list renders each series card in) and the
-    presentational `BookList` (takes `items`/`isPending`/`isError`/`error`/
-    `emptyText` as props so both `MainPage` (from `useBooks()`) and
-    `SearchPage` (from `useSearchBooks(q)`, `useBooksInSeries(id)` or `useBooksInGenre(id)`) can
-    feed it, each from its own `src/queries/books.ts` hook); the presentational `ChapterList` (the reader's list, dated by
-    `publishedAt`, in the order it is given); `SortableList` (a list put in
-    order by drag and drop, used for a book's chapters and a series' books:
-    each item is `{ id, label, content }`, the page rendering `content`.
-    Sortable with `@dnd-kit/core` + `@dnd-kit/sortable` through a drag handle
-    named "Reorder {label}" — `PointerSensor` for the mouse, `KeyboardSensor`
-    for Space, the arrow keys and Space again — and calling `onReorder` with
-    the whole new order only when a drop moved something. It is an `<ol>` with
-    its markers hidden: the order is shown by place, never by number. Its
-    announcements name items by label, not id);
-    `ChapterForm` (title, text, and a "Publish immediately" checkbox that
-    reveals a `DatePicker` and `TimePicker` only while it is off, with past
-    days and today's past hours disabled; "Publish" sends `'now'` or the
-    picked moment as a UTC instant, "Save draft" sends `null`, and a Published
-    chapter gets "Save" — no `publishedAt` — and "Return to draft" instead.
-    `dayjs` is a direct dependency because the pickers take its objects);
-    `CommentSection` (owns the thread query, the three comment mutations, the
-    like toggle, and the "who am I replying to / what am I editing" state —
-    the two are mutually exclusive by construction, so only one composer is
-    ever on screen, and it renders its heading in every state so the section
-    keeps its place while loading; `closed` makes it read-only — no composer,
-    Reply, Edit or like — which `BookPage` sets on a Draft book, where the
-    server refuses new comments and likes for everyone); and
-    `ErrorBoundary`, the client's only class component.
-
-    `CommentSection` assembles the two-level tree itself: the server returns a
-    flat page and the component groups it, so there is no recursive component
-    and a reply carries no Reply button. It also **drops a tombstone that
-    holds no live replies**, of either kind — a tombstone earns its place only
-    by keeping live replies in their thread, and since only two levels
-    render, that means a root with at least one live direct reply; a
-    tombstoned reply is always dropped. This component is the one place that
-    already knows whether a comment has children, so the server is not asked
-    to. A tombstone that survives renders through the molecule as `[deleted]`
-    or `[removed by moderator]` (`TOMBSTONE_LABELS` in `Comment.tsx`), with no
-    author, no `AccountAvatar` and no controls at all, not even for its own author or a
-    moderator: there are no moderation buttons anywhere in the client — remove
-    and restore stay API-only until the reports feature brings a moderation
-    screen. Edit, delete and like are rendered conditionally to mirror the
-    server's rules — the server refuses each with a 403 regardless, so this
-    only avoids offering what would fail.
-- `src/pages/` — one folder per page (see Component folders): `MainPage`,
-  `SearchPage` (`/search`, one filter per visit: `?q=` searches, `?series=`
-  lists a series' books under its `SeriesCard` instead — there is
-  no series page, and a series that no longer exists, or an id that is not
-  one, says "This series no longer exists." — and `?genre=` lists the Genre's
-  books under a level-2 heading naming it, then its series as linked
-  `SeriesCard`s under a level-3 "Series" heading, that block left out while it
-  loads and when it is empty, plus an error `Alert` if the series request
-  fails. With more than one parameter present `series`
-  wins, then `genre`, then `q`; an id that is not a positive integer, or one
-  the loaded Genre list does not hold, says "This genre no longer exists." and
-  asks for no books or series), `BookPage` (`/books/:id`: the
-  book's `BookCover` beside its title, each Co-author's `AccountAvatar` in
-  the byline, and its series linked to `/search?series=` and its Genre to
-  `/search?genre=`), `ChapterPage`
-  (`/books/:bookId/chapters/:chapterId`), `MyBooksPage` (a Books tab of the
-  author's own books, drafts included, and "Create book", and a Series tab of
-  the series they co-author, each linked to its editor, with "Create
-  series"), `NewSeriesPage` (`/series/new`: the series' fields only, then on
-  to editing it), `EditSeriesPage` (`/series/:id/edit`: the fields, the
-  series' books in a `SortableList` that saves the Series order on drop —
-  drafts included, each with its status, its authors and "Remove from series"
-  behind a `Popconfirm`, and a draft the viewer may not read named rather
-  than linked — then `CoAuthorManager` and delete behind a `Popconfirm`; a
-  Moderator gets everything but the byline), `NewBookPage`
-  (`/books/new`: the book's fields only, then on to editing it),
-  `EditBookPage` (`/books/:id/edit`: fields and status; a Cover block —
-  `BookCover`, `ImageUploadButton` and "Remove cover" behind a `Popconfirm`,
-  with its own error `Alert`; every chapter through
-  a `SortableList` that saves the Reading order on drop — with an
-  error Alert when a save fails and a warning when a 409 reloaded the list —
-  and "Add chapter",
-  `CoAuthorManager`, and delete behind a `Popconfirm`; a Moderator gets the
-  form but a read-only byline and no "Add chapter"), `NewChapterPage`
-  (`/books/:bookId/chapters/new`) and `EditChapterPage`
-  (`/books/:bookId/chapters/:chapterId/edit`: saves against the loaded
-  `updatedAt`, and a 409 shows "This chapter was changed by a co-author —
-  reload" with a Reload button while keeping the typed text), `ProfilePage`
-  (a heading alone while the session is pending, an error `Alert` if the
-  session fetch fails, `Empty` when signed out, otherwise a large
-  `AccountAvatar`, "Upload avatar" and "Remove avatar" behind a
-  `Popconfirm`),
-  `AdminGenresPage` (`/admin/genres`: an add form, then the Genres in
-  alphabetical order, each with a Rename that edits the name in place with Save
-  and Cancel and a Delete behind a `Popconfirm` warning that books and series in
-  this genre will be left without one; a 409 says "A genre with that name
-  already exists." beside the field that caused it. For `admin` and
-  `superadmin` only — every other Role, Guests included, gets the "Genres"
-  heading and an info `Alert` saying Genres are kept by admins, the way
-  `MyBooksPage` answers a non-author; like `MyBooksPage`'s own gate, it reads
-  the session with no `isPending` branch, so that `Alert` shows for a
-  moderator too until the session resolves),
-  `NotFoundPage` (also what `/series` gets: there is no
-  series page), and `ResetPasswordRoute` (reads the reset
-  token off `/reset-password?token=...` and opens the confirm modal — not in
-  the original spec's file list, added because the spec routed
-  `/reset-password` to the confirm modal without naming the component that
-  reads the token).
-- `src/store/` — UI state only: `index.ts` (`createAppStore`, the `store`
-  singleton, `RootState`/`AppStore`/`AppDispatch`), `hooks.ts` (pre-typed
-  `useAppDispatch`/`useAppSelector`) and `authSlice.ts`, which holds
-  `activeModal` and `resetToken` and nothing else. `booksSlice` and
-  `searchSlice` are gone; the server state they cached by hand lives in
-  `src/queries/`.
-- `src/theme/` — `tokens.ts`, the quark layer: the `appTheme` `ThemeConfig`
-  handed to `ConfigProvider` in `App.tsx`, and the `AliasToken` augmentation
-  that makes our custom tokens typed everywhere `theme.useToken()` is called.
-- `src/types/` — `user.ts` (`PublicUser` — which now carries the account's
-  `role` (`'user' | 'author' | 'admin' | 'superadmin'`), a mirror of the
-  server's role-permission matrix (see `server/CLAUDE.md`); the client sets
-  it at registration (see `RegisterModal` under `organisms/` above) but does
-  not yet branch any rendering on it — and `avatarUrl`, versioned (`?v=<ms>`)
-  and never stale — and `AuthorSummary`, the email-free
-  shape the public endpoints embed, carrying the same `avatarUrl`),
-  `book.ts` (`PublicBook`, which carries `authors: AuthorSummary[]` — every
-  Co-author in credit order, with no `userId` — a `status` and a versioned
-  `coverUrl`; `BookDetail`;
-  `BookStatus` and `BOOK_STATUS_LABELS`, the one place the three statuses get
-  their words. `BookPage` hides the like button from every Co-author and from
-  everyone on a Draft book, mirroring the server's 403s),
-  `series.ts` (`PublicSeries`, and `SeriesBookSummary` — the series
-  editor's row, carrying a book's title, status and authors but not its
-  text),
-  `genre.ts` (`PublicGenre` and `GENRE_NAME_MAX_LENGTH`, both from `shared`, the
-  second being the cap the add and rename inputs enforce as their
-  `maxLength`, not a validation rule),
-  `chapter.ts` (`PublicChapter` with `publishedAt`, plus `chapterStateOf`
-  and `publishedChapters` — the public `BookPage` and the reader's
-  previous/next show only chapters that are out, even to a Co-author, whose
-  list from the server carries the rest), `comment.ts`,
-  `like.ts`, `notification.ts` (`PublicNotification` and `NotificationList`),
-  `api.ts` (the shared `ListResponse<T>` and `ApiErrorBody`
-  shapes, plus `ACCEPTED_IMAGE_CONTENT_TYPES` and `IMAGE_MAX_BYTES` —
-  `ImageUploadButton`'s own precheck, re-exported so the client fails fast on
-  the same JPEG/PNG/WebP/2 MiB shape the server enforces for real)
-  and `css.d.ts`. None of these shapes is written here any more: each
-  is `Wire<…>` over the type of the same name in the `shared` workspace
-  (ADR-0006), and the unions the client uses (`BOOK_STATUSES`, …) are
-  re-exported from it, each only once something imports it — `BookForm`
-  lists its radios from `BOOK_STATUSES`. What stays local is client-only:
-  labels, `chapterStateOf` and the other helpers, and the request payloads
-  beside each API call. Dates cross the wire as ISO strings, not `Date`,
-  throughout — `shared` types them as `Date`, the way the server holds them,
-  and `Wire<T>` turns each into the string it arrives as.
-- `src/test/` — `setup.ts` (jsdom polyfills, see Testing below),
-  `renderWithProviders.tsx` (wraps a component in a `QueryClientProvider`
-  — the outermost provider — then the Redux `Provider`, antd's
-  `ConfigProvider` and a `MemoryRouter`, and returns `{ store, queryClient
-}`; pass `path` alongside `route` for a page that reads route params, or
-  `useParams()` returns an empty object and the page queries `NaN`),
-  `queryClient.ts` (`createTestQueryClient`, the fresh-per-render
-  client `renderWithProviders` defaults to), `httpFixtures.ts` (minimal
-  `Response`-shaped fixtures, since jsdom has no `fetch`/`Response`),
-  `sortable.ts` (`layOutSortableRows` and `moveWithKeyboard`, see Testing) and
-  `styleMock.ts` (the CSS-import mock `jest.config.mjs` maps `\.css$` to).
-- `config/webpack.common.js` — shared config, exported as `(isDevelopment) => Configuration`
-- `config/webpack.dev.js` / `config/webpack.prod.js` — env overlays. Each
-  spreads `common(isDevelopment)` into a plain object and extends it by hand:
-  its own `plugins` appended after the shared ones, its file-name patterns
-  added to `output`, and the keys only it sets (`mode`, `devtool`, and
-  `devServer` or `optimization`). There is no merge helper: those two are the
-  only keys both files set. Every loader rule, CSS included, lives in
-  `common` and branches on `isDevelopment`
-- `tsconfig.json` — extends the repo-root `tsconfig.base.json` (strict,
-  `skipLibCheck`, the `noUnused*` family) and adds the browser specifics:
-  `noEmit`, `jsx: react-jsx`, `moduleResolution: Bundler`, target `ES2020`,
-  and the `@/*` → `./src/*` path mapping. `allowImportingTsExtensions` is on
-  for `shared`, not for this package: `shared` is type-checked as part of this
-  program, and its relative imports end in `.ts` because Node loads it too.
-  This package's own imports stay extensionless
-- `eslint.config.mjs` — calls `createConfig` (passing its own directory as
-  `tsconfigRootDir`) from the repo-root `eslint.config.base.mjs`, which
-  supplies the recommended sets, the repo-wide rules and the Prettier tail.
-  This file adds only the React + hooks + jsx-a11y block (including
-  `react/function-component-definition` set to `arrow-function`) and the
-  webpack-config override
-
-## Webpack
-
-The three config files live in `config/` and resolve every path against the
-package root (`const root = path.resolve(__dirname, '..')`, plus `context: root`),
-so they behave the same wherever webpack is invoked from.
-
-Entry is `src/index.tsx`; output goes to `build/` (cleaned on each build).
-
-- **Transpile** — `swc-loader` (`@swc/core`) over `src/` and the `shared`
-  workspace's source, `jsc.target: es2020`, automatic JSX runtime. `shared`
-  ships TypeScript, not a build, and webpack follows its workspace link to the
-  real path before matching a rule, so the `include` names that path through
-  `require.resolve('shared')`; without it the build cannot parse
-  `../shared/src/*.ts`. swc **strips types without checking them**, so
-  `fork-ts-checker-webpack-plugin` type-checks in a parallel process against
-  `tsconfig.json`; type errors fail the build and surface in the dev overlay.
-- **Dev** (`config/webpack.dev.js`) — port 3000, `historyApiFallback` for client-side
-  routes, `static: false` (there is no static passthrough folder — assets are
-  imported from `src/` and go through the bundler). Fast Refresh comes from
-  `@pmmmwh/react-refresh-webpack-plugin` plus swc's `transform.react.refresh`;
-  **both must stay enabled together** or refresh silently breaks.
-  `/api` is proxied to `http://localhost:4000` (the Express server), so the
-  browser only ever talks to one origin in development.
-- **Prod** (`config/webpack.prod.js`) — `[contenthash]` filenames under `static/js`,
-  `static/css`, `static/media`; `runtimeChunk: 'single'` and a `vendors`
-  cache group so vendor hashes stay stable across app-only changes; CSS
-  extracted via `mini-css-extract-plugin` and minified by `css-minimizer-webpack-plugin`.
-  Source maps are emitted for both builds.
-- **Assets** — images under 8 KB inline as data URIs, larger ones and fonts emit
-  to `static/media`. CSS is handled by `style-loader` in dev and extracted in prod.
-
-The webpack configs are CommonJS (`require`), unlike everything in `src/`;
-`eslint.config.mjs` has a dedicated block giving them Node globals and turning
-off `@typescript-eslint/no-require-imports`.
-
-## TypeScript
-
-- Strict mode is enabled (`tsconfig.json`). Avoid `any`; prefer `unknown` or a
-  proper type, and add a comment if `any` is truly unavoidable.
-  `@typescript-eslint/no-explicit-any` is enforced as an error.
-- `tsconfig` is `noEmit` — webpack produces the build; `tsc` only checks types.
-- `no-console` is a warning here, inherited from `eslint.config.base.mjs`. Client
-  code has none today; use a proper logger rather than silencing it.
-- **Three typed lint rules** run over every `.ts`/`.tsx` file with type
-  information from this package's `tsconfig.json` (`projectService`, rooted
-  at `import.meta.dirname` in `eslint.config.mjs`): `no-floating-promises`,
-  `no-misused-promises` and `await-thenable`, all errors. The only hits were
-  the four auth modals handing an async `onFinish` straight to antd's
-  `Form`; they now read `onFinish={(values) => void handleFinish(values)}` —
-  `void` because `handleFinish` reports its own failure in the form. Mark a
-  deliberate fire-and-forget the same way, with the reason beside it; never
-  with an `eslint-disable`. The webpack configs, `jest.config.mjs` and
-  `eslint.config.mjs` are JavaScript and are linted without types.
-- `noUncheckedIndexedAccess` is on (root `tsconfig.base.json`), so
-  `items[0]` is `T | undefined`. Component code handles the miss — `?.`/`??`
-  where absence is legitimate, an early return otherwise; tests
-  (`*.test.ts(x)` and `src/test/`) may write `items[0]!`, since a miss fails
-  the test anyway.
-
-## Testing
-
-`npm test` runs Jest against jsdom, transformed by `@swc/jest` — the same
-`@swc/core` webpack uses, so tests and bundle share one transform and no
-Babel config exists. Tests are co-located (`Button.tsx` → `Button.test.tsx`).
-
-The `test` script is not plain `jest`:
-
-```
-cross-env NODE_OPTIONS=--experimental-vm-modules jest
-```
-
-The flag is load-bearing, not incidental. `react-router` 8 is ESM-only — its
-`package.json` is `"type": "module"` with no `require` condition — and its
-package root re-exports server-runtime code (cookie signing, etc.) that uses
-`import.meta`, which Jest's default CJS loader cannot parse.
-`--experimental-vm-modules` is what lets Jest load that code at all; without it
-34 of the 54 suites fail.
-
-Two details of the wrapping matter. `jest` is invoked by name rather than
-through `node_modules/jest/bin/jest.js`, because npm workspaces hoist Jest to
-the repo-root `node_modules` and no such path exists under `client/`; the bare
-name resolves through `node_modules/.bin` on `PATH` whether or not npm hoists.
-And `cross-env` sets the variable portably — npm runs scripts through
-`cmd.exe` on Windows, where a bare `NODE_OPTIONS=... jest` prefix is a syntax
-error.
-
-- **`jest.config.mjs` carries
-  `transformIgnorePatterns: ['/node_modules/(?!react-router/)']`.** Jest
-  ignores all of `node_modules` for transformation by default; `react-router`
-  is carved out of that ignore list so it gets transformed like first-party
-  code, because it ships ESM only. Removing this line breaks every test that
-  touches routing. `antd` needs no such exception — it still ships CJS.
-  Neither does `shared`: Jest resolves its workspace link to `shared/src`,
-  a path outside `node_modules`, so it is transformed like first-party code.
-- **`src/test/setup.ts` polyfills four things jsdom does not implement,**
-  each confirmed necessary by removing it and watching tests fail:
-  - `matchMedia` and `ResizeObserver` — antd's `Modal`, `Menu` and other
-    responsive helpers call them on mount.
-  - `TextEncoder` / `TextDecoder` — react-router's server-runtime builds a
-    `TextEncoder` at module scope, so merely importing `react-router` throws
-    before any test body runs unless this is polyfilled globally.
-  - `MessageChannel` — antd's `Form` (via `@rc-component/form`'s field
-    registration/watch mechanism) constructs one unconditionally on every
-    `Form.Item` mount to schedule a macrotask, so no antd `Form` — none of
-    the four auth modals included — can mount in a test without it.
-- **Drag and drop is tested from the keyboard, over a faked layout.** jsdom
-  lays nothing out, so every element measures as a zero rect and dnd-kit's
-  keyboard coordinates find no row to move past. `layOutSortableRows()` in
-  `src/test/sortable.ts` spies on `getBoundingClientRect` to stack the
-  elements marked `data-sortable-row` in document order (call the function it
-  returns to restore), and `moveWithKeyboard` performs what a keyboard user
-  does — focus the handle, Space, arrows, Space. A pointer drag is not tested:
-  the keyboard path runs through the same `onDragEnd`. `SortableList.test`
-  covers the list itself, and each page that saves an order covers the save,
-  the rollback and the 409 through it.
-- **The API is mocked per test, not the network.** Component and query
-  tests `jest.mock('@/api/auth')` or `'@/api/books')` and drive the mock;
-  only `src/api/*.test.ts` stubs `window.fetch` directly, against the
-  `Response`-shaped fixtures in `httpFixtures.ts`. There is no MSW. Because
-  every other test mocks it, each module in `src/api/` has its own test
-  pinning the request contract — method, exact URL and query encoding, JSON
-  body (none on a GET), the `X-XSRF-Token` header on every write and none on a
-  read, and how a success and a typical error come back. A new API function
-  gets a case there, or nothing checks what it sends.
-  `src/test/renderWithProviders.tsx` wraps a component in a
-  `QueryClientProvider`, the Redux `Provider`, antd's `ConfigProvider` and
-  a `MemoryRouter`, and returns both the store and the query client so a
-  test can seed a session (`queryClient.setQueryData(queryKeys.session,
-user)`) or a UI action (`store.dispatch(openResetConfirm(token))`).
-  Its client comes from `src/test/queryClient.ts` and is **fresh per
-  render** — a shared one leaks cached data between tests — with
-  `staleTime: Infinity` so seeded data is never refetched behind a test's
-  back, and `gcTime: Infinity` so no timer outlives the test.
-- **Tests render without antd's runtime styles.** `renderWithProviders` passes
-  `zeroRuntime: true` to `ConfigProvider` on top of `appTheme`: the DOM, class
-  names and tokens are unchanged, but no CSS-in-JS rules are injected. With
-  them, jsdom's `getComputedStyle` — called by every `*ByRole({ name })`
-  query, user-event's pointer-events check and antd's popup alignment —
-  matched each element against ~1,400 rules, cold after every render and
-  piling up across a file's tests; single tests reached Jest's 5 s timeout
-  under a coverage run, and the full run took ~27 s against ~18 s now. The
-  price is that a role query no longer treats an element hidden only by
-  antd's stylesheet as hidden. A test that renders without the helper pays
-  the old cost. Waiting on cheap text first and calling `getByRole` once is
-  also faster than a `findByRole` polling through a loading phase.
-- **An Avatar or a Cover `<img>` is queried by `src`, never by role.**
-  `AccountAvatar` is `aria-hidden` end to end and `BookCover`'s image is
-  `alt=""`, so `screen.getByRole('img')` finds neither — and even where an
-  image is not hidden, antd's own icon spans already answer to `role="img"`,
-  so a bare role query is ambiguous. Reach for
-  `container.querySelector('img[src="..."]')` instead, naming the exact URL:
-  a card can show a book's Cover and several Co-authors' Avatars side by
-  side, and only the `src` tells them apart.
-
-### What a component test must cover
-
-Every component has a `ComponentName.test.tsx` next to it, asserting:
-
-1. It renders with its default and required props.
-2. It behaves correctly across prop variants — `disabled`, `loading`, empty,
-   error, and whatever else changes the output.
-3. User interaction, driven by `userEvent` (preferred) or `fireEvent`.
-
-Test the inputs and the outputs: props in, rendered DOM and fired callbacks
-out. Do not assert on internal state — a test that knows how a component
-stores something breaks on every refactor that changes nothing a user sees.
-
-Every component and page has a test file.
-
-An antd `Menu` item cannot be activated from the keyboard in a test: the
-menu's handler checks `event.which === 13`, and user-event never sets
-`which`. Its keyboard support is antd's, so test a menu item by clicking it
-and do not synthesise a `which` to force the keyboard path.
+Import the folder, never a file inside it
+(`@/components/organisms/BookCard`). The `@/` alias is set in three places that
+must agree: `paths` in `tsconfig.json` (no `baseUrl`, which errors as `TS5101`
+in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
+`config/webpack.common.js` and `moduleNameMapper` in `jest.config.mjs`.
 
 ## Conventions
 
-- Functional components with hooks only — no class components, with the single
-  `ErrorBoundary` exception noted under Page loading and errors above.
-- **Components are arrow functions assigned to a `const` and typed with `FC`**,
-  never `function` declarations:
-
-  ```tsx
-  import type { FC } from 'react';
-
-  type Props = { book: PublicBook };
-
-  export const BookCard: FC<Props> = ({ book }) => { ... };
-  ```
-
-  Write `FC`, imported as a named type — not `React.FC`. They are the same
-  type, but the automatic JSX runtime (`jsx: react-jsx`) means no file in
-  `src/` imports the `React` namespace, and pulling one in for the prefix adds
-  an import for nothing. A component with no props is
-  `export const AppHeader: FC = () => { ... }`.
-
-  `@types/react` 19 gives `FC` **no implicit `children`** (that was dropped in
-  v18), so a component accepting children must declare
-  `children: ReactNode` in its own `Props`.
-
-  This covers components only; plain helpers and custom hooks keep whichever
-  form reads best. The arrow half is **enforced**:
-  `react/function-component-definition` is set to `arrow-function` in
-  `eslint.config.mjs`, so `lint` fails on a `function` component and
-  `lint:fix` rewrites it. That rule does not add the `FC` annotation — that
-  half is convention, checked in review.
-
-- Do not mutate state directly — use setter functions or immutable updates.
-- **Named exports everywhere, except `src/index.tsx`,
-  `src/test/styleMock.ts` and the ambient declaration in
-  `src/types/css.d.ts`.** `index.tsx` is the webpack entry: it is never
-  imported by anything, so what it exports is moot. `App` used to default-export
-  too, as the app root; once it moved into a component folder behind a barrel
-  it became an ordinary named export like the rest. The other two are not
-  choices at all — each matches a tool's contract. Jest's `moduleNameMapper`
-  requires the module it maps `\.css$` imports to resolve to a default export,
-  so `styleMock.ts` provides one. `css-loader` with `modules` on emits a CSS
-  Module's class-name map as that module's default export, so
-  `declare module '*.module.css'` has to describe it as one — and that file
-  types other people's modules rather than exporting anything of its own.
-  Every component, hook, slice and type elsewhere is a named export.
-- The client talks to the API only through `src/api/client.ts`. Its
-  `request<T>()` prefixes every path with `/api` and sends
-  `credentials: 'include'` — without that, the browser withholds the
-  httpOnly `sid` cookie and every authenticated call fails as a 401.
-  Components reach it through `src/queries/`, never directly; a `queryFn`
-  calling `fetch` itself would drop `credentials: 'include'` and turn every
-  authenticated call into a 401.
+- **Components are `const` arrow functions typed with `FC`**, imported as a
+  named type, not `React.FC` (nothing imports the `React` namespace under the
+  automatic runtime). Lint enforces the arrow; `FC` is checked in review.
+  `FC` has no implicit `children`: declare `children: ReactNode` in `Props`.
+  Helpers and hooks take whichever form reads best.
+- **Named exports everywhere**, except where a tool's contract needs a default:
+  `src/index.tsx` (the entry), `src/test/styleMock.ts` (Jest's CSS mapping) and
+  the `*.module.css` declaration in `src/types/css.d.ts`.
+- **`ErrorBoundary` is the one class component**: React has no hook for
+  `getDerivedStateFromError`. It defines nothing else, because React already
+  logs an uncaught render error and the client has no logger.
+- **Every call goes `component → src/queries → src/api → request()`.** A call
+  that skips `request()` loses `credentials: 'include'` (every authenticated
+  call becomes 401) and the CSRF header.
+- **Types come from `shared`** through `Wire<T>`: dates cross the wire as ISO
+  strings. `src/types/` adds only client-side labels, helpers and request
+  payloads. Format a date through `src/format/date.ts` only (fixed `en` locale,
+  the browser's time zone).
+- **`noUncheckedIndexedAccess`**: component code handles a miss with `?.`/`??`
+  or an early return; only tests (`*.test.ts(x)`, `src/test/`) may write `!`.
+- **A fire-and-forget promise is marked `void`** with the reason beside it, as
+  in `onFinish={(values) => void handleFinish(values)}`. The typed lint rules
+  take no `eslint-disable`.
+- `no-console` warns; client code has none.
