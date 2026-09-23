@@ -1,10 +1,11 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Checkbox, Form, Input, Modal, theme } from 'antd';
+import { Alert, Button, Checkbox, Form, Input, Modal } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { closeModal, openModal } from '@/store/authSlice';
 import { useRegister } from '@/queries/auth';
 import { ApiError } from '@/api/client';
+import styles from './RegisterModal.module.css';
 
 interface RegisterValues {
   login: string;
@@ -29,7 +30,6 @@ const conflictField = (details: unknown): 'login' | 'email' | null => {
 };
 
 export const RegisterModal: FC = () => {
-  const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const [form] = Form.useForm<RegisterValues>();
   const register = useRegister();
@@ -75,11 +75,7 @@ export const RegisterModal: FC = () => {
       footer={null}
     >
       {formError !== null && (
-        <Alert
-          type="error"
-          title={formError}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={formError} className={styles.error} />
       )}
 
       {/* void: handleFinish reports its own failure in the form, so nothing

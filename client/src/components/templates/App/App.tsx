@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { FC } from 'react';
-import { App as AntdApp, ConfigProvider, Layout, Spin, theme } from 'antd';
+import { StyleProvider } from '@ant-design/cssinjs';
+import { App as AntdApp, ConfigProvider, Layout, Spin } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
@@ -10,6 +11,7 @@ import { AppHeader } from '@/components/organisms/AppHeader';
 import { AuthModals } from '@/components/organisms/AuthModals';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary';
 import { appTheme } from '@/theme/tokens';
+import styles from './App.module.css';
 
 // Pages are the only code-split modules: AppHeader, AuthModals and the store
 // render on every route, so splitting them would buy nothing. Each page is a
@@ -71,25 +73,19 @@ const SearchPage = lazy(() =>
 // test cannot point at an arbitrary path. Route tests wrap this in
 // MemoryRouter instead.
 export const AppShell: FC = () => {
-  const { token } = theme.useToken();
   const { pathname } = useLocation();
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout className={styles.layout}>
       <AppHeader />
-      <Layout.Content style={{ padding: token.paddingLG }}>
+      <Layout.Content className={styles.content}>
         {/* One boundary and one fallback for every route, both inside the
             content area so the header and the auth modals survive a page
             that throws or a chunk still in flight. Keyed by pathname so a
             caught error clears on the next navigation. */}
         <ErrorBoundary key={pathname}>
           <Suspense
-            fallback={
-              <Spin
-                size="large"
-                style={{ display: 'block', margin: `${token.marginXXL}px 0` }}
-              />
-            }
+            fallback={<Spin size="large" className={styles.fallback} />}
           >
             <Routes>
               <Route path="/" element={<MainPage />} />
@@ -137,16 +133,22 @@ export const App: FC = () => {
     // store. It matches renderWithProviders, where the nesting has to agree.
     <QueryClientProvider client={queryClient}>
       <Provider store={store}>
-        {/* antd's App must sit inside ConfigProvider to pick up its tokens and
-            style reset. `appTheme` merges our quarks into antd's token set —
-            see CLAUDE.md, Atomic Design, Quarks. */}
-        <ConfigProvider theme={appTheme}>
-          <AntdApp>
-            <BrowserRouter>
-              <AppShell />
-            </BrowserRouter>
-          </AntdApp>
-        </ConfigProvider>
+        {/* `layer` puts antd's styles in `@layer antd`, so a component's
+            `.module.css` outranks them without a specificity contest —
+            antd's Typography selectors (`div.ant-typography`) would beat a
+            lone class otherwise. See docs/adr/0009-css-modules-over-inline-styles.md. */}
+        <StyleProvider layer>
+          {/* antd's App must sit inside ConfigProvider to pick up its tokens
+              and style reset. `appTheme` merges our quarks into antd's token
+              set — see CLAUDE.md, Atomic Design, Quarks. */}
+          <ConfigProvider theme={appTheme}>
+            <AntdApp>
+              <BrowserRouter>
+                <AppShell />
+              </BrowserRouter>
+            </AntdApp>
+          </ConfigProvider>
+        </StyleProvider>
       </Provider>
     </QueryClientProvider>
   );

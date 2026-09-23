@@ -3,6 +3,7 @@ import { Button, Space, theme, Typography } from 'antd';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { LikeButton } from '@/components/molecules/LikeButton';
 import { formatDate } from '@/format/date';
+import styles from './Comment.module.css';
 import type { CommentWithAuthor, Tombstone } from '@/types/comment';
 
 const TOMBSTONE_LABELS: Record<Tombstone, string> = {
@@ -44,7 +45,7 @@ export const Comment: FC<CommentProps> = ({
   // removing was meant to take away.
   if (comment.tombstone !== null) {
     return (
-      <article style={{ marginBottom: token.marginSM }}>
+      <article className={styles.comment}>
         <Typography.Text type="secondary" italic>
           {TOMBSTONE_LABELS[comment.tombstone]}
         </Typography.Text>
@@ -53,7 +54,7 @@ export const Comment: FC<CommentProps> = ({
   }
 
   return (
-    <article style={{ marginBottom: token.marginSM }}>
+    <article className={styles.comment}>
       <Space size={token.marginXS}>
         {comment.author && (
           <AccountAvatar
@@ -72,7 +73,7 @@ export const Comment: FC<CommentProps> = ({
         </Typography.Text>
       </Space>
 
-      <Typography.Paragraph style={{ marginBottom: token.marginXS }}>
+      <Typography.Paragraph className={styles.text}>
         {comment.text}
       </Typography.Paragraph>
 

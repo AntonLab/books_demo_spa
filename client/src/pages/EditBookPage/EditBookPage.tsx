@@ -6,7 +6,6 @@ import {
   Popconfirm,
   Skeleton,
   Space,
-  theme,
   Typography,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -19,9 +18,9 @@ import { useSession } from '@/queries/auth';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
+import styles from './EditBookPage.module.css';
 
 export const EditBookPage: FC = () => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const bookId = Number(useParams().id);
 
@@ -80,13 +79,9 @@ export const EditBookPage: FC = () => {
       <Typography.Title level={2}>Edit book</Typography.Title>
       <Link to={`/books/${book.id}`}>View the book page</Link>
 
-      <div style={{ marginTop: token.margin }}>
+      <div className={styles.body}>
         {update.isSuccess && (
-          <Alert
-            type="success"
-            title="Saved."
-            style={{ marginBottom: token.margin }}
-          />
+          <Alert type="success" title="Saved." className={styles.alert} />
         )}
         <BookForm
           // Keyed by the last save, so the fields reset to what the server

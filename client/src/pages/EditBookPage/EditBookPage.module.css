@@ -1,0 +1,7 @@
+.body {
+  margin-top: var(--ant-margin);
+}
+
+.alert {
+  margin-bottom: var(--ant-margin);
+}

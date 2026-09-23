@@ -21,6 +21,7 @@ import {
 } from '@/queries/coAuthors';
 import type { AuthorSummary } from '@/types/user';
 import type { DefaultOptionType } from 'antd/es/select';
+import styles from './CoAuthorManager.module.css';
 
 // A typed stand-in for antd's own `DefaultOptionType`, whose extra fields
 // fall back to an index signature typed `any`. Naming `avatarUrl` and `name`
@@ -82,11 +83,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
       <Typography.Title level={4}>Co-authors</Typography.Title>
 
       {failure && (
-        <Alert
-          type="error"
-          title={failure.message}
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="error" title={failure.message} className={styles.error} />
       )}
 
       <Listy
@@ -147,7 +144,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
           showSearch
           aria-label="Add a co-author"
           placeholder="Search authors by name or login"
-          style={{ width: '100%', marginTop: token.margin }}
+          className={styles.picker}
           // The server searches; filtering the returned page again would only
           // hide matches it found by first or last name.
           filterOption={false}

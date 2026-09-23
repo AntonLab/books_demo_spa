@@ -1,9 +1,10 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Result, theme } from 'antd';
+import { Alert, Button, Form, Input, Modal, Result } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
 import { closeModal, openModal } from '@/store/authSlice';
 import { useRequestReset } from '@/queries/auth';
+import styles from './ResetRequestModal.module.css';
 
 interface ResetRequestValues {
   email: string;
@@ -16,7 +17,6 @@ const CONFIRMATION =
   'If that email address has an account, a reset link is on its way.';
 
 export const ResetRequestModal: FC = () => {
-  const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const [form] = Form.useForm<ResetRequestValues>();
   const requestReset = useRequestReset();
@@ -49,11 +49,7 @@ export const ResetRequestModal: FC = () => {
       ) : (
         <>
           {formError !== null && (
-            <Alert
-              type="error"
-              title={formError}
-              style={{ marginBottom: token.margin }}
-            />
+            <Alert type="error" title={formError} className={styles.error} />
           )}
 
           {/* void: handleFinish reports its own failure in the form, so nothing
