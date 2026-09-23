@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Button, Dropdown, Layout, Menu, Skeleton, Space, theme } from 'antd';
+import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useAppDispatch } from '@/store/hooks';
@@ -9,9 +9,9 @@ import { useGenres } from '@/queries/genres';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { NotificationBell } from '@/components/organisms/NotificationBell';
+import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {
-  const { token } = theme.useToken();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,9 +65,7 @@ export const AppHeader: FC = () => {
   };
 
   return (
-    <Layout.Header
-      style={{ display: 'flex', alignItems: 'center', gap: token.margin }}
-    >
+    <Layout.Header className={styles.header}>
       {/* Two props the submenu needs:
           - `disabledOverflow`: rc-menu puts every child past the first into an
             overflowDisabled context unless this is set, and such a SubMenu
@@ -89,7 +87,7 @@ export const AppHeader: FC = () => {
         // is highlighted on its own page while / and /my-books keep working.
         selectedKeys={[`${location.pathname}${location.search}`]}
         onClick={({ key }) => void navigate(key)}
-        style={{ flex: 1, minWidth: 0 }}
+        className={styles.nav}
       />
 
       <SearchBar />
@@ -111,7 +109,7 @@ export const AppHeader: FC = () => {
               a non-interactive element here is invisible to keyboard
               navigation. A <Button> is focusable and Enter/Space-activated
               for free. */}
-            <Button type="text" style={{ color: token.colorTextLightSolid }}>
+            <Button type="text" className={styles.account}>
               <Space>
                 <AccountAvatar
                   avatarUrl={user.avatarUrl}

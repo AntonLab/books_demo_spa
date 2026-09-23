@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Alert, Button, Empty, Flex, Skeleton, theme } from 'antd';
+import styles from './SortableList.module.css';
 
 export interface SortableListItem {
   id: number;
@@ -57,16 +58,10 @@ const SortableRow: FC<{ item: SortableListItem }> = ({ item }) => {
       ref={setNodeRef}
       // What src/test/sortable.ts lays out in jsdom, which measures nothing.
       data-sortable-row
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        position: 'relative',
-        zIndex: isDragging ? 1 : undefined,
-        background: token.colorBgContainer,
-        boxShadow: isDragging ? token.boxShadowSecondary : undefined,
-        padding: `${token.paddingSM}px 0`,
-        borderBottom: `${token.lineWidth}px ${token.lineType} ${token.colorSplit}`,
-      }}
+      className={`${styles.row} ${isDragging ? styles.dragging : ''}`}
+      // dnd-kit recomputes these on every pointer move, so they cannot be a
+      // class.
+      style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <Flex align="center" gap={token.marginXS}>
         {/* The handle alone starts a drag, so the links and buttons in the row
@@ -77,13 +72,13 @@ const SortableRow: FC<{ item: SortableListItem }> = ({ item }) => {
           type="text"
           size="small"
           aria-label={`Reorder ${item.label}`}
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          className={styles.handle}
           {...attributes}
           {...listeners}
         >
           ⠿
         </Button>
-        <div style={{ flex: 1, minWidth: 0 }}>{item.content}</div>
+        <div className={styles.content}>{item.content}</div>
       </Flex>
     </li>
   );
@@ -158,9 +153,7 @@ export const SortableList: FC<SortableListProps> = ({
         items={items.map((item) => item.id)}
         strategy={verticalListSortingStrategy}
       >
-        {/* An ordered list for its meaning; the markers are hidden because the
-            order is shown by place, never by number. */}
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        <ol className={styles.list}>
           {items.map((item) => (
             <SortableRow key={item.id} item={item} />
           ))}
