@@ -36,7 +36,10 @@ export interface Models {
   Permission: typeof Permission;
 }
 
-export function initModels(sequelize: Sequelize): Models {
+// Phase one: every model registered on the connection. initModels calls this
+// before declareAssociations, so the ordering the two phases depend on is
+// enforced by its body rather than by the reader's attention.
+function initEachModel(sequelize: Sequelize): void {
   initUserModel(sequelize);
   initUserAvatarModel(sequelize);
   // Reference data, unrelated to any row — no association block follows it.
@@ -55,9 +58,12 @@ export function initModels(sequelize: Sequelize): Models {
   initNotificationModel(sequelize);
   initSessionModel(sequelize);
   initPasswordResetTokenModel(sequelize);
+}
 
-  // Associations are declared after every model is initialised, so the target
-  // is always a registered model no matter what order the files load in.
+// Phase two: the associations. Declared after every model is initialised, so
+// the target is always a registered model no matter what order the files load
+// in.
+function declareAssociations(): void {
   // An Account's Avatar (S1/S3, ADR-0007): one row, cascading with the
   // Account — deleting a User removes its Avatar with no application code.
   User.hasOne(UserAvatar, {
@@ -309,6 +315,11 @@ export function initModels(sequelize: Sequelize): Models {
     onUpdate: 'CASCADE',
   });
   Notification.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+}
+
+export function initModels(sequelize: Sequelize): Models {
+  initEachModel(sequelize);
+  declareAssociations();
 
   return {
     User,

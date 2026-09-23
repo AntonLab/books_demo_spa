@@ -1,0 +1,120 @@
+import type { FC } from 'react';
+import { Alert, Button, Popconfirm, Space, Tag, theme, Typography } from 'antd';
+import { Link } from 'react-router';
+import { SortableList } from '@/components/organisms/SortableList';
+import { ApiError } from '@/api/client';
+import {
+  useRemoveBookFromSeries,
+  useReorderSeriesBooks,
+  useSeriesBooks,
+} from '@/queries/series';
+import { BOOK_STATUS_LABELS } from '@/types/book';
+import type { SeriesBookSummary } from '@/types/series';
+
+interface SeriesOrderListProps {
+  seriesId: number;
+  // Passed in rather than derived here: useSeriesBooks below stays disabled
+  // until the page knows the viewer may edit the series, and a session this
+  // component fetched itself would re-open the query before the permission is
+  // known.
+  mayEdit: boolean;
+  isModerator: boolean;
+  viewerId: number;
+}
+
+// A series' books in Series order (CONTEXT.md), with the save-on-drop that
+// rewrites it and the way out of the series. An organism: it owns the book
+// list query and two mutations.
+export const SeriesOrderList: FC<SeriesOrderListProps> = ({
+  seriesId,
+  mayEdit,
+  isModerator,
+  viewerId,
+}) => {
+  const { token } = theme.useToken();
+  const books = useSeriesBooks(seriesId, mayEdit);
+  const reorder = useReorderSeriesBooks(seriesId);
+  const takeOut = useRemoveBookFromSeries(seriesId);
+
+  const reorderConflict =
+    reorder.error instanceof ApiError && reorder.error.status === 409;
+
+  // A Draft book filed here is listed to every Co-author of the series, so they
+  // can order it, but opens only for its own Co-authors and Moderators: for
+  // anyone else it is named rather than linked.
+  const bookRow = (book: SeriesBookSummary) => {
+    const readable =
+      book.status !== 'draft' ||
+      isModerator ||
+      book.authors.some((author) => author.id === viewerId);
+
+    return (
+      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+        <Space wrap>
+          {readable ? (
+            <Link to={`/books/${book.id}`}>{book.title}</Link>
+          ) : (
+            <Typography.Text>{book.title}</Typography.Text>
+          )}
+          <Tag>{BOOK_STATUS_LABELS[book.status]}</Tag>
+          <Typography.Text type="secondary">
+            {book.authors
+              .map((author) => `${author.firstName} ${author.lastName}`)
+              .join(', ')}
+          </Typography.Text>
+        </Space>
+        <Popconfirm
+          title="Take this book out of the series?"
+          description="The book stays. Filing it again puts it at the end."
+          okText="Take it out"
+          onConfirm={() => takeOut.mutate(book.id)}
+        >
+          <Button
+            size="small"
+            loading={takeOut.isPending && takeOut.variables === book.id}
+          >
+            Remove from series
+          </Button>
+        </Popconfirm>
+      </Space>
+    );
+  };
+
+  return (
+    <>
+      <Typography.Title level={4}>Books</Typography.Title>
+      {/* A 409 has already brought in the current list; this says why the
+          order just moved under the author's hands. */}
+      {reorder.error && (
+        <Alert
+          type={reorderConflict ? 'warning' : 'error'}
+          title={
+            reorderConflict
+              ? 'A co-author changed the books of this series while you were reordering them. This is their current order.'
+              : 'Could not save the new book order.'
+          }
+          style={{ marginBottom: token.margin }}
+        />
+      )}
+      {takeOut.error && (
+        <Alert
+          type="error"
+          title={takeOut.error.message}
+          style={{ marginBottom: token.margin }}
+        />
+      )}
+      <SortableList
+        items={(books.data?.items ?? []).map((book) => ({
+          id: book.id,
+          label: book.title,
+          content: bookRow(book),
+        }))}
+        isPending={books.isPending}
+        isError={books.isError}
+        errorText="Could not load the books of this series."
+        emptyText="No books in this series yet. File one into it from the book's edit page."
+        onReorder={(bookIds) => reorder.mutate(bookIds)}
+      />
+    </>
+  );
+};
