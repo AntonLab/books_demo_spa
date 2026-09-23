@@ -365,9 +365,9 @@ Each layer answers a question the others cannot:
 - `src/sessionCookie.ts` — the `sid` cookie's name, TTL, and the shared
   set/clear helpers, which set and clear the `xsrfToken` cookie beside it
 - `src/delivery/resetDelivery.ts` — the `ResetDelivery` interface,
-  `resetUrl()`, the logger-backed implementation that is the only sink so
-  far, and `createResetDelivery(kind, …)`, which builds the one
-  `RESET_DELIVERY` names (`RESET_DELIVERY_KINDS`)
+  `resetUrl()` and `createLoggerResetDelivery()`, the only sink so far.
+  `RESET_DELIVERY` accepts just `log`; a real mailer adds a second value
+  there and the switch in `index.ts` it would then need
 - `src/images.ts` — the one module every `sharp` call lives in:
   `processCoverImage`/`processAvatarImage`, each a decode-and-reencode
   pipeline for its own frame size (CONTEXT.md, ADR-0007)
