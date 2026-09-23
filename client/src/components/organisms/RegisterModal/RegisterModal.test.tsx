@@ -4,14 +4,14 @@ import { RegisterModal } from './RegisterModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
-import { createAppStore } from '@/store';
-import { openModal } from '@/store/authSlice';
 import { queryKeys } from '@/queries/keys';
 import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/auth');
 
 const mockedAuth = jest.mocked(authApi);
+const onOpen = jest.fn();
+const onClose = jest.fn();
 
 const user: PublicUser = {
   id: 1,
@@ -41,7 +41,7 @@ beforeEach(() => {
 
 describe('RegisterModal validation', () => {
   it('rejects a login shorter than the server minimum of 3', async () => {
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await userEvent.type(screen.getByLabelText('Login'), 'ab');
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -53,7 +53,7 @@ describe('RegisterModal validation', () => {
   });
 
   it('rejects a password shorter than the server minimum of 8', async () => {
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await userEvent.type(screen.getByLabelText('Password'), 'short');
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -64,7 +64,7 @@ describe('RegisterModal validation', () => {
   });
 
   it('rejects a mismatched confirmation', async () => {
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await userEvent.type(screen.getByLabelText('Password'), 'secret123');
     await userEvent.type(
@@ -82,7 +82,7 @@ describe('RegisterModal validation', () => {
 describe('RegisterModal submission', () => {
   it('sends every server field and never sends confirm', async () => {
     mockedAuth.register.mockResolvedValue(user);
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -105,9 +105,9 @@ describe('RegisterModal submission', () => {
 
   it('caches the user and closes the modal on success', async () => {
     mockedAuth.register.mockResolvedValue(user);
-    const store = createAppStore();
-    store.dispatch(openModal('register'));
-    const { queryClient } = renderWithProviders(<RegisterModal />, { store });
+    const { queryClient } = renderWithProviders(
+      <RegisterModal onOpen={onOpen} onClose={onClose} />
+    );
 
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -115,13 +115,13 @@ describe('RegisterModal submission', () => {
     await waitFor(() => {
       expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
     });
-    expect(store.getState().auth.activeModal).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('registers as a plain user when the box is left alone', async () => {
     mockedAuth.register.mockResolvedValue(user);
 
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
@@ -137,7 +137,7 @@ describe('RegisterModal submission', () => {
   it('registers as an author when the box is ticked', async () => {
     mockedAuth.register.mockResolvedValue({ ...user, role: 'author' });
 
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
     await fillInTheForm();
     await userEvent.click(screen.getByRole('checkbox', { name: "I'm author" }));
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -155,7 +155,7 @@ describe('RegisterModal conflict handling', () => {
     mockedAuth.register.mockRejectedValue(
       new ApiError(409, 'login is already taken', { field: 'login' })
     );
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -171,7 +171,7 @@ describe('RegisterModal conflict handling', () => {
     mockedAuth.register.mockRejectedValue(
       new ApiError(409, 'email is already taken', { field: 'email' })
     );
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
@@ -185,7 +185,7 @@ describe('RegisterModal conflict handling', () => {
     mockedAuth.register.mockRejectedValue(
       new ApiError(500, 'Internal Server Error')
     );
-    renderWithProviders(<RegisterModal />);
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await fillInTheForm();
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));

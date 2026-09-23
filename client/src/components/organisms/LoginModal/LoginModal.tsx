@@ -1,9 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Space } from 'antd';
-import { useAppDispatch } from '@/store/hooks';
-import { closeModal, openModal } from '@/store/authSlice';
 import { useLogin } from '@/queries/auth';
+import type { AuthModalProps } from '@/components/organisms/AuthModals';
 import styles from './LoginModal.module.css';
 
 interface LoginValues {
@@ -11,8 +10,7 @@ interface LoginValues {
   password: string;
 }
 
-export const LoginModal: FC = () => {
-  const dispatch = useAppDispatch();
+export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   const [form] = Form.useForm<LoginValues>();
   const login = useLogin();
   // `submitting` is gone — the mutation tracks it.
@@ -23,8 +21,7 @@ export const LoginModal: FC = () => {
 
     try {
       await login.mutateAsync(values);
-      // The reducer no longer sees the API result, so the modal closes itself.
-      dispatch(closeModal());
+      onClose();
     } catch (error) {
       // Form level, never on a field: the server answers an unknown login and
       // a wrong password identically on purpose, and guessing which one was
@@ -34,12 +31,7 @@ export const LoginModal: FC = () => {
   };
 
   return (
-    <Modal
-      open
-      title="Log in"
-      onCancel={() => dispatch(closeModal())}
-      footer={null}
-    >
+    <Modal open title="Log in" onCancel={onClose} footer={null}>
       {formError !== null && (
         <Alert type="error" title={formError} className={styles.error} />
       )}
@@ -79,13 +71,10 @@ export const LoginModal: FC = () => {
         </Form.Item>
 
         <Space>
-          <Button
-            type="link"
-            onClick={() => dispatch(openModal('resetRequest'))}
-          >
+          <Button type="link" onClick={() => onOpen('resetRequest')}>
             Forgot password?
           </Button>
-          <Button type="link" onClick={() => dispatch(openModal('register'))}>
+          <Button type="link" onClick={() => onOpen('register')}>
             Create an account
           </Button>
         </Space>

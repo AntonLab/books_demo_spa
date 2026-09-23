@@ -148,6 +148,26 @@ A free-form label a Book's or Series' Co-authors attach to it, any number of
 them and from no list.
 _Avoid_: Genre (for a Tag), keyword
 
+**Unsaved text**:
+What an Account has typed into a new or an existing Comment or Chapter but not
+yet sent. It exists only on the Account's device, one per place it was typed (a
+Book's Comment, a reply to one Comment, an edit of one Comment, one Chapter),
+survives a reload and the loss of a session, and is
+discarded once sent, when its Account signs out, or when another Account signs
+in on that device. If its place is gone (the Chapter or Book deleted, the
+Comment made a Tombstone, the Account no longer a Co-author), the Account is
+offered a copy before it is discarded. Unsaved text on a Chapter remembers the
+version it was typed against: when a Co-author has saved since, the Account
+chooses between that Co-author's version and its own, and nothing is
+overwritten silently. It is not a Draft book or a Draft chapter.
+_Avoid_: Draft (for text not yet sent)
+
+**Device preferences**:
+How the app looks and reads on one device, such as its theme or the reading
+font size. The server never sees them, so another device does not share them,
+and signing out keeps them.
+_Avoid_: Settings, Profile (both suggest something the Account keeps)
+
 ### Comments
 
 **Comment**:

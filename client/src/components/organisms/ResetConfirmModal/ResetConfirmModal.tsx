@@ -2,8 +2,6 @@ import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result } from 'antd';
 import { useNavigate } from 'react-router';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { closeModal } from '@/store/authSlice';
 import { useConfirmReset } from '@/queries/auth';
 import styles from './ResetConfirmModal.module.css';
 
@@ -13,24 +11,22 @@ interface ResetConfirmValues {
   confirm: string;
 }
 
-export const ResetConfirmModal: FC = () => {
-  const dispatch = useAppDispatch();
+interface Props {
+  token: string;
+}
+
+export const ResetConfirmModal: FC<Props> = ({ token }) => {
   const navigate = useNavigate();
-  const token = useAppSelector((state) => state.auth.resetToken);
   const [form] = Form.useForm<ResetConfirmValues>();
   const confirmReset = useConfirmReset();
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
-  const dismiss = () => {
-    dispatch(closeModal());
-    // replace, so the token is not left sitting in browser history.
-    void navigate('/', { replace: true });
-  };
+  // The token in the URL is what keeps this modal open, so leaving the page
+  // closes it. replace, so the token is not left sitting in browser history.
+  const dismiss = () => void navigate('/', { replace: true });
 
   const handleFinish = async (values: ResetConfirmValues) => {
-    if (!token) return;
-
     setFormError(null);
 
     try {
@@ -47,13 +43,7 @@ export const ResetConfirmModal: FC = () => {
 
   return (
     <Modal open title="Choose a new password" onCancel={dismiss} footer={null}>
-      {!token ? (
-        <Result
-          status="warning"
-          title="This reset link is missing its token."
-          subTitle="Request a new link and try again."
-        />
-      ) : done ? (
+      {done ? (
         <Result
           status="success"
           title="Your password has been reset."

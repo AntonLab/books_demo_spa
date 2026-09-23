@@ -33,10 +33,10 @@ load-bearing:
   `TextEncoder`/`TextDecoder` (react-router builds one at import) and
   `MessageChannel` (every antd `Form.Item` mount).
 - `renderWithProviders` wraps the same providers as `App` around a
-  `MemoryRouter` and returns `{ store, queryClient }`, so a test seeds a session
-  with `queryClient.setQueryData(queryKeys.session, user)` or a UI action with
-  `store.dispatch(…)`. Pass `path` beside `route` for a page that reads params,
-  or `useParams()` is empty and the page queries `NaN`.
+  `MemoryRouter` and returns `{ queryClient }`, so a test seeds a session with
+  `queryClient.setQueryData(queryKeys.session, user)`. Pass `path` beside
+  `route` for a page that reads params, or `useParams()` is empty and the page
+  queries `NaN`.
 - Its query client is **fresh per render** (a shared one leaks cache between
   tests), with `retry: false` and `staleTime`/`gcTime: Infinity` so seeded data
   is never refetched and no timer outlives the test.
