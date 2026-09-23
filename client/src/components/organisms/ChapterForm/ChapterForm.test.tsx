@@ -228,4 +228,27 @@ describe('ChapterForm', () => {
       screen.getByText('A publication time cannot be in the past')
     ).toBeInTheDocument();
   });
+
+  it('reports edits of title and text, not of the publication controls', async () => {
+    const onValuesChange = jest.fn();
+    renderWithProviders(
+      <ChapterForm
+        initialValues={filled}
+        onSubmit={jest.fn()}
+        onValuesChange={onValuesChange}
+      />
+    );
+
+    await userEvent.type(screen.getByLabelText('Title'), '!');
+    expect(onValuesChange).toHaveBeenLastCalledWith({
+      title: 'Chapter One!',
+      text: 'It was a dark night.',
+    });
+
+    onValuesChange.mockClear();
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Publish immediately' })
+    );
+    expect(onValuesChange).not.toHaveBeenCalled();
+  });
 });
