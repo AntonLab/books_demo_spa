@@ -11,8 +11,8 @@ interface ErrorBoundaryState {
 }
 
 // The one class component in the client: React still exposes no hook
-// equivalent of getDerivedStateFromError. See CLAUDE.md, "Page loading and
-// errors", for why this is the documented exception rather than a new
+// equivalent of getDerivedStateFromError. See client/CLAUDE.md, Conventions,
+// for why this is the documented exception rather than a new
 // dependency.
 //
 // There is no componentDidCatch: React already logs an uncaught render error

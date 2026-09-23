@@ -15,8 +15,8 @@ import styles from './App.module.css';
 
 // Pages are the only code-split modules: AppHeader, AuthModals and the store
 // render on every route, so splitting them would buy nothing. Each page is a
-// named export, so `lazy` has to remap it onto `default` — see CLAUDE.md,
-// "Page loading and errors".
+// named export, so `lazy` has to remap it onto `default` — see
+// .claude/rules/client/pages.md.
 const AdminGenresPage = lazy(() =>
   import('@/pages/AdminGenresPage').then((m) => ({
     default: m.AdminGenresPage,
@@ -140,7 +140,7 @@ export const App: FC = () => {
         <StyleProvider layer>
           {/* antd's App must sit inside ConfigProvider to pick up its tokens
               and style reset. `appTheme` merges our quarks into antd's token
-              set — see CLAUDE.md, Atomic Design, Quarks. */}
+              set — see .claude/rules/client/styling.md. */}
           <ConfigProvider theme={appTheme}>
             <AntdApp>
               <BrowserRouter>
