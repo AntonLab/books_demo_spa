@@ -4,17 +4,14 @@ import { StyleProvider } from '@ant-design/cssinjs';
 import { App as AntdApp, ConfigProvider, Layout, Spin } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
-import { store } from '@/store';
 import { queryClient } from '@/queries/queryClient';
 import { AppHeader } from '@/components/organisms/AppHeader';
-import { AuthModals } from '@/components/organisms/AuthModals';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary';
 import { appTheme } from '@/theme/tokens';
 import styles from './App.module.css';
 
-// Pages are the only code-split modules: AppHeader, AuthModals and the store
+// Pages are the only code-split modules: AppHeader and the auth modals it holds
 // render on every route, so splitting them would buy nothing. Each page is a
 // named export, so `lazy` has to remap it onto `default` — see
 // .claude/rules/client/pages.md.
@@ -61,11 +58,6 @@ const NotFoundPage = lazy(() =>
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
 );
-const ResetPasswordRoute = lazy(() =>
-  import('@/pages/ResetPasswordRoute').then((m) => ({
-    default: m.ResetPasswordRoute,
-  }))
-);
 const SearchPage = lazy(() =>
   import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage }))
 );
@@ -90,7 +82,9 @@ export const AppShell: FC = () => {
           >
             <Routes>
               <Route path="/" element={<MainPage />} />
-              <Route path="/reset-password" element={<ResetPasswordRoute />} />
+              {/* The emailed reset link lands here; AuthModals reads its
+                  token and opens the confirm modal over the home page. */}
+              <Route path="/reset-password" element={<MainPage />} />
               {/* A static segment outranks `:id`, so /books/new never reaches
                   BookPage whatever order these are declared in. */}
               <Route path="/books/new" element={<NewBookPage />} />
@@ -122,35 +116,29 @@ export const AppShell: FC = () => {
           </Suspense>
         </ErrorBoundary>
       </Layout.Content>
-      <AuthModals />
     </Layout>
   );
 };
 
 export const App: FC = () => {
   return (
-    // Outermost, though the order is not forced: nothing in the Redux tree
-    // reads the query client through context and nothing in a query reads the
-    // store. It matches renderWithProviders, where the nesting has to agree.
     <QueryClientProvider client={queryClient}>
-      <Provider store={store}>
-        {/* `layer` puts antd's styles in `@layer antd`, so a component's
-            `.module.css` outranks them without a specificity contest —
-            antd's Typography selectors (`div.ant-typography`) would beat a
-            lone class otherwise. See docs/adr/0009-css-modules-over-inline-styles.md. */}
-        <StyleProvider layer>
-          {/* antd's App must sit inside ConfigProvider to pick up its tokens
-              and style reset. `appTheme` merges our quarks into antd's token
-              set — see .claude/rules/client/styling.md. */}
-          <ConfigProvider theme={appTheme}>
-            <AntdApp>
-              <BrowserRouter>
-                <AppShell />
-              </BrowserRouter>
-            </AntdApp>
-          </ConfigProvider>
-        </StyleProvider>
-      </Provider>
+      {/* `layer` puts antd's styles in `@layer antd`, so a component's
+          `.module.css` outranks them without a specificity contest —
+          antd's Typography selectors (`div.ant-typography`) would beat a
+          lone class otherwise. See docs/adr/0009-css-modules-over-inline-styles.md. */}
+      <StyleProvider layer>
+        {/* antd's App must sit inside ConfigProvider to pick up its tokens
+            and style reset. `appTheme` merges our quarks into antd's token
+            set — see .claude/rules/client/styling.md. */}
+        <ConfigProvider theme={appTheme}>
+          <AntdApp>
+            <BrowserRouter>
+              <AppShell />
+            </BrowserRouter>
+          </AntdApp>
+        </ConfigProvider>
+      </StyleProvider>
       <ReactQueryDevtools />
     </QueryClientProvider>
   );

@@ -11,7 +11,7 @@ npm workspaces.
 
 | Layer    | Technology                                                              |
 | -------- | ----------------------------------------------------------------------- |
-| Frontend | React 19, TypeScript, Redux Toolkit, React Router 8, antd 6, webpack 5  |
+| Frontend | React 19, TypeScript, TanStack Query, React Router 8, antd 6, webpack 5 |
 | Backend  | Node.js >= 24, Express 5, Sequelize 6 (MySQL via `mysql2`), zod, argon2 |
 | Tooling  | ESLint 9 (flat config), Prettier, Jest (client), `node:test` (server)   |
 

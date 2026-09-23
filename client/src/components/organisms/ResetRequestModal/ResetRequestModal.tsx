@@ -1,9 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result } from 'antd';
-import { useAppDispatch } from '@/store/hooks';
-import { closeModal, openModal } from '@/store/authSlice';
 import { useRequestReset } from '@/queries/auth';
+import type { AuthModalProps } from '@/components/organisms/AuthModals';
 import styles from './ResetRequestModal.module.css';
 
 interface ResetRequestValues {
@@ -16,8 +15,7 @@ interface ResetRequestValues {
 const CONFIRMATION =
   'If that email address has an account, a reset link is on its way.';
 
-export const ResetRequestModal: FC = () => {
-  const dispatch = useAppDispatch();
+export const ResetRequestModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   const [form] = Form.useForm<ResetRequestValues>();
   const requestReset = useRequestReset();
   const [sent, setSent] = useState(false);
@@ -38,12 +36,7 @@ export const ResetRequestModal: FC = () => {
   };
 
   return (
-    <Modal
-      open
-      title="Reset your password"
-      onCancel={() => dispatch(closeModal())}
-      footer={null}
-    >
+    <Modal open title="Reset your password" onCancel={onClose} footer={null}>
       {sent ? (
         <Result status="success" title={CONFIRMATION} />
       ) : (
@@ -82,7 +75,7 @@ export const ResetRequestModal: FC = () => {
               </Button>
             </Form.Item>
 
-            <Button type="link" onClick={() => dispatch(openModal('login'))}>
+            <Button type="link" onClick={() => onOpen('login')}>
               Back to log in
             </Button>
           </Form>
