@@ -7,8 +7,9 @@ TanStack Query (`src/queries/`), UI state in Redux Toolkit (`src/store/`,
 ## Topic rules
 
 The detail lives in `.claude/rules/client/`, one topic per file. Each loads on
-its own when you read a file its `paths:` names. When a change reaches a topic
-whose files you have not opened, read the rule first:
+its own when you Read a file its `paths:` names — writing or editing one does
+not. Before creating a file, or changing a topic whose files you have not
+read, read the rule first:
 
 | Rule            | Covers                                                                |
 | --------------- | --------------------------------------------------------------------- |
