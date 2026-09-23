@@ -9,7 +9,10 @@ import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { Book, Genre, initModels, Series } from '../models/index.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
-import { createSequelizeGenreRepository } from './genreRepository.ts';
+import {
+  assertGenreExists,
+  createSequelizeGenreRepository,
+} from './genreRepository.ts';
 import { genreRepositoryContract } from './genreRepository.contract.testkit.ts';
 
 // A schema of its own rather than another suite's: node:test runs spec files in
@@ -83,6 +86,36 @@ describe('genreRepository against real MySQL', { skip }, () => {
       (await createSequelizeBookRepository().findById(book.id))?.genre,
       null
     );
+  });
+
+  // Without the lock a Genre deleted between the check and the write trips the
+  // books/series foreign key, which reaches the client as an unmapped 500.
+  test('a Genre checked inside a transaction cannot be deleted until it ends', async () => {
+    const genre = await Genre.create({ name: 'Gothic' });
+
+    await sequelize.transaction(async (holder) => {
+      await assertGenreExists(genre.id, holder);
+
+      await sequelize.transaction(async (deleter) => {
+        await sequelize.query('SET SESSION innodb_lock_wait_timeout = 1', {
+          transaction: deleter,
+        });
+        try {
+          await assert.rejects(
+            Genre.destroy({ where: { id: genre.id }, transaction: deleter }),
+            /Lock wait timeout/
+          );
+        } finally {
+          // The session outlives the transaction in the pool.
+          await sequelize.query(
+            'SET SESSION innodb_lock_wait_timeout = DEFAULT',
+            {
+              transaction: deleter,
+            }
+          );
+        }
+      });
+    });
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
