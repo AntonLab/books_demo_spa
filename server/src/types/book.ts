@@ -1,5 +1,6 @@
 import { BOOK_STATUSES } from 'shared';
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The response shapes and the Book status union are the client's contract too,
 // so they live in the shared workspace (ADR-0006); the schemas stay here.
@@ -11,10 +12,10 @@ export {
   type SeriesBookSummary,
 } from 'shared';
 
-export const BOOK_TAG_MAX_LENGTH = 32;
-export const BOOK_MAX_TAGS = 20;
-export const BOOK_DESCRIPTION_MAX_LENGTH = 5000;
-export const BOOK_TITLE_MAX_LENGTH = 255;
+const BOOK_TAG_MAX_LENGTH = 32;
+const BOOK_MAX_TAGS = 20;
+const BOOK_DESCRIPTION_MAX_LENGTH = 5000;
+const BOOK_TITLE_MAX_LENGTH = 255;
 
 // Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
 // anyway — collapsing them here keeps what lands in the JSON column canonical.
@@ -23,7 +24,6 @@ const tagListSchema = z
   .max(BOOK_MAX_TAGS)
   .transform((tags) => [...new Set(tags)]);
 
-const idSchema = z.coerce.number().int().positive();
 const descriptionSchema = z.string().min(1).max(BOOK_DESCRIPTION_MAX_LENGTH);
 // Trimmed, unlike descriptionSchema and for the reason recorded in
 // types/chapter.ts: a title is echoed in every summary list, where stray
@@ -89,23 +89,6 @@ export const listBooksQuerySchema = z.object({
   q: z.string().min(1).max(200).optional(),
 });
 
-// Deliberately a local copy of the users' and series' param schema rather than
-// an import: the three resources share a shape today, not a reason to change
-// together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
-
-export const addCoAuthorSchema = z.object({
-  userId: idSchema,
-});
-
-export const coAuthorParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  userId: z.coerce.number().int().positive(),
-});
-
 export type CreateBookInput = z.infer<typeof createBookSchema>;
-export type AddCoAuthorInput = z.infer<typeof addCoAuthorSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookSchema>;
 export type ListBooksQuery = z.infer<typeof listBooksQuerySchema>;

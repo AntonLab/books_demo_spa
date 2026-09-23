@@ -339,19 +339,3 @@ export function initModels(sequelize: Sequelize): Models {
     Permission,
   };
 }
-
-export { User, toPublicUser } from './User.ts';
-export { UserAvatar } from './UserAvatar.ts';
-export { Series, toPublicSeries } from './Series.ts';
-export { SeriesAuthor } from './SeriesAuthor.ts';
-export { Book, toPublicBook } from './Book.ts';
-export { BookCover } from './BookCover.ts';
-export { BookAuthor } from './BookAuthor.ts';
-export { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
-export { Genre, toPublicGenre } from './Genre.ts';
-export { Comment, toPublicComment } from './Comment.ts';
-export { Like, toPublicLike } from './Like.ts';
-export { Notification, toPublicNotification } from './Notification.ts';
-export { Session } from './Session.ts';
-export { PasswordResetToken } from './PasswordResetToken.ts';
-export { Permission, toPublicPermission } from './Permission.ts';

@@ -51,10 +51,6 @@ export const listAuthorsQuerySchema = z.object({
   q: z.string().min(1).max(AUTHOR_SEARCH_MAX_LENGTH).optional(),
 });
 
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
-
 // Its own schema, deliberately not part of updateUserSchema: the role travels
 // through one door with its own guard, so it can never ride in alongside a
 // name change.

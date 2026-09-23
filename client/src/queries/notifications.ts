@@ -6,7 +6,7 @@ import { queryKeys } from './keys';
 // How often an open tab asks again. A notification is written when someone
 // else changes a work's credits, which nothing on this page would otherwise
 // learn about.
-export const NOTIFICATIONS_REFETCH_MS = 60_000;
+const NOTIFICATIONS_REFETCH_MS = 60_000;
 
 // Keyed by the account, so signing in as someone else never shows the last
 // account's notifications from the cache. Unlike every other query here it

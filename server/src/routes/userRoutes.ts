@@ -8,10 +8,10 @@ import {
 } from '../types/image.ts';
 import {
   createUserSchema,
-  idParamSchema,
   listUsersQuerySchema,
   updateUserSchema,
 } from '../types/user.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createUserRoutes(deps: RouteDeps): Router {
