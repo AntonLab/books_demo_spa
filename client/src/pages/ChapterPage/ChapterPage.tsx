@@ -3,6 +3,7 @@ import { Alert, Skeleton, Space, theme, Typography } from 'antd';
 import { Link, useParams } from 'react-router';
 import { useChapter, useChapters } from '@/queries/chapters';
 import { publishedChapters } from '@/types/chapter';
+import styles from './ChapterPage.module.css';
 
 export const ChapterPage: FC = () => {
   const { token } = theme.useToken();
@@ -38,7 +39,7 @@ export const ChapterPage: FC = () => {
 
       {/* The body is authored text, so its line breaks are content rather than
           markup and are preserved instead of collapsed. */}
-      <Typography.Paragraph style={{ whiteSpace: 'pre-wrap' }}>
+      <Typography.Paragraph className={styles.text}>
         {chapter.text}
       </Typography.Paragraph>
 

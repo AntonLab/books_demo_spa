@@ -6,7 +6,6 @@ import {
   Popconfirm,
   Skeleton,
   Space,
-  theme,
   Typography,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router';
@@ -16,9 +15,9 @@ import { SeriesOrderList } from '@/components/organisms/SeriesOrderList';
 import { useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
+import styles from './EditSeriesPage.module.css';
 
 export const EditSeriesPage: FC = () => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const seriesId = Number(useParams().id);
 
@@ -59,11 +58,7 @@ export const EditSeriesPage: FC = () => {
       <Typography.Title level={2}>Edit series</Typography.Title>
 
       {update.isSuccess && (
-        <Alert
-          type="success"
-          title="Saved."
-          style={{ marginBottom: token.margin }}
-        />
+        <Alert type="success" title="Saved." className={styles.alert} />
       )}
       <SeriesForm
         // Keyed by the last save, so the fields reset to what the server

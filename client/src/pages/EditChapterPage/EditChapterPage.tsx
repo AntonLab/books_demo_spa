@@ -1,13 +1,5 @@
 import type { FC } from 'react';
-import {
-  Alert,
-  Button,
-  Divider,
-  Popconfirm,
-  Skeleton,
-  theme,
-  Typography,
-} from 'antd';
+import { Alert, Button, Divider, Popconfirm, Skeleton, Typography } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
@@ -21,9 +13,9 @@ import {
   useUpdateChapter,
 } from '@/queries/chapters';
 import { queryKeys } from '@/queries/keys';
+import styles from './EditChapterPage.module.css';
 
 export const EditChapterPage: FC = () => {
-  const { token } = theme.useToken();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const params = useParams();
@@ -84,7 +76,7 @@ export const EditChapterPage: FC = () => {
       <Typography.Title level={2}>Edit chapter</Typography.Title>
       <Link to={`/books/${bookId}/edit`}>{`Back to ${book.data.title}`}</Link>
 
-      <div style={{ marginTop: token.margin }}>
+      <div className={styles.body}>
         {conflict && (
           <Alert
             type="warning"
@@ -94,15 +86,11 @@ export const EditChapterPage: FC = () => {
                 Reload
               </Button>
             }
-            style={{ marginBottom: token.margin }}
+            className={styles.alert}
           />
         )}
         {update.isSuccess && (
-          <Alert
-            type="success"
-            title="Saved."
-            style={{ marginBottom: token.margin }}
-          />
+          <Alert type="success" title="Saved." className={styles.alert} />
         )}
         <ChapterForm
           // Keyed by the version on screen: a reload or a save swaps in what
@@ -125,7 +113,7 @@ export const EditChapterPage: FC = () => {
         <Alert
           type="error"
           title={remove.error.message}
-          style={{ marginBottom: token.margin }}
+          className={styles.alert}
         />
       )}
       <Popconfirm
