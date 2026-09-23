@@ -1,8 +1,9 @@
 # Client — books_demo_spa
 
 React 19 + TypeScript SPA bundled with webpack 5. Server state lives in
-TanStack Query (`src/queries/`), UI state in Redux Toolkit (`src/store/`,
-`authSlice` only: `activeModal` and `resetToken`).
+TanStack Query (`src/queries/`); UI state lives in the components that use it.
+There is no Redux yet: it arrives with the first client state shared across
+pages (ADR-0010).
 
 ## Topic rules
 
@@ -42,12 +43,10 @@ it has no directory.
 | Templates | `src/components/templates/` | `App`: the composition root and the `Layout` around every route |
 | Pages     | `src/pages/`                | A routed template filled with real data                         |
 
-1. **Imports flow downward only.** One exemption: a page may import another
-   page (`ResetPasswordRoute` renders `MainPage`). Checked in review; no lint
-   rule enforces it.
+1. **Imports flow downward only.** Checked in review; no lint rule enforces it.
 2. **Search `src/components/` before creating** a component.
-3. **Business logic stays in organisms and pages.** `useAppSelector`,
-   `useAppDispatch` and `src/queries` hooks never appear below organisms.
+3. **Business logic stays in organisms and pages.** `src/queries` hooks never
+   appear below organisms.
 4. **Tokens, not hardcoded colours or pixels** (see `styling.md`).
 5. **Wrap antd only to fix an awkward API or a variant used three or more
    times**; a passthrough is over-atomization.

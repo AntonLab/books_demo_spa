@@ -64,8 +64,10 @@ that read like mistakes and are not.
   instant, "Save draft" sends `null`; a Published chapter gets "Save" (no
   `publishedAt`) and "Return to draft". `dayjs` is a direct dependency because
   the antd pickers take its objects.
-- `AuthModals` mounts only the `activeModal`. `RegisterModal`'s "I'm author"
-  maps to `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
+- `AuthModals` mounts only the open modal. `AppHeader` owns which one is open,
+  and the modals switch through `onOpen`; the reset-confirm modal is opened by
+  the URL alone, never by state. `RegisterModal`'s "I'm author" maps to
+  `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
   deletes the right row. It uses a text glyph: `@ant-design/icons` is not a
   dependency.

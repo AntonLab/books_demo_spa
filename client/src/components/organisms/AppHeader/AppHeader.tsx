@@ -1,18 +1,21 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
-import { useAppDispatch } from '@/store/hooks';
-import { openModal } from '@/store/authSlice';
 import { useLogout, useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
+import { AuthModals } from '@/components/organisms/AuthModals';
+import type { AuthModalName } from '@/components/organisms/AuthModals';
 import { NotificationBell } from '@/components/organisms/NotificationBell';
 import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {
-  const dispatch = useAppDispatch();
+  // Held here because Log in is the only way into the modals from outside;
+  // once open, they switch among themselves through the same setter.
+  const [authModal, setAuthModal] = useState<AuthModalName | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const session = useSession();
@@ -142,10 +145,16 @@ export const AppHeader: FC = () => {
           items={[{ key: 'login', label: 'Log in' }]}
           onClick={({ domEvent }) => {
             domEvent.preventDefault();
-            dispatch(openModal('login'));
+            setAuthModal('login');
           }}
         />
       )}
+
+      <AuthModals
+        modal={authModal}
+        onOpen={setAuthModal}
+        onClose={() => setAuthModal(null)}
+      />
     </Layout.Header>
   );
 };

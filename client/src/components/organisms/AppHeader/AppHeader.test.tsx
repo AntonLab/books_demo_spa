@@ -122,12 +122,31 @@ describe('AppHeader when logged out', () => {
     expect(mockedNotifications.listNotifications).not.toHaveBeenCalled();
   });
 
-  it('opens the login modal in the store when Log in is clicked', async () => {
-    const { store } = await renderHeader(<AppHeader />, withSession(null));
+  it('opens the login modal when Log in is clicked', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
 
     await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
 
-    expect(store.getState().auth.activeModal).toBe('login');
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+
+  it('switches between the modals and closes them', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create an account' })
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Create an account' })
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
   });
 });
 

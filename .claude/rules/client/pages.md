@@ -8,8 +8,8 @@ paths:
 
 ## Loading and errors (`App.tsx`)
 
-1. **Lazy-load every page, and only pages.** `AppHeader`, `AuthModals` and the
-   store render on every route and stay static.
+1. **Lazy-load every page, and only pages.** `AppHeader` and the `AuthModals`
+   it holds render on every route and stay static.
 2. **Remap the named export**:
    `lazy(() => import('@/pages/MainPage').then((m) => ({ default: m.MainPage })))`.
    Pages keep named exports; do not add a default to shorten this.
@@ -40,5 +40,6 @@ paths:
 - `BookPage` hides the like button from every Co-author and from everyone on a
   Draft book; the public chapter list and the reader's previous/next show only
   published chapters (`publishedChapters`), even to a Co-author.
-- `ResetPasswordRoute` exists to read `?token=` and open the confirm modal over
-  `MainPage`: the spec routed `/reset-password` without naming a component.
+- `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
+  and opens the confirm modal over it. The path and key are a contract with
+  `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.
