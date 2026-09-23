@@ -3,7 +3,7 @@
 // otherwise `?q=%` matches every row and `?q=_` matches any single character.
 // The value still reaches the query as a bound parameter, so this is about
 // search semantics, not SQL injection.
-export function escapeLikePattern(value: string): string {
+function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);
 }
 

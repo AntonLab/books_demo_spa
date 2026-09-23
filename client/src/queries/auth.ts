@@ -9,9 +9,9 @@ import type { PublicUser } from '../types/user';
 // `null` means "asked, and nobody is signed in"; `undefined` means "not asked
 // yet". TanStack enforces the distinction for us — it rejects an `undefined`
 // return from a queryFn outright — so the cache can hold the whole answer.
-export type Session = PublicUser | null;
+type Session = PublicUser | null;
 
-export interface ConfirmResetInput {
+interface ConfirmResetInput {
   token: string;
   password: string;
 }

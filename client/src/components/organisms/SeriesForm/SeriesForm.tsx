@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Alert, Button, Form, Input, Select, theme } from 'antd';
 import type { PublicGenre } from '@/types/genre';
 
-export interface SeriesFormValues {
+interface SeriesFormValues {
   title: string;
   description: string;
   tags: string[];

@@ -5,10 +5,10 @@ import { idSchema } from './params.ts';
 // workspace (ADR-0006); the schemas stay here.
 export type { PublicSeries } from 'shared';
 
-export const SERIES_TAG_MAX_LENGTH = 32;
-export const SERIES_MAX_TAGS = 20;
-export const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
-export const SERIES_TITLE_MAX_LENGTH = 255;
+const SERIES_TAG_MAX_LENGTH = 32;
+const SERIES_MAX_TAGS = 20;
+const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
+const SERIES_TITLE_MAX_LENGTH = 255;
 
 // Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
 // anyway — collapsing them here keeps what lands in the JSON column canonical.

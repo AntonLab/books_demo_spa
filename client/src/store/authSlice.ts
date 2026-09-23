@@ -1,14 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 
-// `as const` union rather than an enum, per the repository rules.
-export const MODAL_NAMES = [
-  'login',
-  'register',
-  'resetRequest',
-  'resetConfirm',
-] as const;
-export type ModalName = (typeof MODAL_NAMES)[number];
+export type ModalName = 'login' | 'register' | 'resetRequest' | 'resetConfirm';
 
 // UI state only. The signed-in user lives in the TanStack Query cache under
 // `queryKeys.session` — see src/queries/auth.ts. What is left here is the
