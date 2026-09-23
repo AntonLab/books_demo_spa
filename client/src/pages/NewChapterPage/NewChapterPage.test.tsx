@@ -8,6 +8,7 @@ import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
+import type { RootState } from '@/store';
 import type { BookDetail } from '@/types/book';
 import type { PublicChapter } from '@/types/chapter';
 import type { PublicUser } from '@/types/user';
@@ -67,7 +68,10 @@ const created: PublicChapter = {
   updatedAt: '2026-09-13T00:00:00.000Z',
 };
 
-const renderPage = (session: PublicUser = account()) => {
+const renderPage = (
+  session: PublicUser = account(),
+  preloadedState?: Partial<RootState>
+) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
 
@@ -76,8 +80,21 @@ const renderPage = (session: PublicUser = account()) => {
       <Route path="/books/:bookId/chapters/new" element={<NewChapterPage />} />
       <Route path="/books/:id/edit" element={<p>Book editor</p>} />
     </Routes>,
-    { route: '/books/1/chapters/new', queryClient }
+    { route: '/books/1/chapters/new', queryClient, preloadedState }
   );
+};
+
+const typedBefore: Partial<RootState> = {
+  unsavedText: {
+    accountId: 3,
+    entries: {
+      'book:1:chapterNew': {
+        title: 'Draft title',
+        text: 'Draft text',
+        savedAt: '2026-09-23T10:00:00.000Z',
+      },
+    },
+  },
 };
 
 const fill = async () => {
@@ -147,5 +164,32 @@ describe('NewChapterPage', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('restores the title and text typed before', async () => {
+    renderPage(account(), typedBefore);
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Draft title');
+    expect(screen.getByLabelText('Text')).toHaveValue('Draft text');
+  });
+
+  it('clears the Unsaved text once the chapter is created', async () => {
+    mockedChapters.createChapter.mockResolvedValue(created);
+    const { store } = renderPage(account(), typedBefore);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Publish' })
+    );
+
+    expect(await screen.findByText('Book editor')).toBeInTheDocument();
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('offers the text to an Account that no longer co-authors the book', async () => {
+    renderPage(account({ id: 99, login: 'other' }), typedBefore);
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Draft title\n\nDraft text');
   });
 });
