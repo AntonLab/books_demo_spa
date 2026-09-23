@@ -17,8 +17,9 @@ of them read.
   client bundle. Node loads it too, so relative imports carry `.ts` and only
   erasable syntax is allowed.
 - `.claude/rules/` — topic rules for Claude Code, split by `server/`,
-  `client/` and `repo/`. Each loads only when Claude reads a file its `paths:`
-  frontmatter names; each package's CLAUDE.md indexes its own.
+  `client/` and `repo/`. Each loads only when Claude Reads a file its `paths:`
+  frontmatter names (a Write or Edit does not trigger it; subagents get them
+  too); each package's CLAUDE.md indexes its own.
 - `tsconfig.base.json`, `eslint.config.base.mjs` — the shared compiler options
   and flat-config core every package extends (see `.claude/rules/repo/tooling.md`).
 
