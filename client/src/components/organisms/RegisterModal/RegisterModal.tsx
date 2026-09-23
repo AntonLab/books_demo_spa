@@ -1,10 +1,9 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Checkbox, Form, Input, Modal } from 'antd';
-import { useAppDispatch } from '@/store/hooks';
-import { closeModal, openModal } from '@/store/authSlice';
 import { useRegister } from '@/queries/auth';
 import { ApiError } from '@/api/client';
+import type { AuthModalProps } from '@/components/organisms/AuthModals';
 import styles from './RegisterModal.module.css';
 
 interface RegisterValues {
@@ -29,8 +28,7 @@ const conflictField = (details: unknown): 'login' | 'email' | null => {
   return field === 'login' || field === 'email' ? field : null;
 };
 
-export const RegisterModal: FC = () => {
-  const dispatch = useAppDispatch();
+export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   const [form] = Form.useForm<RegisterValues>();
   const register = useRegister();
   const [formError, setFormError] = useState<string | null>(null);
@@ -48,8 +46,7 @@ export const RegisterModal: FC = () => {
         lastName: values.lastName,
         role: isAuthor === true ? 'author' : 'user',
       });
-      // The reducer no longer sees the API result, so the modal closes itself.
-      dispatch(closeModal());
+      onClose();
     } catch (error) {
       // The ApiError arrives intact, so `details` can be narrowed straight off
       // it — no AuthFailure in between.
@@ -68,12 +65,7 @@ export const RegisterModal: FC = () => {
   };
 
   return (
-    <Modal
-      open
-      title="Create an account"
-      onCancel={() => dispatch(closeModal())}
-      footer={null}
-    >
+    <Modal open title="Create an account" onCancel={onClose} footer={null}>
       {formError !== null && (
         <Alert type="error" title={formError} className={styles.error} />
       )}
@@ -181,7 +173,7 @@ export const RegisterModal: FC = () => {
           </Button>
         </Form.Item>
 
-        <Button type="link" onClick={() => dispatch(openModal('login'))}>
+        <Button type="link" onClick={() => onOpen('login')}>
           Already have an account?
         </Button>
       </Form>

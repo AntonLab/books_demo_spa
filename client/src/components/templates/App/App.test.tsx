@@ -94,6 +94,19 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the confirm modal over MainPage at the emailed reset link', async () => {
+    renderWithProviders(<AppShell />, {
+      route: '/reset-password?token=tok-123',
+    });
+
+    expect(
+      await screen.findByRole('heading', { name: /books/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: 'Choose a new password' })
+    ).toBeInTheDocument();
+  });
+
   it('renders BookPage at /books/:id', async () => {
     renderWithProviders(<AppShell />, { route: '/books/1' });
 
@@ -249,9 +262,9 @@ describe('AppShell session bootstrap', () => {
 });
 
 describe('App', () => {
-  // The composition root: Provider > ConfigProvider > AntdApp > BrowserRouter
-  // > AppShell, mounted for real rather than swapped for MemoryRouter and a
-  // fresh store the way every other suite in this file does. BrowserRouter
+  // The composition root: QueryClientProvider > StyleProvider > ConfigProvider
+  // > AntdApp > BrowserRouter > AppShell, mounted for real rather than swapped
+  // for MemoryRouter and a fresh query client the way every other suite in this file does. BrowserRouter
   // reads the jsdom URL, which defaults to http://localhost/, so this
   // exercises MainPage the same way the "renders MainPage at /" case above
   // does — just through the real tree instead of AppShell in isolation.

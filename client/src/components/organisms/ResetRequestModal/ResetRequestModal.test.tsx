@@ -7,6 +7,8 @@ import * as authApi from '@/api/auth';
 jest.mock('@/api/auth');
 
 const mockedAuth = jest.mocked(authApi);
+const onOpen = jest.fn();
+const onClose = jest.fn();
 
 const CONFIRMATION =
   'If that email address has an account, a reset link is on its way.';
@@ -17,7 +19,9 @@ beforeEach(() => {
 
 describe('ResetRequestModal', () => {
   it('requires a valid email address', async () => {
-    renderWithProviders(<ResetRequestModal />);
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
 
     await userEvent.type(screen.getByLabelText('Email'), 'not-an-email');
     await userEvent.click(
@@ -32,7 +36,9 @@ describe('ResetRequestModal', () => {
 
   it('sends the address and shows the confirmation', async () => {
     mockedAuth.requestReset.mockResolvedValue(undefined);
-    renderWithProviders(<ResetRequestModal />);
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
 
     await userEvent.type(screen.getByLabelText('Email'), 'bob@example.com');
     await userEvent.click(
@@ -47,7 +53,9 @@ describe('ResetRequestModal', () => {
     // The server answers 202 either way; the UI must not differ, or it becomes
     // the account-enumeration oracle the server refuses to be.
     mockedAuth.requestReset.mockResolvedValue(undefined);
-    renderWithProviders(<ResetRequestModal />);
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
 
     await userEvent.type(screen.getByLabelText('Email'), 'nobody@example.com');
     await userEvent.click(
@@ -60,7 +68,9 @@ describe('ResetRequestModal', () => {
 
   it('hides the form once the confirmation is shown', async () => {
     mockedAuth.requestReset.mockResolvedValue(undefined);
-    renderWithProviders(<ResetRequestModal />);
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
 
     await userEvent.type(screen.getByLabelText('Email'), 'bob@example.com');
     await userEvent.click(
@@ -71,5 +81,17 @@ describe('ResetRequestModal', () => {
     await waitFor(() => {
       expect(screen.queryByLabelText('Email')).toBeNull();
     });
+  });
+
+  it('goes back to the login modal', async () => {
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Back to log in' })
+    );
+
+    expect(onOpen).toHaveBeenCalledWith('login');
   });
 });

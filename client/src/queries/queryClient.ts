@@ -18,9 +18,9 @@ export const shouldRetryQuery = (
   failureCount < MAX_QUERY_RETRIES &&
   (!(error instanceof ApiError) || error.status >= 500);
 
-// A factory as well as a singleton, mirroring `createAppStore`/`store` in
-// src/store/index.ts — and safe for the same reason that one is: there is no
-// SSR here, so one client per process is one client per user.
+// A factory as well as a singleton: tests need a fresh client each, and the
+// singleton is safe because there is no SSR here, so one client per process
+// is one client per user.
 export const createQueryClient = (): QueryClient => {
   return new QueryClient({
     defaultOptions: {
