@@ -5,11 +5,8 @@ import {
   validatedBody,
   validatedParams,
 } from '../middleware/validate.ts';
-import {
-  idParamSchema,
-  updateRoleSchema,
-  type UpdateRoleInput,
-} from '../types/user.ts';
+import { updateRoleSchema, type UpdateRoleInput } from '../types/user.ts';
+import { idParamSchema } from '../types/params.ts';
 import { REGISTRABLE_ROLES } from '../types/permission.ts';
 import {
   ForbiddenError,

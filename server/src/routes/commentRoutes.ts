@@ -4,10 +4,10 @@ import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createCommentSchema,
-  idParamSchema,
   listCommentsQuerySchema,
   updateCommentSchema,
 } from '../types/comment.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createCommentRoutes(deps: RouteDeps): Router {

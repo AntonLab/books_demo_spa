@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The response shapes are the client's contract too, so they live in the shared
 // workspace (ADR-0006); the schemas stay here.
@@ -8,8 +9,6 @@ export const CHAPTER_TITLE_MAX_LENGTH = 255;
 // Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
 // were a 4-byte astral one, a million of them reach 4 MB.
 export const CHAPTER_TEXT_MAX_LENGTH = 1_000_000;
-
-const idSchema = z.coerce.number().int().positive();
 
 // Trimmed, unlike the descriptions on series and books: a leading space in a
 // description is harmless, but a title is echoed in every summary list, where
@@ -84,13 +83,6 @@ export const listChaptersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   bookId: idSchema.optional(),
   q: z.string().min(1).max(200).optional(),
-});
-
-// A local copy rather than an import, following the same reasoning as
-// types/book.ts: the resources share a shape today, not a reason to change
-// together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
 });
 
 export type CreateChapterInput = z.infer<typeof createChapterSchema>;

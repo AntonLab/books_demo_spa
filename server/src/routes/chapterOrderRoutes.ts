@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { createChapterController } from '../controllers/chapterController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
-import { idParamSchema, reorderChaptersSchema } from '../types/chapter.ts';
+import { reorderChaptersSchema } from '../types/chapter.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 // A book's Reading order, mounted under /books because the order belongs to

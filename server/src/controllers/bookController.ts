@@ -15,11 +15,11 @@ import {
   UnsupportedMediaTypeError,
 } from '../types/errors.ts';
 import type {
-  AddCoAuthorInput,
   CreateBookInput,
   ListBooksQuery,
   UpdateBookInput,
 } from '../types/book.ts';
+import type { AddCoAuthorInput } from '../types/params.ts';
 import type { ReorderSeriesBooksInput } from '../types/series.ts';
 
 export interface BookController {

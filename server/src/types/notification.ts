@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The kinds, work types and actor kinds, and the response shape, are the
 // client's contract too, so they live in the shared workspace (ADR-0006); the
@@ -22,7 +23,7 @@ export const listNotificationsQuerySchema = z.object({
 // ignored rather than refused, so a stale id costs nothing and names nobody
 // else's notification.
 export const markNotificationsReadSchema = z.object({
-  ids: z.array(z.coerce.number().int().positive()).min(1).max(100),
+  ids: z.array(idSchema).min(1).max(100),
 });
 
 export type ListNotificationsQuery = z.infer<
