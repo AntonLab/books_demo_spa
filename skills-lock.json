@@ -19,6 +19,18 @@
       "skillPath": "plugins/patterns/atomic-design/skills/atomic-design-fundamentals/SKILL.md",
       "computedHash": "ae644e79c53f1b450aaf5fd662459da1d66402112230e5b8d4881f8deff981ba"
     },
+    "fallow": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow/SKILL.md",
+      "computedHash": "51052d5339bae02c3bb56542382685ebcc6438ba693c837da1d16ec68618a04b"
+    },
+    "fallow-review": {
+      "source": "fallow-rs/fallow-skills",
+      "sourceType": "github",
+      "skillPath": "fallow/skills/fallow-review/SKILL.md",
+      "computedHash": "ff8aacf205459332fbe49b518318ec8ab647aa297a311694a52ea9733d822829"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",

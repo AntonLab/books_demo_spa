@@ -253,7 +253,7 @@ Single-context: one `CONTEXT.md` plus `docs/adr/` at the repo root. See
 
 ### Project skills
 
-`skills-lock.json` pins the repo's own skills — eight, kept for fit with this
+`skills-lock.json` pins the repo's own skills — ten, kept for fit with this
 stack — and `npm run skills` restores them in two steps. The `skills` CLI
 writes them into `.agents/skills/`; `scripts/link-skills.mjs` then links each
 into `.claude/skills/`, because the restore installs only for the CLI's
