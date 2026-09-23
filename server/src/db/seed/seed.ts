@@ -22,7 +22,7 @@
 // without writing.
 
 import type { ModelStatic, Model, Transaction } from 'sequelize';
-import { logger } from '../logger.ts';
+import { logger } from '../../logger.ts';
 import {
   Book,
   BookAuthor,
@@ -35,18 +35,18 @@ import {
   SeriesAuthor,
   User,
   initModels,
-} from '../models/index.ts';
-import { createBookSchema, type BookStatus } from '../types/book.ts';
-import { createChapterSchema } from '../types/chapter.ts';
-import { createCommentSchema, type Tombstone } from '../types/comment.ts';
-import { createLikeSchema } from '../types/like.ts';
-import type { UserRole } from '../types/permission.ts';
-import { createSeriesSchema } from '../types/series.ts';
-import { createUserSchema } from '../types/user.ts';
-import { loadConfig } from './config.ts';
-import { ensureDatabase } from './ensureDatabase.ts';
+} from '../../models/index.ts';
+import { createBookSchema, type BookStatus } from '../../types/book.ts';
+import { createChapterSchema } from '../../types/chapter.ts';
+import { createCommentSchema, type Tombstone } from '../../types/comment.ts';
+import { createLikeSchema } from '../../types/like.ts';
+import type { UserRole } from '../../types/permission.ts';
+import { createSeriesSchema } from '../../types/series.ts';
+import { createUserSchema } from '../../types/user.ts';
+import { loadConfig } from '../config.ts';
+import { ensureDatabase } from '../ensureDatabase.ts';
 import { assertSafeTarget } from './seedGuards.ts';
-import { createSequelize } from './sequelize.ts';
+import { createSequelize } from '../sequelize.ts';
 
 // One password for all ten accounts. This is demo data on a developer's
 // machine, not a credential: it is printed at the end of a run so nobody has

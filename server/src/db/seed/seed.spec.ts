@@ -10,7 +10,7 @@ import {
   type ModelStatic,
   type Sequelize,
 } from 'sequelize';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import { createCreditedBook } from '../../models/creditedBook.testkit.ts';
 import {
   Book,
   BookAuthor,
@@ -23,18 +23,18 @@ import {
   SeriesAuthor,
   User,
   initModels,
-} from '../models/index.ts';
-import { parseConfig } from './config.ts';
-import { ensureDatabase } from './ensureDatabase.ts';
-import { skipWithoutMysql } from './mysqlProbe.testkit.ts';
-import { createSequelize } from './sequelize.ts';
+} from '../../models/index.ts';
+import { parseConfig } from '../config.ts';
+import { ensureDatabase } from '../ensureDatabase.ts';
+import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
+import { createSequelize } from '../sequelize.ts';
 
 // seed.ts is a script with a top-level `await main()`, so it cannot be imported
 // without seeding. These tests run it the way `npm run seed` does, as a child
 // process, and watch what it does to a schema of their own.
 const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`;
 
-const SERVER_DIR = path.resolve(import.meta.dirname, '../..');
+const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
 // The ten tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
@@ -64,7 +64,7 @@ function runSeed(
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['--env-file-if-exists=.env.local', 'src/db/seed.ts', ...args],
+      ['--env-file-if-exists=.env.local', 'src/db/seed/seed.ts', ...args],
       { cwd: SERVER_DIR, env }
     );
     const stdout: string[] = [];
