@@ -41,6 +41,11 @@ that read like mistakes and are not.
 - Replying and editing are mutually exclusive state, so one composer at most is
   on screen. The heading renders in every state so the section keeps its place.
 - The molecule may be called `Comment` because antd removed its own in v5.
+- The composer has no local state: its value is the Unsaved text entry of the
+  open composer (root, reply or edit). Edit seeds its entry from the Comment's
+  text, so clearing the field leaves it empty. A send clears the entry only on
+  success. A reply or edit whose target is gone or a Tombstone falls back to
+  the root composer, and its text shows as an `UnsavedTextNotice`.
 
 ## Images (`BookCover`, `AccountAvatar`, `ImageUploadButton`)
 

@@ -1,9 +1,10 @@
 # Client — books_demo_spa
 
 React 19 + TypeScript SPA bundled with webpack 5. Server state lives in
-TanStack Query (`src/queries/`); UI state lives in the components that use it.
-There is no Redux yet: it arrives with the first client state shared across
-pages (ADR-0010).
+TanStack Query (`src/queries/`). Client state that outlives the component
+showing it and never reaches the server, Unsaved text and Device preferences,
+lives in Redux Toolkit (`src/store/`, kept in `localStorage`). All other UI
+state lives in the component that uses it (ADR-0010).
 
 ## Topic rules
 
@@ -16,6 +17,7 @@ read, read the rule first:
 | --------------- | --------------------------------------------------------------------- |
 | `api.md`        | `request()`, its body and CSRF traps, the per-module request contract |
 | `queries.md`    | retries, the session shape, mutation wrapping, invalidation           |
+| `store.md`      | the two slices, `localStorage` persistence, binding to the Account    |
 | `components.md` | component-level traps: antd menus, comments, sortable lists, images   |
 | `pages.md`      | routing, lazy loading and the error boundary, page-level rules        |
 | `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                |
@@ -45,8 +47,8 @@ it has no directory.
 
 1. **Imports flow downward only.** Checked in review; no lint rule enforces it.
 2. **Search `src/components/` before creating** a component.
-3. **Business logic stays in organisms and pages.** `src/queries` hooks never
-   appear below organisms.
+3. **Business logic stays in organisms and pages.** `useAppSelector`,
+   `useAppDispatch` and `src/queries` hooks never appear below organisms.
 4. **Tokens, not hardcoded colours or pixels** (see `styling.md`).
 5. **Wrap antd only to fix an awkward API or a variant used three or more
    times**; a passthrough is over-atomization.
