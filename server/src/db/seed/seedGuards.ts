@@ -3,8 +3,8 @@
 // would run the seed. Only the target check moves here; the dry run, the other
 // half of the seed's safety, is the shape of main() itself and stays there.
 
-import { logger as defaultLogger, type Logger } from '../logger.ts';
-import type { AppConfig } from './config.ts';
+import { logger as defaultLogger, type Logger } from '../../logger.ts';
+import type { AppConfig } from '../config.ts';
 
 // The schema this seed is written for. Any other name needs --force, which is
 // the same flag that authorises the delete — one gesture, two guards.
