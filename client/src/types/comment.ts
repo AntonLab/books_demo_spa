@@ -3,7 +3,7 @@ import type { Wire } from 'shared';
 
 // How a comment became a tombstone: `deleted` by its owner (or with the
 // owner's account), `removed` by a moderator. null while it is live.
-export { TOMBSTONES, type Tombstone } from 'shared';
+export type { Tombstone } from 'shared';
 
 // On a tombstone `userId` is null and `text` is empty: the server keeps the
 // original on the row and withholds it in the response, so the client never

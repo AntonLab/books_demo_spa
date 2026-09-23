@@ -509,8 +509,8 @@ Prettier has no script here: it is root-only, because `.prettierrc.json` and
   the same JPEG/PNG/WebP/2 MiB shape the server enforces for real)
   and `css.d.ts`. None of these shapes is written here any more: each
   is `Wire<…>` over the type of the same name in the `shared` workspace
-  (ADR-0006), and the unions (`BOOK_STATUSES`, `USER_ROLES`, `USER_STATUSES`,
-  `TOMBSTONES`, `REGISTRABLE_ROLES`, …) are re-exported from it — `BookForm`
+  (ADR-0006), and the unions the client uses (`BOOK_STATUSES`, …) are
+  re-exported from it, each only once something imports it — `BookForm`
   lists its radios from `BOOK_STATUSES`. What stays local is client-only:
   labels, `chapterStateOf` and the other helpers, and the request payloads
   beside each API call. Dates cross the wire as ISO strings, not `Date`,
