@@ -11,12 +11,7 @@ export interface SessionRecord {
 // What opening a login's session came to. Three answers rather than a
 // boolean, because the controller refuses the two failures differently: a
 // changed credential as a failed login, a block as a block.
-export const SESSION_OPENINGS = [
-  'created',
-  'credential-changed',
-  'blocked',
-] as const;
-export type SessionOpening = (typeof SESSION_OPENINGS)[number];
+export type SessionOpening = 'created' | 'credential-changed' | 'blocked';
 
 export interface SessionRepository {
   // register's door: a brand-new account has no password change or block in

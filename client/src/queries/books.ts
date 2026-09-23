@@ -79,7 +79,7 @@ export const useMyBooks = (userId: number | undefined) => {
 
 // The server's list cap. "My books" is one author's catalogue, not a feed, so a
 // single full page stands in for paging.
-export const MY_BOOKS_LIMIT = 100;
+const MY_BOOKS_LIMIT = 100;
 
 // Every book write invalidates the whole `books` prefix: a change to one book
 // can move it into or out of any list (a status change hides it from the main

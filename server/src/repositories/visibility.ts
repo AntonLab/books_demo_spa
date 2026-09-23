@@ -21,7 +21,7 @@ export function actorOf(req: Request): { id: number; role: Role } {
 
 // A Moderator reads every Draft book, but only by direct link: no list is
 // widened for one.
-export function isModerator(viewer: Viewer): boolean {
+function isModerator(viewer: Viewer): boolean {
   return viewer?.role === 'admin' || viewer?.role === 'superadmin';
 }
 
