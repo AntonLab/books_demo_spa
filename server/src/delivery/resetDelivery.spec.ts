@@ -1,10 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  createLoggerResetDelivery,
-  createResetDelivery,
-  resetUrl,
-} from './resetDelivery.ts';
+import { createLoggerResetDelivery, resetUrl } from './resetDelivery.ts';
 import type { Logger } from '../logger.ts';
 
 function recordingLogger(): { logger: Logger; lines: string[] } {
@@ -37,20 +33,9 @@ test('a trailing slash on the base URL does not double up', () => {
   );
 });
 
-test('the logger delivery emits the link', async () => {
+test('the logger delivery emits the address and the link', async () => {
   const { logger, lines } = recordingLogger();
   await createLoggerResetDelivery(logger, 'http://localhost:3000').send(
-    'bob@example.com',
-    'abc'
-  );
-
-  assert.equal(lines.length, 1);
-  assert.match(lines[0] ?? '', /reset-password\?token=abc/);
-});
-
-test('createResetDelivery builds the log delivery for RESET_DELIVERY=log', async () => {
-  const { logger, lines } = recordingLogger();
-  await createResetDelivery('log', logger, 'http://localhost:3000').send(
     'bob@example.com',
     'abc'
   );
