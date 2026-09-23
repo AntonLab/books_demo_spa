@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
-import { idParamSchema, reorderSeriesBooksSchema } from '../types/series.ts';
+import { reorderSeriesBooksSchema } from '../types/series.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 // The books of a series as its editor works with them — the full list, drafts

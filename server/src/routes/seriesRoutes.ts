@@ -4,14 +4,16 @@ import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
-  addCoAuthorSchema,
-  coAuthorParamSchema,
   createSeriesSchema,
-  idParamSchema,
   listSeriesQuerySchema,
   seriesBookParamSchema,
   updateSeriesSchema,
 } from '../types/series.ts';
+import {
+  addCoAuthorSchema,
+  coAuthorParamSchema,
+  idParamSchema,
+} from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createSeriesRoutes(deps: RouteDeps): Router {

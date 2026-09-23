@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import {
   createUserSchema,
-  idParamSchema,
   listAuthorsQuerySchema,
   listUsersQuerySchema,
   updateUserSchema,
@@ -87,12 +86,6 @@ test('author search accepts a term up to the shared limit and no longer', () => 
 
   assert.equal(listAuthorsQuerySchema.parse({ q: longest }).q, longest);
   assert.throws(() => listAuthorsQuerySchema.parse({ q: `${longest}a` }));
-});
-
-test('id param coerces a numeric string and rejects anything else', () => {
-  assert.equal(idParamSchema.parse({ id: '7' }).id, 7);
-  assert.throws(() => idParamSchema.parse({ id: 'abc' }));
-  assert.throws(() => idParamSchema.parse({ id: '0' }));
 });
 
 test('errors carry the right status codes', () => {

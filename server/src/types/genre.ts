@@ -20,11 +20,4 @@ export const genreBodySchema = z.object({
   name: nameSchema,
 });
 
-// Deliberately a local copy of the users', series' and books' param schema
-// rather than an import: the resources share a shape today, not a reason to
-// change together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
-});
-
 export type GenreInput = z.infer<typeof genreBodySchema>;

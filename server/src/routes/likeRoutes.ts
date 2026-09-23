@@ -4,10 +4,10 @@ import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   createLikeSchema,
-  idParamSchema,
   listLikesQuerySchema,
   updateLikeSchema,
 } from '../types/like.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createLikeRoutes(deps: RouteDeps): Router {

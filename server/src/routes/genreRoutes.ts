@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { createGenreController } from '../controllers/genreController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
-import { genreBodySchema, idParamSchema } from '../types/genre.ts';
+import { genreBodySchema } from '../types/genre.ts';
+import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
 export function createGenreRoutes(deps: RouteDeps): Router {

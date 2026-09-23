@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { idSchema } from './params.ts';
 
 // The response shapes and the tombstone union are the client's contract too, so
 // they live in the shared workspace (ADR-0006); the schemas stay here.
@@ -15,8 +16,6 @@ export {
 // the same care at a far larger bound; see CHAPTER_TEXT_MAX_LENGTH in
 // types/chapter.ts.
 export const COMMENT_TEXT_MAX_LENGTH = 10_000;
-
-const idSchema = z.coerce.number().int().positive();
 
 // Deliberately untrimmed, like a chapter body and unlike a title: paragraph
 // breaks and indentation are part of what someone wrote, not an input artefact.
@@ -57,13 +56,6 @@ export const listCommentsQuerySchema = z.object({
   // to serve. There is no `?q=` alongside these: a comments section is read in
   // full, not searched.
   parentId: idSchema.optional(),
-});
-
-// A local copy rather than an import, following the same reasoning as
-// types/book.ts: the resources share a shape today, not a reason to change
-// together.
-export const idParamSchema = z.object({
-  id: z.coerce.number().int().positive(),
 });
 
 export type CreateCommentInput = z.infer<typeof createCommentSchema>;

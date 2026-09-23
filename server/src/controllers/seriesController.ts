@@ -13,11 +13,11 @@ import {
   UnauthorizedError,
 } from '../types/errors.ts';
 import type {
-  AddCoAuthorInput,
   CreateSeriesInput,
   ListSeriesQuery,
   UpdateSeriesInput,
 } from '../types/series.ts';
+import type { AddCoAuthorInput } from '../types/params.ts';
 
 export interface SeriesController {
   create: RequestHandler;
