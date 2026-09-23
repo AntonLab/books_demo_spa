@@ -14,8 +14,8 @@ const targetIdSchema = idSchema.nullable().default(null);
 
 // Exactly one target, never both and never neither. Enforced again as a
 // model-level validate in models/Like.ts, because a caller reaching Sequelize
-// directly never passes through this schema; see server/CLAUDE.md for why
-// there is no CHECK constraint behind either of them.
+// directly never passes through this schema; see .claude/rules/server/sequelize.md
+// for why there is no CHECK constraint behind either of them.
 function exactlyOneTarget(value: {
   bookId: number | null;
   commentId: number | null;
