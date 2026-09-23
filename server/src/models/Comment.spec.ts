@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import { Book, User, initModels } from './index.ts';
+import { Book } from './Book.ts';
+import { initModels } from './index.ts';
+import { User } from './User.ts';
 import { Comment, toCommentWithAuthor, toPublicComment } from './Comment.ts';
 import { TOMBSTONES } from '../types/comment.ts';
 

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import { Book, initModels } from './index.ts';
+import { Book } from './Book.ts';
+import { initModels } from './index.ts';
 import { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is

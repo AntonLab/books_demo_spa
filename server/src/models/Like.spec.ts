@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import { Book, Comment, User, initModels } from './index.ts';
+import { Book } from './Book.ts';
+import { Comment } from './Comment.ts';
+import { initModels } from './index.ts';
+import { User } from './User.ts';
 import { Like, toPublicLike } from './Like.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
