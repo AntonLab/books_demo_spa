@@ -237,7 +237,7 @@ scripts below still run from this directory, or from the root with `-w server`.
   are never emitted. `shared` is not emitted either: `dist/` imports it as
   `.ts` at runtime, through the workspace link, so `node dist/index.js` needs
   that link and a type-stripping Node like `npm start` does (ADR-0006)
-- `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed.ts`,
+- `npm run seed` — `node --env-file-if-exists=.env.local ./src/db/seed/seed.ts`,
   which fills the database with the demo data (see **Demo seed** below).
   **It deletes every row in the ten content tables**, and every uploaded
   Cover and Avatar with them, so it does nothing without `--force`:
@@ -410,12 +410,14 @@ Each layer answers a question the others cannot:
   `mysqlProbe.testkit.ts` is the other test-support file here, and a module:
   `skipWithoutMysql()`, the one place a MySQL-backed spec learns whether to
   skip, and where `REQUIRE_MYSQL=1` turns that skip into a failure.
-  `seed.ts` is the demo seed (see **Demo seed**), also a script nothing
-  imports — it carries no suffix, because `.testkit.ts` means _test support_
-  and this is neither, so `tsconfig.build.json` names it in `exclude`
-  directly rather than growing a second suffix convention for one file.
-  `seedGuards.ts` (`assertSafeTarget`, `DEMO_DATABASE`) is named beside it for
-  the same reason: only the seed and its specs use it.
+- `src/db/seed/` — the demo seed (see **Demo seed**). `seed.ts` is the script
+  nothing imports; `rng.ts`, `content.ts`, `personas.ts` and `plan.ts` are the
+  planning phase it builds on, and none of them runs anything on import, which
+  is what lets `plan.spec.ts` unit-test the plan with no database. Nothing here
+  carries a `.testkit.ts` suffix, because that means _test support_ and this is
+  neither, so `tsconfig.build.json` excludes the directory with one glob.
+  `seedGuards.ts` (`assertSafeTarget`, `DEMO_DATABASE`) sits inside it: only
+  the seed and its specs use it.
 - `src/middleware/` — auth, permissions, validation, error handling
   (`csrfProtection.ts` (see **CSRF** under Auth), `requireAuth.ts`,
   `requirePermission.ts`, `optionalAuth.ts` (unmounted — see **Auth**),
@@ -458,7 +460,7 @@ than skip without a database (see `npm test` above).
 
 ## Demo seed
 
-`src/db/seed.ts` fills the database with the data the demo version is shown
+`src/db/seed/seed.ts` fills the database with the data the demo version is shown
 with: ten accounts, three authors' back catalogues, and the comment threads and
 likes that make the reader-facing pages look lived-in. Run it with
 `npm run seed -w server -- --force`.
@@ -1250,7 +1252,7 @@ snippets — still get wrong. Verified against the 5.x router and request source
 - **Index reads are checked**: `noUncheckedIndexedAccess` (root
   `tsconfig.base.json`) types `items[i]` as `T | undefined`. Application
   code — `seed.ts` included — handles the miss with an early return, a throw
-  that names what was missing (`itemAt` in `seed.ts`), or `?.`/`??` where
+  that names what was missing (`itemAt` in `seed/rng.ts`), or `?.`/`??` where
   absence is legitimate. Only test files (`*.spec.ts`, `*.testkit.ts`) may
   assert it away with `!`.
 
