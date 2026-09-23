@@ -262,8 +262,8 @@ describe('AppShell session bootstrap', () => {
 });
 
 describe('App', () => {
-  // The composition root: QueryClientProvider > StyleProvider > ConfigProvider
-  // > AntdApp > BrowserRouter > AppShell, mounted for real rather than swapped
+  // The composition root: QueryClientProvider > Provider > StyleProvider >
+  // ThemedConfigProvider > AntdApp > BrowserRouter > AppShell, mounted for real rather than swapped
   // for MemoryRouter and a fresh query client the way every other suite in this file does. BrowserRouter
   // reads the jsdom URL, which defaults to http://localhost/, so this
   // exercises MainPage the same way the "renders MainPage at /" case above

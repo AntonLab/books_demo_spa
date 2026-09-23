@@ -5,6 +5,8 @@ import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { AuthModals } from '@/components/organisms/AuthModals';
@@ -21,6 +23,8 @@ export const AppHeader: FC = () => {
   const session = useSession();
   const logout = useLogout();
   const user = session.data;
+  const dispatch = useAppDispatch();
+  const theme = useAppSelector((state) => state.devicePreferences.theme);
 
   const genres = useGenres();
   // Empty covers all three cases the submenu must not appear in: loading,
@@ -94,6 +98,22 @@ export const AppHeader: FC = () => {
       />
 
       <SearchBar />
+
+      {/* Offered to everyone, Guests included: a Device preference belongs
+          to the device, not to an Account. The header itself stays dark in
+          both themes. */}
+      <Button
+        type="text"
+        className={styles.onDark}
+        aria-label={
+          theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'
+        }
+        onClick={() => dispatch(devicePreferences.themeToggled())}
+      >
+        {/* A text glyph: @ant-design/icons is not a dependency. The label
+            carries the meaning, so the glyph is decorative. */}
+        <span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>
+      </Button>
 
       {session.isPending ? (
         // Not "Log in": showing it here would flash a logged-out header at a
