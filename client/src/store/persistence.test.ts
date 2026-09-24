@@ -1,5 +1,9 @@
 import { createAppStore } from './index';
-import { devicePreferences } from './devicePreferencesSlice';
+import {
+  devicePreferences,
+  initialDevicePreferences,
+  initialReadingPreferences,
+} from './devicePreferencesSlice';
 import { unsavedText } from './unsavedTextSlice';
 import {
   STORAGE_KEYS,
@@ -22,11 +26,9 @@ afterEach(() => {
 describe('persistence', () => {
   it('starts from the defaults when nothing is stored', () => {
     expect(loadPersistedState()).toEqual({});
-    expect(createAppStore().getState().devicePreferences).toEqual({
-      theme: 'light',
-      resultsLayout: 'grid',
-      searchFormExpanded: true,
-    });
+    expect(createAppStore().getState().devicePreferences).toEqual(
+      initialDevicePreferences
+    );
   });
 
   // An added field does not bump the key: a value stored before it existed is
@@ -38,9 +40,8 @@ describe('persistence', () => {
     );
 
     expect(loadPersistedState().devicePreferences).toEqual({
+      ...initialDevicePreferences,
       theme: 'dark',
-      resultsLayout: 'grid',
-      searchFormExpanded: true,
     });
   });
 
@@ -49,11 +50,7 @@ describe('persistence', () => {
 
     expect(
       parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
-    ).toEqual({
-      theme: 'dark',
-      resultsLayout: 'grid',
-      searchFormExpanded: true,
-    });
+    ).toEqual({ ...initialDevicePreferences, theme: 'dark' });
   });
 
   it('ignores corrupt JSON', () => {
@@ -93,9 +90,9 @@ describe('persistence', () => {
     );
 
     expect(loadPersistedState().devicePreferences).toEqual({
+      ...initialDevicePreferences,
       theme: 'dark',
       resultsLayout: 'list',
-      searchFormExpanded: true,
     });
   });
 
@@ -112,15 +109,32 @@ describe('persistence', () => {
     ).toBe(false);
   });
 
+  it('reads reading preferences field by field, dropping only unknown ones', () => {
+    const raw = JSON.stringify({
+      theme: 'light',
+      reading: {
+        background: 'sepia',
+        font: 'comic',
+        fontSize: 15,
+        width: 'full',
+      },
+    });
+
+    expect(
+      parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
+        ?.reading
+    ).toEqual({
+      ...initialReadingPreferences,
+      background: 'sepia',
+      width: 'full',
+    });
+  });
+
   it('reads back what it wrote under the v1 key', () => {
     createAppStore().dispatch(devicePreferences.themeToggled());
 
     expect(localStorage.getItem('books.devicePreferences.v1')).toBe(
-      JSON.stringify({
-        theme: 'dark',
-        resultsLayout: 'grid',
-        searchFormExpanded: true,
-      })
+      JSON.stringify({ ...initialDevicePreferences, theme: 'dark' })
     );
     expect(createAppStore().getState().devicePreferences.theme).toBe('dark');
   });

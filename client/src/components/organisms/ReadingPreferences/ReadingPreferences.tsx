@@ -1,0 +1,126 @@
+import type { FC, ReactNode } from 'react';
+import { Button, Flex, Popover, Segmented, theme, Typography } from 'antd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faGear, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  devicePreferences,
+  READING_FONT_SIZE,
+  type ReadingBackground,
+  type ReadingFont,
+  type ReadingLineHeight,
+  type ReadingPreferences as Reading,
+  type ReadingWidth,
+} from '@/store/devicePreferencesSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+
+const BACKGROUND_OPTIONS: { value: ReadingBackground; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'white', label: 'White' },
+  { value: 'sepia', label: 'Sepia' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'black', label: 'Black' },
+];
+
+const FONT_OPTIONS: { value: ReadingFont; label: string }[] = [
+  { value: 'sans', label: 'Sans' },
+  { value: 'serif', label: 'Serif' },
+];
+
+const LINE_HEIGHT_OPTIONS: ReadingLineHeight[] = [1.4, 1.6, 1.8, 2];
+
+const WIDTH_OPTIONS: { value: ReadingWidth; label: string }[] = [
+  { value: 'narrow', label: 'Narrow' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'wide', label: 'Wide' },
+  { value: 'full', label: 'Full' },
+];
+
+const Field: FC<{ label: string; children: ReactNode }> = ({
+  label,
+  children,
+}) => {
+  const { token } = theme.useToken();
+  return (
+    <Flex vertical gap={token.marginXXS}>
+      <Typography.Text type="secondary">{label}</Typography.Text>
+      {children}
+    </Flex>
+  );
+};
+
+// How a Chapter reads on this device: a Device preference, so it holds for
+// every Book. Each change applies at once, behind the open popover.
+export const ReadingPreferences: FC = () => {
+  const { token } = theme.useToken();
+  const reading = useAppSelector((state) => state.devicePreferences.reading);
+  const dispatch = useAppDispatch();
+  const change = (patch: Partial<Reading>) =>
+    dispatch(devicePreferences.readingChanged(patch));
+  const { min, max, step } = READING_FONT_SIZE;
+
+  const form = (
+    <Flex vertical gap={token.marginSM}>
+      <Field label="Background">
+        <Segmented<ReadingBackground>
+          aria-label="Background"
+          value={reading.background}
+          onChange={(background) => change({ background })}
+          options={BACKGROUND_OPTIONS}
+        />
+      </Field>
+      <Field label="Font size">
+        <Flex align="center" gap={token.marginSM}>
+          <Button
+            aria-label="Smaller text"
+            icon={<FontAwesomeIcon icon={faMinus} />}
+            disabled={reading.fontSize <= min}
+            onClick={() => change({ fontSize: reading.fontSize - step })}
+          />
+          <Typography.Text>{reading.fontSize}</Typography.Text>
+          <Button
+            aria-label="Larger text"
+            icon={<FontAwesomeIcon icon={faPlus} />}
+            disabled={reading.fontSize >= max}
+            onClick={() => change({ fontSize: reading.fontSize + step })}
+          />
+        </Flex>
+      </Field>
+      <Field label="Line height">
+        <Segmented<ReadingLineHeight>
+          aria-label="Line height"
+          value={reading.lineHeight}
+          onChange={(lineHeight) => change({ lineHeight })}
+          options={LINE_HEIGHT_OPTIONS}
+        />
+      </Field>
+      <Field label="Text width">
+        <Segmented<ReadingWidth>
+          aria-label="Text width"
+          value={reading.width}
+          onChange={(width) => change({ width })}
+          options={WIDTH_OPTIONS}
+        />
+      </Field>
+      <Field label="Font">
+        <Segmented<ReadingFont>
+          aria-label="Font"
+          value={reading.font}
+          onChange={(font) => change({ font })}
+          options={FONT_OPTIONS}
+        />
+      </Field>
+      <Button onClick={() => dispatch(devicePreferences.readingReset())}>
+        Reset
+      </Button>
+    </Flex>
+  );
+
+  return (
+    <Popover content={form} trigger="click" placement="bottomRight">
+      <Button
+        aria-label="Reading preferences"
+        icon={<FontAwesomeIcon icon={faGear} />}
+      />
+    </Popover>
+  );
+};
