@@ -18,7 +18,10 @@ export interface CardListProps<T extends { id: number }> {
 
 const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
 
-// Presentational on purpose: each page runs its own query (`useBooks`,
+// For `tile` cards: six to a row on a wide screen, two on a phone.
+export const TILE_COLUMNS: ColProps = { xs: 12, sm: 8, md: 6, xl: 4 };
+
+// Presentational on purpose: each page runs its own query (`useSortedBooks`,
 // `useSearchBooks`, `useSeriesInGenre`…) and hands the states down. A
 // component that ran the query itself could not serve them all.
 //

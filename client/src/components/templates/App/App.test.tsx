@@ -90,7 +90,7 @@ describe('AppShell routing', () => {
     renderWithProviders(<AppShell />, { route: '/' });
 
     expect(
-      await screen.findByRole('heading', { name: /books/i })
+      await screen.findByRole('heading', { name: 'Popular' })
     ).toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe('AppShell routing', () => {
     });
 
     expect(
-      await screen.findByRole('heading', { name: /books/i })
+      await screen.findByRole('heading', { name: 'Popular' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('dialog', { name: 'Choose a new password' })
@@ -246,7 +246,7 @@ describe('AppShell session bootstrap', () => {
   it('asks the server who is logged in on mount', async () => {
     renderWithProviders(<AppShell />);
 
-    await screen.findByRole('heading', { name: /books/i });
+    await screen.findByRole('heading', { name: 'Popular' });
     // AppHeader reading useSession() is what fires this; there is no longer
     // an explicit dispatch on mount.
     expect(mockedAuth.me).toHaveBeenCalledTimes(1);
@@ -273,7 +273,7 @@ describe('App', () => {
     render(<App />);
 
     expect(
-      await screen.findByRole('heading', { name: /books/i })
+      await screen.findByRole('heading', { name: 'Popular' })
     ).toBeInTheDocument();
     expect(
       await screen.findByRole('menuitem', { name: 'Log in' })

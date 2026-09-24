@@ -30,11 +30,15 @@ paths:
 - **There is no series page.** A series' books are `/search?series=<id>`;
   `/series` is `NotFoundPage`.
 - `SearchPage` takes one filter per visit, by precedence `series`, then
-  `genre`, then `q`. An id that is not a positive integer, or names nothing,
-  gets "This series no longer exists." / "This genre no longer exists." and
-  requests nothing more. Its results show as tiles or a list, by the
-  `resultsLayout` Device preference; one switch covers every list on the page,
-  and other pages' `CardList`s keep their default columns.
+  `genre`, then `q`, then `sort`. An id that is not a positive integer, or
+  names nothing, gets "This series no longer exists." / "This genre no longer
+  exists." and requests nothing more; an unknown `sort` is no search at all.
+  Its results show as tiles or a list, by the `resultsLayout` Device
+  preference; one switch covers every list on the page. `MainPage`'s sections
+  are always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s
+  keep their default columns.
+- `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
+  more" (`/search?sort=`) shows only once the section has loaded more than six.
 - Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
