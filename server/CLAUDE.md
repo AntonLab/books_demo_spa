@@ -122,8 +122,6 @@ The directories are what their names say; these are what they do not:
   repeats its startup steps, and a change to startup needs the same change there.
 - `repositories/likePattern.ts` is SQL `LIKE` escaping and has nothing to do
   with `likeRepository.ts`.
-- `middleware/optionalAuth.ts` is mounted nowhere: `requirePermission` resolves
-  the session on public reads too. It is not load-bearing; reuse or delete it.
 - `*.testkit.ts` means test support and is never emitted. `src/db/seed/` is not
   test support and carries no such suffix; `tsconfig.build.json` excludes the
   directory instead.

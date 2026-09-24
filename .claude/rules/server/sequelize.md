@@ -71,7 +71,7 @@ paths:
   NULLs are distinct in a unique index, so the two do not interfere. They also
   serve `?userId=`; a further index would cost every insert on the busiest
   table.
-- `bookRepository` maps a `ForeignKeyConstraintError` on create to
+- Creating a book or series maps a `ForeignKeyConstraintError` to
   `NotFoundError('User')`: the first credit is the only reference that can
   fail, because a series is checked under lock by `nextSeriesPosition` first.
 
