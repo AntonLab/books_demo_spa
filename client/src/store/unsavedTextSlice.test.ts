@@ -1,5 +1,6 @@
 import {
   entriesOfBook,
+  ownEntries,
   unsavedText,
   unsavedTextKeys,
   unsavedTextReducer,
@@ -180,5 +181,17 @@ describe('unsavedTextSlice', () => {
     expect(entriesOfBook(entries, 1)).toEqual([
       ['book:1:comment', { text: 'a', savedAt }],
     ]);
+  });
+
+  it("hides another signed-in Account's entries until accountChanged clears them", () => {
+    const state = { unsavedText: withEntry(3) };
+
+    expect(ownEntries(state, 5)).toEqual({});
+    expect(ownEntries(state, 3)).toBe(state.unsavedText.entries);
+    // Nobody signed in here yet, or no owner recorded: nothing to tell apart.
+    expect(ownEntries(state, undefined)).toBe(state.unsavedText.entries);
+    expect(ownEntries({ unsavedText: withEntry(null) }, 5)).toEqual(
+      withEntry(null).entries
+    );
   });
 });

@@ -255,7 +255,8 @@ describe('NewChapterPage', () => {
   });
 
   it('offers the text to an Account that no longer co-authors the book', async () => {
-    renderPage(account({ id: 99, login: 'other' }), typedBefore);
+    mockedBooks.getBook.mockResolvedValue({ ...book, authors: [] });
+    renderPage(account(), typedBefore);
 
     expect(
       await screen.findByRole('textbox', { name: 'Unsaved text' })
