@@ -27,6 +27,9 @@ import tseslint from 'typescript-eslint';
 // The repo-wide anti-patterns from CLAUDE.md, applied to every package.
 const sharedRules = {
   'no-console': 'error',
+  // The repo writes types on their own `import type` line beside the value
+  // import from the same module; that pair is not a duplicate.
+  'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
   '@typescript-eslint/no-explicit-any': 'error',
   // noUncheckedIndexedAccess types a miss as undefined; application code
   // handles it. Tests may assert it away (the override below).
