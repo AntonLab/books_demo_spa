@@ -33,7 +33,7 @@ afterEach(() => {
   document.cookie = 'xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 });
 
-const envelope = { items: [], total: 0, limit: 20, offset: 0 };
+const envelope = { items: [], total: 0, current: 1, pageSize: 20 };
 
 describe('listBooks', () => {
   it('requests /api/books with no query string when given no params', async () => {
@@ -44,63 +44,83 @@ describe('listBooks', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/books');
   });
 
-  it('encodes q, limit and offset into the query string', async () => {
+  it('encodes q, current and pageSize into the query string', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ q: 'dragon riders', limit: 20, offset: 40 });
+    await listBooks({ q: 'dragon riders', current: 3, pageSize: 20 });
 
     expect(fetchMock.mock.calls[0][0]).toBe(
-      '/api/books?q=dragon+riders&limit=20&offset=40'
+      '/api/books?q=dragon+riders&current=3&pageSize=20'
+    );
+  });
+
+  it('encodes the search filters in the order given', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({
+      status: 'complete',
+      releasedFrom: '2026-01-01T00:00:00.000Z',
+      author: 'ann lee',
+      seriesTitle: 'ash',
+      q: undefined,
+    });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?status=complete&releasedFrom=2026-01-01T00%3A00%3A00.000Z&author=ann+lee&seriesTitle=ash'
     );
   });
 
   it('omits an empty q rather than sending q= which the server rejects', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ q: '', limit: 20 });
+    await listBooks({ q: '', pageSize: 20 });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?limit=20');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?pageSize=20');
   });
 
   it('names the caller with userId, the one list that includes drafts', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ userId: 3, limit: 100 });
+    await listBooks({ userId: 3, pageSize: 100 });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?userId=3&limit=100');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?userId=3&pageSize=100');
   });
 
   it('narrows the list to one series with seriesId', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ seriesId: 12, limit: 20 });
+    await listBooks({ seriesId: 12, pageSize: 20 });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?seriesId=12&limit=20');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?seriesId=12&pageSize=20'
+    );
   });
 
   it('narrows the list to one genre with genreId', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ genreId: 4, limit: 20 });
+    await listBooks({ genreId: 4, pageSize: 20 });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?genreId=4&limit=20');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?genreId=4&pageSize=20');
   });
 
   it('ranks the list with sort', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ sort: 'popular', limit: 6 });
+    await listBooks({ sort: 'popular', pageSize: 6 });
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?sort=popular&limit=6');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?sort=popular&pageSize=6'
+    );
   });
 
   it('combines genreId with the other filters, in a fixed order', async () => {
     const fetchMock = mockFetch(envelope);
 
-    await listBooks({ q: 'dragon', seriesId: 12, genreId: 4, limit: 20 });
+    await listBooks({ q: 'dragon', seriesId: 12, genreId: 4, pageSize: 20 });
 
     expect(fetchMock.mock.calls[0][0]).toBe(
-      '/api/books?q=dragon&seriesId=12&genreId=4&limit=20'
+      '/api/books?q=dragon&seriesId=12&genreId=4&pageSize=20'
     );
   });
 
@@ -119,8 +139,8 @@ describe('listBooks', () => {
     mockFetch({
       items: [{ id: 1, description: 'A book' }],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     await expect(listBooks()).resolves.toMatchObject({ total: 1 });

@@ -44,8 +44,8 @@ const answerBySort = (answers: Record<BookSort, Answer>) => {
         title,
       })),
       total: answer.total ?? answer.titles.length,
-      limit: 6,
-      offset: 0,
+      current: 1,
+      pageSize: 6,
     };
   });
 };
@@ -78,7 +78,7 @@ describe('MainPage', () => {
       within(section('New releases')).getByRole('link', { name: 'Fresh' })
     ).toBeInTheDocument();
     for (const sort of ['popular', 'new', 'updated']) {
-      expect(mockedBooks.listBooks).toHaveBeenCalledWith({ sort, limit: 6 });
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith({ sort, pageSize: 6 });
     }
   });
 

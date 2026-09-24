@@ -251,6 +251,8 @@ describe('AppHeader genres submenu', () => {
     await userEvent.click(genresTrigger);
     await screen.findByRole('menuitem', { name: 'Gothic' });
 
+    expect(mockedGenres.listGenres).toHaveBeenCalledWith({ nonEmpty: true });
+
     // Scoped to the submenu's own popup — found through the ARIA relationship
     // the trigger already declares via `aria-controls` — rather than the
     // whole document, so this pins the render order rather than membership:

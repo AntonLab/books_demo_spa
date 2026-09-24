@@ -58,8 +58,8 @@ describe('SearchPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?q=dragon' });
@@ -69,7 +69,7 @@ describe('SearchPage', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -77,8 +77,8 @@ describe('SearchPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?q=dragon' });
@@ -92,8 +92,8 @@ describe('SearchPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book, { ...book, id: 2 }],
       total: 2,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?q=dragon' });
@@ -107,8 +107,8 @@ describe('SearchPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?q=griffin' });
@@ -145,8 +145,8 @@ describe('SearchPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?q=%20dragon%20' });
@@ -156,7 +156,7 @@ describe('SearchPage', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -167,12 +167,17 @@ describe('SearchPage', () => {
       title: 'An Elf Journey',
     };
     mockedBooks.listBooks
-      .mockResolvedValueOnce({ items: [book], total: 1, limit: 20, offset: 0 })
+      .mockResolvedValueOnce({
+        items: [book],
+        total: 1,
+        current: 1,
+        pageSize: 20,
+      })
       .mockResolvedValueOnce({
         items: [elfBook],
         total: 1,
-        limit: 20,
-        offset: 0,
+        current: 1,
+        pageSize: 20,
       });
 
     // A stand-in for the header's SearchBar navigating while SearchPage stays
@@ -208,11 +213,11 @@ describe('SearchPage', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledTimes(2);
     expect(mockedBooks.listBooks).toHaveBeenNthCalledWith(1, {
       q: 'dragon',
-      limit: 20,
+      pageSize: 20,
     });
     expect(mockedBooks.listBooks).toHaveBeenNthCalledWith(2, {
       q: 'elf',
-      limit: 20,
+      pageSize: 20,
     });
   });
 });
@@ -221,8 +226,8 @@ describe('SearchPage results layout', () => {
   const oneBook = {
     items: [book],
     total: 1,
-    limit: 20,
-    offset: 0,
+    current: 1,
+    pageSize: 20,
   };
 
   it('shows tiles by default and switches to a list the device keeps', async () => {
@@ -304,8 +309,8 @@ describe('SearchPage for one series', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?series=12' });
@@ -322,7 +327,7 @@ describe('SearchPage for one series', () => {
     expect(mockedSeries.getSeries).toHaveBeenCalledWith(12);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       seriesId: 12,
-      limit: 20,
+      pageSize: 100,
     });
   });
 
@@ -331,8 +336,8 @@ describe('SearchPage for one series', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?series=12' });
@@ -349,8 +354,8 @@ describe('SearchPage for one series', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?series=99' });
@@ -367,8 +372,8 @@ describe('SearchPage for one series', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     renderWithProviders(<SearchPage />, { route: '/search?series=12' });
@@ -415,8 +420,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [],
@@ -435,7 +440,7 @@ describe('SearchPage for one genre', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       genreId: 4,
-      limit: 20,
+      pageSize: 20,
     });
     expect(mockedSeries.listSeries).toHaveBeenCalledWith({
       genreId: 4,
@@ -448,8 +453,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [gothicSeries],
@@ -477,8 +482,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [],
@@ -501,8 +506,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockRejectedValue(new Error('Network down'));
 
@@ -519,8 +524,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [],
@@ -575,8 +580,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [],
@@ -597,7 +602,7 @@ describe('SearchPage for one genre', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       seriesId: 12,
-      limit: 20,
+      pageSize: 100,
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
     expect(mockedSeries.listSeries).not.toHaveBeenCalled();
@@ -608,8 +613,8 @@ describe('SearchPage for one genre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     mockedSeries.listSeries.mockResolvedValue({
       items: [],
@@ -625,7 +630,7 @@ describe('SearchPage for one genre', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       genreId: 4,
-      limit: 20,
+      pageSize: 20,
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
     expect(mockedSeries.listSeries).toHaveBeenCalledTimes(1);
@@ -637,8 +642,8 @@ describe('SearchPage for a ranking (?sort=)', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
   });
 
@@ -656,7 +661,7 @@ describe('SearchPage for a ranking (?sort=)', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'updated',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -670,7 +675,7 @@ describe('SearchPage for a ranking (?sort=)', () => {
     ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
-      limit: 20,
+      pageSize: 20,
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
   });

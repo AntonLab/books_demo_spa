@@ -106,8 +106,8 @@ beforeEach(() => {
   mockedBooks.listBooks.mockResolvedValue({
     items: [book(1, 'Private Draft', 'draft'), book(2, 'Out Now', 'complete')],
     total: 2,
-    limit: 100,
-    offset: 0,
+    current: 1,
+    pageSize: 100,
   });
 });
 
@@ -123,7 +123,7 @@ describe('MyBooksPage', () => {
     // Naming the caller's own id is what makes the server include drafts.
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       userId: author.id,
-      limit: 100,
+      pageSize: 100,
     });
   });
 
@@ -149,8 +149,8 @@ describe('MyBooksPage', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
       total: 0,
-      limit: 100,
-      offset: 0,
+      current: 1,
+      pageSize: 100,
     });
     renderPage();
 
