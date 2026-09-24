@@ -17,6 +17,7 @@ import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNo
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
@@ -54,8 +55,7 @@ export const EditBookPage: FC = () => {
   const isCoAuthor = book.authors.some((author) => author.id === session?.id);
   // A Moderator may edit and delete any book, but never change its byline —
   // CoAuthorManager stays read-only for one.
-  const isModerator =
-    session?.role === 'admin' || session?.role === 'superadmin';
+  const isModerator = isModeratorRole(session?.role);
 
   // Mirrors the server, which refuses anyone else with a 403: offering the
   // form would only collect edits it cannot save.

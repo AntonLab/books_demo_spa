@@ -4,6 +4,7 @@ import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import { useGenresWithBooks } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
@@ -45,7 +46,7 @@ export const AppHeader: FC = () => {
   // Empty covers all three cases the submenu must not appear in: loading,
   // failed, and a genuinely empty list.
   const genreItems = genres.data?.items ?? [];
-  const isModerator = user?.role === 'admin' || user?.role === 'superadmin';
+  const isModerator = isModeratorRole(user?.role);
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },

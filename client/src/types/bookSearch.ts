@@ -3,17 +3,12 @@ import { ApiError } from '../api/client';
 import type { ListBooksParams } from '../api/books';
 import {
   BOOK_SORTS,
-  RANGE_ORDER,
   SEARCHABLE_BOOK_STATUSES,
   type BookSort,
   type SearchableBookStatus,
 } from './book';
 
 export const SEARCH_PAGE_SIZE = 20;
-
-// Re-exported so SearchForm can still import it from here; the value itself
-// now lives in shared/src/book.ts, next to the server's own copy.
-export { RANGE_ORDER };
 
 const TEXT_KEYS = ['q', 'author', 'seriesTitle'] as const;
 const DAY_KEYS = [
@@ -183,19 +178,23 @@ export const filterCount = (search: BookSearch): number =>
     search.updatedFrom ?? search.updatedTo,
   ].filter((value) => value !== undefined).length;
 
-// The API's names for the form's fields. Two differ: the Genre select sends
-// `genreId`, and `current` / `pageSize` have no field to show an error on.
-const FIELD_OF_PARAM: Partial<Record<string, keyof BookSearchFormValues>> = {
-  q: 'q',
-  author: 'author',
-  seriesTitle: 'seriesTitle',
-  genreId: 'genre',
-  status: 'status',
-  releasedFrom: 'releasedFrom',
-  releasedTo: 'releasedTo',
-  updatedFrom: 'updatedFrom',
-  updatedTo: 'updatedTo',
-  sort: 'sort',
+// The API names the form's fields as the form does, but for the Genre select,
+// which sends `genreId`; `current` / `pageSize` have no field to show an
+// error on.
+const SAME_NAME_FIELDS: readonly string[] = [
+  ...TEXT_KEYS,
+  'status',
+  ...DAY_KEYS,
+  'sort',
+];
+
+const fieldOfParam = (
+  param: unknown
+): keyof BookSearchFormValues | undefined => {
+  if (param === 'genreId') return 'genre';
+  return typeof param === 'string' && SAME_NAME_FIELDS.includes(param)
+    ? (param as keyof BookSearchFormValues)
+    : undefined;
 };
 
 // A 400 carries zod's issues in `details`; each lands on the field it names.
@@ -211,7 +210,7 @@ export const fieldErrorsOf = (error: unknown): SearchFieldError[] => {
     if (typeof issue !== 'object' || issue === null) return [];
     const { path, message } = issue as { path?: unknown; message?: unknown };
     const [head]: unknown[] = Array.isArray(path) ? path : [];
-    const name = typeof head === 'string' ? FIELD_OF_PARAM[head] : undefined;
+    const name = fieldOfParam(head);
     return name !== undefined && typeof message === 'string'
       ? [{ name, errors: [message] }]
       : [];

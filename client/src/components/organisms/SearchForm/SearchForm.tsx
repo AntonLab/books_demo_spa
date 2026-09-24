@@ -18,13 +18,13 @@ import {
   BOOK_SORT_LABELS,
   BOOK_SORTS,
   BOOK_STATUS_LABELS,
+  RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
 } from '@/types/book';
-import {
-  RANGE_ORDER,
-  type BookSearchFormValues,
-  type SearchFieldError,
+import type {
+  BookSearchFormValues,
+  SearchFieldError,
 } from '@/types/bookSearch';
 import type { PublicGenre } from '@/types/genre';
 import styles from './SearchForm.module.css';

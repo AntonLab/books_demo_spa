@@ -15,6 +15,7 @@ import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/Unsa
 import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
 import type { ChapterFormValues } from '@/components/organisms/ChapterForm/ChapterForm';
 import { useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import { useBook } from '@/queries/books';
 import {
   useChapter,
@@ -95,8 +96,7 @@ export const EditChapterPage: FC = () => {
   const isCoAuthor = book.data.authors.some(
     (author) => author.id === session?.id
   );
-  const isModerator =
-    session?.role === 'admin' || session?.role === 'superadmin';
+  const isModerator = isModeratorRole(session?.role);
   if (!isCoAuthor && !isModerator) {
     return (
       <>
