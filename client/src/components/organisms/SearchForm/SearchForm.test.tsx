@@ -1,3 +1,4 @@
+import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
@@ -31,6 +32,7 @@ const renderForm = (
           theme: 'light',
           resultsLayout: 'grid',
           searchFormExpanded: expanded,
+          reading: initialReadingPreferences,
         },
       },
     }

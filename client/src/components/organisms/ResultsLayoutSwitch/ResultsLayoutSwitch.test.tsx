@@ -1,3 +1,4 @@
+import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ResultsLayoutSwitch } from './ResultsLayoutSwitch';
@@ -11,6 +12,7 @@ describe('ResultsLayoutSwitch', () => {
           theme: 'light',
           resultsLayout: 'list',
           searchFormExpanded: true,
+          reading: initialReadingPreferences,
         },
       },
     });

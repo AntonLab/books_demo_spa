@@ -1,3 +1,4 @@
+import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
 import { screen } from '@testing-library/react';
 import { theme } from 'antd';
 import type { FC } from 'react';
@@ -27,6 +28,7 @@ describe('ThemedConfigProvider', () => {
           theme: 'dark',
           resultsLayout: 'grid',
           searchFormExpanded: true,
+          reading: initialReadingPreferences,
         },
       },
     });
@@ -41,6 +43,7 @@ describe('ThemedConfigProvider', () => {
           theme: 'dark',
           resultsLayout: 'grid',
           searchFormExpanded: true,
+          reading: initialReadingPreferences,
         },
       },
     });
@@ -62,6 +65,7 @@ describe('ThemedConfigProvider', () => {
           theme: 'dark',
           resultsLayout: 'grid',
           searchFormExpanded: true,
+          reading: initialReadingPreferences,
         },
       },
     });

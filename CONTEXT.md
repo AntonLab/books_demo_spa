@@ -178,7 +178,8 @@ _Avoid_: Draft (for text not yet sent)
 
 **Device preferences**:
 How the app looks and reads on one device, such as its theme, the layout of
-search results (grid or list) or the reading font size. The server never sees
+search results (grid or list), or how a Chapter reads: its background, font,
+font size, line height and text width. The server never sees
 them, so another device does not share them,
 and signing out keeps them.
 _Avoid_: Settings, Profile (both suggest something the Account keeps)

@@ -1,0 +1,22 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: block;
+  padding: var(--ant-padding-xs) var(--ant-padding-sm);
+  border-radius: var(--ant-border-radius);
+  color: var(--ant-color-text);
+}
+
+.item:hover {
+  background: var(--ant-color-fill-tertiary);
+}
+
+.current {
+  background: var(--ant-color-primary-bg);
+  color: var(--ant-color-primary);
+  font-weight: var(--ant-font-weight-strong);
+}
