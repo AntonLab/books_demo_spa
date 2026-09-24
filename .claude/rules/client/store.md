@@ -21,6 +21,12 @@ and that the server never sees: Unsaved text and Device preferences
   unsubscribes, waits, writes the state as it is then, and resubscribes. A
   `pagehide` listener writes both slices at once, so a reload inside that
   window loses nothing.
+- **Two open tabs sync through the `storage` event**, not just at startup: a
+  `window` listener in `index.ts` reparses the other tab's value with
+  `persistence.ts`'s own shape guards and replaces the slice here, or resets
+  it when the other tab cleared the key. The 500 ms throttle still leaves a
+  small race — a keystroke in this tab lands after that reparse and before
+  the next write, so a slow-enough interleaving can still lose it.
 - **Reducers stay pure**: `upsert` stamps `savedAt` in its `prepare`.
 - **An entry is keyed by its place**, always `book:{bookId}:…`
   (`unsavedTextKeys`), so a page whose Book is gone finds all of its entries

@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 
 // Device preferences (CONTEXT.md): how the app looks on this device. Not tied
 // to an Account, so signing out keeps them. Reading font size and the like
@@ -18,6 +19,12 @@ const slice = createSlice({
   reducers: {
     themeToggled(state) {
       state.theme = state.theme === 'light' ? 'dark' : 'light';
+    },
+    // Another tab's write, relayed by the `storage` event: that tab's value
+    // wins here too. `null` means that tab cleared the key (a corrupt value
+    // is filtered out before this dispatches, so it never arrives here).
+    replaced(_state, action: PayloadAction<DevicePreferencesState | null>) {
+      return action.payload ?? initialState;
     },
   },
 });
