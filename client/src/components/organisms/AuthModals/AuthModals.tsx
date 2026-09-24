@@ -40,7 +40,7 @@ export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
       return <RegisterModal onOpen={onOpen} onClose={onClose} />;
     case 'resetRequest':
       return <ResetRequestModal onOpen={onOpen} onClose={onClose} />;
-    default:
+    case null:
       return null;
   }
 };
