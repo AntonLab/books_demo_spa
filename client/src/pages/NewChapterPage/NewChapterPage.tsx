@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import { Alert, Skeleton, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -26,6 +27,15 @@ export const NewChapterPage: FC = () => {
   const entry = useAppSelector(
     (state) => state.unsavedText.entries[unsavedKey]
   );
+  // A create can land after the Account has already moved to an unrelated
+  // route; without this, the delayed navigate() below would still fire and
+  // pull them back here.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -62,7 +72,10 @@ export const NewChapterPage: FC = () => {
       .then(
         () => {
           dispatch(unsavedText.remove(unsavedKey));
-          void navigate(`/books/${bookId}/edit`);
+          // Only while still here: the Account may have already moved to
+          // an unrelated route, and forcing them back here now would be
+          // jarring.
+          if (mountedRef.current) void navigate(`/books/${bookId}/edit`);
         },
         // A rejection is already surfaced through create.error; this handler
         // exists only so the rejection is not left unhandled.

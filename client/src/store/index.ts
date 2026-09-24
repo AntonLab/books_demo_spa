@@ -58,9 +58,26 @@ export const syncFromStorageEvent = (
     target.dispatch(
       devicePreferences.replaced(parsed?.devicePreferences ?? null)
     );
-  } else {
-    target.dispatch(unsavedText.replaced(parsed?.unsavedText ?? null));
+    return;
   }
+  const incoming = parsed?.unsavedText ?? null;
+  const thisAccountId = target.getState().unsavedText.accountId;
+  // Two tabs signed into different Accounts would otherwise ping-pong: this
+  // tab adopts the other Account's slice, AppHeader's `accountChanged`
+  // effect wipes it straight back to this Account and writes that, the
+  // other tab adopts it back, and so on — each round losing Unsaved text.
+  // `null` on either side (nobody seen signed in yet, or the key was
+  // cleared) never triggers `accountChanged`, so only a genuine mismatch
+  // between two signed-in Accounts is skipped here.
+  if (
+    incoming !== null &&
+    incoming.accountId !== null &&
+    thisAccountId !== null &&
+    incoming.accountId !== thisAccountId
+  ) {
+    return;
+  }
+  target.dispatch(unsavedText.replaced(incoming));
 };
 
 export const store = createAppStore();

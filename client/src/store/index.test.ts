@@ -23,7 +23,31 @@ describe('cross-tab sync', () => {
     expect(store.getState().unsavedText).toEqual(fromOtherTab);
   });
 
-  it('resets Unsaved text when another tab clears the key (a Log out)', () => {
+  it("keeps this tab's Unsaved text when another tab shows a different signed-in Account", () => {
+    const store = createAppStore({});
+    store.dispatch(unsavedText.accountChanged(3));
+    store.dispatch(unsavedText.upsert({ key: 'book:1:comment', text: 'Mine' }));
+    const before = store.getState().unsavedText;
+
+    syncFromStorageEvent(
+      store,
+      new StorageEvent('storage', {
+        key: STORAGE_KEYS.unsavedText,
+        newValue: JSON.stringify({
+          accountId: 5,
+          entries: { 'book:1:comment': { text: 'Theirs', savedAt } },
+        }),
+      })
+    );
+
+    // Replacing it here would make AppHeader's accountChanged effect wipe it
+    // back to Account 3 and write that back, which the other tab would then
+    // replace again — a loop between two Accounts that wipes Unsaved text
+    // every round.
+    expect(store.getState().unsavedText).toEqual(before);
+  });
+
+  it('resets Unsaved text when another tab removes the key (a null newValue)', () => {
     const store = createAppStore({});
     store.dispatch(
       unsavedText.upsert({ key: 'book:1:comment', text: 'Local text' })

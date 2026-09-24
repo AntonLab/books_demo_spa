@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
@@ -48,6 +48,15 @@ export const EditChapterPage: FC = () => {
   // Bumped by "Use their version" to remount the form even when the version
   // on screen has not changed, so it lets go of the discarded text.
   const [resets, setResets] = useState(0);
+  // A delete can land after the Account has already moved to an unrelated
+  // route; without this, the delayed navigate() below would still fire and
+  // pull them back here.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const discardEntry = () => {
     dispatch(unsavedText.remove(unsavedKey));
@@ -170,13 +179,16 @@ export const EditChapterPage: FC = () => {
 
   const handleDelete = () => {
     // mutateAsync over mutate's per-call onSuccess: TanStack skips that
-    // callback if the page unmounts before the mutation settles (Popconfirm
-    // closing right after "Delete"), but mutateAsync's own promise still
-    // settles, so the entry is still discarded.
+    // callback if the page unmounts before the mutation settles (the
+    // Account navigating away, not Popconfirm closing, is what unmounts
+    // it), but mutateAsync's own promise still settles, so the entry is
+    // still discarded.
     void remove.mutateAsync(undefined).then(
       () => {
         discardEntry();
-        void navigate(`/books/${bookId}/edit`);
+        // Only while still here: the Account may have already moved to an
+        // unrelated route, and forcing them back here now would be jarring.
+        if (mountedRef.current) void navigate(`/books/${bookId}/edit`);
       },
       // A rejection is already surfaced through remove.error; this handler
       // exists only so the rejection is not left unhandled.
