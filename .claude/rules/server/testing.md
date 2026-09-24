@@ -39,10 +39,11 @@ Each answers a question the others cannot:
 
 ## MySQL-backed suites
 
-- Each asks `skipWithoutMysql()` (`db/mysqlProbe.testkit.ts`) whether to run: it
-  skips when `DB_USER` is unset or MySQL is unreachable. `REQUIRE_MYSQL=1`, set
-  in CI, turns that skip into a failure. A new suite takes its `skip` from this
-  helper, or CI cannot tell it skipped.
+- Each asks `skipWithoutMysql()` (`db/mysqlProbe.testkit.ts`) whether to run:
+  with `DB_USER` unset or MySQL unreachable it throws, failing the spec file
+  with the reason. `SKIP_MYSQL=1` turns that failure into a skip, and makes
+  `posttest` skip its cleanup. A new suite takes its `skip` from this helper,
+  or a missing database passes it silently.
 - `node:test` runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one schema drop each other's tables. So each suite
   has its own schema, named `TEST_DB_NAME` (default `books_demo_spa_test`) plus

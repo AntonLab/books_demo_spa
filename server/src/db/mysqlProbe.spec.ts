@@ -11,13 +11,21 @@ const unreachable = {
   DB_PORT: '1',
 };
 
-test('skips with a reason when DB_USER is not set', async () => {
-  assert.match(String(await skipWithoutMysql({})), /DB_USER is not set/);
+test('fails when DB_USER is not set or MySQL is unreachable', async () => {
+  await assert.rejects(skipWithoutMysql({}), /DB_USER is not set/);
+  await assert.rejects(
+    skipWithoutMysql(unreachable),
+    /MySQL unreachable: .*ECONNREFUSED.*SKIP_MYSQL=1/
+  );
 });
 
-test('skips with a reason when MySQL is unreachable', async () => {
+test('skips with the reason instead under SKIP_MYSQL=1', async () => {
   assert.match(
-    String(await skipWithoutMysql(unreachable)),
+    String(await skipWithoutMysql({ SKIP_MYSQL: '1' })),
+    /DB_USER is not set/
+  );
+  assert.match(
+    String(await skipWithoutMysql({ ...unreachable, SKIP_MYSQL: '1' })),
     /MySQL unreachable: .*ECONNREFUSED/
   );
 });
@@ -37,16 +45,5 @@ test('names every refused address when localhost resolves to several', () => {
   assert.equal(
     connectionErrorText(error),
     'connect ECONNREFUSED ::1:3306; connect ECONNREFUSED 127.0.0.1:3306'
-  );
-});
-
-test('throws instead of skipping under REQUIRE_MYSQL=1', async () => {
-  await assert.rejects(
-    skipWithoutMysql({ REQUIRE_MYSQL: '1' }),
-    /REQUIRE_MYSQL is set but DB_USER is not set/
-  );
-  await assert.rejects(
-    skipWithoutMysql({ ...unreachable, REQUIRE_MYSQL: '1' }),
-    /REQUIRE_MYSQL is set but MySQL unreachable/
   );
 });
