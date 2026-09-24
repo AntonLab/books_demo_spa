@@ -32,6 +32,9 @@ export const NewChapterPage: FC = () => {
   // pull them back here.
   const mountedRef = useRef(true);
   useEffect(() => {
+    // Set here too, not only at init: StrictMode runs the cleanup once between
+    // two mounts, which would otherwise leave the page never navigating.
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };

@@ -77,6 +77,10 @@ no MSW.
   `navigator.clipboard.readText()`.
 - **`UnsavedTextNotice`'s textarea is a fixed `rows={6}`, not antd's
   `autoSize`**: `autoSize` logs a NaN-height `console.error` under jsdom.
+- **Tests run without StrictMode, but the app runs with it** (`index.tsx`).
+  Code whose effect cleanup flips a ref needs one test with
+  `renderWithProviders(ui, { reactStrictMode: true })`. A `<StrictMode>`
+  nested inside the providers does not double-run the effects.
 - **A persistence test uses fake timers**: Unsaved text is written 500 ms
   after a change, so `await jest.advanceTimersByTimeAsync(500)` before reading
   `localStorage`.

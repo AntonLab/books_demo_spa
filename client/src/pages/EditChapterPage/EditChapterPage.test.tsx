@@ -233,10 +233,9 @@ describe('EditChapterPage', () => {
       expect(mockedChapters.deleteChapter).toHaveBeenCalled()
     );
 
-    // The Account left for an unrelated route before the delete responded —
-    // a page swap through the router, not a full unmount — so a guard-less
-    // navigate would still fire once the promise landed and silently pull
-    // them back here.
+    // The Account left for an unrelated route before the delete responded, which
+    // unmounts the page; a guard-less navigate would still fire once the
+    // promise landed and silently pull them back here.
     await userEvent.click(screen.getByRole('link', { name: 'Elsewhere' }));
     expect(
       await screen.findByText('Somewhere else entirely')
