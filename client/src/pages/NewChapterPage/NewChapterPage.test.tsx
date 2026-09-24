@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Link, Route, Routes } from 'react-router';
 import { NewChapterPage } from './NewChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -183,6 +183,55 @@ describe('NewChapterPage', () => {
 
     expect(await screen.findByText('Book editor')).toBeInTheDocument();
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('does not force navigation back once the Account has moved elsewhere before the create lands', async () => {
+    let land: (chapter: PublicChapter) => void = () => {};
+    mockedChapters.createChapter.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        })
+    );
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, account());
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/books/:bookId/chapters/new"
+          element={
+            <>
+              <NewChapterPage />
+              <Link to="/elsewhere">Elsewhere</Link>
+            </>
+          }
+        />
+        <Route path="/books/:id/edit" element={<p>Book editor</p>} />
+        <Route path="/elsewhere" element={<p>Somewhere else entirely</p>} />
+      </Routes>,
+      { route: '/books/1/chapters/new', queryClient }
+    );
+
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(mockedChapters.createChapter).toHaveBeenCalled()
+    );
+
+    // The Account left for an unrelated route before the create responded —
+    // a page swap through the router, not a full unmount — so a guard-less
+    // navigate would still fire once the promise landed and silently pull
+    // them back here.
+    await userEvent.click(screen.getByRole('link', { name: 'Elsewhere' }));
+    expect(
+      await screen.findByText('Somewhere else entirely')
+    ).toBeInTheDocument();
+
+    await act(async () => land(created));
+
+    expect(screen.getByText('Somewhere else entirely')).toBeInTheDocument();
+    expect(screen.queryByText('Book editor')).toBeNull();
   });
 
   it('offers the text to an Account that no longer co-authors the book', async () => {
