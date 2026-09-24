@@ -51,15 +51,21 @@ export const SearchPage: FC = () => {
   const fieldErrors = useMemo(() => fieldErrorsOf(books.error), [books.error]);
 
   // Past the end the server serves its last non-empty page; the URL follows
-  // it without a history entry of its own.
+  // it without a history entry of its own. While the genre is blocked the
+  // query is disabled but still keyed with `genreId: undefined` — the same
+  // key as the same search without a genre — so `served` can be a stale
+  // `current` read back from that other search's cache entry rather than
+  // anything this search asked for.
   const served = books.data?.current;
   useEffect(() => {
-    if (served === undefined || served === search.page) return;
+    if (genreBlocked || served === undefined || served === search.page) {
+      return;
+    }
     setSearchParams(
       toSearchParams({ ...parseBookSearch(searchParams), page: served }),
       { replace: true }
     );
-  }, [served, search.page, searchParams, setSearchParams]);
+  }, [genreBlocked, served, search.page, searchParams, setSearchParams]);
 
   return (
     <>
