@@ -179,7 +179,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       viewer: Viewer
     ): Promise<string[]> =>
       (
-        await repository.list({ limit: 20, offset: 0, ...query }, viewer)
+        await repository.list({ current: 1, pageSize: 20, ...query }, viewer)
       ).items.map((book) => book.title);
 
     const owner: Viewer = { id: ownerId, role: 'author' };
@@ -464,15 +464,15 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     const page = await listAsGuest({
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
       userId: coAuthorId,
     });
 
     assert.equal(page.total, 1);
     assert.equal(page.items[0]?.title, 'Shared Book');
     assert.equal(
-      (await listAsGuest({ limit: 20, offset: 0, userId: ownerId })).total,
+      (await listAsGuest({ current: 1, pageSize: 20, userId: ownerId })).total,
       2
     );
   });
@@ -587,7 +587,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: ['epic-fantasy'],
     });
 
-    const exact = await listAsGuest({ limit: 20, offset: 0, tag: 'epic' });
+    const exact = await listAsGuest({ current: 1, pageSize: 20, tag: 'epic' });
 
     // A LIKE-based implementation would return both rows here.
     assert.equal(exact.total, 1);
@@ -622,13 +622,13 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     const inGothic = await listAsGuest({
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
       genreId: gothic.id,
     });
     const inMissing = await listAsGuest({
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
       genreId: 999_999,
     });
 
@@ -650,8 +650,8 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     const { items } = await listAsGuest({
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
       q: 'Dragon Gate',
     });
 
@@ -675,7 +675,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const matches = await listAsGuest({ limit: 20, offset: 0, q: '%' });
+    const matches = await listAsGuest({ current: 1, pageSize: 20, q: '%' });
 
     assert.equal(matches.total, 1);
     assert.match(matches.items[0]?.description ?? '', /100% real/);
@@ -719,7 +719,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     };
 
     const sortedTitles = async (sort: 'popular' | 'new' | 'updated') => {
-      const page = await listAsGuest({ limit: 20, offset: 0, sort });
+      const page = await listAsGuest({ current: 1, pageSize: 20, sort });
       return {
         titles: page.items.map((book) => book.title),
         total: page.total,
@@ -787,7 +787,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       tags: [],
     });
 
-    const page = await listAsGuest({ limit: 2, offset: 0, seriesId });
+    const page = await listAsGuest({ current: 1, pageSize: 2, seriesId });
 
     assert.equal(page.total, 3);
     assert.equal(page.items.length, 2);
@@ -904,7 +904,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
   const seriesTitles = async (id: number = seriesId): Promise<string[]> =>
-    (await listAsGuest({ limit: 20, offset: 0, seriesId: id })).items.map(
+    (await listAsGuest({ current: 1, pageSize: 20, seriesId: id })).items.map(
       (book) => book.title
     );
 
@@ -1167,7 +1167,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
     await repository.setCover(withCover.id, Buffer.from('list-cover-bytes'));
 
-    const { items } = await listAsGuest({ limit: 20, offset: 0 });
+    const { items } = await listAsGuest({ current: 1, pageSize: 20 });
 
     const withCoverItem = items.find((item) => item.id === withCover.id);
     const withoutCoverItem = items.find((item) => item.id === withoutCover.id);

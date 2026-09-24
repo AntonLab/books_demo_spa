@@ -279,7 +279,7 @@ export function bookRepositoryContract(
     );
 
     const page = await repository.list(
-      { limit: 20, offset: 0, seriesId },
+      { current: 1, pageSize: 20, seriesId },
       null
     );
     assert.deepEqual(
@@ -301,6 +301,33 @@ export function bookRepositoryContract(
       status: 'draft',
       authors: four.authors,
     });
+  });
+
+  test('contract: a page past the end is served as the last non-empty page, and page 1 when nothing matches', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    for (const title of ['One', 'Two', 'Three']) {
+      const book = await aBook(repository, authorId, { title });
+      // Published, so the public list shows them to a Guest as well.
+      await repository.update(book.id, { status: 'in_progress' });
+    }
+
+    const past = await repository.list(
+      { current: 9, pageSize: 2, userId: authorId },
+      null
+    );
+    assert.equal(past.current, 2);
+    assert.equal(past.total, 3);
+    assert.equal(past.items.length, 1);
+
+    const none = await repository.list(
+      { current: 4, pageSize: 2, userId: MISSING_ID },
+      null
+    );
+    assert.deepEqual(
+      { current: none.current, total: none.total, items: none.items },
+      { current: 1, total: 0, items: [] }
+    );
   });
 
   test('contract: a missing series has no books to list or reorder', async () => {

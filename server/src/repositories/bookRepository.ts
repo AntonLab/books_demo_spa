@@ -50,6 +50,8 @@ function sequelizeOf(): Sequelize {
 export interface BookListResult {
   items: PublicBook[];
   total: number;
+  // The page served, which is lower than the one asked for past the end.
+  current: number;
 }
 
 export interface BookRepository {
@@ -352,10 +354,19 @@ export function createSequelizeBookRepository(): BookRepository {
             ).map((credit) => credit.bookId);
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);
-      const { rows, count } = await Book.findAndCountAll({
-        where: buildWhere(query, creditedBookIds, viewer, rank),
-        limit: query.limit,
-        offset: query.offset,
+      const where = buildWhere(query, creditedBookIds, viewer, rank);
+      // Counted first, so a page past the end can be served as the last
+      // non-empty one (page 1 when nothing matches) rather than as an empty
+      // page the client would have to page back from.
+      const total = await Book.count({ where });
+      const current = Math.min(
+        query.current,
+        Math.max(1, Math.ceil(total / query.pageSize))
+      );
+      const rows = await Book.findAll({
+        where,
+        limit: query.pageSize,
+        offset: (current - 1) * query.pageSize,
         // A ranked list goes best first, ties to the newer book; otherwise a
         // series' books come in Series order and every other list by id.
         order:
@@ -386,7 +397,8 @@ export function createSequelizeBookRepository(): BookRepository {
             genreOf(row.genreId, genres)
           )
         ),
-        total: count,
+        total,
+        current,
       };
     },
 
