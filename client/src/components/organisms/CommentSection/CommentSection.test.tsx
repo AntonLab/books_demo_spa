@@ -444,6 +444,27 @@ describe('CommentSection Unsaved text', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Better wording');
   });
 
+  it('leaves no entry behind for an Edit opened and left unchanged', async () => {
+    const { store } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.type(screen.getByRole('textbox'), '!{Backspace}');
+
+    expect(screen.getByRole('textbox')).toHaveValue('A fine book');
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('keeps an edit cleared to nothing empty', async () => {
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.clear(screen.getByRole('textbox'));
+
+    expect(screen.getByRole('textbox')).toHaveValue('');
+  });
+
   it('keeps the text when the post fails', async () => {
     mockedComments.createComment.mockRejectedValue(
       new ApiError(500, 'Server error')

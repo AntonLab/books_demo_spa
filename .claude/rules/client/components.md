@@ -42,8 +42,9 @@ that read like mistakes and are not.
   on screen. The heading renders in every state so the section keeps its place.
 - The molecule may be called `Comment` because antd removed its own in v5.
 - The composer has no local state: its value is the Unsaved text entry of the
-  open composer (root, reply or edit). Edit seeds its entry from the Comment's
-  text, so clearing the field leaves it empty. A send clears the entry only on
+  open composer (root, reply or edit), or the saved Comment while an edit has
+  none. Opening Edit writes nothing; clearing the field keeps an empty entry,
+  so the saved text does not come back. A send clears the entry only on
   success. A reply or edit whose target is gone or a Tombstone falls back to
   the root composer, and its text shows as an `UnsavedTextNotice`.
 
