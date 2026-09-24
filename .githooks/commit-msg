@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Commit-msg: the subject must be a conventional commit with one of the types
+# CLAUDE.md lists. Git's own subjects (merges, reverts) and autosquash markers
+# pass untouched. Bypass with `git commit --no-verify`.
+
+subject=$(head -n 1 "$1")
+
+case $subject in
+  'Merge '* | 'Revert "'* | 'fixup! '* | 'squash! '* | 'amend! '*) exit 0 ;;
+esac
+
+echo "$subject" | grep -Eq '^(feat|fix|refactor|chore|docs|test|ci)(\([^)]+\))?!?: .+' &&
+  exit 0
+
+echo "commit-msg: not a conventional commit subject:"
+echo "  $subject"
+echo "Expected <type>(<scope>)?: <summary>, type one of"
+echo "feat, fix, refactor, chore, docs, test, ci."
+exit 1

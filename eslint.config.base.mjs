@@ -26,8 +26,11 @@ import tseslint from 'typescript-eslint';
 
 // The repo-wide anti-patterns from CLAUDE.md, applied to every package.
 const sharedRules = {
-  'no-console': 'warn',
+  'no-console': 'error',
   '@typescript-eslint/no-explicit-any': 'error',
+  // noUncheckedIndexedAccess types a miss as undefined; application code
+  // handles it. Tests may assert it away (the override below).
+  '@typescript-eslint/no-non-null-assertion': 'error',
   '@typescript-eslint/no-unused-vars': [
     'error',
     {
@@ -38,11 +41,13 @@ const sharedRules = {
   ],
 };
 
-// Three typed rules rather than the whole recommendedTypeChecked preset: the
-// promise mistakes the untyped rules cannot see. node:test's `test`,
+// A few typed rules rather than the whole recommendedTypeChecked preset: the
+// promise mistakes the untyped rules cannot see, and a switch over an
+// `as const` union (the repo's enum) that misses a member. node:test's `test`,
 // `describe`, `it` and `suite` return promises the runner itself tracks, so
 // they are exempt — typescript-eslint's documented form for that API.
 const typedRules = {
+  '@typescript-eslint/switch-exhaustiveness-check': 'error',
   '@typescript-eslint/no-floating-promises': [
     'error',
     {
@@ -87,6 +92,14 @@ export const createConfig = (
         parserOptions: { projectService: true, tsconfigRootDir },
       },
       rules: { ...sharedRules, ...typedRules },
+    },
+    {
+      files: [
+        '**/*.{spec,test}.{ts,tsx}',
+        '**/*.testkit.ts',
+        'src/test/**/*.{ts,tsx}',
+      ],
+      rules: { '@typescript-eslint/no-non-null-assertion': 'off' },
     },
     ...packageConfigs,
     // Disables stylistic rules that conflict with Prettier. Must stay last,

@@ -14,12 +14,7 @@
     // Node's type stripping resolves imports exactly as written, so relative
     // imports carry `.ts`, as they do in the server.
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    // Node strips types rather than compiling them: no enums or namespaces,
-    // and every type-only import marked `type`, or it survives into the
-    // runtime import and fails to link.
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "noEmit": true
   },
   "include": ["src"]
 }
