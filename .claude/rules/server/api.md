@@ -98,6 +98,10 @@ code alone does not explain.
   failure, which always has one.
 - Absent `genreId` on a create means `null`; absent on a `PATCH` leaves it
   alone.
+- `GET /api/genres?nonEmpty=true` lists only Genres holding an `in_progress`
+  or `complete` Book (a fixed subquery), so a Draft book never reveals its
+  Genre. The header menu and the search form use it; the forms and
+  AdminGenresPage take the whole list.
 
 ## Zod traps
 

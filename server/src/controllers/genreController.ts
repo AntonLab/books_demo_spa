@@ -1,8 +1,12 @@
 import type { RequestHandler } from 'express';
-import { validatedBody, validatedParams } from '../middleware/validate.ts';
+import {
+  validatedBody,
+  validatedParams,
+  validatedQuery,
+} from '../middleware/validate.ts';
 import type { GenreRepository } from '../repositories/genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { GenreInput } from '../types/genre.ts';
+import type { GenreInput, ListGenresQuery } from '../types/genre.ts';
 
 export interface GenreController {
   list: RequestHandler;
@@ -25,8 +29,9 @@ export function createGenreController(
     // A1. Rides on `genres × read`, which `guest` holds, so the header's
     // Genres menu renders for a visitor with no session. No paging envelope:
     // the list is short and every caller wants it whole.
-    list: async (_req, res) => {
-      res.json({ items: await repository.list() });
+    list: async (req, res) => {
+      const { nonEmpty = false } = validatedQuery<ListGenresQuery>(req);
+      res.json({ items: await repository.list({ nonEmpty }) });
     },
 
     // A2. A name already taken is the repository's ConflictError (409); a
