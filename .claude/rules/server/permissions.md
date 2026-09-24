@@ -26,8 +26,8 @@ paths:
   access to nothing today.
 - On `create`, `own` and `any` mean the same thing, since a new row is the
   caller's by construction. The create path still checks rows after the matrix:
-  `assertMayAddToSeries` for a book filed into a series,
-  `assertMayChangeChaptersOf` for a chapter.
+  `assertMayAddToSeries` for a book filed into a series, and `assertMayChange`
+  on the book for a chapter.
 - **Admins moderate; they do not author.** `admin` and `superadmin` get no
   `create` on `books`, `series` or `chapters`, and `update: own` rather than
   `any` on `comments` and `likes`: a Moderator removes, never rewrites.

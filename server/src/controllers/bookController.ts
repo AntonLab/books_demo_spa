@@ -6,6 +6,11 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
+import {
+  assertCoAuthor,
+  assertMayChange,
+  type CoAuthorTarget,
+} from './coAuthorGuard.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
@@ -25,54 +30,27 @@ import type { ReorderSeriesBooksInput } from '../types/series.ts';
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
 export function createBookController(repository: BookRepository) {
-  // The other half of enforcement. requirePermission already refused `none`;
-  // `any` needs nothing more, and `own` is the only case that has to look at
-  // the row — which is why this cannot live in the middleware, where the row
-  // is not loaded yet.
-  //
-  // Only `any` returns early. Every other value, a missing scope included,
-  // falls through to the owner comparison: a handler mounted without
-  // requirePermission fails closed rather than acting as `any`.
-  //
-  // 404 before 403, so a refusal cannot be used to probe which ids exist.
-  //
-  // `own` means "one of the book's Co-authors": a book has no single owner, and
-  // every Co-author holds the same rights over it (ADR-0005).
-  const assertCoAuthor = async (req: Request, id: number): Promise<void> => {
-    const coAuthorIds = await repository.findCoAuthorIds(id);
-    if (coAuthorIds === null) throw new NotFoundError('Book', id);
-    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
-      throw new ForbiddenError('You may only change books you co-author');
-    }
-  };
-
-  const assertMayTouch = async (req: Request, id: number): Promise<void> => {
-    if (req.permissionScope === 'any') return;
-    await assertCoAuthor(req, id);
-  };
-
+  // Row-level checks go through coAuthorGuard.ts, which holds the rule.
+  const bookTarget = (id: number): CoAuthorTarget => ({
+    resource: 'Book',
+    id,
+    coAuthorIds: () => repository.findCoAuthorIds(id),
+  });
   // A series' Co-authors — or a Moderator under `any` — are the ones who may
   // change which books it holds and in what order.
-  async function assertMayChangeSeries(
-    req: Request,
-    seriesId: number,
-    refusal: string
-  ): Promise<void> {
-    if (req.permissionScope === 'any') return;
-
-    const coAuthorIds = await repository.findSeriesCoAuthorIds(seriesId);
-    if (coAuthorIds === null) throw new NotFoundError('Series', seriesId);
-    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
-      throw new ForbiddenError(refusal);
-    }
-  }
+  const seriesTarget = (id: number): CoAuthorTarget => ({
+    resource: 'Series',
+    id,
+    coAuthorIds: () => repository.findSeriesCoAuthorIds(id),
+  });
+  const MAY_ONLY_CHANGE_OWN = 'You may only change books you co-author';
 
   // Filing a book under a series changes that series too — it starts listing
   // the book — so the caller must co-author the series as well as the book.
   // The two Co-author lists are independent: a book credited to A and B may sit
   // in a series credited to A and C, and only A may file it there. Without
   // this an author could put their book into a stranger's series.
-  // chapterController.assertMayChangeChaptersOf closes the same hole one level
+  // chapterController closes the same hole one level
   // down.
   //
   // null (unlinking) and an absent key (leaving the link alone) touch no
@@ -83,9 +61,9 @@ export function createBookController(repository: BookRepository) {
     seriesId: number | null | undefined
   ): Promise<void> => {
     if (seriesId === null || seriesId === undefined) return;
-    await assertMayChangeSeries(
+    await assertMayChange(
       req,
-      seriesId,
+      seriesTarget(seriesId),
       'You may only add books to series you co-author'
     );
   };
@@ -130,7 +108,7 @@ export function createBookController(repository: BookRepository) {
       const input = validatedBody<UpdateBookInput>(req);
       // The book first: a caller who may not touch it learns nothing about
       // the series they named.
-      await assertMayTouch(req, id);
+      await assertMayChange(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
       await assertMayAddToSeries(req, input.seriesId);
 
       const book = await repository.update(id, input);
@@ -140,7 +118,7 @@ export function createBookController(repository: BookRepository) {
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayTouch(req, id);
+      await assertMayChange(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const deleted = await repository.remove(id, actorOf(req));
       if (!deleted) throw new NotFoundError('Book', id);
@@ -150,7 +128,7 @@ export function createBookController(repository: BookRepository) {
     addCoAuthor: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       const { userId } = validatedBody<AddCoAuthorInput>(req);
-      await assertCoAuthor(req, id);
+      await assertCoAuthor(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const book = await repository.addCoAuthor(id, userId, actorOf(req));
       if (!book) throw new NotFoundError('Book', id);
@@ -172,7 +150,7 @@ export function createBookController(repository: BookRepository) {
         if (scopeFor(req.user.role, 'books', 'update') !== 'own') {
           throw new ForbiddenError('Only a co-author may remove a co-author');
         }
-        await assertCoAuthor(req, id);
+        await assertCoAuthor(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
       }
 
       const book = await repository.removeCoAuthor(id, userId, actorOf(req));
@@ -185,9 +163,9 @@ export function createBookController(repository: BookRepository) {
     // them need to see.
     listInSeries: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChangeSeries(
+      await assertMayChange(
         req,
-        id,
+        seriesTarget(id),
         'You may only see the books of series you co-author'
       );
 
@@ -198,9 +176,9 @@ export function createBookController(repository: BookRepository) {
 
     reorderInSeries: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChangeSeries(
+      await assertMayChange(
         req,
-        id,
+        seriesTarget(id),
         'You may only reorder the books of series you co-author'
       );
 
@@ -216,7 +194,7 @@ export function createBookController(repository: BookRepository) {
       if (!Buffer.isBuffer(req.body)) {
         throw new UnsupportedMediaTypeError();
       }
-      await assertMayTouch(req, id);
+      await assertMayChange(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const processed = await processCoverImage(req.body);
       const found = await repository.setCover(id, processed);
@@ -228,12 +206,12 @@ export function createBookController(repository: BookRepository) {
     },
 
     // A2: same guards as uploadCover; 204 whether or not a Cover existed, but
-    // 404 for a missing Book. assertMayTouch alone cannot catch a missing
+    // 404 for a missing Book. assertMayChange alone cannot catch a missing
     // Book under `any` scope — it returns immediately for a Moderator — so
     // this checks removeCover's own report of whether the row was there.
     removeCover: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayTouch(req, id);
+      await assertMayChange(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const found = await repository.removeCover(id);
       if (!found) throw new NotFoundError('Book', id);
