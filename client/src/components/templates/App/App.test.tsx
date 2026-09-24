@@ -35,8 +35,8 @@ beforeEach(() => {
   mockedBooks.listBooks.mockResolvedValue({
     items: [],
     total: 0,
-    limit: 20,
-    offset: 0,
+    current: 1,
+    pageSize: 20,
   });
   mockedBooks.getBook.mockResolvedValue({
     id: 1,

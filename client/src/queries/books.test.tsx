@@ -55,8 +55,8 @@ describe('useSortedBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     const { result } = renderHook(() => useSortedBooks('new'), {
@@ -69,7 +69,7 @@ describe('useSortedBooks', () => {
     expect(result.current.data?.items).toEqual([book]);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'new',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -77,8 +77,8 @@ describe('useSortedBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 6,
-      offset: 0,
+      current: 1,
+      pageSize: 6,
     });
     const client = createTestQueryClient();
     const wrap = wrapper(client);
@@ -92,7 +92,7 @@ describe('useSortedBooks', () => {
 
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'popular',
-      limit: 6,
+      pageSize: 6,
     });
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
@@ -116,8 +116,8 @@ describe('useSearchBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     const { result } = renderHook(() => useSearchBooks('dragon'), {
@@ -129,7 +129,7 @@ describe('useSearchBooks', () => {
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -155,8 +155,8 @@ describe('useSearchBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     const client = createTestQueryClient();
     const wrap = wrapper(client);
@@ -184,8 +184,8 @@ describe('useBooksInGenre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     const { result } = renderHook(() => useBooksInGenre(4), {
@@ -197,7 +197,7 @@ describe('useBooksInGenre', () => {
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       genreId: 4,
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -205,8 +205,8 @@ describe('useBooksInGenre', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     const client = createTestQueryClient();
     const wrap = wrapper(client);
@@ -242,6 +242,7 @@ describe('useUploadBookCover', () => {
     expect(mockedBooks.uploadBookCover).toHaveBeenCalledWith(1, file);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
   });
 });
 
@@ -260,5 +261,6 @@ describe('useDeleteBookCover', () => {
     expect(mockedBooks.deleteBookCover).toHaveBeenCalledWith(1);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
   });
 });

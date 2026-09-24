@@ -1,6 +1,7 @@
-// The list envelope and the error body, from the shared workspace (ADR-0006).
-// Neither carries a date, so neither needs Wire<>.
-export type { ApiErrorBody, ListResponse } from 'shared';
+// The list envelope, the paged envelope and the error body, from the shared
+// workspace (ADR-0006). None carries a date, so none needs Wire<>.
+export type { ApiErrorBody, ListResponse, PagedResponse } from 'shared';
+export { PAGE_SIZE_MAX } from 'shared';
 
 // The accepted Cover/Avatar upload formats and the byte ceiling (P1). Neither
 // carries a date, so neither needs Wire<>. The client checks both only to

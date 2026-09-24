@@ -5,6 +5,7 @@ import {
   useCreateGenre,
   useDeleteGenre,
   useGenres,
+  useGenresWithBooks,
   useRenameGenre,
 } from './genres';
 import { createTestQueryClient } from '../test/queryClient';
@@ -50,6 +51,25 @@ describe('useGenres', () => {
       expect(result.current.isError).toBe(true);
     });
     expect(result.current.error?.message).toBe('Network down');
+  });
+});
+
+describe('useGenresWithBooks', () => {
+  it('asks only for the genres with a published book, in its own cache entry', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [{ id: 1, name: 'Gothic' }],
+    });
+    const client = createTestQueryClient();
+
+    const { result } = renderHook(() => useGenresWithBooks(), {
+      wrapper: wrapper(client),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedGenres.listGenres).toHaveBeenCalledWith({ nonEmpty: true });
+    expect(client.getQueryData(['genres', { nonEmpty: true }])).toEqual({
+      items: [{ id: 1, name: 'Gothic' }],
+    });
   });
 });
 

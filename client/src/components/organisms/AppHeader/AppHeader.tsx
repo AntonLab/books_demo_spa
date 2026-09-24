@@ -4,7 +4,7 @@ import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
-import { useGenres } from '@/queries/genres';
+import { useGenresWithBooks } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { unsavedText } from '@/store/unsavedTextSlice';
@@ -41,7 +41,7 @@ export const AppHeader: FC = () => {
     }
   }, [userId, unsavedTextAccountId, dispatch]);
 
-  const genres = useGenres();
+  const genres = useGenresWithBooks();
   // Empty covers all three cases the submenu must not appear in: loading,
   // failed, and a genuinely empty list.
   const genreItems = genres.data?.items ?? [];
