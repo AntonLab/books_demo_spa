@@ -2,7 +2,8 @@ import type { FC } from 'react';
 import { Alert, Empty, Skeleton, Typography } from 'antd';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { BookList } from '@/components/organisms/BookList';
+import { BookCard } from '@/components/organisms/BookCard';
+import { CardList } from '@/components/organisms/CardList';
 import { SeriesCard } from '@/components/organisms/SeriesCard';
 import {
   useBooksInGenre,
@@ -59,7 +60,7 @@ const TermResults: FC<{ q: string }> = ({ q }) => {
 
   // Load-bearing, not cosmetic. `useSearchBooks` is disabled on a blank term,
   // and a disabled query reports `isPending: true` indefinitely, so falling
-  // through to BookList here would render a skeleton that never resolves.
+  // through to CardList here would render a skeleton that never resolves.
   if (q.length === 0) {
     return <Empty description="Enter a search term to find books." />;
   }
@@ -74,8 +75,10 @@ const TermResults: FC<{ q: string }> = ({ q }) => {
             : `${total} ${total === 1 ? 'result' : 'results'} for "${q}"`}
       </Typography.Title>
 
-      <BookList
+      <CardList
+        noun="books"
         items={data?.items ?? []}
+        renderItem={(book) => <BookCard book={book} />}
         isPending={isPending}
         isError={isError}
         error={error}
@@ -105,8 +108,10 @@ const SeriesResults: FC<{ seriesId: number }> = ({ seriesId }) => {
   return (
     <>
       <SeriesCard series={series.data} />
-      <BookList
+      <CardList
+        noun="books"
         items={books.data?.items ?? []}
+        renderItem={(book) => <BookCard book={book} />}
         isPending={books.isPending}
         isError={books.isError}
         error={books.error}
@@ -143,32 +148,34 @@ const GenreResults: FC<{ genreId: number }> = ({ genreId }) => {
 const GenreBooks: FC<{ genre: PublicGenre }> = ({ genre }) => {
   const books = useBooksInGenre(genre.id);
   const series = useSeriesInGenre(genre.id);
-  const seriesItems = series.data?.items ?? [];
 
   return (
     <>
       <Typography.Title level={2}>{genre.name}</Typography.Title>
 
-      <BookList
+      <CardList
+        noun="books"
         items={books.data?.items ?? []}
+        renderItem={(book) => <BookCard book={book} />}
         isPending={books.isPending}
         isError={books.isError}
         error={books.error}
         emptyText="No books in this genre yet."
       />
 
-      {series.isError && (
-        <Alert type="error" title="Could not load the series in this genre." />
-      )}
-
-      {/* Left out while it loads and when it is empty: an empty heading would
-          only be noise under a page that already has its books. */}
-      {seriesItems.length > 0 && (
+      {/* Left out once it has loaded empty: an empty heading would only be
+          noise under a page that already has its books. */}
+      {!(series.isSuccess && series.data.items.length === 0) && (
         <>
           <Typography.Title level={3}>Series</Typography.Title>
-          {seriesItems.map((entry) => (
-            <SeriesCard key={entry.id} series={entry} linked />
-          ))}
+          <CardList
+            noun="series"
+            items={series.data?.items ?? []}
+            renderItem={(entry) => <SeriesCard series={entry} linked />}
+            isPending={series.isPending}
+            isError={series.isError}
+            error={series.error}
+          />
         </>
       )}
     </>

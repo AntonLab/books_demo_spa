@@ -11,7 +11,8 @@ import {
   Typography,
 } from 'antd';
 import { Link, useNavigate } from 'react-router';
-import { BookList } from '@/components/organisms/BookList';
+import { BookCard } from '@/components/organisms/BookCard';
+import { CardList } from '@/components/organisms/CardList';
 import { useSession } from '@/queries/auth';
 import { useMyBooks } from '@/queries/books';
 import { useMySeries } from '@/queries/series';
@@ -83,8 +84,10 @@ export const MyBooksPage: FC = () => {
             key: 'books',
             label: 'Books',
             children: (
-              <BookList
+              <CardList
+                noun="books"
                 items={books.data?.items ?? []}
+                renderItem={(book) => <BookCard book={book} />}
                 isPending={books.isPending}
                 isError={books.isError}
                 error={books.error}
