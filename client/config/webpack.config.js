@@ -28,9 +28,9 @@ module.exports = (_env, argv) => {
   const styleLoader = isDevelopment
     ? 'style-loader'
     : MiniCssExtractPlugin.loader;
+  const hash = isDevelopment ? '' : '.[contenthash:8]';
 
   return {
-    mode: isDevelopment ? 'development' : 'production',
     devtool: isDevelopment ? 'eval-cheap-module-source-map' : 'source-map',
     // Pin the context to the package root so resolution does not depend on the
     // directory webpack was invoked from.
@@ -39,12 +39,8 @@ module.exports = (_env, argv) => {
     output: {
       path: path.resolve(root, 'build'),
       publicPath: '/',
-      filename: isDevelopment
-        ? 'static/js/[name].bundle.js'
-        : 'static/js/[name].[contenthash:8].js',
-      chunkFilename: isDevelopment
-        ? 'static/js/[name].chunk.js'
-        : 'static/js/[name].[contenthash:8].chunk.js',
+      filename: `static/js/[name]${hash}.js`,
+      chunkFilename: `static/js/[name]${hash}.chunk.js`,
       assetModuleFilename: 'static/media/[name].[hash:8][ext]',
       clean: true,
     },
@@ -161,16 +157,12 @@ module.exports = (_env, argv) => {
         },
     devServer: {
       port: 3000,
-      hot: true,
-      open: false,
       // Serve index.html for client-side routes instead of 404ing.
       historyApiFallback: true,
       // public/index.html is injected by html-webpack-plugin; everything else
       // is bundled from src/, so there is no static passthrough folder.
       static: false,
-      client: {
-        overlay: { errors: true, warnings: false },
-      },
+      client: { overlay: { warnings: false } },
       // Forwards API calls to the Express server (server/src/index.ts, port
       // 4000) so the browser only ever talks to one origin in development.
       proxy: [
