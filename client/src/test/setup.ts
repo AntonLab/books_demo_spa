@@ -50,6 +50,12 @@ if (!window.ResizeObserver) {
     ResizeObserverStub as unknown as typeof ResizeObserver;
 }
 
+// jsdom lays nothing out, so it has no scrollIntoView. ChapterContents calls it
+// once its drawer has opened, to bring the chapter being read into view.
+if (!(Element.prototype.scrollIntoView as unknown)) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // jsdom implements no MessageChannel. antd's Form (via @rc-component/form's
 // watch mechanism) constructs one unconditionally on every field mount to
 // schedule a macrotask, so without this polyfill mounting any Form-based

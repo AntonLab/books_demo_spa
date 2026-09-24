@@ -1,3 +1,27 @@
+.toolbar {
+  margin-block: var(--ant-margin);
+}
+
+.column {
+  margin-inline: auto;
+}
+
+.narrow {
+  max-width: var(--ant-app-reading-width-narrow);
+}
+
+.medium {
+  max-width: var(--ant-app-reading-width-medium);
+}
+
+.wide {
+  max-width: var(--ant-app-reading-width-wide);
+}
+
+/* The size and spacing come from the column, which carries the reader's
+   choice; antd's own Typography rule would otherwise reset them. */
 .text {
   white-space: pre-wrap;
+  font-size: inherit;
+  line-height: inherit;
 }

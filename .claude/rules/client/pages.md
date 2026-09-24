@@ -81,6 +81,12 @@ paths:
 - `BookPage` hides the like button from every Co-author and from everyone on a
   Draft book; the public chapter list and the reader's previous/next show only
   published chapters (`publishedChapters`), even to a Co-author.
+- `ChapterPage` applies the reading Device preferences: background and font
+  through a nested `ConfigProvider` (a class overriding `--ant-*` never
+  reaches antd's components, which redeclare them), size and line height
+  inline on the text column, whose `ch` width is measured at that size. Its
+  arrows are antd `Button`s with `href`, routed in-app on a plain click, and
+  stay disabled rather than vanish at either end.
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
   and opens the confirm modal over it. The path and key are a contract with
   `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.

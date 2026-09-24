@@ -1,23 +1,101 @@
+import { useState } from 'react';
 import type { FC } from 'react';
-import { Alert, Skeleton, Space, theme, Typography } from 'antd';
-import { Link, useParams } from 'react-router';
+import {
+  Alert,
+  Button,
+  Card,
+  ConfigProvider,
+  Flex,
+  Skeleton,
+  theme,
+  Typography,
+} from 'antd';
+import type { ThemeConfig } from 'antd';
+import { useNavigate, useParams } from 'react-router';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faArrowLeft,
+  faArrowRight,
+  faListUl,
+} from '@fortawesome/free-solid-svg-icons';
+import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
+import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
+import { useBook } from '@/queries/books';
 import { useChapter, useChapters } from '@/queries/chapters';
-import { publishedChapters } from '@/types/chapter';
+import type { ReadingPreferences as Reading } from '@/store/devicePreferencesSlice';
+import { useAppSelector } from '@/store/hooks';
+import { READING_PALETTES, READING_SERIF_FONT } from '@/theme/tokens';
+import { publishedChapters, type ChapterSummary } from '@/types/chapter';
 import styles from './ChapterPage.module.css';
+
+// Tokens for a ConfigProvider around the text: `auto` keeps the app's colours,
+// and `sans` keeps its font.
+const readingTheme = ({ background, font }: Reading): ThemeConfig => {
+  const palette =
+    background === 'auto' ? undefined : READING_PALETTES[background];
+  return {
+    token: {
+      ...(palette && {
+        colorBgContainer: palette.background,
+        colorText: palette.text,
+        colorTextHeading: palette.text,
+      }),
+      ...(font === 'serif' && { fontFamily: READING_SERIF_FONT }),
+    },
+  };
+};
+
+interface ChapterArrowProps {
+  direction: 'previous' | 'next';
+  target: ChapterSummary | undefined;
+  size?: 'large';
+}
+
+// A real link (middle-click opens a tab) routed in-app on a plain click; at
+// either end of the book it stays in place, disabled, so the bar never jumps.
+const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
+  const navigate = useNavigate();
+  const label = direction === 'previous' ? 'Previous chapter' : 'Next chapter';
+  const icon = (
+    <FontAwesomeIcon
+      icon={direction === 'previous' ? faArrowLeft : faArrowRight}
+    />
+  );
+
+  if (target === undefined) {
+    return <Button aria-label={label} icon={icon} size={size} disabled />;
+  }
+  const href = `/books/${target.bookId}/chapters/${target.id}`;
+  return (
+    <Button
+      aria-label={`${label}: ${target.title}`}
+      icon={icon}
+      size={size}
+      href={href}
+      onClick={(event) => {
+        event.preventDefault();
+        void navigate(href);
+      }}
+    />
+  );
+};
 
 export const ChapterPage: FC = () => {
   const { token } = theme.useToken();
   const { bookId, chapterId } = useParams();
   const book = Number(bookId);
   const id = Number(chapterId);
+  const reading = useAppSelector((state) => state.devicePreferences.reading);
+  const [contentsOpen, setContentsOpen] = useState(false);
 
-  // The same cache key BookPage already filled, so arriving from the book page
-  // costs no request: only the body below is fetched here.
+  // The same cache keys BookPage already filled, so arriving from the book
+  // page costs no request: only the body below is fetched here.
+  const { data: bookDetail } = useBook(book);
   const { data: list } = useChapters(book);
   const { data: chapter, isPending, isError } = useChapter(id);
 
   if (isError) {
-    return <Alert type="error" message="Could not load this chapter." />;
+    return <Alert type="error" title="Could not load this chapter." />;
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
 
@@ -33,22 +111,55 @@ export const ChapterPage: FC = () => {
 
   return (
     <article>
-      <Link to={`/books/${book}`}>Back to the book</Link>
+      <Flex justify="space-between" align="center" className={styles.toolbar}>
+        <ChapterArrow direction="previous" target={previous} />
+        <Flex gap={token.marginXS}>
+          <Button
+            icon={<FontAwesomeIcon icon={faListUl} />}
+            onClick={() => setContentsOpen(true)}
+          >
+            Contents
+          </Button>
+          <ReadingPreferences />
+        </Flex>
+        <ChapterArrow direction="next" target={next} />
+      </Flex>
 
-      <Typography.Title level={2}>{chapter.title}</Typography.Title>
+      <ConfigProvider theme={readingTheme(reading)}>
+        <Card variant="borderless">
+          {/* Size and spacing are the reader's own numbers, so they go inline;
+              the width is in `ch`, measured at that size, so a line holds as
+              many characters whatever the size. */}
+          <div
+            className={`${styles.column} ${styles[reading.width] ?? ''}`}
+            style={{
+              fontSize: reading.fontSize,
+              lineHeight: reading.lineHeight,
+            }}
+          >
+            <Typography.Title level={2}>{chapter.title}</Typography.Title>
 
-      {/* The body is authored text, so its line breaks are content rather than
-          markup and are preserved instead of collapsed. */}
-      <Typography.Paragraph className={styles.text}>
-        {chapter.text}
-      </Typography.Paragraph>
+            {/* The body is authored text, so its line breaks are content rather
+                than markup and are preserved instead of collapsed. */}
+            <Typography.Paragraph className={styles.text}>
+              {chapter.text}
+            </Typography.Paragraph>
+          </div>
+        </Card>
+      </ConfigProvider>
 
-      <Space size={token.marginSM}>
-        {previous && (
-          <Link to={`/books/${book}/chapters/${previous.id}`}>Previous</Link>
-        )}
-        {next && <Link to={`/books/${book}/chapters/${next.id}`}>Next</Link>}
-      </Space>
+      <Flex justify="space-between" className={styles.toolbar}>
+        <ChapterArrow direction="previous" target={previous} size="large" />
+        <ChapterArrow direction="next" target={next} size="large" />
+      </Flex>
+
+      <ChapterContents
+        book={bookDetail}
+        chapters={items}
+        currentId={id}
+        open={contentsOpen}
+        onClose={() => setContentsOpen(false)}
+      />
     </article>
   );
 };

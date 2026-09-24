@@ -31,8 +31,9 @@ is load-bearing:
 
 - `src/test/setup.ts` polyfills what jsdom lacks, each proven necessary:
   `matchMedia` and `ResizeObserver` (antd responsive helpers),
-  `TextEncoder`/`TextDecoder` (react-router builds one at import) and
-  `MessageChannel` (every antd `Form.Item` mount).
+  `TextEncoder`/`TextDecoder` (react-router builds one at import),
+  `MessageChannel` (every antd `Form.Item` mount) and `scrollIntoView`
+  (`ChapterContents` once its drawer opens).
 - `renderWithProviders` wraps the same providers as `App` around a
   `MemoryRouter` and returns `{ store, queryClient }`, so a test seeds a
   session with `queryClient.setQueryData(queryKeys.session, user)` and client
