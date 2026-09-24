@@ -14,7 +14,7 @@ and that the server never sees: Unsaved text and Device preferences
   writes each back on change, under `books.unsavedText.v1` and
   `books.devicePreferences.v1`. Changing a slice's shape bumps its `v` suffix,
   so old data is dropped instead of misread. A stored value that fails the
-  shape check is ignored.
+  shape check is ignored (an array is not an `entries` object).
 - **Every storage access is in `try/catch`.** Missing storage, a full quota or
   corrupt JSON leave the store working in memory.
 - **Unsaved text is written at most once per 500 ms**: the listener
@@ -26,7 +26,9 @@ and that the server never sees: Unsaved text and Device preferences
   `persistence.ts`'s own shape guards and replaces the slice here, or resets
   it when the other tab cleared the key. Unsaved text of a different
   signed-in Account is ignored, or the two tabs' `accountChanged` would
-  overwrite each other forever. The 500 ms throttle still leaves a
+  overwrite each other forever. A `replaced` never starts a write of its
+  own, or an idle tab could write back a value older than the one its
+  sender wrote since. The 500 ms throttle still leaves a
   small race — a keystroke in this tab lands after that reparse and before
   the next write, so a slow-enough interleaving can still lose it.
 - **Reducers stay pure**: `upsert` stamps `savedAt` in its `prepare`.
