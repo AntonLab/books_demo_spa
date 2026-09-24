@@ -3,6 +3,8 @@ import { devicePreferences } from './devicePreferencesSlice';
 import { unsavedText } from './unsavedTextSlice';
 import { STORAGE_KEYS, loadPersistedState, persistNow } from './persistence';
 
+const savedAt = '2026-09-23T10:00:00.000Z';
+
 beforeEach(() => {
   localStorage.clear();
 });
@@ -66,6 +68,26 @@ describe('persistence', () => {
     );
 
     expect(loadPersistedState()).toEqual({});
+  });
+
+  it('drops a stored entry whose text is not a string, keeping the rest', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.unsavedText,
+      JSON.stringify({
+        accountId: null,
+        entries: {
+          bad: null,
+          'book:1:comment': { text: 'Hello', savedAt },
+        },
+      })
+    );
+
+    expect(loadPersistedState()).toEqual({
+      unsavedText: {
+        accountId: null,
+        entries: { 'book:1:comment': { text: 'Hello', savedAt } },
+      },
+    });
   });
 
   it('writes Unsaved text at most once per 500 ms, with the latest text', async () => {

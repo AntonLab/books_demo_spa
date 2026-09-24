@@ -2,7 +2,7 @@ import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { THEMES } from './devicePreferencesSlice';
 import type { DevicePreferencesState } from './devicePreferencesSlice';
 import { isBlank } from './unsavedTextSlice';
-import type { UnsavedTextState } from './unsavedTextSlice';
+import type { UnsavedTextEntry, UnsavedTextState } from './unsavedTextSlice';
 import type { RootState } from './index';
 
 // The `v1` suffix: a later change of shape bumps it, so old data is dropped
@@ -41,7 +41,12 @@ const isDevicePreferences = (value: unknown): value is DevicePreferencesState =>
   'theme' in value &&
   (THEMES as readonly unknown[]).includes(value.theme);
 
-const isUnsavedText = (value: unknown): value is UnsavedTextState =>
+// Only the top shape: `accountId` and an `entries` object. Each entry is
+// checked separately by `isValidEntry`, since a single malformed entry (from
+// a future shape, or storage edited by hand) must not fail the whole slice.
+const isUnsavedTextShape = (
+  value: unknown
+): value is { accountId: number | null; entries: Record<string, unknown> } =>
   typeof value === 'object' &&
   value !== null &&
   'accountId' in value &&
@@ -50,6 +55,33 @@ const isUnsavedText = (value: unknown): value is UnsavedTextState =>
   typeof value.entries === 'object' &&
   value.entries !== null;
 
+// An entry with a non-string `text` (or `title`/`baseUpdatedAt`) would throw
+// inside `isBlank`/`entriesOfBook` once a page reads it, landing the page in
+// the ErrorBoundary. Dropping it here is cheaper than guarding every reader.
+const isValidEntry = (value: unknown): value is UnsavedTextEntry => {
+  if (typeof value !== 'object' || value === null) return false;
+  const { text, title, baseUpdatedAt, savedAt } = value as Record<
+    string,
+    unknown
+  >;
+  return (
+    typeof text === 'string' &&
+    (title === undefined || typeof title === 'string') &&
+    (baseUpdatedAt === undefined || typeof baseUpdatedAt === 'string') &&
+    typeof savedAt === 'string'
+  );
+};
+
+const validEntries = (
+  entries: Record<string, unknown>
+): Record<string, UnsavedTextEntry> => {
+  const result: Record<string, UnsavedTextEntry> = {};
+  for (const [key, entry] of Object.entries(entries)) {
+    if (isValidEntry(entry)) result[key] = entry;
+  }
+  return result;
+};
+
 export const loadPersistedState = (): Partial<RootState> => {
   const state: Partial<RootState> = {};
   const devicePreferences = read(STORAGE_KEYS.devicePreferences);
@@ -57,8 +89,42 @@ export const loadPersistedState = (): Partial<RootState> => {
     state.devicePreferences = devicePreferences;
   }
   const unsavedText = read(STORAGE_KEYS.unsavedText);
-  if (isUnsavedText(unsavedText)) state.unsavedText = unsavedText;
+  if (isUnsavedTextShape(unsavedText)) {
+    state.unsavedText = {
+      accountId: unsavedText.accountId,
+      entries: validEntries(unsavedText.entries),
+    };
+  }
   return state;
+};
+
+// Parses another tab's raw storage value through the same guards above, for
+// the `storage` event listener in index.ts. `null` (the key was cleared) and
+// a value of the wrong shape are told apart: `null` return means "reset the
+// slice", `undefined` means "ignore, keep this tab's state".
+export const parsePersisted = (
+  key: string,
+  raw: string | null
+): Partial<RootState> | null | undefined => {
+  if (raw === null) return null;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+  if (key === STORAGE_KEYS.devicePreferences && isDevicePreferences(value)) {
+    return { devicePreferences: value };
+  }
+  if (key === STORAGE_KEYS.unsavedText && isUnsavedTextShape(value)) {
+    return {
+      unsavedText: {
+        accountId: value.accountId,
+        entries: validEntries(value.entries),
+      },
+    };
+  }
+  return undefined;
 };
 
 // A whitespace-only entry lives in memory while its field is being typed in,

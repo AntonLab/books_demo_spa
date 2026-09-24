@@ -103,6 +103,12 @@ const slice = createSlice({
     discardAll() {
       return initialState;
     },
+    // Another tab's write, relayed by the `storage` event: that tab's value
+    // wins here too. `null` means that tab cleared the key (a corrupt value
+    // is filtered out before this dispatches, so it never arrives here).
+    replaced(_state, action: PayloadAction<UnsavedTextState | null>) {
+      return action.payload ?? initialState;
+    },
     // Entries follow the Account, not the session: a lost session dispatches
     // nothing, so the same Account signing back in gets its text back.
     accountChanged(state, action: PayloadAction<number>) {
