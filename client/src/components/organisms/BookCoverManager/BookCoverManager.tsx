@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Alert, Button, Popconfirm, Space, theme, Typography } from 'antd';
-import { BookCover } from '@/components/molecules/BookCover';
-import { ImageUploadButton } from '@/components/molecules/ImageUploadButton';
+import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { ImageUploadButton } from '@/components/molecules/ImageUploadButton/ImageUploadButton';
 import { useDeleteBookCover, useUploadBookCover } from '@/queries/books';
 import styles from './BookCoverManager.module.css';
 

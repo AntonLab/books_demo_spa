@@ -56,20 +56,18 @@ it has no directory.
 
 ## Component folders
 
-Every component and page is a PascalCase folder with its tests, styles and
-types beside it:
+Every component and page is a PascalCase folder with its tests and styles
+beside it:
 
 ```text
 src/components/organisms/BookCard/
-├── BookCard.tsx          # named export
+├── BookCard.tsx          # named export, types included
 ├── BookCard.test.tsx
-├── BookCard.types.ts     # only when the types are worth moving
-├── BookCard.module.css   # only when it has styles
-└── index.ts              # barrel: re-exports only
+└── BookCard.module.css   # only when it has styles
 ```
 
-Import the folder, never a file inside it
-(`@/components/organisms/BookCard`). The `@/` alias is set in three places that
+Import the file, not the folder: `@/components/organisms/BookCard/BookCard`.
+There are no barrel `index.ts` files. The `@/` alias is set in three places that
 must agree: `paths` in `tsconfig.json` (no `baseUrl`, which errors as `TS5101`
 in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
 `config/webpack.config.js` and `moduleNameMapper` in `jest.config.mjs`.

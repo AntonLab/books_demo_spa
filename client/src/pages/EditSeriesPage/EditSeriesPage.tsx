@@ -9,9 +9,9 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router';
-import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
-import { SeriesForm } from '@/components/organisms/SeriesForm';
-import { SeriesOrderList } from '@/components/organisms/SeriesOrderList';
+import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
+import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
+import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';

@@ -11,7 +11,7 @@ paths:
 1. **Lazy-load every page, and only pages.** `AppHeader` and the `AuthModals`
    it holds render on every route and stay static.
 2. **Remap the named export**:
-   `lazy(() => import('@/pages/MainPage').then((m) => ({ default: m.MainPage })))`.
+   `lazy(() => import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage })))`.
    Pages keep named exports; do not add a default to shorten this.
 3. **One `<Suspense>` and one `<ErrorBoundary>` around `<Routes>`**, inside
    `Layout.Content`, so the header and modals stay mounted while a chunk loads

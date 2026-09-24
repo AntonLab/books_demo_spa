@@ -10,12 +10,12 @@ import {
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { BookCoverManager } from '@/components/organisms/BookCoverManager';
-import { BookForm } from '@/components/organisms/BookForm';
-import type { BookFormValues } from '@/components/organisms/BookForm';
-import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices';
-import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
-import { ReadingOrderList } from '@/components/organisms/ReadingOrderList';
+import { BookCoverManager } from '@/components/organisms/BookCoverManager/BookCoverManager';
+import { BookForm } from '@/components/organisms/BookForm/BookForm';
+import type { BookFormValues } from '@/components/organisms/BookForm/BookForm';
+import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
+import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
+import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { useSession } from '@/queries/auth';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';

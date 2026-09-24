@@ -8,11 +8,11 @@ import { useGenres } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { unsavedText } from '@/store/unsavedTextSlice';
-import { SearchBar } from '@/components/molecules/SearchBar';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
-import { AuthModals } from '@/components/organisms/AuthModals';
-import type { AuthModalName } from '@/components/organisms/AuthModals';
-import { NotificationBell } from '@/components/organisms/NotificationBell';
+import { SearchBar } from '@/components/molecules/SearchBar/SearchBar';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
+import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
+import { NotificationBell } from '@/components/organisms/NotificationBell/NotificationBell';
 import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {

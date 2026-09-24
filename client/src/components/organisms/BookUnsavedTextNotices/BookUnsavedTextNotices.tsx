@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice';
+import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {

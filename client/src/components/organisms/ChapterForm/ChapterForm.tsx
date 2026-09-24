@@ -4,7 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import {
   PublicationTimeFields,
   type PublicationTimeValues,
-} from '@/components/molecules/PublicationTimeFields';
+} from '@/components/molecules/PublicationTimeFields/PublicationTimeFields';
 import type { PublishedAtPayload } from '@/api/chapters';
 import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';

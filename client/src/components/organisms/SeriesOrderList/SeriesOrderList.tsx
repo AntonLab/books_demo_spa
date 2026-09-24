@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Alert, Button, Flex, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link } from 'react-router';
-import { SortableList } from '@/components/organisms/SortableList';
+import { SortableList } from '@/components/organisms/SortableList/SortableList';
 import { ApiError } from '@/api/client';
 import {
   useRemoveBookFromSeries,

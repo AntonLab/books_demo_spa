@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Space, Tag, theme, Typography } from 'antd';
-import { BookCover } from '@/components/molecules/BookCover';
-import { Card } from '@/components/organisms/Card';
+import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { Card } from '@/components/organisms/Card/Card';
 import { formatDate } from '@/format/date';
 import {
   BOOK_STATUS_COLORS,
