@@ -91,8 +91,9 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   is readable and `publishedAt` has passed. Co-authors and Moderators see all.
 - **Likes** exclude instead (`hiddenBookIds`); drafts are few, so the lists stay
   short.
-- **Listed is narrower than readable**: no book list shows a draft, a
-  Moderator's included, except `?userId=` naming the caller ("My books").
+- **Listed is narrower than readable** (`listedBookWhere`): no book list shows
+  a draft, a Moderator's included, except `?userId=` naming the caller ("My
+  books").
 - **Series** have no status: visible with at least one non-draft book, or to its
   Co-authors and Moderators (`visibleSeriesWhere`). The published side is a
   fixed subquery, because an id list would grow with the catalogue.
