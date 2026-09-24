@@ -1,86 +1,39 @@
 import type { FC } from 'react';
-import { Card, Flex, Space, Tag, theme, Typography } from 'antd';
-import { Link } from 'react-router';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
+import { Space, Tag, theme, Typography } from 'antd';
 import { BookCover } from '@/components/molecules/BookCover';
+import { Card } from '@/components/organisms/Card';
 import { formatDate } from '@/format/date';
-import styles from './BookCard.module.css';
 import { BOOK_STATUS_LABELS, type PublicBook } from '@/types/book';
 
 interface BookCardProps {
   book: PublicBook;
 }
 
-// Title-led and linked to the book page, with every Co-author named under the
-// title: the list response embeds them, so no second request is needed.
+// Linked to the book page, with its Cover beside the text and its status
+// under it. The list response embeds the Co-authors, so no second request is
+// needed to name them.
 export const BookCard: FC<BookCardProps> = ({ book }) => {
   const { token } = theme.useToken();
 
   return (
-    <Card size="small">
-      {/* Flex, not Space: Space wraps each child in a div.ant-space-item
-          that carries no flex rule of its own, so a flex style on a child
-          beneath it does nothing. Flex's children are the flex items
-          themselves, so the text column below really takes the rest of the
-          row and can shrink at phone width, while the cover keeps its
-          size. */}
-      <Flex align="start" gap={token.margin} className={styles.row}>
-        <BookCover coverUrl={book.coverUrl} title={book.title} />
-        <div className={styles.body}>
-          <Typography.Title level={4} className={styles.title}>
-            <Link to={`/books/${book.id}`}>{book.title}</Link>
-          </Typography.Title>
-
-          <Space size={token.marginXS} wrap className={styles.line}>
-            {book.authors.map((author, index) => (
-              <Space key={author.id} size={4}>
-                <AccountAvatar
-                  avatarUrl={author.avatarUrl}
-                  name={`${author.firstName} ${author.lastName}`}
-                  size="small"
-                />
-                <Typography.Text type="secondary">
-                  {`${author.firstName} ${author.lastName}${
-                    index < book.authors.length - 1 ? ',' : ''
-                  }`}
-                </Typography.Text>
-              </Space>
-            ))}
-          </Space>
-
-          <Typography.Paragraph
-            ellipsis={{ rows: 3 }}
-            className={styles.description}
-          >
-            {book.description}
-          </Typography.Paragraph>
-
-          {book.genre !== null && (
-            <div className={styles.line}>
-              <Link to={`/search?genre=${book.genre.id}`}>
-                {book.genre.name}
-              </Link>
-            </div>
-          )}
-
-          {book.tags.length > 0 && (
-            <Space wrap size={[0, token.marginXS]} className={styles.line}>
-              {book.tags.map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
-              ))}
-            </Space>
-          )}
-
-          <Space size={token.marginXS}>
-            <Tag color={book.status === 'draft' ? 'orange' : undefined}>
-              {BOOK_STATUS_LABELS[book.status]}
-            </Tag>
-            <Typography.Text type="secondary">
-              {formatDate(book.createdAt)}
-            </Typography.Text>
-          </Space>
-        </div>
-      </Flex>
-    </Card>
+    <Card
+      title={book.title}
+      href={`/books/${book.id}`}
+      authors={book.authors}
+      description={book.description}
+      genre={book.genre}
+      tags={book.tags}
+      media={<BookCover coverUrl={book.coverUrl} title={book.title} />}
+      footer={
+        <Space size={token.marginXS}>
+          <Tag color={book.status === 'draft' ? 'orange' : undefined}>
+            {BOOK_STATUS_LABELS[book.status]}
+          </Tag>
+          <Typography.Text type="secondary">
+            {formatDate(book.createdAt)}
+          </Typography.Text>
+        </Space>
+      }
+    />
   );
 };

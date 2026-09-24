@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Typography } from 'antd';
-import { BookList } from '@/components/organisms/BookList';
+import { BookCard } from '@/components/organisms/BookCard';
+import { CardList } from '@/components/organisms/CardList';
 import { useBooks } from '@/queries/books';
 
 export const MainPage: FC = () => {
@@ -10,8 +11,10 @@ export const MainPage: FC = () => {
   return (
     <>
       <Typography.Title level={2}>Books</Typography.Title>
-      <BookList
+      <CardList
+        noun="books"
         items={data?.items ?? []}
+        renderItem={(book) => <BookCard book={book} />}
         isPending={isPending}
         isError={isError}
         error={error}
