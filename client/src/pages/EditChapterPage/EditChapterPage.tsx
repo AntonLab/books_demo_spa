@@ -24,6 +24,7 @@ import {
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   isBlank,
+  ownEntries,
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
@@ -43,7 +44,7 @@ export const EditChapterPage: FC = () => {
   const update = useUpdateChapter(bookId, chapterId);
   const remove = useDeleteChapter(bookId, chapterId);
   const entry = useAppSelector(
-    (state) => state.unsavedText.entries[unsavedKey]
+    (state) => ownEntries(state, session?.id)[unsavedKey]
   );
   // Bumped by "Use their version" to remount the form even when the version
   // on screen has not changed, so it lets go of the discarded text.

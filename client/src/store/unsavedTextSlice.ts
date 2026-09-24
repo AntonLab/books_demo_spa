@@ -123,6 +123,26 @@ const slice = createSlice({
 export const unsavedText = slice.actions;
 export const unsavedTextReducer = slice.reducer;
 
+const NO_ENTRIES: Record<string, UnsavedTextEntry> = {};
+
+// The entries the signed-in Account may see. After a lost session another
+// Account can sign in with the slice still holding the first one's entries,
+// and AppHeader's `accountChanged` clears them only after that render: a form
+// seeded from them in the meantime would show the first Account's text.
+// `null` on either side is no mismatch, as in `accountChanged`. The constant
+// keeps the result stable for `useAppSelector`.
+export const ownEntries = (
+  state: { unsavedText: UnsavedTextState },
+  sessionId: number | undefined
+): Record<string, UnsavedTextEntry> => {
+  const { accountId, entries } = state.unsavedText;
+  return accountId !== null &&
+    sessionId !== undefined &&
+    accountId !== sessionId
+    ? NO_ENTRIES
+    : entries;
+};
+
 export const entriesOfBook = (
   entries: Record<string, UnsavedTextEntry>,
   bookId: number

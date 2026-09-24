@@ -67,6 +67,22 @@ describe('cross-tab sync', () => {
     });
   });
 
+  it("takes another tab's theme, and the default when that tab clears it", () => {
+    const store = createAppStore({});
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.devicePreferences,
+      newValue: JSON.stringify({ theme: 'dark' }),
+    });
+    expect(store.getState().devicePreferences.theme).toBe('dark');
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.devicePreferences,
+      newValue: null,
+    });
+    expect(store.getState().devicePreferences.theme).toBe('light');
+  });
+
   it('ignores a corrupt value from another tab', () => {
     const store = createAppStore({});
     store.dispatch(

@@ -14,7 +14,7 @@ and that the server never sees: Unsaved text and Device preferences
   writes each back on change, under `books.unsavedText.v1` and
   `books.devicePreferences.v1`. Changing a slice's shape bumps its `v` suffix,
   so old data is dropped instead of misread. A stored value that fails the
-  shape check is ignored.
+  shape check is ignored (an array is not an `entries` object).
 - **Every storage access is in `try/catch`.** Missing storage, a full quota or
   corrupt JSON leave the store working in memory.
 - **Unsaved text is written at most once per 500 ms**: the listener
@@ -26,7 +26,9 @@ and that the server never sees: Unsaved text and Device preferences
   `persistence.ts`'s own shape guards and replaces the slice here, or resets
   it when the other tab cleared the key. Unsaved text of a different
   signed-in Account is ignored, or the two tabs' `accountChanged` would
-  overwrite each other forever. The 500 ms throttle still leaves a
+  overwrite each other forever. A `replaced` never starts a write of its
+  own, or an idle tab could write back a value older than the one its
+  sender wrote since. The 500 ms throttle still leaves a
   small race — a keystroke in this tab lands after that reparse and before
   the next write, so a slow-enough interleaving can still lose it.
 - **Reducers stay pure**: `upsert` stamps `savedAt` in its `prepare`.
@@ -46,6 +48,11 @@ and that the server never sees: Unsaved text and Device preferences
   dispatches `discardAll` on success. A lost session (expiry, Block, password
   reset) dispatches nothing, so the same Account gets its text back; until
   then the text stays readable in that browser's `localStorage` (accepted).
+- **Read entries through `ownEntries(state, session?.id)`**, never
+  `state.unsavedText.entries`. After a lost session a second Account can sign
+  in before `accountChanged` clears the first one's entries, and a form
+  seeded in that render would show them. A test of "no longer a Co-author"
+  drops the Account from the Book, not the session's id.
 - **Select narrowly.** A selector that builds a new array or object on each
   call re-renders on every dispatch: select `entries` or one entry and derive
   in the component.
