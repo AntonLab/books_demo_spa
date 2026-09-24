@@ -6,6 +6,11 @@ import type { AuthorSummary } from './user.ts';
 export const BOOK_STATUSES = ['draft', 'in_progress', 'complete'] as const;
 export type BookStatus = (typeof BOOK_STATUSES)[number];
 
+// What `GET /api/books?sort=` ranks by (CONTEXT.md): Popularity, Release time,
+// Last update — each best first.
+export const BOOK_SORTS = ['popular', 'new', 'updated'] as const;
+export type BookSort = (typeof BOOK_SORTS)[number];
+
 // No userId: a book has no single owner (ADR-0005).
 export interface PublicBook {
   id: number;

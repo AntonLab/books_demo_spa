@@ -2,11 +2,12 @@ import {
   col,
   fn,
   ForeignKeyConstraintError,
+  literal,
   Op,
   UniqueConstraintError,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
+import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
@@ -24,6 +25,7 @@ import {
 } from '../types/errors.ts';
 import type {
   BookDetail,
+  BookSort,
   CreateBookInput,
   ListBooksQuery,
   PublicBook,
@@ -226,15 +228,39 @@ async function withAuthors(
   );
 }
 
+// What `?sort=` ranks a book row by, as a correlated subquery (CONTEXT.md).
+// Chapters count once their Publication time has passed on this process's
+// clock, as readableChapterScope judges them; the escaped Date is the only
+// value spliced in.
+function rankOf(sort: BookSort): Utils.Literal {
+  if (sort === 'popular') {
+    return literal(
+      '(SELECT COUNT(*) FROM `likes` WHERE `likes`.`bookId` = `Book`.`id` AND `likes`.`isLike` = true)'
+    );
+  }
+  const now = sequelizeOf().escape(new Date());
+  const edge = sort === 'new' ? 'MIN' : 'MAX';
+  return literal(
+    `(SELECT ${edge}(\`publishedAt\`) FROM \`chapters\` WHERE \`chapters\`.\`bookId\` = \`Book\`.\`id\` AND \`publishedAt\` <= ${now})`
+  );
+}
+
 // creditedBookIds is the books `?userId=` names, looked up beforehand: a book
 // matches through any of its Co-authors, and a plain id list keeps the LIMIT
 // paging over books, which an include on the credits would not.
 function buildWhere(
   query: ListBooksQuery,
   creditedBookIds: number[] | undefined,
-  viewer: Viewer
+  viewer: Viewer,
+  rank: Utils.Literal | undefined
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
+
+  // A Book with no Published Chapter has no Release time or Last update, so
+  // those two rankings leave it out; Popularity ranks every Book.
+  if (rank !== undefined && query.sort !== 'popular') {
+    clauses.push(sequelizeWhere(rank, Op.ne, null));
+  }
 
   if (creditedBookIds !== undefined) {
     // An empty list becomes `IN (NULL)`, which matches nothing, as it should.
@@ -325,18 +351,25 @@ export function createSequelizeBookRepository(): BookRepository {
               })
             ).map((credit) => credit.bookId);
 
+      const rank = query.sort === undefined ? undefined : rankOf(query.sort);
       const { rows, count } = await Book.findAndCountAll({
-        where: buildWhere(query, creditedBookIds, viewer),
+        where: buildWhere(query, creditedBookIds, viewer, rank),
         limit: query.limit,
         offset: query.offset,
-        // A series' books come in Series order; every other list by id.
+        // A ranked list goes best first, ties to the newer book; otherwise a
+        // series' books come in Series order and every other list by id.
         order:
-          query.seriesId === undefined
-            ? [['id', 'ASC']]
-            : [
-                ['seriesPosition', 'ASC'],
-                ['id', 'ASC'],
-              ],
+          rank !== undefined
+            ? [
+                [rank, 'DESC'],
+                ['id', 'DESC'],
+              ]
+            : query.seriesId === undefined
+              ? [['id', 'ASC']]
+              : [
+                  ['seriesPosition', 'ASC'],
+                  ['id', 'ASC'],
+                ],
       });
 
       const [authors, coverUrls, genres] = await Promise.all([

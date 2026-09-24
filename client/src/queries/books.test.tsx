@@ -2,10 +2,10 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
-  useBooks,
   useBooksInGenre,
   useDeleteBookCover,
   useSearchBooks,
+  useSortedBooks,
   useUploadBookCover,
 } from './books';
 import { createTestQueryClient } from '../test/queryClient';
@@ -50,8 +50,8 @@ beforeEach(() => {
   jest.resetAllMocks();
 });
 
-describe('useBooks', () => {
-  it('fetches the first page', async () => {
+describe('useSortedBooks', () => {
+  it('fetches the first page in the ranking asked for', async () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
@@ -59,19 +59,50 @@ describe('useBooks', () => {
       offset: 0,
     });
 
-    const { result } = renderHook(() => useBooks(), { wrapper: wrapper() });
+    const { result } = renderHook(() => useSortedBooks('new'), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
     expect(result.current.data?.items).toEqual([book]);
-    expect(mockedBooks.listBooks).toHaveBeenCalledWith({ limit: 20 });
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      sort: 'new',
+      limit: 20,
+    });
+  });
+
+  it('keeps a shorter list apart from the full page', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 6,
+      offset: 0,
+    });
+    const client = createTestQueryClient();
+    const wrap = wrapper(client);
+
+    const short = renderHook(() => useSortedBooks('popular', 6), {
+      wrapper: wrap,
+    });
+    await waitFor(() => expect(short.result.current.isSuccess).toBe(true));
+    const full = renderHook(() => useSortedBooks('popular'), { wrapper: wrap });
+    await waitFor(() => expect(full.result.current.isSuccess).toBe(true));
+
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      sort: 'popular',
+      limit: 6,
+    });
+    expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
 
   it('surfaces a failure as an error rather than throwing', async () => {
     mockedBooks.listBooks.mockRejectedValue(new Error('Network down'));
 
-    const { result } = renderHook(() => useBooks(), { wrapper: wrapper() });
+    const { result } = renderHook(() => useSortedBooks('updated'), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => {
       expect(result.current.isError).toBe(true);
@@ -130,7 +161,7 @@ describe('useSearchBooks', () => {
     const client = createTestQueryClient();
     const wrap = wrapper(client);
 
-    const list = renderHook(() => useBooks(), { wrapper: wrap });
+    const list = renderHook(() => useSortedBooks('popular'), { wrapper: wrap });
     await waitFor(() => {
       expect(list.result.current.isSuccess).toBe(true);
     });
@@ -170,7 +201,7 @@ describe('useBooksInGenre', () => {
     });
   });
 
-  it('keeps its own cache entry, distinct from the unfiltered list', async () => {
+  it('keeps its own cache entry, distinct from the ranked list', async () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
@@ -180,7 +211,7 @@ describe('useBooksInGenre', () => {
     const client = createTestQueryClient();
     const wrap = wrapper(client);
 
-    const list = renderHook(() => useBooks(), { wrapper: wrap });
+    const list = renderHook(() => useSortedBooks('popular'), { wrapper: wrap });
     await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
 
     const genre = renderHook(() => useBooksInGenre(4), { wrapper: wrap });

@@ -86,6 +86,14 @@ describe('listBooks', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/api/books?genreId=4&limit=20');
   });
 
+  it('ranks the list with sort', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ sort: 'popular', limit: 6 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/books?sort=popular&limit=6');
+  });
+
   it('combines genreId with the other filters, in a fixed order', async () => {
     const fetchMock = mockFetch(envelope);
 

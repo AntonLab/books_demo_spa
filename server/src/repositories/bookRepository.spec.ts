@@ -11,7 +11,9 @@ import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { Genre } from '../models/Genre.ts';
+import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
 import { createCreditedSeries } from '../models/creditedBook.testkit.ts';
@@ -677,6 +679,94 @@ describe('bookRepository against real MySQL', { skip }, () => {
 
     assert.equal(matches.total, 1);
     assert.match(matches.items[0]?.description ?? '', /100% real/);
+  });
+
+  describe('sorted lists', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
+
+    const publishedBook = (title: string) =>
+      createPublished({
+        userId: ownerId,
+        seriesId: null,
+        title,
+        description: title,
+        tags: [],
+      });
+
+    const addChapters = (bookId: number, publishedAt: (Date | null)[]) =>
+      Chapter.bulkCreate(
+        publishedAt.map((at, index) => ({
+          bookId,
+          title: `Chapter ${index + 1}`,
+          text: 'text',
+          publishedAt: at,
+          position: index + 1,
+        }))
+      );
+
+    const reactTo = async (bookId: number, isLikes: boolean[]) => {
+      for (const [index, isLike] of isLikes.entries()) {
+        const reader = await User.create({
+          login: `reader${bookId}x${index}`,
+          email: `reader${bookId}x${index}@example.com`,
+          password: 'hunter2hunter2',
+          firstName: 'Rea',
+          lastName: 'Der',
+        });
+        await Like.create({ userId: reader.id, bookId, isLike });
+      }
+    };
+
+    const sortedTitles = async (sort: 'popular' | 'new' | 'updated') => {
+      const page = await listAsGuest({ limit: 20, offset: 0, sort });
+      return {
+        titles: page.items.map((book) => book.title),
+        total: page.total,
+      };
+    };
+
+    test('popular ranks by likes on the book, dislikes aside, ties newest first', async () => {
+      const loved = await publishedBook('Loved');
+      const mixed = await publishedBook('Mixed');
+      await publishedBook('Quiet');
+      await publishedBook('Quieter');
+      await reactTo(loved.id, [true, true]);
+      await reactTo(mixed.id, [true, false, false, false]);
+
+      assert.deepEqual(await sortedTitles('popular'), {
+        titles: ['Loved', 'Mixed', 'Quieter', 'Quiet'],
+        total: 4,
+      });
+    });
+
+    test('new ranks by the earliest published chapter and leaves out books with nothing published', async () => {
+      const older = await publishedBook('Older');
+      const newer = await publishedBook('Newer');
+      const scheduled = await publishedBook('Scheduled only');
+      await publishedBook('No chapters');
+      await addChapters(older.id, [daysFromNow(-3), daysFromNow(-1)]);
+      await addChapters(newer.id, [daysFromNow(-2), null]);
+      await addChapters(scheduled.id, [daysFromNow(1), null]);
+
+      assert.deepEqual(await sortedTitles('new'), {
+        titles: ['Newer', 'Older'],
+        total: 2,
+      });
+    });
+
+    test('updated ranks by the latest published chapter, a scheduled one aside', async () => {
+      const older = await publishedBook('Older');
+      const newer = await publishedBook('Newer');
+      await publishedBook('No chapters');
+      await addChapters(older.id, [daysFromNow(-3), daysFromNow(-1)]);
+      await addChapters(newer.id, [daysFromNow(-2), daysFromNow(1)]);
+
+      assert.deepEqual(await sortedTitles('updated'), {
+        titles: ['Older', 'Newer'],
+        total: 2,
+      });
+    });
   });
 
   test('the series filter and paging envelope agree on the total', async () => {

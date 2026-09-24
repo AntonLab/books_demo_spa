@@ -1,1 +1,1 @@
-export { CardList } from './CardList';
+export { CardList, TILE_COLUMNS } from './CardList';
