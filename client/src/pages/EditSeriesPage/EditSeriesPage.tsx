@@ -13,6 +13,7 @@ import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthor
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
 import styles from './EditSeriesPage.module.css';
@@ -27,8 +28,7 @@ export const EditSeriesPage: FC = () => {
     series?.authors.some((author) => author.id === session?.id) ?? false;
   // A Moderator may edit and delete any series, and order its books, but never
   // change its byline — CoAuthorManager stays read-only for one.
-  const isModerator =
-    session?.role === 'admin' || session?.role === 'superadmin';
+  const isModerator = isModeratorRole(session?.role);
   const mayEdit = Boolean(session) && (isCoAuthor || isModerator);
 
   const genres = useGenres();

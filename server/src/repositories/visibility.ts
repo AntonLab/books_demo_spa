@@ -4,7 +4,7 @@ import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { UnauthorizedError } from '../types/errors.ts';
-import type { Role } from '../types/permission.ts';
+import { isModeratorRole, type Role } from '../types/permission.ts';
 
 // Who is reading, as far as Draft books are concerned: the signed-in account's
 // id and Role, or null for a Guest. Passed to every repository read that can
@@ -22,7 +22,7 @@ export function actorOf(req: Request): { id: number; role: Role } {
 // A Moderator reads every Draft book, but only by direct link: no list is
 // widened for one.
 function isModerator(viewer: Viewer): boolean {
-  return viewer?.role === 'admin' || viewer?.role === 'superadmin';
+  return isModeratorRole(viewer?.role);
 }
 
 // The books a viewer may read, as a WHERE on `books`: every Published book,

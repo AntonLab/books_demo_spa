@@ -1,9 +1,9 @@
 import type * as Shared from 'shared';
 import type { Wire } from 'shared';
 
-// The roles the public sign-up form may pick, from the shared workspace
-// (ADR-0006).
-export type { RegistrableRole } from 'shared';
+// The roles the public sign-up form may pick, and who counts as a Moderator,
+// from the shared workspace (ADR-0006).
+export { isModeratorRole, type RegistrableRole } from 'shared';
 
 // The shared shapes are the server's, with `Date` fields. Wire<> turns those
 // into the ISO strings they cross the wire as: using the server type directly

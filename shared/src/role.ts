@@ -9,6 +9,11 @@
 export const USER_ROLES = ['user', 'author', 'admin', 'superadmin'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+// A Moderator is an admin or a superadmin (CONTEXT.md). Takes any string so
+// the server's `guest` and the client's missing session both read as no.
+export const isModeratorRole = (role: string | undefined): boolean =>
+  role === 'admin' || role === 'superadmin';
+
 // What registration may set. admin and superadmin are unreachable from the
 // public form by construction rather than by a check.
 export const REGISTRABLE_ROLES = ['user', 'author'] as const;
