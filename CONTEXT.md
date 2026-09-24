@@ -166,7 +166,9 @@ yet sent. It exists only on the Account's device, one per place it was typed (a
 Book's Comment, a reply to one Comment, an edit of one Comment, one Chapter),
 survives a reload and the loss of a session, and is
 discarded once sent, when its Account signs out, or when another Account signs
-in on that device. If its place is gone (the Chapter or Book deleted, the
+in on that device. Text left exactly as it is saved in its place is not
+Unsaved text: opening an edit and changing nothing, or changing it back, leaves
+nothing behind. If its place is gone (the Chapter or Book deleted, the
 Comment made a Tombstone, the Account no longer a Co-author), the Account is
 offered a copy before it is discarded. Unsaved text on a Chapter remembers the
 version it was typed against: when a Co-author has saved since, the Account

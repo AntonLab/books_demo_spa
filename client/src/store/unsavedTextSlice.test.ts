@@ -52,6 +52,52 @@ describe('unsavedTextSlice', () => {
     expect(state.entries).toEqual({});
   });
 
+  it('removes an edit changed back to the text its place has saved', () => {
+    const state = unsavedTextReducer(
+      withEntry(1),
+      unsavedText.upsert({
+        key: 'book:1:comment',
+        text: 'Saved words',
+        saved: { text: 'Saved words' },
+      })
+    );
+
+    expect(state.entries).toEqual({});
+  });
+
+  it('keeps an edit cleared to nothing, so the saved text stays away', () => {
+    const state = unsavedTextReducer(
+      undefined,
+      unsavedText.upsert({
+        key: 'book:1:commentEdit:5',
+        text: '',
+        saved: { text: 'Saved words' },
+      })
+    );
+
+    expect(state.entries['book:1:commentEdit:5']?.text).toBe('');
+  });
+
+  it('compares a chapter edit by its title as well as its text', () => {
+    const saved = { title: 'One', text: 'Saved words' };
+    const same = unsavedTextReducer(
+      undefined,
+      unsavedText.upsert({ key: 'book:1:chapter:9', ...saved, saved })
+    );
+    const retitled = unsavedTextReducer(
+      undefined,
+      unsavedText.upsert({
+        key: 'book:1:chapter:9',
+        title: 'Two',
+        text: 'Saved words',
+        saved,
+      })
+    );
+
+    expect(same.entries).toEqual({});
+    expect(retitled.entries['book:1:chapter:9']?.title).toBe('Two');
+  });
+
   it('keeps a chapter entry that has a title but no text yet', () => {
     const state = unsavedTextReducer(
       undefined,
