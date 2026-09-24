@@ -391,4 +391,12 @@ describe('EditChapterPage', () => {
       await screen.findByRole('textbox', { name: 'Unsaved text' })
     ).toHaveValue('Chapter One\n\nMy text');
   });
+
+  it('offers the Unsaved text to an Account that no longer co-authors the book', async () => {
+    renderPage(account({ id: 99, login: 'other' }), typedAgainst());
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Chapter One\n\nMy text');
+  });
 });
