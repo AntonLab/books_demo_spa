@@ -47,6 +47,14 @@ describe('listGenres', () => {
 
     await expect(listGenres()).resolves.toEqual(page);
   });
+
+  it('asks for the genres with a published book on nonEmpty', async () => {
+    const fetchMock = mockFetch({ items: [] });
+
+    await listGenres({ nonEmpty: true });
+
+    expect(callOf(fetchMock)[0]).toBe('/api/genres?nonEmpty=true');
+  });
 });
 
 describe('createGenre', () => {

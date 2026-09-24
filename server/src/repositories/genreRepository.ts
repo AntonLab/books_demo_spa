@@ -1,4 +1,4 @@
-import { UniqueConstraintError } from 'sequelize';
+import { literal, Op, UniqueConstraintError } from 'sequelize';
 import type { Transaction } from 'sequelize';
 import { Genre, toPublicGenre } from '../models/Genre.ts';
 import { BadRequestError, ConflictError } from '../types/errors.ts';
@@ -7,7 +7,9 @@ import type { GenreInput, PublicGenre } from '../types/genre.ts';
 export interface GenreRepository {
   // Every Genre, alphabetically. No paging envelope, unlike the books and
   // series lists: the list is short, the header shows it whole, and A1 says so.
-  list(): Promise<PublicGenre[]>;
+  // `nonEmpty` keeps only Genres holding a Book in progress or complete, so a
+  // Draft book never reveals its Genre.
+  list(options?: { nonEmpty?: boolean }): Promise<PublicGenre[]>;
   create(input: GenreInput): Promise<PublicGenre>;
   // null when no Genre has that id, the way every other repository reports a
   // missing row.
@@ -82,10 +84,23 @@ export function genreOf(
 
 export function createSequelizeGenreRepository(): GenreRepository {
   return {
-    async list() {
+    async list({ nonEmpty = false } = {}) {
       // ORDER BY name under the column's utf8mb4_0900_ai_ci collation, so the
-      // order ignores case exactly as the uniqueness does (M1).
-      const genres = await Genre.findAll({ order: [['name', 'ASC']] });
+      // order ignores case exactly as the uniqueness does (M1). The non-empty
+      // side is a fixed subquery, as visibleSeriesWhere's is: it carries no
+      // caller-supplied value.
+      const genres = await Genre.findAll({
+        where: nonEmpty
+          ? {
+              id: {
+                [Op.in]: literal(
+                  "(SELECT DISTINCT `genreId` FROM `books` WHERE `status` <> 'draft' AND `genreId` IS NOT NULL)"
+                ),
+              },
+            }
+          : {},
+        order: [['name', 'ASC']],
+      });
       return genres.map(toPublicGenre);
     },
 

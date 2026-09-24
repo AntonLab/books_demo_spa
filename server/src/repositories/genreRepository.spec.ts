@@ -121,6 +121,32 @@ describe('genreRepository against real MySQL', { skip }, () => {
     });
   });
 
+  test('nonEmpty lists only genres holding a book in progress or complete; a draft reveals none', async () => {
+    const ongoing = await Genre.create({ name: 'A Ongoing' });
+    const complete = await Genre.create({ name: 'B Complete' });
+    const draftOnly = await Genre.create({ name: 'C Draft only' });
+    await Genre.create({ name: 'D Bare' });
+    for (const [genre, status] of [
+      [ongoing, 'in_progress'],
+      [complete, 'complete'],
+      [draftOnly, 'draft'],
+    ] as const) {
+      await Book.create({
+        title: genre.name,
+        description: 'x',
+        tags: [],
+        genreId: genre.id,
+        status,
+      });
+    }
+
+    assert.deepEqual(
+      (await repository.list({ nonEmpty: true })).map((genre) => genre.name),
+      ['A Ongoing', 'B Complete']
+    );
+    assert.equal((await repository.list()).length, 4);
+  });
+
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   genreRepositoryContract(async () => ({ repository }));

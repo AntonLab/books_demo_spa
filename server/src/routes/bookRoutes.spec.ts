@@ -275,7 +275,7 @@ test('POST against an unknown series blames the series, not the user', async () 
   );
 });
 
-test('GET list returns items with the paging envelope', async () => {
+test('GET list returns items with the page-numbered envelope', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },
     async (base) => {
@@ -283,17 +283,41 @@ test('GET list returns items with the paging envelope', async () => {
       const response = await fetch(`${base}/api/books`);
       const body = await json<{
         total: number;
-        limit: number;
-        offset: number;
+        current: number;
+        pageSize: number;
         items: unknown[];
       }>(response);
 
       assert.equal(response.status, 200);
       assert.deepEqual(
-        { total: body.total, limit: body.limit, offset: body.offset },
-        { total: 1, limit: 20, offset: 0 }
+        { total: body.total, current: body.current, pageSize: body.pageSize },
+        { total: 1, current: 1, pageSize: 20 }
       );
       assert.equal(body.items.length, 1);
+    }
+  );
+});
+
+test('GET list serves the last non-empty page past the end and refuses a bad page with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const past = await json<{ current: number; items: unknown[] }>(
+        await fetch(`${base}/api/books?current=5&pageSize=10`)
+      );
+      assert.deepEqual(
+        { current: past.current, count: past.items.length },
+        { current: 1, count: 1 }
+      );
+      for (const query of ['current=0', 'pageSize=101', 'pageSize=0']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?${query}`)).status,
+          400,
+          query
+        );
+      }
     }
   );
 });
@@ -432,6 +456,51 @@ test('GET list takes a known sort and refuses any other with 400', async () => {
         );
       }
       assert.equal((await fetch(`${base}/api/books?sort=oldest`)).status, 400);
+    }
+  );
+});
+
+test('GET list takes every search filter together and refuses a bad one with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const everyFilter = new URLSearchParams({
+        q: 'dragon',
+        status: 'complete',
+        releasedFrom: '2026-01-01T00:00:00.000Z',
+        releasedTo: '2026-01-31T23:59:59.999Z',
+        updatedFrom: '2026-01-01T00:00:00.000Z',
+        author: 'ann',
+        seriesTitle: 'cycle',
+        genreId: String(KNOWN_GENRE_ID),
+        sort: 'new',
+        current: '1',
+        pageSize: '20',
+      });
+      assert.equal(
+        (await fetch(`${base}/api/books?${everyFilter}`)).status,
+        200
+      );
+
+      for (const query of [
+        'status=draft',
+        'q=%20%20',
+        `author=${'a'.repeat(201)}`,
+        'releasedFrom=2026-01-01',
+      ]) {
+        assert.equal(
+          (await fetch(`${base}/api/books?${query}`)).status,
+          400,
+          query
+        );
+      }
+
+      const reversed = await fetch(
+        `${base}/api/books?updatedFrom=2026-02-01T00:00:00.000Z&updatedTo=2026-01-01T00:00:00.000Z`
+      );
+      const body = await json<{ details: { path: string[] }[] }>(reversed);
+      assert.equal(reversed.status, 400);
+      assert.deepEqual(body.details[0]?.path, ['updatedFrom']);
     }
   );
 });

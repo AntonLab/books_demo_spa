@@ -55,6 +55,10 @@ const toDevicePreferences = (
     resultsLayout:
       RESULTS_LAYOUTS.find((known) => known === stored.resultsLayout) ??
       initialDevicePreferences.resultsLayout,
+    searchFormExpanded:
+      typeof stored.searchFormExpanded === 'boolean'
+        ? stored.searchFormExpanded
+        : initialDevicePreferences.searchFormExpanded,
   };
 };
 

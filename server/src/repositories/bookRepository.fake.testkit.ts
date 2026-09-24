@@ -166,11 +166,16 @@ export function createFakeBookRepository(
           (query.genreId === undefined || row.genre?.id === query.genreId) &&
           (!query.q || row.description.includes(query.q))
       );
+      // Past the end, the last non-empty page, as the real repository serves it.
+      const current = Math.min(
+        query.current,
+        Math.max(1, Math.ceil(matching.length / query.pageSize))
+      );
+      const start = (current - 1) * query.pageSize;
       return {
-        items: matching
-          .slice(query.offset, query.offset + query.limit)
-          .map(withCredits),
+        items: matching.slice(start, start + query.pageSize).map(withCredits),
         total: matching.length,
+        current,
       };
     },
 

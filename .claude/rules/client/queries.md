@@ -26,8 +26,12 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   `setQueryData(null)`, since a sign-in elsewhere may have overtaken the
   request.
 - **A disabled query reports `isPending: true` forever** (with
-  `fetchStatus: 'idle'`). `useSearchBooks` is disabled on a blank term, which is
-  why `SearchPage` returns `<Empty>` before rendering `CardList`.
+  `fetchStatus: 'idle'`). `useBookSearch` is disabled while the URL's Genre is
+  unresolved or gone, which is why `SearchPage` renders no `CardList` then.
+- `useGenresWithBooks` (`?nonEmpty=true`, under the `genres` prefix) feeds the
+  header menu and the search form; book forms and `AdminGenresPage` keep
+  `useGenres`. A book write invalidates `genres` too, since a status change
+  moves a Genre in or out of that list.
 - **Wrap every `mutationFn`; never pass an `src/api/` function straight
   through.** TanStack passes a second context argument, which arrives as a
   stray parameter and fails `toHaveBeenCalledWith` naming

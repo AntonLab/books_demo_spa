@@ -6,11 +6,15 @@ export interface GenrePayload {
   name: string;
 }
 
-// Every Genre, sorted by name, with no paging: the list is short and the
-// header's submenu shows all of it, so the response is `{ items }` rather than
-// the paged envelope every other list uses.
-export const listGenres = (): Promise<{ items: PublicGenre[] }> => {
-  return request<{ items: PublicGenre[] }>('/genres');
+// Sorted by name, with no paging: the list is short and the header's submenu
+// shows all of it, so the response is `{ items }` rather than a paged
+// envelope. `nonEmpty` keeps only Genres with a Book in progress or complete.
+export const listGenres = (
+  params: { nonEmpty?: boolean } = {}
+): Promise<{ items: PublicGenre[] }> => {
+  return request<{ items: PublicGenre[] }>(
+    params.nonEmpty ? '/genres?nonEmpty=true' : '/genres'
+  );
 };
 
 export const createGenre = (payload: GenrePayload): Promise<PublicGenre> => {
