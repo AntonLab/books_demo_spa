@@ -4,7 +4,15 @@ import { LoginModal } from '@/components/organisms/LoginModal';
 import { RegisterModal } from '@/components/organisms/RegisterModal';
 import { ResetConfirmModal } from '@/components/organisms/ResetConfirmModal';
 import { ResetRequestModal } from '@/components/organisms/ResetRequestModal';
-import type { AuthModalName, AuthModalProps } from './AuthModals.types';
+
+// The modals a click can open. The reset-confirm modal is not one of them:
+// only the emailed link opens it, so the URL is its state.
+export type AuthModalName = 'login' | 'register' | 'resetRequest';
+
+export interface AuthModalProps {
+  onOpen: (modal: AuthModalName) => void;
+  onClose: () => void;
+}
 
 interface Props extends AuthModalProps {
   modal: AuthModalName | null;

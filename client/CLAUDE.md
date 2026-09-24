@@ -72,7 +72,7 @@ Import the folder, never a file inside it
 (`@/components/organisms/BookCard`). The `@/` alias is set in three places that
 must agree: `paths` in `tsconfig.json` (no `baseUrl`, which errors as `TS5101`
 in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
-`config/webpack.common.js` and `moduleNameMapper` in `jest.config.mjs`.
+`config/webpack.config.js` and `moduleNameMapper` in `jest.config.mjs`.
 
 ## Conventions
 
