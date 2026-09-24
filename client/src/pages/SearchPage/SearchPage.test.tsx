@@ -254,7 +254,11 @@ describe('SearchPage results layout', () => {
     renderWithProviders(<SearchPage />, {
       route: '/search?q=dragon',
       preloadedState: {
-        devicePreferences: { theme: 'light', resultsLayout: 'list' },
+        devicePreferences: {
+          theme: 'light',
+          resultsLayout: 'list',
+          searchFormExpanded: true,
+        },
       },
     });
 
