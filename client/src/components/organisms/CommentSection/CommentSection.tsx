@@ -106,7 +106,13 @@ export const CommentSection: FC<CommentSectionProps> = ({
       : activeReply !== null
         ? unsavedTextKeys.reply(bookId, activeReply)
         : unsavedTextKeys.comment(bookId);
-  const draft = entries[composerKey]?.text ?? '';
+  // An edit with no entry shows the Comment as saved; clearing it keeps an
+  // empty entry, so the saved text does not come back.
+  const savedText =
+    activeEdit !== null
+      ? (all.find((item) => item.id === activeEdit)?.text ?? '')
+      : '';
+  const draft = entries[composerKey]?.text ?? savedText;
 
   const orphans = session
     ? entriesOfBook(entries, bookId).filter(([key]) => {
@@ -151,18 +157,6 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const startEdit = (id: number) => {
     setEditing(id);
     setReplyTo(null);
-    const key = unsavedTextKeys.commentEdit(bookId, id);
-    // Seeded into the store rather than a local copy: with one source,
-    // clearing the field leaves it empty instead of bringing the saved text
-    // back (an entry cleared to '' is removed, and the composer reads '').
-    if (entries[key] === undefined) {
-      dispatch(
-        unsavedText.upsert({
-          key,
-          text: all.find((item) => item.id === id)?.text ?? '',
-        })
-      );
-    }
   };
 
   const startReply = (id: number) => {
@@ -257,6 +251,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
                 unsavedText.upsert({
                   key: composerKey,
                   text: event.target.value,
+                  saved: { text: savedText },
                 })
               )
             }

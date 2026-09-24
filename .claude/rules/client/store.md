@@ -38,8 +38,10 @@ and that the server never sees: Unsaved text and Device preferences
 - **An entry is keyed by its place**, always `book:{bookId}:…`
   (`unsavedTextKeys`), so a page whose Book is gone finds all of its entries
   through `entriesOfBook`.
-- **Text is kept as typed.** Only an entry cleared to `''` leaves the state;
-  a whitespace-only one stays there, or a field whose first keystroke is a
+- **Text is kept as typed.** Only an entry equal to its place's `saved` text
+  (`''` for a new place, the Comment or Chapter for an edit) leaves the
+  state, so opening an edit writes nothing and an edit cleared to `''` stays.
+  A whitespace-only entry stays too, or a field whose first keystroke is a
   space or an Enter would snap back to empty. `isBlank` keeps it out of
   storage and out of `entriesOfBook`.
 - **A landed Chapter save goes through `saved`, not `remove`.** Text typed

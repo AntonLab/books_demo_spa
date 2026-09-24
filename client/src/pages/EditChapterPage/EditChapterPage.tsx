@@ -134,8 +134,20 @@ export const EditChapterPage: FC = () => {
   // version with no 409.
   const baseUpdatedAt = entry?.baseUpdatedAt ?? latestUpdatedAt;
 
+  const latest =
+    update.data && update.data.updatedAt === latestUpdatedAt
+      ? update.data
+      : chapter.data;
+
   const handleValuesChange = (values: { title: string; text: string }) => {
-    dispatch(unsavedText.upsert({ key: unsavedKey, ...values, baseUpdatedAt }));
+    dispatch(
+      unsavedText.upsert({
+        key: unsavedKey,
+        ...values,
+        baseUpdatedAt,
+        saved: { title: latest.title, text: latest.text },
+      })
+    );
   };
 
   const handleSubmit = (values: ChapterFormValues) => {
