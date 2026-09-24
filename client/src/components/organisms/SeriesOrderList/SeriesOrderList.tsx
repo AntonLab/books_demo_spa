@@ -10,7 +10,8 @@ import {
 } from '@/queries/series';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import type { SeriesBookSummary } from '@/types/series';
-import { isCreditedTo } from '@/types/user';
+import { bookCapabilities } from '@/types/capabilities';
+import type { PublicUser } from '@/types/user';
 import styles from './SeriesOrderList.module.css';
 
 interface SeriesOrderListProps {
@@ -20,8 +21,7 @@ interface SeriesOrderListProps {
   // component fetched itself would re-open the query before the permission is
   // known.
   mayEdit: boolean;
-  isModerator: boolean;
-  viewerId: number;
+  session: PublicUser;
 }
 
 // A series' books in Series order (CONTEXT.md), with the save-on-drop that
@@ -30,8 +30,7 @@ interface SeriesOrderListProps {
 export const SeriesOrderList: FC<SeriesOrderListProps> = ({
   seriesId,
   mayEdit,
-  isModerator,
-  viewerId,
+  session,
 }) => {
   const books = useSeriesBooks(seriesId, mayEdit);
   const reorder = useReorderSeriesBooks(seriesId);
@@ -44,8 +43,7 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
   // can order it, but opens only for its own Co-authors and Moderators: for
   // anyone else it is named rather than linked.
   const bookRow = (book: SeriesBookSummary) => {
-    const readable =
-      book.status !== 'draft' || isModerator || isCreditedTo(book, viewerId);
+    const readable = bookCapabilities(book, session).mayRead;
 
     return (
       <Flex justify="space-between" align="center" gap="small">

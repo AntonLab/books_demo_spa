@@ -54,7 +54,11 @@ paths:
 - Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
-- A Moderator gets a work's form but a read-only byline, and no "Add chapter".
+- What the viewer may do with a work comes from `bookCapabilities` /
+  `seriesCapabilities` (`types/capabilities.ts`), never from `authors` and the
+  Role combined in the page. A Moderator gets a work's form but a read-only
+  byline, and no "Add chapter". `BookPage`'s "Edit" link reads `isCoAuthor`,
+  not `mayEdit`, on purpose.
 - `EditChapterPage` saves against the Unsaved text's `baseUpdatedAt`, the
   version the typing started from, and against the loaded `updatedAt` only
   when nothing was typed; otherwise a reload would refetch a Co-author's save

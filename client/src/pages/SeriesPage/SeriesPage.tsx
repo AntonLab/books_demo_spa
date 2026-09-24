@@ -10,7 +10,7 @@ import {
 } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { useSession } from '@/queries/auth';
-import { isCreditedTo, isModeratorRole } from '@/types/user';
+import { seriesCapabilities } from '@/types/capabilities';
 import { useBooksInSeries } from '@/queries/books';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
@@ -44,8 +44,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
-  const mayEdit =
-    isCreditedTo(series.data, session?.id) || isModeratorRole(session?.role);
+  const { mayEdit } = seriesCapabilities(series.data, session);
 
   return (
     <>
