@@ -25,6 +25,7 @@ describe('persistence', () => {
     expect(createAppStore().getState().devicePreferences).toEqual({
       theme: 'light',
       resultsLayout: 'grid',
+      searchFormExpanded: true,
     });
   });
 
@@ -39,6 +40,7 @@ describe('persistence', () => {
     expect(loadPersistedState().devicePreferences).toEqual({
       theme: 'dark',
       resultsLayout: 'grid',
+      searchFormExpanded: true,
     });
   });
 
@@ -47,7 +49,11 @@ describe('persistence', () => {
 
     expect(
       parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
-    ).toEqual({ theme: 'dark', resultsLayout: 'grid' });
+    ).toEqual({
+      theme: 'dark',
+      resultsLayout: 'grid',
+      searchFormExpanded: true,
+    });
   });
 
   it('ignores corrupt JSON', () => {
@@ -80,11 +86,41 @@ describe('persistence', () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 
+  it('reads a value stored before the search form preference existed as open', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.devicePreferences,
+      JSON.stringify({ theme: 'dark', resultsLayout: 'list' })
+    );
+
+    expect(loadPersistedState().devicePreferences).toEqual({
+      theme: 'dark',
+      resultsLayout: 'list',
+      searchFormExpanded: true,
+    });
+  });
+
+  it('keeps a stored closed search form', () => {
+    const raw = JSON.stringify({
+      theme: 'light',
+      resultsLayout: 'grid',
+      searchFormExpanded: false,
+    });
+
+    expect(
+      parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
+        ?.searchFormExpanded
+    ).toBe(false);
+  });
+
   it('reads back what it wrote under the v1 key', () => {
     createAppStore().dispatch(devicePreferences.themeToggled());
 
     expect(localStorage.getItem('books.devicePreferences.v1')).toBe(
-      JSON.stringify({ theme: 'dark', resultsLayout: 'grid' })
+      JSON.stringify({
+        theme: 'dark',
+        resultsLayout: 'grid',
+        searchFormExpanded: true,
+      })
     );
     expect(createAppStore().getState().devicePreferences.theme).toBe('dark');
   });

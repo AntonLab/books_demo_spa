@@ -23,7 +23,11 @@ describe('ThemedConfigProvider', () => {
 
     renderWithProviders(<TokenProbe />, {
       preloadedState: {
-        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+        devicePreferences: {
+          theme: 'dark',
+          resultsLayout: 'grid',
+          searchFormExpanded: true,
+        },
       },
     });
 
@@ -33,7 +37,11 @@ describe('ThemedConfigProvider', () => {
   it('sets the page color-scheme to the theme, for native controls', () => {
     const { unmount } = renderWithProviders(<TokenProbe />, {
       preloadedState: {
-        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+        devicePreferences: {
+          theme: 'dark',
+          resultsLayout: 'grid',
+          searchFormExpanded: true,
+        },
       },
     });
     expect(
@@ -50,7 +58,11 @@ describe('ThemedConfigProvider', () => {
   it('keeps the app quarks in the dark theme', () => {
     renderWithProviders(<TokenProbe />, {
       preloadedState: {
-        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+        devicePreferences: {
+          theme: 'dark',
+          resultsLayout: 'grid',
+          searchFormExpanded: true,
+        },
       },
     });
 
