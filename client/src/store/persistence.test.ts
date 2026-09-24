@@ -24,7 +24,30 @@ describe('persistence', () => {
     expect(loadPersistedState()).toEqual({});
     expect(createAppStore().getState().devicePreferences).toEqual({
       theme: 'light',
+      resultsLayout: 'grid',
     });
+  });
+
+  // An added field does not bump the key: a value stored before it existed is
+  // read with the field's default, so nobody loses the theme they chose.
+  it('reads a value stored before the results layout existed as a grid', () => {
+    localStorage.setItem(
+      STORAGE_KEYS.devicePreferences,
+      JSON.stringify({ theme: 'dark' })
+    );
+
+    expect(loadPersistedState().devicePreferences).toEqual({
+      theme: 'dark',
+      resultsLayout: 'grid',
+    });
+  });
+
+  it('keeps the theme when the stored results layout is unknown', () => {
+    const raw = JSON.stringify({ theme: 'dark', resultsLayout: 'carousel' });
+
+    expect(
+      parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
+    ).toEqual({ theme: 'dark', resultsLayout: 'grid' });
   });
 
   it('ignores corrupt JSON', () => {
@@ -61,7 +84,7 @@ describe('persistence', () => {
     createAppStore().dispatch(devicePreferences.themeToggled());
 
     expect(localStorage.getItem('books.devicePreferences.v1')).toBe(
-      JSON.stringify({ theme: 'dark' })
+      JSON.stringify({ theme: 'dark', resultsLayout: 'grid' })
     );
     expect(createAppStore().getState().devicePreferences.theme).toBe('dark');
   });

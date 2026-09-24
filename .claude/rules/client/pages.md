@@ -32,7 +32,9 @@ paths:
 - `SearchPage` takes one filter per visit, by precedence `series`, then
   `genre`, then `q`. An id that is not a positive integer, or names nothing,
   gets "This series no longer exists." / "This genre no longer exists." and
-  requests nothing more.
+  requests nothing more. Its results show as tiles or a list, by the
+  `resultsLayout` Device preference; one switch covers every list on the page,
+  and other pages' `CardList`s keep their default columns.
 - Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
