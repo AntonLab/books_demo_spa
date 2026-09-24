@@ -24,7 +24,9 @@ and that the server never sees: Unsaved text and Device preferences
 - **Two open tabs sync through the `storage` event**, not just at startup: a
   `window` listener in `index.ts` reparses the other tab's value with
   `persistence.ts`'s own shape guards and replaces the slice here, or resets
-  it when the other tab cleared the key. The 500 ms throttle still leaves a
+  it when the other tab cleared the key. Unsaved text of a different
+  signed-in Account is ignored, or the two tabs' `accountChanged` would
+  overwrite each other forever. The 500 ms throttle still leaves a
   small race — a keystroke in this tab lands after that reparse and before
   the next write, so a slow-enough interleaving can still lose it.
 - **Reducers stay pure**: `upsert` stamps `savedAt` in its `prepare`.

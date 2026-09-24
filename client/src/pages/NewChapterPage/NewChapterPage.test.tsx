@@ -124,6 +124,27 @@ describe('NewChapterPage', () => {
     });
   });
 
+  it('still returns to the book editor under StrictMode', async () => {
+    mockedChapters.createChapter.mockResolvedValue(created);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, account());
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/books/:bookId/chapters/new"
+          element={<NewChapterPage />}
+        />
+        <Route path="/books/:id/edit" element={<p>Book editor</p>} />
+      </Routes>,
+      { route: '/books/1/chapters/new', queryClient, reactStrictMode: true }
+    );
+
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+    expect(await screen.findByText('Book editor')).toBeInTheDocument();
+  });
+
   it('saves a draft', async () => {
     mockedChapters.createChapter.mockResolvedValue({
       ...created,
@@ -219,10 +240,9 @@ describe('NewChapterPage', () => {
       expect(mockedChapters.createChapter).toHaveBeenCalled()
     );
 
-    // The Account left for an unrelated route before the create responded —
-    // a page swap through the router, not a full unmount — so a guard-less
-    // navigate would still fire once the promise landed and silently pull
-    // them back here.
+    // The Account left for an unrelated route before the create responded, which
+    // unmounts the page; a guard-less navigate would still fire once the
+    // promise landed and silently pull them back here.
     await userEvent.click(screen.getByRole('link', { name: 'Elsewhere' }));
     expect(
       await screen.findByText('Somewhere else entirely')
