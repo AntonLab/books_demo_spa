@@ -5,6 +5,9 @@ import { isModeratorRole, type PublicUser } from './user';
 // server would allow. The server refuses the rest regardless: it decides from
 // the matrix scope and the credits (coAuthorGuard.ts, visibility.ts), and
 // these answers mirror that for the Roles that exist today.
+//
+// isCoAuthor alone gates what a Moderator never does: the byline and adding
+// chapters (the matrix gives Moderators no create).
 
 type Session = PublicUser | null | undefined;
 
@@ -12,48 +15,28 @@ interface Credited {
   authors: readonly { id: number }[];
 }
 
-const isCredited = (work: Credited, session: Session): boolean =>
-  session != null && work.authors.some((author) => author.id === session.id);
-
-export interface SeriesCapabilities {
-  isCoAuthor: boolean;
-  // A Co-author or a Moderator: the form, the order, the delete.
-  mayEdit: boolean;
-  // A Co-author only: a Moderator edits a work but never its byline.
-  mayManageByline: boolean;
-}
-
-export interface BookCapabilities extends SeriesCapabilities {
-  // Only a Co-author adds chapters: the matrix gives Moderators no create.
-  mayAddChapter: boolean;
-  // Signed in, not a Draft, not the viewer's own book.
-  mayLike: boolean;
-  // A Draft is for its Co-authors and Moderators; anything else is public.
-  mayRead: boolean;
-}
-
-export const seriesCapabilities = (
-  series: Credited,
-  session: Session
-): SeriesCapabilities => {
-  const isCoAuthor = isCredited(series, session);
+export const seriesCapabilities = (series: Credited, session: Session) => {
+  const isCoAuthor =
+    session != null &&
+    series.authors.some((author) => author.id === session.id);
   return {
     isCoAuthor,
+    // A Co-author or a Moderator: the form, the order, the delete.
     mayEdit: isCoAuthor || isModeratorRole(session?.role),
-    mayManageByline: isCoAuthor,
   };
 };
 
 export const bookCapabilities = (
   book: Credited & { status: BookStatus },
   session: Session
-): BookCapabilities => {
+) => {
   const shared = seriesCapabilities(book, session);
   const isDraft = book.status === 'draft';
   return {
     ...shared,
-    mayAddChapter: shared.isCoAuthor,
+    // Signed in, not a Draft, not the viewer's own book.
     mayLike: session != null && !isDraft && !shared.isCoAuthor,
+    // A Draft is for its Co-authors and Moderators; anything else is public.
     mayRead: !isDraft || shared.mayEdit,
   };
 };
