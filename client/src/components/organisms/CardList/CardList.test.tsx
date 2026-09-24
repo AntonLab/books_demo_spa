@@ -89,4 +89,20 @@ describe('CardList', () => {
       screen.getAllByRole('paragraph').map((node) => node.textContent)
     ).toEqual(['A Tale of Dragons', 'The Ashgrove Chronicles']);
   });
+
+  it('lays the items out in the columns the caller asks for', () => {
+    renderWithProviders(
+      <CardList
+        noun="books"
+        items={items}
+        renderItem={(item) => <p>{item.title}</p>}
+        {...states}
+        columns={{ span: 24 }}
+      />
+    );
+
+    for (const node of screen.getAllByRole('paragraph')) {
+      expect(node.parentElement).toHaveClass('ant-col-24');
+    }
+  });
 });
