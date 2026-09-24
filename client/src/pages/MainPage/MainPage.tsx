@@ -1,8 +1,11 @@
 import { useId, type FC } from 'react';
 import { Flex, Typography } from 'antd';
 import { Link } from 'react-router';
-import { BookCard } from '@/components/organisms/BookCard';
-import { CardList, TILE_COLUMNS } from '@/components/organisms/CardList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import {
+  CardList,
+  TILE_COLUMNS,
+} from '@/components/organisms/CardList/CardList';
 import { useSortedBooks } from '@/queries/books';
 import { BOOK_SORT_LABELS, BOOK_SORTS, type BookSort } from '@/types/book';
 import styles from './MainPage.module.css';

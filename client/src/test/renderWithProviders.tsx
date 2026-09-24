@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import type { RenderOptions, RenderResult } from '@testing-library/react';
-import { ThemedConfigProvider } from '../components/organisms/ThemedConfigProvider';
+import { ThemedConfigProvider } from '../components/organisms/ThemedConfigProvider/ThemedConfigProvider';
 import { createAppStore } from '../store';
 import type { AppStore, RootState } from '../store';
 import { createTestQueryClient } from './queryClient';

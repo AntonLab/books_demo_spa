@@ -1,7 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Result } from 'antd';
+import { Alert, Button, Form, Modal, Result } from 'antd';
 import { useNavigate } from 'react-router';
+import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
 import { useConfirmReset } from '@/queries/auth';
 import styles from './ResetConfirmModal.module.css';
 
@@ -67,41 +68,7 @@ export const ResetConfirmModal: FC<Props> = ({ token }) => {
             layout="vertical"
             onFinish={(values) => void handleFinish(values)}
           >
-            <Form.Item
-              name="password"
-              label="New password"
-              rules={[
-                { required: true, message: 'Enter a password' },
-                {
-                  min: 8,
-                  max: 128,
-                  message: 'Password must be 8 to 128 characters',
-                },
-              ]}
-            >
-              <Input.Password autoComplete="new-password" />
-            </Form.Item>
-
-            <Form.Item
-              name="confirm"
-              label="Confirm password"
-              dependencies={['password']}
-              rules={[
-                { required: true, message: 'Repeat the password' },
-                ({ getFieldValue }) => ({
-                  validator: (_rule, value: string) => {
-                    if (!value || getFieldValue('password') === value) {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(
-                      new Error('The two passwords do not match')
-                    );
-                  },
-                }),
-              ]}
-            >
-              <Input.Password autoComplete="new-password" />
-            </Form.Item>
+            <NewPasswordFields label="New password" />
 
             <Form.Item>
               <Button

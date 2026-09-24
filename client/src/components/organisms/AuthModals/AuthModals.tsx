@@ -1,9 +1,9 @@
 import type { FC } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
-import { LoginModal } from '@/components/organisms/LoginModal';
-import { RegisterModal } from '@/components/organisms/RegisterModal';
-import { ResetConfirmModal } from '@/components/organisms/ResetConfirmModal';
-import { ResetRequestModal } from '@/components/organisms/ResetRequestModal';
+import { LoginModal } from '@/components/organisms/LoginModal/LoginModal';
+import { RegisterModal } from '@/components/organisms/RegisterModal/RegisterModal';
+import { ResetConfirmModal } from '@/components/organisms/ResetConfirmModal/ResetConfirmModal';
+import { ResetRequestModal } from '@/components/organisms/ResetRequestModal/ResetRequestModal';
 
 // The modals a click can open. The reset-confirm modal is not one of them:
 // only the emailed link opens it, so the URL is its state.

@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Space } from 'antd';
 import { useLogin } from '@/queries/auth';
-import type { AuthModalProps } from '@/components/organisms/AuthModals';
+import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
 import styles from './LoginModal.module.css';
 
 interface LoginValues {

@@ -1,7 +1,7 @@
 import { useState, type FC } from 'react';
 import { Alert, Button, Empty, Input, Skeleton, Space, Typography } from 'antd';
-import { Comment } from '@/components/molecules/Comment';
-import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice';
+import { Comment } from '@/components/molecules/Comment/Comment';
+import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
 import {
   useComments,

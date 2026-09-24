@@ -1,5 +1,9 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Input, Select } from 'antd';
+import { Alert, Button, Form } from 'antd';
+import {
+  NO_GENRE,
+  WorkFields,
+} from '@/components/molecules/WorkFields/WorkFields';
 import type { PublicGenre } from '@/types/genre';
 import styles from './SeriesForm.module.css';
 
@@ -21,18 +25,13 @@ interface SeriesFormProps {
   error?: string | null;
 }
 
-// As in BookForm: a select cannot hold `null` as an option value, so "No
-// genre" travels as 0 inside the form and becomes null on the way out.
-const NO_GENRE = 0;
-
 interface FieldValues extends Omit<SeriesFormValues, 'genreId'> {
   genreId: number;
 }
 
 // Presentational, like BookForm: the page that renders it owns the mutation
 // and the error, so creating and editing share one set of fields. A series has
-// no status and belongs to no series, so it is BookForm's fields minus those
-// two rather than BookForm with switches.
+// no status and belongs to no series, so it is WorkFields alone.
 export const SeriesForm: FC<SeriesFormProps> = ({
   genreOptions,
   submitLabel,
@@ -64,46 +63,7 @@ export const SeriesForm: FC<SeriesFormProps> = ({
         }}
         onFinish={handleFinish}
       >
-        <Form.Item
-          name="title"
-          label="Title"
-          rules={[
-            { required: true, whitespace: true, message: 'Enter a title' },
-          ]}
-        >
-          <Input maxLength={255} />
-        </Form.Item>
-
-        <Form.Item
-          name="description"
-          label="Description"
-          rules={[
-            {
-              required: true,
-              whitespace: true,
-              message: 'Enter a description',
-            },
-          ]}
-        >
-          <Input.TextArea rows={4} maxLength={5000} />
-        </Form.Item>
-
-        <Form.Item name="tags" label="Tags">
-          <Select mode="tags" aria-label="Tags" tokenSeparators={[',']} />
-        </Form.Item>
-
-        <Form.Item name="genreId" label="Genre">
-          <Select
-            aria-label="Genre"
-            options={[
-              { value: NO_GENRE, label: 'No genre' },
-              ...genreOptions.map((genre) => ({
-                value: genre.id,
-                label: genre.name,
-              })),
-            ]}
-          />
-        </Form.Item>
+        <WorkFields genreOptions={genreOptions} />
 
         <Button type="primary" htmlType="submit" loading={isSubmitting}>
           {submitLabel}

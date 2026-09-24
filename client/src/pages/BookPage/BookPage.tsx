@@ -11,12 +11,12 @@ import {
 } from 'antd';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
-import { BookCover } from '@/components/molecules/BookCover';
-import { LikeButton } from '@/components/molecules/LikeButton';
-import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices';
-import { ChapterList } from '@/components/organisms/ChapterList';
-import { CommentSection } from '@/components/organisms/CommentSection';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
+import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
+import { CommentSection } from '@/components/organisms/CommentSection/CommentSection';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';

@@ -1,1 +1,0 @@
-export { BookCoverManager } from './BookCoverManager';
