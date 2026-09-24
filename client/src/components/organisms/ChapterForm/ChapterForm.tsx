@@ -26,6 +26,10 @@ interface ChapterFormProps {
   publishedAt?: string | null;
   isSubmitting?: boolean;
   error?: string | null;
+  // Every user edit of the title or the text, for keeping Unsaved text. The
+  // Publication time controls are left out on purpose: a stale moment could
+  // publish a Chapter when nobody means it any more.
+  onValuesChange?: (values: { title: string; text: string }) => void;
 }
 
 interface FieldValues extends PublicationTimeValues {
@@ -44,6 +48,7 @@ export const ChapterForm: FC<ChapterFormProps> = ({
   publishedAt = null,
   isSubmitting = false,
   error = null,
+  onValuesChange,
 }) => {
   const [form] = Form.useForm<FieldValues>();
   const state = chapterStateOf({ publishedAt });
@@ -108,6 +113,11 @@ export const ChapterForm: FC<ChapterFormProps> = ({
           immediately: scheduledFor === null,
           date: scheduledFor,
           time: scheduledFor,
+        }}
+        onValuesChange={(changed: Partial<FieldValues>, all: FieldValues) => {
+          if ('title' in changed || 'text' in changed) {
+            onValuesChange?.({ title: all.title, text: all.text });
+          }
         }}
       >
         <Form.Item

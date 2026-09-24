@@ -1,14 +1,18 @@
 import { render } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider } from 'antd';
+import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
 import type { RenderOptions, RenderResult } from '@testing-library/react';
+import { ThemedConfigProvider } from '../components/organisms/ThemedConfigProvider';
+import { createAppStore } from '../store';
+import type { AppStore, RootState } from '../store';
 import { createTestQueryClient } from './queryClient';
-import { appTheme } from '../theme/tokens';
 
 interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
+  preloadedState?: Partial<RootState>;
+  store?: AppStore;
   queryClient?: QueryClient;
   route?: string;
   // Only for a page that reads route params. Without a matched Route,
@@ -18,9 +22,9 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
   path?: string;
 }
 
-// Every component test needs a query client, a router and the app's
-// tokens. ConfigProvider is here because App.tsx mounts it in production:
-// without it a component reading a custom quark would get `undefined` in
+// Every component test needs a query client, a store, a router and the app's
+// tokens. ThemedConfigProvider is the one App mounts: without it a component
+// reading a custom quark or the dark algorithm would see something else in
 // tests only, and that divergence would be invisible.
 //
 // It mirrors production in everything but one flag. `zeroRuntime` stops antd
@@ -34,13 +38,17 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
 //
 // The query client is fresh per render unless the test supplies one. A shared
 // client would leak cached data between tests, which is the usual way a query
-// suite turns order-dependent. It is returned so a test can seed a session
-// (`queryClient.setQueryData`) without reaching for a second helper.
+// suite turns order-dependent. The store starts from `preloadedState`, or from
+// `{}`: never from localStorage, which a previous test may have written. Both
+// are returned so a test can seed a session (`queryClient.setQueryData`),
+// read client state (`store.getState()`), or remount on the same store.
 export const renderWithProviders = (
   ui: ReactElement,
   options: ProviderOptions = {}
-): RenderResult & { queryClient: QueryClient } => {
+): RenderResult & { store: AppStore; queryClient: QueryClient } => {
   const {
+    preloadedState = {},
+    store = createAppStore(preloadedState),
     queryClient = createTestQueryClient(),
     route = '/',
     path,
@@ -50,22 +58,25 @@ export const renderWithProviders = (
   const Wrapper = ({ children }: { children: ReactNode }) => {
     return (
       <QueryClientProvider client={queryClient}>
-        <ConfigProvider theme={{ ...appTheme, zeroRuntime: true }}>
-          <MemoryRouter initialEntries={[route]}>
-            {path ? (
-              <Routes>
-                <Route path={path} element={children} />
-              </Routes>
-            ) : (
-              children
-            )}
-          </MemoryRouter>
-        </ConfigProvider>
+        <Provider store={store}>
+          <ThemedConfigProvider zeroRuntime>
+            <MemoryRouter initialEntries={[route]}>
+              {path ? (
+                <Routes>
+                  <Route path={path} element={children} />
+                </Routes>
+              ) : (
+                children
+              )}
+            </MemoryRouter>
+          </ThemedConfigProvider>
+        </Provider>
       </QueryClientProvider>
     );
   };
 
   return {
+    store,
     queryClient,
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
   };

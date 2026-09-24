@@ -9,9 +9,11 @@ import {
   Typography,
 } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
+import { ApiError } from '@/api/client';
 import { BookCoverManager } from '@/components/organisms/BookCoverManager';
 import { BookForm } from '@/components/organisms/BookForm';
 import type { BookFormValues } from '@/components/organisms/BookForm';
+import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList';
 import { useSession } from '@/queries/auth';
@@ -25,7 +27,7 @@ export const EditBookPage: FC = () => {
   const bookId = Number(useParams().id);
 
   const { data: session } = useSession();
-  const { data: book, isPending, isError } = useBook(bookId);
+  const { data: book, isPending, isError, error } = useBook(bookId);
   const series = useMySeries(
     session?.role === 'author' ? session.id : undefined
   );
@@ -34,7 +36,18 @@ export const EditBookPage: FC = () => {
   const remove = useDeleteBook(bookId);
 
   if (isError) {
-    return <Alert type="error" title="Could not load this book." />;
+    return (
+      <>
+        <Alert
+          type="error"
+          title="Could not load this book."
+          className={styles.alert}
+        />
+        {error instanceof ApiError && error.status === 404 && (
+          <BookUnsavedTextNotices bookId={bookId} />
+        )}
+      </>
+    );
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
 

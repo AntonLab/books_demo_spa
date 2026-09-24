@@ -1,6 +1,7 @@
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommentSection } from './CommentSection';
+import { ApiError } from '@/api/client';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
@@ -8,6 +9,7 @@ import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import type { CommentWithAuthor } from '@/types/comment';
 import type { PublicUser } from '@/types/user';
+import type { RootState } from '@/store';
 
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
@@ -65,11 +67,19 @@ const reply: CommentWithAuthor = {
 
 // Seeding the session through the query client is what makes the component
 // think somebody is signed in; useSession reads this exact key.
-const renderSignedIn = () => {
+const renderSignedIn = (preloadedState?: Partial<RootState>) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, viewer);
-  return renderWithProviders(<CommentSection bookId={1} />, { queryClient });
+  return renderWithProviders(<CommentSection bookId={1} />, {
+    queryClient,
+    preloadedState,
+  });
 };
+
+const savedAt = '2026-09-23T10:00:00.000Z';
+const withEntries = (
+  entries: Record<string, { text: string; savedAt: string }>
+): Partial<RootState> => ({ unsavedText: { accountId: 3, entries } });
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -386,5 +396,133 @@ describe('CommentSection', () => {
       commentId: 6,
       isLike: true,
     });
+  });
+});
+
+describe('CommentSection Unsaved text', () => {
+  it('restores the root composer after a remount', async () => {
+    const { store, queryClient, unmount } = renderSignedIn();
+    await screen.findByText('A fine book');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Write a comment' }),
+      'Half a thought'
+    );
+
+    unmount();
+    renderWithProviders(<CommentSection bookId={1} />, { store, queryClient });
+
+    await screen.findByText('A fine book');
+    expect(
+      screen.getByRole('textbox', { name: 'Write a comment' })
+    ).toHaveValue('Half a thought');
+  });
+
+  it('opens Edit on the Unsaved text rather than the saved comment', async () => {
+    renderSignedIn(
+      withEntries({
+        'book:1:commentEdit:5': { text: 'Better wording', savedAt },
+      })
+    );
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+    expect(screen.getByRole('textbox')).toHaveValue('Better wording');
+  });
+
+  it('keeps the text when the post fails', async () => {
+    mockedComments.createComment.mockRejectedValue(
+      new ApiError(500, 'Server error')
+    );
+    const { store } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.type(screen.getByRole('textbox'), 'Keep me');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalled()
+    );
+    // Let the rejection settle, so a wrongly wired onSuccess would have run.
+    await act(async () => {});
+
+    expect(screen.getByRole('textbox')).toHaveValue('Keep me');
+    expect(store.getState().unsavedText.entries['book:1:comment']?.text).toBe(
+      'Keep me'
+    );
+  });
+
+  it('clears the text once the post succeeds', async () => {
+    mockedComments.createComment.mockResolvedValue({ ...root, id: 7 });
+    const { store } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue(''));
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('offers the text of a reply whose comment became a Tombstone', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        { ...root, text: '', tombstone: 'deleted', userId: null, author: null },
+        reply,
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+    const { store } = renderSignedIn(
+      withEntries({ 'book:1:reply:5': { text: 'Lost words', savedAt } })
+    );
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Lost words');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('clears the entry for a post that lands after the section unmounted', async () => {
+    let land: (comment: CommentWithAuthor) => void = () => {};
+    mockedComments.createComment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        })
+    );
+    const { store, unmount } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalled()
+    );
+    unmount();
+    // mutateAsync's promise settles whether or not the section that started
+    // it is still mounted; mutate's per-call onSuccess would not fire here.
+    await act(async () => land({ ...root, id: 7 }));
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('drops the edit entry of a comment its owner deletes', async () => {
+    mockedComments.deleteComment.mockResolvedValue(undefined);
+    const { store } = renderSignedIn(
+      withEntries({
+        'book:1:commentEdit:5': { text: 'Better wording', savedAt },
+      })
+    );
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(store.getState().unsavedText.entries).toEqual({})
+    );
   });
 });
