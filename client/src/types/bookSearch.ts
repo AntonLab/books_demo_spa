@@ -3,6 +3,7 @@ import { ApiError } from '../api/client';
 import type { ListBooksParams } from '../api/books';
 import {
   BOOK_SORTS,
+  RANGE_ORDER,
   SEARCHABLE_BOOK_STATUSES,
   type BookSort,
   type SearchableBookStatus,
@@ -10,9 +11,9 @@ import {
 
 export const SEARCH_PAGE_SIZE = 20;
 
-// The server's message for a range whose start comes after its end, reused by
-// the form's own rule so both say the same thing.
-export const RANGE_ORDER = 'Must not be after the end date.';
+// Re-exported so SearchForm can still import it from here; the value itself
+// now lives in shared/src/book.ts, next to the server's own copy.
+export { RANGE_ORDER };
 
 const TEXT_KEYS = ['q', 'author', 'seriesTitle'] as const;
 const DAY_KEYS = [

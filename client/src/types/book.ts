@@ -6,6 +6,7 @@ import type { BookSort, BookStatus, Wire } from 'shared';
 export {
   BOOK_SORTS,
   BOOK_STATUSES,
+  RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
   type BookSort,
