@@ -1,4 +1,10 @@
-import { BOOK_SORTS, BOOK_STATUSES, PAGE_SIZE_MAX } from 'shared';
+import {
+  BOOK_SORTS,
+  BOOK_STATUSES,
+  PAGE_SIZE_MAX,
+  SEARCH_TEXT_MAX_LENGTH,
+  SEARCHABLE_BOOK_STATUSES,
+} from 'shared';
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
@@ -80,16 +86,49 @@ export const updateBookSchema = z
     message: 'At least one field must be provided',
   });
 
-export const listBooksQuerySchema = z.object({
-  current: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
-  userId: idSchema.optional(),
-  seriesId: idSchema.optional(),
-  genreId: idSchema.optional(),
-  tag: z.string().min(1).max(BOOK_TAG_MAX_LENGTH).optional(),
-  q: z.string().min(1).max(200).optional(),
-  sort: z.enum(BOOK_SORTS).optional(),
-});
+// Trimmed before the length checks, so a whitespace-only term is a 400
+// rather than a filter that matches everything.
+const searchTextSchema = z.string().trim().min(1).max(SEARCH_TEXT_MAX_LENGTH);
+
+// The client sends the start of a "from" day and the end of a "to" day in its
+// own time zone, as ISO instants, so the server compares instants only.
+const instantSchema = z.iso
+  .datetime({ offset: true })
+  .transform((value) => new Date(value));
+
+const RANGE_ORDER = 'Must not be after the end date.';
+
+const inOrder = (from: Date | undefined, to: Date | undefined): boolean =>
+  from === undefined || to === undefined || from <= to;
+
+export const listBooksQuerySchema = z
+  .object({
+    current: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+    userId: idSchema.optional(),
+    seriesId: idSchema.optional(),
+    genreId: idSchema.optional(),
+    tag: z.string().min(1).max(BOOK_TAG_MAX_LENGTH).optional(),
+    q: searchTextSchema.optional(),
+    // `draft` is not offered: no search lists a Draft book.
+    status: z.enum(SEARCHABLE_BOOK_STATUSES).optional(),
+    releasedFrom: instantSchema.optional(),
+    releasedTo: instantSchema.optional(),
+    updatedFrom: instantSchema.optional(),
+    updatedTo: instantSchema.optional(),
+    author: searchTextSchema.optional(),
+    seriesTitle: searchTextSchema.optional(),
+    sort: z.enum(BOOK_SORTS).optional(),
+  })
+  // Pinned to the "from" field, so the client can show it there.
+  .refine((query) => inOrder(query.releasedFrom, query.releasedTo), {
+    message: RANGE_ORDER,
+    path: ['releasedFrom'],
+  })
+  .refine((query) => inOrder(query.updatedFrom, query.updatedTo), {
+    message: RANGE_ORDER,
+    path: ['updatedFrom'],
+  });
 
 export type CreateBookInput = z.infer<typeof createBookSchema>;
 export type UpdateBookInput = z.infer<typeof updateBookSchema>;

@@ -56,3 +56,11 @@ export interface BookDetail extends PublicBook {
   // the button outright.
   viewerLikeId: number | null;
 }
+
+// The Book statuses a search may ask for: a Draft book never appears in one.
+export const SEARCHABLE_BOOK_STATUSES = ['in_progress', 'complete'] as const;
+export type SearchableBookStatus = (typeof SEARCHABLE_BOOK_STATUSES)[number];
+
+// The longest text a search field takes (title/description, author, series
+// title), counted after trimming. Client and server both check it.
+export const SEARCH_TEXT_MAX_LENGTH = 200;
