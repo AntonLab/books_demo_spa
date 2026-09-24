@@ -34,14 +34,21 @@ paths:
   longer exists." and nothing else is requested. "Edit series" shows for its
   Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
   link points here, and old `/search?series=` links are not redirected.
-- `SearchPage` takes one filter per visit, by precedence `series`, then
-  `genre`, then `q`, then `sort`. An id that is not a positive integer, or
-  names nothing, gets "This series no longer exists." / "This genre no longer
-  exists." and requests nothing more; an unknown `sort` is no search at all.
-  Its results show as tiles or a list, by the `resultsLayout` Device
-  preference; one switch covers every list on the page. `MainPage`'s sections
-  are always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s
-  keep their default columns.
+- `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
+  paginated book results. The URL is its only state, read and written through
+  `types/bookSearch.ts`: days stay `YYYY-MM-DD` in the URL and become instants
+  only in `listParamsOf`; the default sort and page 1 are never written;
+  `?series=` and an unknown `status` / `sort` / day are ignored. The form is
+  keyed by the URL plus the resolved Genre, because antd reads
+  `initialValues` once. A `genre` the non-empty Genre list does not hold
+  shows "This genre no longer exists." and asks for no books. When the
+  server serves a lower `current` than asked, the page `replace`s the URL. A
+  400's zod issues land on their fields (`fieldErrorsOf`). The form is
+  collapsible, open by default, by the `searchFormExpanded` Device
+  preference. Results show as tiles or a list by `resultsLayout`
+  (`ResultsLayoutSwitch`, also on `SeriesPage`). `MainPage`'s sections are
+  always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
+  their default columns.
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`/search?sort=`) shows only once the section has loaded more than six.
 - Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session

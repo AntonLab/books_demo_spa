@@ -8,18 +8,17 @@ import {
   updateBook,
   uploadBookCover,
   type CreateBookPayload,
+  type ListBooksParams,
   type UpdateBookPayload,
 } from '../api/books';
 import type { BookSort } from '../types/book';
 import { PAGE_SIZE_MAX } from '../types/api';
 import { queryKeys } from './keys';
 
-// The first page only. Paging is a documented non-goal; `total` is kept so the
-// count can be displayed and paging added later without a state change.
 export const BOOKS_PAGE_SIZE = 20;
 
-// A ranking's first `pageSize` books: the main page shows a few of each, the
-// search page a full page.
+// A ranking's first `pageSize` books, for the main page's sections; the search
+// page pages through `useBookSearch` instead.
 export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
   return useQuery({
     queryKey: queryKeys.books({ sort, pageSize }),
@@ -27,19 +26,15 @@ export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
   });
 };
 
-// `enabled` keeps a blank term off the network entirely. It agrees with
-// `listBooks`, which already omits an empty `q` because the server's schema
-// rejects it (`z.string().min(1)`) — but neither guard makes the other
-// redundant: that one shapes the URL, this one stops the request happening.
-//
-// A disabled query reports `isPending: true` with `fetchStatus: 'idle'`
-// indefinitely, which is why SearchPage must return before rendering CardList
-// when the term is blank.
-export const useSearchBooks = (q: string) => {
+// The search page's one query: every filter, the page and its size, straight
+// from the URL. `enabled` is false while the URL's Genre is unresolved or
+// gone, so no book is asked for then; a disabled query reports isPending
+// forever, which is why SearchPage renders no CardList in that state.
+export const useBookSearch = (params: ListBooksParams, enabled: boolean) => {
   return useQuery({
-    queryKey: queryKeys.books({ q, pageSize: BOOKS_PAGE_SIZE }),
-    queryFn: () => listBooks({ q, pageSize: BOOKS_PAGE_SIZE }),
-    enabled: q.length > 0,
+    queryKey: queryKeys.books(params),
+    queryFn: () => listBooks(params),
+    enabled,
   });
 };
 
@@ -50,16 +45,6 @@ export const useBooksInSeries = (seriesId: number) => {
   return useQuery({
     queryKey: queryKeys.books({ seriesId, pageSize: PAGE_SIZE_MAX }),
     queryFn: () => listBooks({ seriesId, pageSize: PAGE_SIZE_MAX }),
-  });
-};
-
-// One Genre's books: the server's default order (oldest first, by id), drafts excluded
-// as in every public list. One page, like every search result — Genre results
-// are capped at a page rather than paged.
-export const useBooksInGenre = (genreId: number) => {
-  return useQuery({
-    queryKey: queryKeys.books({ genreId, pageSize: BOOKS_PAGE_SIZE }),
-    queryFn: () => listBooks({ genreId, pageSize: BOOKS_PAGE_SIZE }),
   });
 };
 
