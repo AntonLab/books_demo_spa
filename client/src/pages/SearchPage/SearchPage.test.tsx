@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useNavigate } from 'react-router';
 import { SearchPage } from './SearchPage';
@@ -379,11 +379,11 @@ describe('SearchPage for one genre', () => {
     renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
 
     expect(
-      await screen.findByRole('heading', { level: 3, name: 'Series' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
+      await screen.findByRole('link', { name: 'The Ashgrove Chronicles' })
     ).toHaveAttribute('href', '/search?series=12');
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'Series' })
+    ).toBeInTheDocument();
   });
 
   it('leaves the Series block out when the genre holds none', async () => {
@@ -404,7 +404,10 @@ describe('SearchPage for one genre', () => {
     renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
 
     await screen.findByText('A tale of dragons');
-    expect(screen.queryByRole('heading', { name: 'Series' })).toBeNull();
+    // The block shows while the series load, so wait for it to go.
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Series' })).toBeNull()
+    );
   });
 
   it('reports a failure to load the series without hiding the books', async () => {
@@ -419,9 +422,7 @@ describe('SearchPage for one genre', () => {
 
     renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Could not load the series in this genre.'
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Network down');
     expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
   });
 

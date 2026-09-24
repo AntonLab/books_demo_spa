@@ -29,7 +29,7 @@ export const useBooks = () => {
 // redundant: that one shapes the URL, this one stops the request happening.
 //
 // A disabled query reports `isPending: true` with `fetchStatus: 'idle'`
-// indefinitely, which is why SearchPage must return before rendering BookList
+// indefinitely, which is why SearchPage must return before rendering CardList
 // when the term is blank.
 export const useSearchBooks = (q: string) => {
   return useQuery({

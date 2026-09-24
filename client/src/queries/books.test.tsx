@@ -115,7 +115,7 @@ describe('useSearchBooks', () => {
 
     // This is why SearchPage's early return on a blank term is load-bearing
     // rather than cosmetic: a disabled query reports isPending forever, so
-    // rendering BookList here would show an endless skeleton.
+    // rendering CardList here would show an endless skeleton.
     expect(result.current.isPending).toBe(true);
     expect(result.current.fetchStatus).toBe('idle');
   });
