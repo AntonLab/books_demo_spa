@@ -4,6 +4,8 @@ import dayjs from 'dayjs';
 import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
@@ -205,6 +207,36 @@ describe('SearchPage', () => {
 
     await screen.findByRole('link', { name: 'A Tale of Dragons' });
     await waitFor(() => expect(location()).toBe('/search?q=dragon'));
+  });
+
+  it('ignores a cached page from the same search without a genre while the genre is blocked', async () => {
+    const queryClient = createTestQueryClient();
+    // Same search, minus the genre: `genreId: undefined` hashes the same as
+    // no `genreId` key at all, so this collides with the blocked search's
+    // own query key below.
+    queryClient.setQueryData(
+      queryKeys.books({
+        q: 'dragon',
+        sort: 'popular',
+        current: 3,
+        pageSize: 20,
+      }),
+      pageOf({ current: 1 })
+    );
+
+    renderWithProviders(
+      <>
+        <SearchPage />
+        <LocationProbe />
+      </>,
+      { route: '/search?q=dragon&genre=99&page=3', queryClient }
+    );
+
+    await screen.findByText('This genre no longer exists.');
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(location()).toBe('/search?q=dragon&genre=99&page=3')
+    );
   });
 
   it("shows the server's 400 on the field it names", async () => {
