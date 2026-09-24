@@ -6,12 +6,13 @@ import { faList, faTableCellsLarge } from '@fortawesome/free-solid-svg-icons';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCard } from '@/components/organisms/BookCard';
-import { CardList } from '@/components/organisms/CardList';
+import { CardList, TILE_COLUMNS } from '@/components/organisms/CardList';
 import { SeriesCard } from '@/components/organisms/SeriesCard';
 import {
   useBooksInGenre,
   useBooksInSeries,
   useSearchBooks,
+  useSortedBooks,
 } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useSeries, useSeriesInGenre } from '@/queries/series';
@@ -20,6 +21,7 @@ import {
   type ResultsLayout,
 } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { BOOK_SORT_LABELS, BOOK_SORTS, type BookSort } from '@/types/book';
 import type { PublicGenre } from '@/types/genre';
 import styles from './SearchPage.module.css';
 
@@ -27,7 +29,7 @@ const SERIES_GONE = 'This series no longer exists.';
 const GENRE_GONE = 'This genre no longer exists.';
 
 const RESULTS_COLUMNS: Record<ResultsLayout, ColProps> = {
-  grid: { xs: 12, sm: 8, md: 6, xl: 4 },
+  grid: TILE_COLUMNS,
   list: { span: 24 },
 };
 
@@ -76,10 +78,13 @@ const ResultsBar: FC<{ heading?: ReactNode }> = ({ heading }) => {
   );
 };
 
+const isBookSort = (value: string | null): value is BookSort =>
+  (BOOK_SORTS as readonly (string | null)[]).includes(value);
+
 // One filter per visit, and when several are present `series` wins, then
-// `genre`, then `q`: the header's search bar navigates to a bare `?q=` and a
-// Genre in its menu to a bare `?genre=`, so each starts over rather than
-// narrowing what is on screen.
+// `genre`, then `q`, then `sort`: the header's search bar navigates to a bare
+// `?q=`, a Genre in its menu to a bare `?genre=` and a main page section to a
+// bare `?sort=`, so each starts over rather than narrowing what is on screen.
 export const SearchPage: FC = () => {
   const [searchParams] = useSearchParams();
   const seriesParam = searchParams.get('series');
@@ -106,7 +111,40 @@ export const SearchPage: FC = () => {
     );
   }
 
-  return <TermResults q={(searchParams.get('q') ?? '').trim()} />;
+  const q = (searchParams.get('q') ?? '').trim();
+  const sort = searchParams.get('sort');
+  // An unknown ranking is no search at all, like a blank term.
+  return q.length === 0 && isBookSort(sort) ? (
+    <SortedResults sort={sort} />
+  ) : (
+    <TermResults q={q} />
+  );
+};
+
+const SortedResults: FC<{ sort: BookSort }> = ({ sort }) => {
+  const { data, isPending, isError, error } = useSortedBooks(sort);
+  const layout = useResultsLayout();
+
+  return (
+    <>
+      <ResultsBar
+        heading={
+          <Typography.Title level={2} className={styles.heading}>
+            {BOOK_SORT_LABELS[sort]}
+          </Typography.Title>
+        }
+      />
+      <CardList
+        noun="books"
+        items={data?.items ?? []}
+        renderItem={(book) => <BookCard book={book} tile={layout === 'grid'} />}
+        columns={RESULTS_COLUMNS[layout]}
+        isPending={isPending}
+        isError={isError}
+        error={error}
+      />
+    </>
+  );
 };
 
 const TermResults: FC<{ q: string }> = ({ q }) => {

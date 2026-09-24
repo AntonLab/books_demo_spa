@@ -27,6 +27,12 @@ code alone does not explain.
 - `POST /api/books` takes no status: every book starts `draft`. Only `draft`
   changes what anyone may do (see `access.md`).
 - `?q=` matches `title` or `description`.
+- `?sort=popular|new|updated` ranks by Popularity, Release time or Last update
+  (CONTEXT.md), best first, ties to the higher id, overriding Series order.
+  Each is a correlated subquery on the book row; `new` and `updated` drop a
+  book with no Published chapter. "Published" compares with the process clock,
+  as `readableChapterScope` does, so a Scheduled chapter counts once its time
+  passes.
 
 ## Chapters
 

@@ -1,6 +1,11 @@
 import { request } from './client';
 import type { ListResponse } from '../types/api';
-import type { BookDetail, BookStatus, PublicBook } from '../types/book';
+import type {
+  BookDetail,
+  BookSort,
+  BookStatus,
+  PublicBook,
+} from '../types/book';
 
 export interface ListBooksParams {
   q?: string;
@@ -11,6 +16,8 @@ export interface ListBooksParams {
   // One Genre's books. Combined with the filters above by AND; an id that names
   // no Genre yields an empty list rather than an error.
   genreId?: number;
+  // Best first by Popularity, Release time or Last update, rather than by id.
+  sort?: BookSort;
   limit?: number;
   offset?: number;
 }
@@ -32,8 +39,8 @@ export type UpdateBookPayload = Partial<CreateBookPayload> & {
   status?: BookStatus;
 };
 
-// One function, several callers: `useBooks` fetches the unfiltered first page,
-// `useSearchBooks` passes a `q` and `useBooksInSeries` a `seriesId`. The
+// One function, several callers: `useSortedBooks` passes a `sort`,
+// `useSearchBooks` a `q` and `useBooksInSeries` a `seriesId`. The
 // server's schema rejects an empty `q`
 // (`z.string().min(1)`), so a blank term is omitted rather than sent —
 // `useSearchBooks` also disables itself on one, which stops the request
@@ -50,6 +57,7 @@ export const listBooks = (
   if (params.genreId !== undefined) {
     search.set('genreId', String(params.genreId));
   }
+  if (params.sort !== undefined) search.set('sort', params.sort);
   if (params.limit !== undefined) search.set('limit', String(params.limit));
   if (params.offset !== undefined) search.set('offset', String(params.offset));
 
