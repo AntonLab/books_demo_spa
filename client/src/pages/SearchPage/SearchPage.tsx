@@ -1,12 +1,13 @@
 import type { FC, ReactNode } from 'react';
-import { Alert, Empty, Flex, Segmented, Skeleton, Typography } from 'antd';
-import type { ColProps } from 'antd';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faList, faTableCellsLarge } from '@fortawesome/free-solid-svg-icons';
+import { Alert, Empty, Flex, Skeleton, Typography } from 'antd';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCard } from '@/components/organisms/BookCard';
-import { CardList, TILE_COLUMNS } from '@/components/organisms/CardList';
+import { CardList } from '@/components/organisms/CardList';
+import {
+  RESULTS_COLUMNS,
+  ResultsLayoutSwitch,
+} from '@/components/organisms/ResultsLayoutSwitch';
 import { SeriesCard } from '@/components/organisms/SeriesCard';
 import {
   useBooksInGenre,
@@ -16,22 +17,13 @@ import {
 } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useSeries, useSeriesInGenre } from '@/queries/series';
-import {
-  devicePreferences,
-  type ResultsLayout,
-} from '@/store/devicePreferencesSlice';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useAppSelector } from '@/store/hooks';
 import { BOOK_SORT_LABELS, BOOK_SORTS, type BookSort } from '@/types/book';
 import type { PublicGenre } from '@/types/genre';
 import styles from './SearchPage.module.css';
 
 const SERIES_GONE = 'This series no longer exists.';
 const GENRE_GONE = 'This genre no longer exists.';
-
-const RESULTS_COLUMNS: Record<ResultsLayout, ColProps> = {
-  grid: TILE_COLUMNS,
-  list: { span: 24 },
-};
 
 // A Device preference, so it holds across every term, Genre and Series
 // searched on this device.
@@ -40,43 +32,18 @@ const useResultsLayout = () =>
 
 // Shown whenever the page has something to search for, loading or failed
 // included, so it never jumps in late or leaves.
-const ResultsBar: FC<{ heading?: ReactNode }> = ({ heading }) => {
-  const layout = useResultsLayout();
-  const dispatch = useAppDispatch();
-
-  return (
-    <Flex
-      justify={heading === undefined ? 'end' : 'space-between'}
-      align="center"
-      gap="middle"
-      wrap
-      className={styles.bar}
-    >
-      {heading}
-      <Segmented<ResultsLayout>
-        aria-label="Results layout"
-        value={layout}
-        onChange={(value) =>
-          dispatch(devicePreferences.resultsLayoutChanged(value))
-        }
-        options={[
-          {
-            value: 'grid',
-            icon: (
-              <FontAwesomeIcon icon={faTableCellsLarge} aria-label="Grid" />
-            ),
-            tooltip: 'Grid',
-          },
-          {
-            value: 'list',
-            icon: <FontAwesomeIcon icon={faList} aria-label="List" />,
-            tooltip: 'List',
-          },
-        ]}
-      />
-    </Flex>
-  );
-};
+const ResultsBar: FC<{ heading?: ReactNode }> = ({ heading }) => (
+  <Flex
+    justify={heading === undefined ? 'end' : 'space-between'}
+    align="center"
+    gap="middle"
+    wrap
+    className={styles.bar}
+  >
+    {heading}
+    <ResultsLayoutSwitch />
+  </Flex>
+);
 
 const isBookSort = (value: string | null): value is BookSort =>
   (BOOK_SORTS as readonly (string | null)[]).includes(value);

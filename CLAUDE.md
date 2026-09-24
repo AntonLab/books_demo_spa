@@ -44,7 +44,6 @@ types only from a file whose real path lies outside `node_modules`.
 - `npm run seed -w server -- --force` loads the demo data. **The flag is
   mandatory**, and with it the script first deletes every row in the ten
   content tables, Covers and Avatars with them.
-- There is no series page: a series' books are reached through `/search`.
 
 ## Quality Gates
 
