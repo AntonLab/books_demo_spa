@@ -24,8 +24,26 @@ declare module 'antd/es/theme/interface' {
     appBookCoverWidth: number;
     /** Width of the page's content column (header and route): a CSS length. */
     appPageWidth: string;
+    /** Widest a Chapter's text column grows at each reading width: CSS lengths. */
+    appReadingWidthNarrow: string;
+    appReadingWidthMedium: string;
+    appReadingWidthWide: string;
   }
 }
+
+// A Chapter's reading backgrounds, fed as tokens to a ConfigProvider around the
+// text rather than as CSS: antd redeclares its `--ant-*` variables on every
+// component it renders, so a class overriding them on an ancestor never
+// reaches a Typography inside. `auto` has none: it keeps the app's theme.
+export const READING_PALETTES = {
+  white: { background: '#ffffff', text: 'rgba(0, 0, 0, 0.88)' },
+  sepia: { background: '#f4ecd8', text: '#5b4636' },
+  dark: { background: '#2b2b2b', text: '#d4d4d4' },
+  black: { background: '#000000', text: '#b3b3b3' },
+} as const;
+
+// `sans` keeps antd's own stack.
+export const READING_SERIF_FONT = "Georgia, 'Times New Roman', Times, serif";
 
 export const appTheme: ThemeConfig = {
   token: {
@@ -35,5 +53,9 @@ export const appTheme: ThemeConfig = {
     // A share of the window, kept between a floor and a ceiling. The `%`
     // resolves where the variable is used, against the Layout's full width.
     appPageWidth: 'clamp(1024px, 75%, 1440px)',
+    // In characters, so the line length holds at every font size.
+    appReadingWidthNarrow: '50ch',
+    appReadingWidthMedium: '65ch',
+    appReadingWidthWide: '80ch',
   },
 };

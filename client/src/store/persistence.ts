@@ -1,10 +1,19 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import {
   initialDevicePreferences,
+  initialReadingPreferences,
+  READING_BACKGROUNDS,
+  READING_FONT_SIZE,
+  READING_FONTS,
+  READING_LINE_HEIGHTS,
+  READING_WIDTHS,
   RESULTS_LAYOUTS,
   THEMES,
 } from './devicePreferencesSlice';
-import type { DevicePreferencesState } from './devicePreferencesSlice';
+import type {
+  DevicePreferencesState,
+  ReadingPreferences,
+} from './devicePreferencesSlice';
 import { isBlank, unsavedText } from './unsavedTextSlice';
 import type { UnsavedTextEntry, UnsavedTextState } from './unsavedTextSlice';
 import type { RootState } from './index';
@@ -40,6 +49,34 @@ const write = (key: string, value: unknown): void => {
   }
 };
 
+const isReadingFontSize = (value: unknown): value is number =>
+  typeof value === 'number' &&
+  value >= READING_FONT_SIZE.min &&
+  value <= READING_FONT_SIZE.max &&
+  (value - READING_FONT_SIZE.min) % READING_FONT_SIZE.step === 0;
+
+// Field by field, like the rest: one unknown value falls back alone.
+const toReadingPreferences = (value: unknown): ReadingPreferences => {
+  const stored = (
+    typeof value === 'object' && value !== null ? value : {}
+  ) as Record<string, unknown>;
+  const initial = initialReadingPreferences;
+  return {
+    background:
+      READING_BACKGROUNDS.find((known) => known === stored.background) ??
+      initial.background,
+    font: READING_FONTS.find((known) => known === stored.font) ?? initial.font,
+    fontSize: isReadingFontSize(stored.fontSize)
+      ? stored.fontSize
+      : initial.fontSize,
+    lineHeight:
+      READING_LINE_HEIGHTS.find((known) => known === stored.lineHeight) ??
+      initial.lineHeight,
+    width:
+      READING_WIDTHS.find((known) => known === stored.width) ?? initial.width,
+  };
+};
+
 // A field added since the value was stored reads as its default rather than
 // failing the whole value, so an addition needs no new key and nobody loses
 // the theme they chose. Only a bad `theme` drops the value.
@@ -59,6 +96,7 @@ const toDevicePreferences = (
       typeof stored.searchFormExpanded === 'boolean'
         ? stored.searchFormExpanded
         : initialDevicePreferences.searchFormExpanded,
+    reading: toReadingPreferences(stored.reading),
   };
 };
 

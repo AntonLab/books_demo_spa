@@ -1,3 +1,4 @@
+import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
@@ -257,6 +258,7 @@ describe('SearchPage', () => {
         theme: 'light',
         resultsLayout: 'grid',
         searchFormExpanded: false,
+        reading: initialReadingPreferences,
       },
     });
 
