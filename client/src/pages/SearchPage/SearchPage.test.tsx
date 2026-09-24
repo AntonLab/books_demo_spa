@@ -631,3 +631,56 @@ describe('SearchPage for one genre', () => {
     expect(mockedSeries.listSeries).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('SearchPage for a ranking (?sort=)', () => {
+  beforeEach(() => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+  });
+
+  it('lists the first page of the ranking under its name', async () => {
+    renderWithProviders(<SearchPage />, { route: '/search?sort=updated' });
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 2,
+        name: 'Recently updated',
+      })
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      sort: 'updated',
+      limit: 20,
+    });
+  });
+
+  it('gives way to a search term', async () => {
+    renderWithProviders(<SearchPage />, {
+      route: '/search?sort=popular&q=dragon',
+    });
+
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      q: 'dragon',
+      limit: 20,
+    });
+    expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an unknown ranking as no search at all', () => {
+    renderWithProviders(<SearchPage />, { route: '/search?sort=oldest' });
+
+    expect(
+      screen.getByText('Enter a search term to find books.')
+    ).toBeInTheDocument();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+});

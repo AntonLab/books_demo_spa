@@ -10,16 +10,19 @@ import {
   type CreateBookPayload,
   type UpdateBookPayload,
 } from '../api/books';
+import type { BookSort } from '../types/book';
 import { queryKeys } from './keys';
 
 // The first page only. Paging is a documented non-goal; `total` is kept so the
 // count can be displayed and paging added later without a state change.
 export const BOOKS_PAGE_SIZE = 20;
 
-export const useBooks = () => {
+// A ranking's first `limit` books: the main page shows a few of each, the
+// search page a full page.
+export const useSortedBooks = (sort: BookSort, limit = BOOKS_PAGE_SIZE) => {
   return useQuery({
-    queryKey: queryKeys.books({ limit: BOOKS_PAGE_SIZE }),
-    queryFn: () => listBooks({ limit: BOOKS_PAGE_SIZE }),
+    queryKey: queryKeys.books({ sort, limit }),
+    queryFn: () => listBooks({ sort, limit }),
   });
 };
 
@@ -50,7 +53,7 @@ export const useBooksInSeries = (seriesId: number) => {
 };
 
 // One Genre's books: the server's default order (oldest first, by id), drafts excluded
-// as in every public list. One page, like the main page's list — Genre results
+// as in every public list. One page, like every search result — Genre results
 // are capped at a page rather than paged.
 export const useBooksInGenre = (genreId: number) => {
   return useQuery({

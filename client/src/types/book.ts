@@ -1,9 +1,22 @@
 import type * as Shared from 'shared';
-import type { BookStatus, Wire } from 'shared';
+import type { BookSort, BookStatus, Wire } from 'shared';
 
 // The server's BOOK_STATUSES, from the shared workspace (ADR-0006). Only
 // `draft` keeps a book from readers; see CONTEXT.md.
-export { BOOK_STATUSES, type BookStatus } from 'shared';
+export {
+  BOOK_SORTS,
+  BOOK_STATUSES,
+  type BookSort,
+  type BookStatus,
+} from 'shared';
+
+// What each ranking is called, both as a main page section and as the search
+// page it leads to.
+export const BOOK_SORT_LABELS: Record<BookSort, string> = {
+  popular: 'Popular',
+  new: 'New releases',
+  updated: 'Recently updated',
+};
 
 // What a reader sees for each status. Kept beside the type so every place that
 // shows a status says the same words.
@@ -11,6 +24,14 @@ export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
   draft: 'Draft',
   in_progress: 'In progress',
   complete: 'Complete',
+};
+
+// antd Tag presets, so dark mode adapts them. `gold` rather than `yellow`:
+// yellow text on its light background fails WCAG AA contrast.
+export const BOOK_STATUS_COLORS: Record<BookStatus, string> = {
+  draft: 'red',
+  in_progress: 'gold',
+  complete: 'green',
 };
 
 // No userId: a book has no single owner (ADR-0005). Every Co-author comes

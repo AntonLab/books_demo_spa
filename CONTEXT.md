@@ -216,3 +216,26 @@ _Avoid_: Notice, alert, message
 An Account's vote of approval on exactly one Book or one Comment, never both
 at once.
 _Avoid_: Vote, favorite, upvote
+
+**Popularity**:
+How many Likes a Book has received, all time. Dislikes and Likes on its
+Comments do not count.
+_Avoid_: Rating, trending
+
+### Discovery
+
+**Release time**:
+The Publication time of a Book's earliest Published Chapter: the moment it
+first had something to read. A Book with no Published Chapter has none, so it
+is not a New release. Its Book status and creation time do not enter into it.
+_Avoid_: Created at, publish date (for a Book)
+
+**New release**:
+A Book ranked by its Release time, latest first.
+_Avoid_: New book (for any recently created Book)
+
+**Last update**:
+The Publication time of a Book's latest Published Chapter. Editing a Book's
+details or an existing Chapter does not move it, and neither does a Scheduled
+chapter until its Publication time passes.
+_Avoid_: Updated at (for a Book)

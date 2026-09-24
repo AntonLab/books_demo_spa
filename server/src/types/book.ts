@@ -1,4 +1,4 @@
-import { BOOK_STATUSES } from 'shared';
+import { BOOK_SORTS, BOOK_STATUSES } from 'shared';
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
@@ -7,6 +7,7 @@ import { idSchema } from './params.ts';
 export {
   BOOK_STATUSES,
   type BookDetail,
+  type BookSort,
   type BookStatus,
   type PublicBook,
   type SeriesBookSummary,
@@ -87,6 +88,7 @@ export const listBooksQuerySchema = z.object({
   genreId: idSchema.optional(),
   tag: z.string().min(1).max(BOOK_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),
+  sort: z.enum(BOOK_SORTS).optional(),
 });
 
 export type CreateBookInput = z.infer<typeof createBookSchema>;

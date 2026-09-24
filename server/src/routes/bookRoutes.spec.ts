@@ -421,6 +421,21 @@ test('GET list filters by genre', async () => {
   );
 });
 
+test('GET list takes a known sort and refuses any other with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      for (const sort of ['popular', 'new', 'updated']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?sort=${sort}`)).status,
+          200
+        );
+      }
+      assert.equal((await fetch(`${base}/api/books?sort=oldest`)).status, 400);
+    }
+  );
+});
+
 test('GET by id embeds the co-authors and series, and never an email', async () => {
   // Seeded through the authenticated harness because POST is guarded, then read
   // back with no cookie at all: that is what proves the detail read stays

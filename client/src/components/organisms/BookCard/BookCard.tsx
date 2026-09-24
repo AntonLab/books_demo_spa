@@ -3,7 +3,11 @@ import { Space, Tag, theme, Typography } from 'antd';
 import { BookCover } from '@/components/molecules/BookCover';
 import { Card } from '@/components/organisms/Card';
 import { formatDate } from '@/format/date';
-import { BOOK_STATUS_LABELS, type PublicBook } from '@/types/book';
+import {
+  BOOK_STATUS_COLORS,
+  BOOK_STATUS_LABELS,
+  type PublicBook,
+} from '@/types/book';
 
 interface BookCardProps {
   book: PublicBook;
@@ -35,7 +39,7 @@ export const BookCard: FC<BookCardProps> = ({ book, tile = false }) => {
       }
       footer={
         <Space size={token.marginXS}>
-          <Tag color={book.status === 'draft' ? 'orange' : undefined}>
+          <Tag color={BOOK_STATUS_COLORS[book.status]}>
             {BOOK_STATUS_LABELS[book.status]}
           </Tag>
           {!tile && (
