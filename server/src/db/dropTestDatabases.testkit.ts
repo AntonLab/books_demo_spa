@@ -28,9 +28,15 @@ function isTestSchema(name: string): boolean {
 }
 
 async function dropTestDatabases(): Promise<void> {
-  // No credentials means the MySQL suites skipped rather than passed, so there
-  // is nothing to drop. Checked before parseConfig, which throws on a missing
-  // DB_USER.
+  // Under SKIP_MYSQL=1 the MySQL suites may have skipped rather than passed, so
+  // there may be no server to reach. Checked before parseConfig, which throws
+  // on a missing DB_USER.
+  if (process.env.SKIP_MYSQL === '1') {
+    logger.info('Test schema cleanup skipped: SKIP_MYSQL is set');
+    return;
+  }
+  // A green run without SKIP_MYSQL had credentials, or the suites would have
+  // failed; this guards a cleanup run on its own.
   if (!process.env.DB_USER) {
     logger.info('Test schema cleanup skipped: DB_USER is not set');
     return;
@@ -64,8 +70,8 @@ async function dropTestDatabases(): Promise<void> {
       connectTimeout: 4000,
     });
   } catch (error) {
-    // Unreachable MySQL means the suites skipped, exactly as an absent DB_USER
-    // does. Warn and leave the run green rather than failing a passing build.
+    // The suites passed, so the server went away after them. Warn and leave
+    // the run green: a failed cleanup says nothing about the code.
     logger.warn(
       `Test schema cleanup skipped: MySQL unreachable — ${connectionErrorText(error)}`
     );

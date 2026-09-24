@@ -82,7 +82,7 @@ with zod and refuses to start on a malformed value.
 | `RESET_DELIVERY`          | `log`; none in production | `log` is the only sink. Production refuses to start without it, so link-logging never ships by accident. |
 
 The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
-`REQUIRE_MYSQL` (see `testing.md`).
+`SKIP_MYSQL` (see `testing.md`).
 
 ## Runtime
 
