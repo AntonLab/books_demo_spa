@@ -24,7 +24,7 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   refetches on every focus (`'always'`).
 - **A disabled query reports `isPending: true` forever** (with
   `fetchStatus: 'idle'`). `useSearchBooks` is disabled on a blank term, which is
-  why `SearchPage` returns `<Empty>` before rendering `BookList`.
+  why `SearchPage` returns `<Empty>` before rendering `CardList`.
 - **Wrap every `mutationFn`; never pass an `src/api/` function straight
   through.** TanStack passes a second context argument, which arrives as a
   stray parameter and fails `toHaveBeenCalledWith` naming

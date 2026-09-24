@@ -1,3 +1,9 @@
+/* In a list the grid's gutter spaces the cards; heading a page, the card
+   keeps its own distance from the list beneath it. */
+.pageHeading {
+  margin-bottom: var(--ant-margin);
+}
+
 .row {
   width: 100%;
 }
