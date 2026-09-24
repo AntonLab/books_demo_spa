@@ -98,7 +98,7 @@ describe('SeriesCard', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
-    ).toHaveAttribute('href', '/search?series=12');
+    ).toHaveAttribute('href', '/series/12');
   });
 
   it('links the genre to its results, in both title forms', () => {
@@ -123,7 +123,7 @@ describe('SeriesCard', () => {
 
     expect(
       screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
-    ).toHaveAttribute('href', '/search?series=12');
+    ).toHaveAttribute('href', '/series/12');
     expect(screen.getByText(series.description)).toBeInTheDocument();
     expect(screen.queryByText('Gothic')).toBeNull();
     expect(screen.queryByText('gothic')).toBeNull();

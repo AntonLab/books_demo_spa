@@ -123,8 +123,11 @@ export function createBookController(
 
     list: async (req, res) => {
       const query = validatedQuery<ListBooksQuery>(req);
-      const { items, total } = await repository.list(query, viewerOf(req.user));
-      res.json({ items, total, limit: query.limit, offset: query.offset });
+      const { items, total, current } = await repository.list(
+        query,
+        viewerOf(req.user)
+      );
+      res.json({ items, total, current, pageSize: query.pageSize });
     },
 
     getById: async (req, res) => {

@@ -5,14 +5,17 @@ import type { ListSeriesParams } from '../api/series';
 // disagree about what identifies a query.
 //
 // `books` taking the same params object `listBooks` does is what keeps
-// MainPage's key (`{ limit }`) and SearchPage's (`{ q, limit }`) distinct.
-// searchSlice existed as a separate slice precisely so a search could not
-// overwrite the MainPage list and leave stale results behind; two cache keys
-// give that structurally, since neither can write the other's entry.
+// MainPage's key (`{ sort, pageSize }`) and SearchPage's (`{ q, pageSize }`)
+// distinct. searchSlice existed as a separate slice precisely so a search
+// could not overwrite the MainPage list and leave stale results behind; two
+// cache keys give that structurally, since neither can write the other's
+// entry.
 export const queryKeys = {
   session: ['auth', 'me'] as const,
   // A constant key, like `session`: the list takes no parameters at all.
   genres: ['genres'] as const,
+  // Under the `genres` prefix, so a Genre write invalidates it too.
+  genresWithBooks: ['genres', { nonEmpty: true }] as const,
   books: (params: ListBooksParams) => ['books', params] as const,
   // Keyed by a bare id, so it cannot collide with `books`, which is always
   // keyed by a params object.

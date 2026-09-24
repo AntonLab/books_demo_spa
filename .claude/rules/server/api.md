@@ -26,7 +26,20 @@ code alone does not explain.
   the Co-author picker for the same reason.
 - `POST /api/books` takes no status: every book starts `draft`. Only `draft`
   changes what anyone may do (see `access.md`).
-- `?q=` matches `title` or `description`.
+- The search filters combine by AND: `q` (title or description), `status`
+  (`in_progress` | `complete`; `draft` is a 400), `releasedFrom`/`releasedTo`
+  and `updatedFrom`/`updatedTo` (ISO instants, both bounds inclusive, compared
+  with the same `publicationEdge` subqueries the `new` / `updated` sorts use,
+  so a book with no Published chapter drops out once any bound is set),
+  `author` (login, first or last name of any Co-author, `login` compared
+  `COLLATE utf8mb4_0900_ai_ci`) and `seriesTitle`. Text is trimmed, 1–200. A
+  start after its end is a 400 pinned to the "from" key. `author` and
+  `seriesTitle` are looked up as id lists first, like `userId`.
+- `GET /api/books` pages by `current` / `pageSize` (1–`PAGE_SIZE_MAX`,
+  default 20), not `limit` / `offset`, and answers `PagedResponse`
+  (`{ items, total, current, pageSize }`). It counts first: past the end it
+  serves the last non-empty page, page 1 when nothing matches, and says so in
+  `current`. Every other list keeps `limit` / `offset` and `ListResponse`.
 - `?sort=popular|new|updated` ranks by Popularity, Release time or Last update
   (CONTEXT.md), best first, ties to the higher id, overriding Series order.
   Each is a correlated subquery on the book row; `new` and `updated` drop a
@@ -85,6 +98,10 @@ code alone does not explain.
   failure, which always has one.
 - Absent `genreId` on a create means `null`; absent on a `PATCH` leaves it
   alone.
+- `GET /api/genres?nonEmpty=true` lists only Genres holding an `in_progress`
+  or `complete` Book (a fixed subquery), so a Draft book never reveals its
+  Genre. The header menu and the search form use it; the forms and
+  AdminGenresPage take the whole list.
 
 ## Zod traps
 

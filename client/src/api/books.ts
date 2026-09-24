@@ -1,25 +1,36 @@
 import { request } from './client';
-import type { ListResponse } from '../types/api';
+import type { PagedResponse } from '../types/api';
 import type {
   BookDetail,
   BookSort,
   BookStatus,
   PublicBook,
+  SearchableBookStatus,
 } from '../types/book';
 
 export interface ListBooksParams {
+  // Title or description.
   q?: string;
   // Naming the caller's own id is the one list that includes their drafts.
   userId?: number;
   // The series' books in its Series order, rather than the default by id.
   seriesId?: number;
-  // One Genre's books. Combined with the filters above by AND; an id that names
-  // no Genre yields an empty list rather than an error.
   genreId?: number;
+  status?: SearchableBookStatus;
+  // ISO instants, both bounds inclusive: the Release time and Last update
+  // ranges (CONTEXT.md).
+  releasedFrom?: string;
+  releasedTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  // Login, first or last name of any Co-author.
+  author?: string;
+  seriesTitle?: string;
   // Best first by Popularity, Release time or Last update, rather than by id.
   sort?: BookSort;
-  limit?: number;
-  offset?: number;
+  // antd Pagination's names: the 1-based page and its size.
+  current?: number;
+  pageSize?: number;
 }
 
 export interface CreateBookPayload {
@@ -39,30 +50,22 @@ export type UpdateBookPayload = Partial<CreateBookPayload> & {
   status?: BookStatus;
 };
 
-// One function, several callers: `useSortedBooks` passes a `sort`,
-// `useSearchBooks` a `q` and `useBooksInSeries` a `seriesId`. The
-// server's schema rejects an empty `q`
-// (`z.string().min(1)`), so a blank term is omitted rather than sent —
-// `useSearchBooks` also disables itself on one, which stops the request
-// happening at all rather than merely shaping the URL.
+// Every filter combines with the others by AND. Written in the order the
+// caller gave them; an undefined or empty value is left out, since the server
+// refuses a blank text filter.
 export const listBooks = (
   params: ListBooksParams = {}
-): Promise<ListResponse<PublicBook>> => {
+): Promise<PagedResponse<PublicBook>> => {
   const search = new URLSearchParams();
-  if (params.q) search.set('q', params.q);
-  if (params.userId !== undefined) search.set('userId', String(params.userId));
-  if (params.seriesId !== undefined) {
-    search.set('seriesId', String(params.seriesId));
+  for (const [key, value] of Object.entries(params) as [
+    string,
+    string | number | undefined,
+  ][]) {
+    if (value !== undefined && value !== '') search.set(key, String(value));
   }
-  if (params.genreId !== undefined) {
-    search.set('genreId', String(params.genreId));
-  }
-  if (params.sort !== undefined) search.set('sort', params.sort);
-  if (params.limit !== undefined) search.set('limit', String(params.limit));
-  if (params.offset !== undefined) search.set('offset', String(params.offset));
 
   const query = search.toString();
-  return request<ListResponse<PublicBook>>(
+  return request<PagedResponse<PublicBook>>(
     query ? `/books?${query}` : '/books'
   );
 };

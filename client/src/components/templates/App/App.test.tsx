@@ -35,8 +35,8 @@ beforeEach(() => {
   mockedBooks.listBooks.mockResolvedValue({
     items: [],
     total: 0,
-    limit: 20,
-    offset: 0,
+    current: 1,
+    pageSize: 20,
   });
   mockedBooks.getBook.mockResolvedValue({
     id: 1,
@@ -200,11 +200,19 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('has no page at /series: a series is found through its books', async () => {
+  it('renders the not-found page at a bare /series', async () => {
     renderWithProviders(<AppShell />, { route: '/series' });
 
     expect(
       await screen.findByRole('heading', { name: 'Page not found' })
+    ).toBeInTheDocument();
+  });
+
+  it('renders SeriesPage at /series/:id', async () => {
+    renderWithProviders(<AppShell />, { route: '/series/12' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'The Scale Cycle' })
     ).toBeInTheDocument();
   });
 

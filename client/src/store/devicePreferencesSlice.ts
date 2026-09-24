@@ -13,11 +13,14 @@ export type ResultsLayout = (typeof RESULTS_LAYOUTS)[number];
 export interface DevicePreferencesState {
   theme: Theme;
   resultsLayout: ResultsLayout;
+  // Whether the search page's form is open. Open by default.
+  searchFormExpanded: boolean;
 }
 
 export const initialDevicePreferences: DevicePreferencesState = {
   theme: 'light',
   resultsLayout: 'grid',
+  searchFormExpanded: true,
 };
 
 const slice = createSlice({
@@ -29,6 +32,9 @@ const slice = createSlice({
     },
     resultsLayoutChanged(state, action: PayloadAction<ResultsLayout>) {
       state.resultsLayout = action.payload;
+    },
+    searchFormExpandedChanged(state, action: PayloadAction<boolean>) {
+      state.searchFormExpanded = action.payload;
     },
     // Another tab's write, relayed by the `storage` event: that tab's value
     // wins here too. `null` means that tab cleared the key (a corrupt value

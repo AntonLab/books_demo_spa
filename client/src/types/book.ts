@@ -6,8 +6,12 @@ import type { BookSort, BookStatus, Wire } from 'shared';
 export {
   BOOK_SORTS,
   BOOK_STATUSES,
+  RANGE_ORDER,
+  SEARCH_TEXT_MAX_LENGTH,
+  SEARCHABLE_BOOK_STATUSES,
   type BookSort,
   type BookStatus,
+  type SearchableBookStatus,
 } from 'shared';
 
 // What each ranking is called, both as a main page section and as the search

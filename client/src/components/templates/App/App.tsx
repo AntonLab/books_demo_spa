@@ -63,6 +63,9 @@ const ProfilePage = lazy(() =>
 const SearchPage = lazy(() =>
   import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage }))
 );
+const SeriesPage = lazy(() =>
+  import('@/pages/SeriesPage').then((m) => ({ default: m.SeriesPage }))
+);
 
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
 // test cannot point at an arbitrary path. Route tests wrap this in
@@ -107,8 +110,10 @@ export const AppShell: FC = () => {
                 element={<EditChapterPage />}
               />
               <Route path="/search" element={<SearchPage />} />
-              {/* The public series page is still a stub; only authoring is built. */}
+              {/* The static `new` segment outranks `:id`, as /books/new
+                  does. A bare /series stays NotFoundPage. */}
               <Route path="/series/new" element={<NewSeriesPage />} />
+              <Route path="/series/:id" element={<SeriesPage />} />
               <Route path="/series/:id/edit" element={<EditSeriesPage />} />
               <Route path="/my-books" element={<MyBooksPage />} />
               <Route path="/profile" element={<ProfilePage />} />
