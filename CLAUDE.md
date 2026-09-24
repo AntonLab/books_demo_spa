@@ -59,7 +59,8 @@ Run from the repo root before commit; each fans out over every workspace
 
 The pre-commit hook (`.githooks/pre-commit`, enabled by `prepare`) runs ESLint
 and Prettier over staged files only. It refuses a partially staged file, and it
-never runs `typecheck` or tests. `git commit --no-verify` bypasses it.
+never runs `typecheck` or tests. `.githooks/commit-msg` rejects a subject that
+is not a conventional commit. `git commit --no-verify` bypasses both.
 
 CI (`.github/workflows/`) runs seven required checks on every PR into `dev` or
 `main`; see `.claude/rules/repo/ci.md` before renaming a job.
@@ -100,7 +101,8 @@ CI (`.github/workflows/`) runs seven required checks on every PR into `dev` or
    returns starts in `shared/`.
 2. Name domain things the way `CONTEXT.md` does; check `docs/adr/` before
    contradicting a recorded decision.
-3. Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `ci:`).
+3. Conventional commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
+   `test:`, `ci:`).
 4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
 
 ## Agent skills
