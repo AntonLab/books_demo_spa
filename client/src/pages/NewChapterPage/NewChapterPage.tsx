@@ -11,6 +11,7 @@ import { useCreateChapter } from '@/queries/chapters';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   isBlank,
+  ownEntries,
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
@@ -25,7 +26,7 @@ export const NewChapterPage: FC = () => {
   const dispatch = useAppDispatch();
   const unsavedKey = unsavedTextKeys.chapterNew(bookId);
   const entry = useAppSelector(
-    (state) => state.unsavedText.entries[unsavedKey]
+    (state) => ownEntries(state, session?.id)[unsavedKey]
   );
   // A create can land after the Account has already moved to an unrelated
   // route; without this, the delayed navigate() below would still fire and
