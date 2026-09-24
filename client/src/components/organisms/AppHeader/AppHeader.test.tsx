@@ -90,7 +90,7 @@ describe('AppHeader while the session is loading', () => {
 });
 
 describe('AppHeader navigation', () => {
-  it('has no Series item, since there is no series page to go to', async () => {
+  it('has no Series item, since the header has no series list to link to', async () => {
     await renderHeader(<AppHeader />, withSession(null));
 
     expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
