@@ -9,16 +9,7 @@ import { logger } from './logger.ts';
 import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
-import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
-import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
-import { createSequelizeCommentRepository } from './repositories/commentRepository.ts';
-import { createSequelizeGenreRepository } from './repositories/genreRepository.ts';
-import { createSequelizeLikeRepository } from './repositories/likeRepository.ts';
-import { createSequelizeNotificationRepository } from './repositories/notificationRepository.ts';
-import { createSequelizePasswordResetRepository } from './repositories/passwordResetRepository.ts';
-import { createSequelizeSessionRepository } from './repositories/sessionRepository.ts';
-import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
-import { createSequelizeUserRepository } from './repositories/userRepository.ts';
+import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { createShutdown, registerShutdownSignals } from './shutdown.ts';
 
 function loadLocalEnv(): void {
@@ -57,8 +48,8 @@ async function main(): Promise<void> {
   // never provisioned, and failing loudly at boot beats discovering it later.
   await syncPermissions();
 
-  const sessionRepository = createSequelizeSessionRepository();
-  const passwordResetRepository = createSequelizePasswordResetRepository();
+  const repositories = createSequelizeRepositories();
+  const { sessionRepository, passwordResetRepository } = repositories;
   // After syncPermissions(): by now the schema is known to be provisioned.
   const expiryPurge = startExpiryPurge({
     sessionRepository,
@@ -68,16 +59,7 @@ async function main(): Promise<void> {
   const authRateLimits = createAuthRateLimits();
 
   const app = createApp({
-    userRepository: createSequelizeUserRepository(),
-    seriesRepository: createSequelizeSeriesRepository(),
-    bookRepository: createSequelizeBookRepository(),
-    chapterRepository: createSequelizeChapterRepository(),
-    genreRepository: createSequelizeGenreRepository(),
-    commentRepository: createSequelizeCommentRepository(),
-    likeRepository: createSequelizeLikeRepository(),
-    notificationRepository: createSequelizeNotificationRepository(),
-    sessionRepository,
-    passwordResetRepository,
+    ...repositories,
     resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,

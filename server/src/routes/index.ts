@@ -1,16 +1,7 @@
 import { Router } from 'express';
 import type { ResetDelivery } from '../delivery/resetDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
-import type { BookRepository } from '../repositories/bookRepository.ts';
-import type { ChapterRepository } from '../repositories/chapterRepository.ts';
-import type { CommentRepository } from '../repositories/commentRepository.ts';
-import type { GenreRepository } from '../repositories/genreRepository.ts';
-import type { LikeRepository } from '../repositories/likeRepository.ts';
-import type { NotificationRepository } from '../repositories/notificationRepository.ts';
-import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
-import type { SeriesRepository } from '../repositories/seriesRepository.ts';
-import type { SessionRepository } from '../repositories/sessionRepository.ts';
-import type { UserRepository } from '../repositories/userRepository.ts';
+import type { Repositories } from '../repositories/sequelizeRepositories.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
@@ -25,18 +16,11 @@ import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoleRoutes } from './userRoleRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
-export interface RouteDeps {
-  userRepository: UserRepository;
-  seriesRepository: SeriesRepository;
-  bookRepository: BookRepository;
-  chapterRepository: ChapterRepository;
-  genreRepository: GenreRepository;
-  commentRepository: CommentRepository;
-  likeRepository: LikeRepository;
-  notificationRepository: NotificationRepository;
-  sessionRepository: SessionRepository;
-  passwordResetRepository: PasswordResetRepository;
+export interface RouteDeps extends Repositories {
   resetDelivery: ResetDelivery;
+  // The sign-in rate limits (middleware/authRateLimit.ts). Required, so no
+  // app is ever built without them by accident; tests pass
+  // unlimitedAuthRateLimits() from the route test kit.
   authRateLimits: AuthRateLimits;
 }
 
