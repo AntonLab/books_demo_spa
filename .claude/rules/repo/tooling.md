@@ -42,6 +42,8 @@ paths:
   `switch-exhaustiveness-check` (a `default:` does not cover a missing union
   member: write the `case`). JavaScript stays untyped. Growing this toward
   `recommendedTypeChecked` is a deliberate step, one measured rule at a time.
+- `no-duplicate-imports` allows one `import type` line beside the value import
+  from the same module, the repo's style.
 - `no-console` and `no-non-null-assertion` are errors; test files
   (`*.spec.ts`, `*.test.ts(x)`, `*.testkit.ts`, `src/test/`) may write `!`.
 - The client config adds the rules `client/CLAUDE.md` lists: imports flow
