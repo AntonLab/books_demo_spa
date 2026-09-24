@@ -64,3 +64,8 @@ export type SearchableBookStatus = (typeof SEARCHABLE_BOOK_STATUSES)[number];
 // The longest text a search field takes (title/description, author, series
 // title), counted after trimming. Client and server both check it.
 export const SEARCH_TEXT_MAX_LENGTH = 200;
+
+// The message for a range whose start comes after its end (a "from" day
+// after its "to"): the server's zod refinement and the client's form rule
+// both say this, so the error reads the same whichever one catches it.
+export const RANGE_ORDER = 'Must not be after the end date.';

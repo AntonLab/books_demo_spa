@@ -2,6 +2,7 @@ import {
   BOOK_SORTS,
   BOOK_STATUSES,
   PAGE_SIZE_MAX,
+  RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
 } from 'shared';
@@ -95,8 +96,6 @@ const searchTextSchema = z.string().trim().min(1).max(SEARCH_TEXT_MAX_LENGTH);
 const instantSchema = z.iso
   .datetime({ offset: true })
   .transform((value) => new Date(value));
-
-const RANGE_ORDER = 'Must not be after the end date.';
 
 const inOrder = (from: Date | undefined, to: Date | undefined): boolean =>
   from === undefined || to === undefined || from <= to;
