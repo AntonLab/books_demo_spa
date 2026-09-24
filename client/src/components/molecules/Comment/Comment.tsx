@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Button, Space, theme, Typography } from 'antd';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
-import { LikeButton } from '@/components/molecules/LikeButton';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { formatDate } from '@/format/date';
 import styles from './Comment.module.css';
 import type { CommentWithAuthor, Tombstone } from '@/types/comment';

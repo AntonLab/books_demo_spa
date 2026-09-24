@@ -1,9 +1,11 @@
 const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
+const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
-// These configs live in `config/`, so paths resolve against the package root
+// This config lives in `config/`, so paths resolve against the package root
 // rather than this directory.
 const root = path.resolve(__dirname, '..');
 
@@ -14,21 +16,22 @@ const root = path.resolve(__dirname, '..');
 const sharedSrc = path.dirname(require.resolve('shared'));
 
 /**
- * Shared configuration. `webpack.dev.js` and `webpack.prod.js` spread it into
- * a plain object and append their own plugins; nothing here is environment
- * specific except what is derived from `isDevelopment`.
+ * One config for both builds; `--mode` on the command line picks which.
  *
- * @param {boolean} isDevelopment
  * @returns {import('webpack').Configuration}
  */
-module.exports = (isDevelopment) => {
+module.exports = (_env, argv) => {
+  const isDevelopment = argv.mode === 'development';
+
   // Development injects styles for hot reload; production extracts them to
-  // files, which webpack.prod.js adds MiniCssExtractPlugin for.
+  // files.
   const styleLoader = isDevelopment
     ? 'style-loader'
     : MiniCssExtractPlugin.loader;
+  const hash = isDevelopment ? '' : '.[contenthash:8]';
 
   return {
+    devtool: isDevelopment ? 'eval-cheap-module-source-map' : 'source-map',
     // Pin the context to the package root so resolution does not depend on the
     // directory webpack was invoked from.
     context: root,
@@ -36,6 +39,8 @@ module.exports = (isDevelopment) => {
     output: {
       path: path.resolve(root, 'build'),
       publicPath: '/',
+      filename: `static/js/[name]${hash}.js`,
+      chunkFilename: `static/js/[name]${hash}.chunk.js`,
       assetModuleFilename: 'static/media/[name].[hash:8][ext]',
       clean: true,
     },
@@ -60,7 +65,7 @@ module.exports = (isDevelopment) => {
                   runtime: 'automatic',
                   development: isDevelopment,
                   // Injects the Fast Refresh runtime; paired with
-                  // ReactRefreshWebpackPlugin in webpack.dev.js.
+                  // ReactRefreshWebpackPlugin below.
                   refresh: isDevelopment,
                 },
               },
@@ -122,6 +127,51 @@ module.exports = (isDevelopment) => {
           configFile: path.resolve(root, 'tsconfig.json'),
         },
       }),
+      isDevelopment
+        ? new ReactRefreshWebpackPlugin({ overlay: false })
+        : new MiniCssExtractPlugin({
+            filename: 'static/css/[name].[contenthash:8].css',
+            chunkFilename: 'static/css/[name].[contenthash:8].chunk.css',
+          }),
     ],
+    optimization: isDevelopment
+      ? undefined
+      : {
+          // '...' keeps webpack's default JS minimizer (SWC/Terser) alongside
+          // the CSS one.
+          minimizer: ['...', new CssMinimizerPlugin()],
+          // Keeps the webpack runtime out of the entry chunk so vendor hashes
+          // stay stable across app-only changes.
+          runtimeChunk: 'single',
+          splitChunks: {
+            cacheGroups: {
+              vendors: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendors',
+                // 'initial', not 'all': 'all' pulls every lazy page's
+                // libraries (antd pickers, dnd-kit) into the first load.
+                chunks: 'initial',
+              },
+            },
+          },
+        },
+    devServer: {
+      port: 3000,
+      // Serve index.html for client-side routes instead of 404ing.
+      historyApiFallback: true,
+      // public/index.html is injected by html-webpack-plugin; everything else
+      // is bundled from src/, so there is no static passthrough folder.
+      static: false,
+      client: { overlay: { warnings: false } },
+      // Forwards API calls to the Express server (server/src/index.ts, port
+      // 4000) so the browser only ever talks to one origin in development.
+      proxy: [
+        {
+          context: ['/api'],
+          target: 'http://localhost:4000',
+          changeOrigin: true,
+        },
+      ],
+    },
   };
 };

@@ -1,24 +1,19 @@
-import {
-  col,
-  fn,
-  ForeignKeyConstraintError,
-  Op,
-  UniqueConstraintError,
-  where as sequelizeWhere,
-} from 'sequelize';
+import { col, fn, Op, where as sequelizeWhere } from 'sequelize';
 import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
-import { toAuthorSummary, User } from '../models/User.ts';
-import { loadAvatarUrls } from './userRepository.ts';
-import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import { User } from '../models/User.ts';
 import {
-  BadRequestError,
-  NotFoundError,
-  StateConflictError,
-} from '../types/errors.ts';
-import type { AuthorSummary } from '../types/user.ts';
+  addCoAuthor,
+  asMissingUser,
+  creditedIds,
+  loadAuthors,
+  removeCoAuthor,
+  type CreditTable,
+} from './coAuthors.ts';
+import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import { NotFoundError } from '../types/errors.ts';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -26,12 +21,7 @@ import type {
   UpdateSeriesInput,
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
-import {
-  deleterOf,
-  displayNameOf,
-  notify,
-  type Actor,
-} from './notificationRepository.ts';
+import { deleterOf, notify, type Actor } from './notificationRepository.ts';
 import { visibleSeriesWhere, type Viewer } from './visibility.ts';
 
 export interface SeriesListResult {
@@ -74,66 +64,35 @@ export interface SeriesRepository {
   findCoAuthorIds(id: number): Promise<number[] | null>;
 }
 
-// A rejected FK while creating a series means its first credit names an
-// account that is gone. Reporting that as a 404 on the user is more useful
-// than the generic 500 an unmapped SequelizeForeignKeyConstraintError would
-// produce.
-//
-// series_authors.userId is the only foreign key this maps. series.genreId
-// cannot fail here: assertGenreExists (genreRepository.ts) holds the Genre
-// under a share lock for the rest of the transaction.
-function asMissingUser(error: unknown, userId: number): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    throw new NotFoundError('User', userId);
-  }
-  throw error;
-}
-
 function sequelizeOf(): Sequelize {
   const sequelize = Series.sequelize;
   if (!sequelize) throw new Error('Series model is not initialised');
   return sequelize;
 }
 
-// Every Co-author of every series named, in credit order, in one query — the
-// series' copy of bookRepository's loadAuthors.
-async function loadAuthors(
-  seriesIds: number[],
-  transaction?: Transaction
-): Promise<Map<number, AuthorSummary[]>> {
-  const authors = new Map<number, AuthorSummary[]>(
-    seriesIds.map((id) => [id, []])
-  );
-  if (seriesIds.length === 0) return authors;
-
-  const credits = await SeriesAuthor.findAll({
-    where: { seriesId: seriesIds },
-    include: [{ model: User, as: 'user' }],
-    order: [['id', 'ASC']],
-    transaction,
-  });
-  const avatarUrls = await loadAvatarUrls(
-    credits.flatMap((credit) => (credit.user ? [credit.user.id] : [])),
-    transaction
-  );
-  for (const credit of credits) {
-    if (credit.user) {
-      authors
-        .get(credit.seriesId)
-        ?.push(
-          toAuthorSummary(credit.user, avatarUrls.get(credit.user.id) ?? null)
-        );
-    }
-  }
-  return authors;
-}
+const credits: CreditTable = {
+  type: 'series',
+  find: async (seriesIds, { withUser = false, transaction }) =>
+    (
+      await SeriesAuthor.findAll({
+        where: { seriesId: seriesIds },
+        include: withUser ? [{ model: User, as: 'user' }] : [],
+        order: [['id', 'ASC']],
+        transaction,
+      })
+    ).map(({ seriesId, userId, user }) => ({ workId: seriesId, userId, user })),
+  create: (seriesId, userId, transaction) =>
+    SeriesAuthor.create({ seriesId, userId }, { transaction }),
+  destroy: (seriesId, userId, transaction) =>
+    SeriesAuthor.destroy({ where: { seriesId, userId }, transaction }),
+};
 
 async function withAuthors(
   series: Series,
   transaction?: Transaction
 ): Promise<PublicSeries> {
   const [authors, genres] = await Promise.all([
-    loadAuthors([series.id], transaction),
+    loadAuthors(credits, [series.id], transaction),
     loadGenres([series.genreId], transaction),
   ]);
   return toPublicSeries(
@@ -149,14 +108,7 @@ export async function findSeriesCoAuthorIds(
   seriesId: number
 ): Promise<number[] | null> {
   const series = await Series.findByPk(seriesId, { attributes: ['id'] });
-  if (!series) return null;
-
-  const credits = await SeriesAuthor.findAll({
-    where: { seriesId },
-    attributes: ['userId'],
-    order: [['id', 'ASC']],
-  });
-  return credits.map((credit) => credit.userId);
+  return series ? creditedIds(credits, seriesId) : null;
 }
 
 // creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
@@ -217,10 +169,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
           const { userId, ...attributes } = input;
           await assertGenreExists(attributes.genreId, transaction);
           const series = await Series.create(attributes, { transaction });
-          await SeriesAuthor.create(
-            { seriesId: series.id, userId },
-            { transaction }
-          );
+          await credits.create(series.id, userId, transaction);
           return withAuthors(series, transaction);
         });
       } catch (error) {
@@ -252,7 +201,10 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       });
 
       const [authors, genres] = await Promise.all([
-        loadAuthors(rows.map((row) => row.id)),
+        loadAuthors(
+          credits,
+          rows.map((row) => row.id)
+        ),
         loadGenres(rows.map((row) => row.genreId)),
       ]);
       return {
@@ -294,13 +246,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         });
         if (!series) return false;
 
-        const coAuthorIds = (
-          await SeriesAuthor.findAll({
-            where: { seriesId: id },
-            attributes: ['userId'],
-            transaction,
-          })
-        ).map((credit) => credit.userId);
+        const coAuthorIds = await creditedIds(credits, id, transaction);
         await notify(
           [
             {
@@ -329,39 +275,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       const series = await Series.findByPk(seriesId);
       if (!series) return null;
 
-      const user = await User.findByPk(userId, { attributes: ['role'] });
-      if (!user) throw new NotFoundError('User', userId);
-      if (user.role !== 'author') {
-        throw new BadRequestError(
-          'Only an account holding the author role can be a co-author'
-        );
-      }
-
-      try {
-        await sequelizeOf().transaction(async (transaction) => {
-          await SeriesAuthor.create({ seriesId, userId }, { transaction });
-          await notify(
-            [
-              {
-                recipientIds: [userId],
-                kind: 'co_author_added',
-                work: { type: 'series', id: seriesId, title: series.title },
-                actorKind: 'co_author',
-                actorName: await displayNameOf(actor.id, transaction),
-              },
-            ],
-            actor.id,
-            transaction
-          );
-        });
-      } catch (error) {
-        if (error instanceof UniqueConstraintError) {
-          throw new StateConflictError(
-            'That account is already a co-author of this series'
-          );
-        }
-        throw error;
-      }
+      await addCoAuthor(credits, sequelizeOf(), series, userId, actor);
       return withAuthors(series);
     },
 
@@ -379,9 +293,8 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       return true;
     },
 
-    // Under a lock on the series row, for the reason bookRepository's
-    // removeCoAuthor gives: two co-authors leaving at once would otherwise
-    // each count two and leave the series credited to nobody.
+    // Under a lock on the series row, which removeCoAuthor (coAuthors.ts)
+    // relies on.
     async removeCoAuthor(seriesId, userId, actor) {
       return sequelizeOf().transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {
@@ -390,43 +303,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         });
         if (!series) return null;
 
-        const credits = await SeriesAuthor.findAll({
-          where: { seriesId },
-          attributes: ['userId'],
-          transaction,
-        });
-        // Not credited comes first, so a stranger on a solo series is not told
-        // its real co-author cannot leave.
-        if (!credits.some((credit) => credit.userId === userId)) {
-          throw new NotFoundError('Co-author', userId);
-        }
-        if (credits.length <= 1) {
-          throw new StateConflictError(
-            'The last co-author cannot leave; delete the series instead'
-          );
-        }
-
-        await SeriesAuthor.destroy({
-          where: { seriesId, userId },
-          transaction,
-        });
-        // As on a book: a leave tells those who remain, a removal the removed.
-        const leaving = userId === actor.id;
-        await notify(
-          [
-            {
-              recipientIds: leaving
-                ? credits.map((credit) => credit.userId)
-                : [userId],
-              kind: leaving ? 'co_author_left' : 'co_author_removed',
-              work: { type: 'series', id: seriesId, title: series.title },
-              actorKind: 'co_author',
-              actorName: await displayNameOf(actor.id, transaction),
-            },
-          ],
-          actor.id,
-          transaction
-        );
+        await removeCoAuthor(credits, series, userId, actor, transaction);
         return withAuthors(series, transaction);
       });
     },

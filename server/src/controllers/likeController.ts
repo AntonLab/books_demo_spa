@@ -18,19 +18,9 @@ import type {
   UpdateLikeInput,
 } from '../types/like.ts';
 
-export interface LikeController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-}
-
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createLikeController(
-  repository: LikeRepository
-): LikeController {
+export function createLikeController(repository: LikeRepository) {
   // The matrix grants `user` only `own` on update/delete — flipping or
   // removing someone else's like is not a plain user's call to make. Mirrors
   // commentController's assertOwned: 404 before 403, so a refusal cannot be
@@ -99,5 +89,5 @@ export function createLikeController(
       if (!deleted) throw new NotFoundError('Like', id);
       res.status(204).end();
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

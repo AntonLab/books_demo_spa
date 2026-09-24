@@ -12,8 +12,8 @@ export interface RequireAuthDeps {
 
 // The cookie-to-user lookup shared by every auth middleware. It reports
 // "nobody" for every failure — missing cookie, unknown token, expired
-// session, deleted user, blocked account — because each of its three callers
-// (requireAuth, requirePermission, optionalAuth) draws its own conclusion
+// session, deleted user, blocked account — because each of its two callers
+// (requireAuth, requirePermission) draws its own conclusion
 // from that answer and none of them needs to know which of the five
 // happened.
 export async function resolveSessionUser(

@@ -33,7 +33,7 @@ export function createBookRoutes(deps: RouteDeps): Router {
     validate({ query: listBooksQuerySchema }),
     controller.list
   );
-  // No separate optionalAuth: requirePermission resolves the session itself
+  // requirePermission resolves the session itself
   // and sets req.user whenever one exists, so the detail handler still fills
   // in viewerLikeId for a signed-in caller.
   router.get(

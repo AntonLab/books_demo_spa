@@ -12,7 +12,7 @@ import {
   Typography,
 } from 'antd';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { useAuthorSearch } from '@/queries/authors';
 import {
   useAddCoAuthor,

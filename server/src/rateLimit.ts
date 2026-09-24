@@ -1,7 +1,7 @@
 // A fixed-window rate limiter kept in memory. No dependency and no database:
 // counts live in this process only, and a restart forgets them.
 
-export interface RateLimitState {
+interface RateLimitState {
   // For hit: whether this request is within the limit. For peek: whether one
   // more request would be.
   allowed: boolean;
@@ -31,7 +31,7 @@ export interface RateLimiter {
   stop(): void;
 }
 
-export interface RateLimiterOptions {
+interface RateLimiterOptions {
   limit: number;
   windowMs: number;
   // Date.now, injectable so a spec moves time by hand.

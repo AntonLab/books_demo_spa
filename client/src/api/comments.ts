@@ -2,7 +2,7 @@ import { request } from './client';
 import type { ListResponse } from '../types/api';
 import type { CommentWithAuthor, PublicComment } from '../types/comment';
 
-export const COMMENTS_PAGE_SIZE = 100;
+const COMMENTS_PAGE_SIZE = 100;
 
 export interface CreateCommentPayload {
   bookId: number;

@@ -1,7 +1,7 @@
 import type { FC, ReactNode } from 'react';
 import { Card as AntCard, Flex, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import type { PublicGenre } from '@/types/genre';
 import type { AuthorSummary } from '@/types/user';
 import styles from './Card.module.css';

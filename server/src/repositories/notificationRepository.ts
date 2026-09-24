@@ -10,7 +10,7 @@ import type {
 } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
 
-export interface NotificationListResult {
+interface NotificationListResult {
   items: PublicNotification[];
   total: number;
   unread: number;
@@ -35,7 +35,7 @@ export interface Actor {
 }
 
 // One event and everyone it is told to.
-export interface NotificationEvent {
+interface NotificationEvent {
   recipientIds: number[];
   kind: NotificationKind;
   work: { type: WorkType; id: number | null; title: string };

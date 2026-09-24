@@ -27,7 +27,7 @@ const SHARED_BOOK_COUNT = 2;
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
-export interface PlannedChapter {
+interface PlannedChapter {
   title: string;
   text: string;
   createdAt: Date;
@@ -69,7 +69,7 @@ export interface PlannedComment {
   parent: PlannedComment | null;
 }
 
-export interface PlannedLike {
+interface PlannedLike {
   book: PlannedBook | null;
   comment: PlannedComment | null;
   accountIndex: number;

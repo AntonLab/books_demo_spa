@@ -47,11 +47,7 @@ test('an unknown login still spends a password verify, so timing cannot separate
 
   await assert.rejects(
     async () =>
-      controller.login(
-        loginRequest('Nobody', 'whatever12345'),
-        unusedResponse,
-        () => {}
-      ),
+      controller.login(loginRequest('Nobody', 'whatever12345'), unusedResponse),
     /Invalid credentials/
   );
 
@@ -80,11 +76,7 @@ test('the dummy hash is reused rather than recomputed per attempt', async () => 
 
   const attempt = () =>
     assert.rejects(async () =>
-      controller.login(
-        loginRequest('Nobody', 'whatever12345'),
-        unusedResponse,
-        () => {}
-      )
+      controller.login(loginRequest('Nobody', 'whatever12345'), unusedResponse)
     );
   await attempt();
   await attempt();
@@ -187,8 +179,7 @@ test('a login whose account is unchanged since the verify opens its session', as
 
   await loginController(deps, async () => true).login(
     loginRequest('Racer', 'whatever12345'),
-    response,
-    () => {}
+    response
   );
 
   assert.equal(deps.opened.length, 1);
@@ -208,11 +199,7 @@ test('a password change that lands during the verify leaves the login without a 
 
   await assert.rejects(
     async () =>
-      controller.login(
-        loginRequest('Racer', 'whatever12345'),
-        response,
-        () => {}
-      ),
+      controller.login(loginRequest('Racer', 'whatever12345'), response),
     (error: unknown) =>
       error instanceof UnauthorizedError &&
       error.statusCode === 401 &&
@@ -233,11 +220,7 @@ test('a block that lands during the verify leaves the login without a session', 
 
   await assert.rejects(
     async () =>
-      controller.login(
-        loginRequest('Racer', 'whatever12345'),
-        response,
-        () => {}
-      ),
+      controller.login(loginRequest('Racer', 'whatever12345'), response),
     (error: unknown) =>
       error instanceof ForbiddenError &&
       error.statusCode === 403 &&

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Alert, Col, Empty, Row, Skeleton } from 'antd';
 import type { ColProps } from 'antd';
 
-export interface CardListProps<T extends { id: number }> {
+interface CardListProps<T extends { id: number }> {
   items: T[];
   renderItem: (item: T) => ReactNode;
   // What the list holds, plural ("books", "series"): it names the loading

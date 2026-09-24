@@ -17,9 +17,8 @@ export function createCommentRoutes(deps: RouteDeps): Router {
 
   // Every route runs through the matrix, reads included: every role has
   // `read: any` on comments, which is what keeps the list and detail routes
-  // public. requirePermission resolves the session itself, so the list no
-  // longer needs optionalAuth to get a signed-in reader's own likes back with
-  // it.
+  // public. requirePermission resolves the session itself, so the list still
+  // gets a signed-in reader's own likes back with it.
   router.get(
     '/',
     requirePermission('comments', 'read'),

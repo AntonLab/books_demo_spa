@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result } from 'antd';
 import { useRequestReset } from '@/queries/auth';
-import type { AuthModalProps } from '@/components/organisms/AuthModals';
+import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
 import styles from './ResetRequestModal.module.css';
 
 interface ResetRequestValues {

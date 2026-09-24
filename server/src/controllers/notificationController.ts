@@ -7,16 +7,11 @@ import type {
   MarkNotificationsReadInput,
 } from '../types/notification.ts';
 
-export interface NotificationController {
-  list: RequestHandler;
-  markRead: RequestHandler;
-}
-
 // Whose notifications these are comes from the session and nowhere else: there
 // is no userId in any query or body here to name someone else's.
 export function createNotificationController(
   repository: NotificationRepository
-): NotificationController {
+) {
   return {
     list: async (req, res) => {
       const { id } = actorOf(req);
@@ -36,5 +31,5 @@ export function createNotificationController(
       const { ids } = validatedBody<MarkNotificationsReadInput>(req);
       res.json({ unread: await repository.markRead(id, ids) });
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

@@ -4,15 +4,16 @@ import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import { useGenresWithBooks } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { unsavedText } from '@/store/unsavedTextSlice';
-import { SearchBar } from '@/components/molecules/SearchBar';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
-import { AuthModals } from '@/components/organisms/AuthModals';
-import type { AuthModalName } from '@/components/organisms/AuthModals';
-import { NotificationBell } from '@/components/organisms/NotificationBell';
+import { SearchBar } from '@/components/molecules/SearchBar/SearchBar';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
+import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
+import { NotificationBell } from '@/components/organisms/NotificationBell/NotificationBell';
 import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {
@@ -45,7 +46,7 @@ export const AppHeader: FC = () => {
   // Empty covers all three cases the submenu must not appear in: loading,
   // failed, and a genuinely empty list.
   const genreItems = genres.data?.items ?? [];
-  const isModerator = user?.role === 'admin' || user?.role === 'superadmin';
+  const isModerator = isModeratorRole(user?.role);
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },

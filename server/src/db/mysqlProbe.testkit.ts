@@ -1,11 +1,10 @@
 // Decides whether a MySQL-backed suite runs, for the `{ skip }` option of its
 // top-level describe.
 //
-// Locally a missing or unreachable MySQL skips the suite, so `npm test` stays
-// usable on a machine with no database. CI sets REQUIRE_MYSQL=1, and there the
-// same two conditions throw instead: a skipped suite exits 0, so without this a
-// broken service container or a renamed variable would turn the integration
-// tests off while the build stayed green.
+// A missing or unreachable MySQL throws, failing the spec file: a skipped suite
+// exits 0, so a broken database or a renamed variable would otherwise turn the
+// integration tests off while the run stayed green. SKIP_MYSQL=1 is the one way
+// to skip them instead, on a machine with no database.
 
 import mysql from 'mysql2/promise';
 import { parseConfig } from './config.ts';
@@ -15,10 +14,8 @@ export async function skipWithoutMysql(
 ): Promise<false | string> {
   const reason = await unavailableReason(env);
   if (reason === null) return false;
-  if (env.REQUIRE_MYSQL === '1') {
-    throw new Error(`REQUIRE_MYSQL is set but ${reason}`);
-  }
-  return reason;
+  if (env.SKIP_MYSQL === '1') return reason;
+  throw new Error(`${reason} (set SKIP_MYSQL=1 to skip these suites)`);
 }
 
 async function unavailableReason(
@@ -39,6 +36,20 @@ async function unavailableReason(
     await connection.end();
     return null;
   } catch (error) {
-    return `MySQL unreachable: ${(error as Error).message}`;
+    return `MySQL unreachable: ${connectionErrorText(error)}`;
   }
+}
+
+// mysql2 tries every address `localhost` resolves to and, when all refuse,
+// throws an AggregateError whose own message is empty; the reasons are in
+// its `errors`.
+export function connectionErrorText(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.map(connectionErrorText).join('; ');
+  }
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return error.message || code || error.name;
+  }
+  return String(error);
 }

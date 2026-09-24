@@ -22,26 +22,9 @@ import type {
 import type { AddCoAuthorInput } from '../types/params.ts';
 import type { ReorderSeriesBooksInput } from '../types/series.ts';
 
-export interface BookController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-  addCoAuthor: RequestHandler;
-  removeCoAuthor: RequestHandler;
-  listInSeries: RequestHandler;
-  reorderInSeries: RequestHandler;
-  uploadCover: RequestHandler;
-  removeCover: RequestHandler;
-  getCover: RequestHandler;
-}
-
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createBookController(
-  repository: BookRepository
-): BookController {
+export function createBookController(repository: BookRepository) {
   // The other half of enforcement. requirePermission already refused `none`;
   // `any` needs nothing more, and `own` is the only case that has to look at
   // the row — which is why this cannot live in the middleware, where the row
@@ -275,5 +258,5 @@ export function createBookController(
         })
         .send(cover.data);
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

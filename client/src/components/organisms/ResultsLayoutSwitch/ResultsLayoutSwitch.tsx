@@ -3,7 +3,7 @@ import { Segmented } from 'antd';
 import type { ColProps } from 'antd';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faList, faTableCellsLarge } from '@fortawesome/free-solid-svg-icons';
-import { TILE_COLUMNS } from '@/components/organisms/CardList';
+import { TILE_COLUMNS } from '@/components/organisms/CardList/CardList';
 import {
   devicePreferences,
   type ResultsLayout,

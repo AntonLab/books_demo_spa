@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import { Alert, Typography } from 'antd';
 import { useNavigate } from 'react-router';
-import { BookForm } from '@/components/organisms/BookForm';
-import type { BookFormValues } from '@/components/organisms/BookForm';
+import { BookForm } from '@/components/organisms/BookForm/BookForm';
+import type { BookFormValues } from '@/components/organisms/BookForm/BookForm';
 import { useSession } from '@/queries/auth';
 import { useCreateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
