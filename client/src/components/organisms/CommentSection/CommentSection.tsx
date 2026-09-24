@@ -121,17 +121,29 @@ export const CommentSection: FC<CommentSectionProps> = ({
     if (text.length === 0) return;
 
     const key = composerKey;
-    // Only once the server has the text: a failed send keeps it.
-    const onSuccess = () => {
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the section unmounts before the mutation settles (the
+    // reader navigating away right after Post), but mutateAsync's own
+    // promise still settles, so the entry is still cleared instead of
+    // resurfacing in the next composer that reads this key.
+    const onFulfilled = () => {
+      // Only once the server has the text: a failed send keeps it.
       dispatch(unsavedText.remove(key));
       setReplyTo(null);
       setEditing(null);
     };
+    // Neither error is rendered anywhere in this section yet; this handler
+    // exists only so the rejection is not left unhandled.
+    const onRejected = () => {};
 
     if (activeEdit !== null) {
-      update.mutate({ id: activeEdit, text }, { onSuccess });
+      void update
+        .mutateAsync({ id: activeEdit, text })
+        .then(onFulfilled, onRejected);
     } else {
-      create.mutate({ bookId, parentId: activeReply, text }, { onSuccess });
+      void create
+        .mutateAsync({ bookId, parentId: activeReply, text })
+        .then(onFulfilled, onRejected);
     }
   };
 
@@ -158,11 +170,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
   };
 
   const deleteComment = (id: number) => {
-    remove.mutate(id, {
+    // mutateAsync over mutate's per-call onSuccess: see submit() above.
+    void remove.mutateAsync(id).then(
       // The Account chose to delete it; its edit text is not worth offering.
-      onSuccess: () =>
+      () =>
         dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id))),
-    });
+      // Neither error is rendered anywhere in this section yet; this handler
+      // exists only so the rejection is not left unhandled.
+      () => {}
+    );
   };
 
   const like = (comment: CommentWithAuthor) => {

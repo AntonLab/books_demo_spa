@@ -53,15 +53,21 @@ export const NewChapterPage: FC = () => {
   }
 
   const handleSubmit = ({ title, text, publishedAt }: ChapterFormValues) => {
-    create.mutate(
-      { bookId, title, text, publishedAt: publishedAt ?? null },
-      {
-        onSuccess: () => {
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the page unmounts before the mutation settles, but
+    // mutateAsync's own promise still settles, so the entry is still
+    // cleared instead of re-seeding the next "New chapter" form.
+    void create
+      .mutateAsync({ bookId, title, text, publishedAt: publishedAt ?? null })
+      .then(
+        () => {
           dispatch(unsavedText.remove(unsavedKey));
           void navigate(`/books/${bookId}/edit`);
         },
-      }
-    );
+        // A rejection is already surfaced through create.error; this handler
+        // exists only so the rejection is not left unhandled.
+        () => {}
+      );
   };
 
   return (

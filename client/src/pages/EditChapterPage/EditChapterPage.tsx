@@ -169,12 +169,19 @@ export const EditChapterPage: FC = () => {
   };
 
   const handleDelete = () => {
-    remove.mutate(undefined, {
-      onSuccess: () => {
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the page unmounts before the mutation settles (Popconfirm
+    // closing right after "Delete"), but mutateAsync's own promise still
+    // settles, so the entry is still discarded.
+    void remove.mutateAsync(undefined).then(
+      () => {
         discardEntry();
         void navigate(`/books/${bookId}/edit`);
       },
-    });
+      // A rejection is already surfaced through remove.error; this handler
+      // exists only so the rejection is not left unhandled.
+      () => {}
+    );
   };
 
   return (

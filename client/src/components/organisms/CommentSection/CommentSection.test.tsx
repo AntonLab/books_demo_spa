@@ -486,6 +486,30 @@ describe('CommentSection Unsaved text', () => {
     expect(store.getState().unsavedText.entries).toEqual({});
   });
 
+  it('clears the entry for a post that lands after the section unmounted', async () => {
+    let land: (comment: CommentWithAuthor) => void = () => {};
+    mockedComments.createComment.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        })
+    );
+    const { store, unmount } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalled()
+    );
+    unmount();
+    // mutateAsync's promise settles whether or not the section that started
+    // it is still mounted; mutate's per-call onSuccess would not fire here.
+    await act(async () => land({ ...root, id: 7 }));
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
   it('drops the edit entry of a comment its owner deletes', async () => {
     mockedComments.deleteComment.mockResolvedValue(undefined);
     const { store } = renderSignedIn(
