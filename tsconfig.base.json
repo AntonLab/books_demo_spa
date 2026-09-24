@@ -16,6 +16,15 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    // Node strips types rather than compiling them (the server and `shared`,
+    // ADR-0006): no enums, namespaces or parameter properties, and every
+    // type-only import marked `type`, or it survives into the runtime import
+    // and fails to link. An ambient `const enum` from a dependency is refused
+    // too. The client is held to the same so code moves between packages.
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
     // An index read (`items[i]`, `record[key]`) is typed `T | undefined`, as
     // it can be at runtime. Application code handles the miss — an early
     // return, a throw naming what was missing, or `?.`/`??` where absence is
