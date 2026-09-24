@@ -75,6 +75,30 @@ test('GET is open to a guest and lists every genre alphabetically', async () => 
   );
 });
 
+test('GET hands nonEmpty to the repository and refuses a value that is not a boolean', async () => {
+  const listCalls: { nonEmpty: boolean }[] = [];
+  await withApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [{ id: 1, name: 'Horror' }],
+        listCalls,
+      }),
+    },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/genres?nonEmpty=true`)).status,
+        200
+      );
+      assert.equal((await fetch(`${base}/api/genres`)).status, 200);
+      assert.equal(
+        (await fetch(`${base}/api/genres?nonEmpty=maybe`)).status,
+        400
+      );
+    }
+  );
+  assert.deepEqual(listCalls, [{ nonEmpty: true }, { nonEmpty: false }]);
+});
+
 test('POST adds a genre for an admin and for a superadmin', async () => {
   await withAuthenticatedApp(
     { genreRepository: createFakeGenreRepository() },

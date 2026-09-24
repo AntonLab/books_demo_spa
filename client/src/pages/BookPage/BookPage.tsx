@@ -106,9 +106,7 @@ export const BookPage: FC = () => {
                 its address, the way they reach a draft. */}
             {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
             {book.series && (
-              <Link to={`/search?series=${book.series.id}`}>
-                {book.series.title}
-              </Link>
+              <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
             )}
             {book.genre !== null && (
               <Link to={`/search?genre=${book.genre.id}`}>

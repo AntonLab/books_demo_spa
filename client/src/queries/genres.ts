@@ -17,6 +17,15 @@ export const useGenres = () => {
   });
 };
 
+// Only the Genres a reader can find a book in: the header's menu and the
+// search form's select. Book forms and the management page keep useGenres.
+export const useGenresWithBooks = () => {
+  return useQuery({
+    queryKey: queryKeys.genresWithBooks,
+    queryFn: () => listGenres({ nonEmpty: true }),
+  });
+};
+
 // Every genre write invalidates three prefixes. `genres` is obvious; `books`
 // and `series` go because a rename or a deletion changes the `genre` embedded
 // in every book and series a cached list already holds.
