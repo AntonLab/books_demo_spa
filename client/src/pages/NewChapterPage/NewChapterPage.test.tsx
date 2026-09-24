@@ -1,6 +1,6 @@
-import { screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Link, Route, Routes } from 'react-router';
 import { NewChapterPage } from './NewChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -8,6 +8,7 @@ import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
+import type { RootState } from '@/store';
 import type { BookDetail } from '@/types/book';
 import type { PublicChapter } from '@/types/chapter';
 import type { PublicUser } from '@/types/user';
@@ -67,7 +68,10 @@ const created: PublicChapter = {
   updatedAt: '2026-09-13T00:00:00.000Z',
 };
 
-const renderPage = (session: PublicUser = account()) => {
+const renderPage = (
+  session: PublicUser = account(),
+  preloadedState?: Partial<RootState>
+) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
 
@@ -76,8 +80,21 @@ const renderPage = (session: PublicUser = account()) => {
       <Route path="/books/:bookId/chapters/new" element={<NewChapterPage />} />
       <Route path="/books/:id/edit" element={<p>Book editor</p>} />
     </Routes>,
-    { route: '/books/1/chapters/new', queryClient }
+    { route: '/books/1/chapters/new', queryClient, preloadedState }
   );
+};
+
+const typedBefore: Partial<RootState> = {
+  unsavedText: {
+    accountId: 3,
+    entries: {
+      'book:1:chapterNew': {
+        title: 'Draft title',
+        text: 'Draft text',
+        savedAt: '2026-09-23T10:00:00.000Z',
+      },
+    },
+  },
 };
 
 const fill = async () => {
@@ -105,6 +122,27 @@ describe('NewChapterPage', () => {
       text: 'It was a dark night.',
       publishedAt: 'now',
     });
+  });
+
+  it('still returns to the book editor under StrictMode', async () => {
+    mockedChapters.createChapter.mockResolvedValue(created);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, account());
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/books/:bookId/chapters/new"
+          element={<NewChapterPage />}
+        />
+        <Route path="/books/:id/edit" element={<p>Book editor</p>} />
+      </Routes>,
+      { route: '/books/1/chapters/new', queryClient, reactStrictMode: true }
+    );
+
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+    expect(await screen.findByText('Book editor')).toBeInTheDocument();
   });
 
   it('saves a draft', async () => {
@@ -147,5 +185,80 @@ describe('NewChapterPage', () => {
       )
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('restores the title and text typed before', async () => {
+    renderPage(account(), typedBefore);
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Draft title');
+    expect(screen.getByLabelText('Text')).toHaveValue('Draft text');
+  });
+
+  it('clears the Unsaved text once the chapter is created', async () => {
+    mockedChapters.createChapter.mockResolvedValue(created);
+    const { store } = renderPage(account(), typedBefore);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Publish' })
+    );
+
+    expect(await screen.findByText('Book editor')).toBeInTheDocument();
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('does not force navigation back once the Account has moved elsewhere before the create lands', async () => {
+    let land: (chapter: PublicChapter) => void = () => {};
+    mockedChapters.createChapter.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        })
+    );
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, account());
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/books/:bookId/chapters/new"
+          element={
+            <>
+              <NewChapterPage />
+              <Link to="/elsewhere">Elsewhere</Link>
+            </>
+          }
+        />
+        <Route path="/books/:id/edit" element={<p>Book editor</p>} />
+        <Route path="/elsewhere" element={<p>Somewhere else entirely</p>} />
+      </Routes>,
+      { route: '/books/1/chapters/new', queryClient }
+    );
+
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(mockedChapters.createChapter).toHaveBeenCalled()
+    );
+
+    // The Account left for an unrelated route before the create responded, which
+    // unmounts the page; a guard-less navigate would still fire once the
+    // promise landed and silently pull them back here.
+    await userEvent.click(screen.getByRole('link', { name: 'Elsewhere' }));
+    expect(
+      await screen.findByText('Somewhere else entirely')
+    ).toBeInTheDocument();
+
+    await act(async () => land(created));
+
+    expect(screen.getByText('Somewhere else entirely')).toBeInTheDocument();
+    expect(screen.queryByText('Book editor')).toBeNull();
+  });
+
+  it('offers the text to an Account that no longer co-authors the book', async () => {
+    renderPage(account({ id: 99, login: 'other' }), typedBefore);
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Draft title\n\nDraft text');
   });
 });

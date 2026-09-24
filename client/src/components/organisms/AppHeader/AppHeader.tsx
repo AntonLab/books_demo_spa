@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { devicePreferences } from '@/store/devicePreferencesSlice';
+import { unsavedText } from '@/store/unsavedTextSlice';
 import { SearchBar } from '@/components/molecules/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar';
 import { AuthModals } from '@/components/organisms/AuthModals';
@@ -21,6 +24,22 @@ export const AppHeader: FC = () => {
   const session = useSession();
   const logout = useLogout();
   const user = session.data;
+  const dispatch = useAppDispatch();
+  const theme = useAppSelector((state) => state.devicePreferences.theme);
+
+  const unsavedTextAccountId = useAppSelector(
+    (state) => state.unsavedText.accountId
+  );
+  const userId = user?.id;
+
+  // Mounted on every route, so it sees each sign-in. A different Account
+  // discards the previous one's Unsaved text; a lost session (null) is not a
+  // sign out and dispatches nothing, so the same Account gets its text back.
+  useEffect(() => {
+    if (userId !== undefined && userId !== unsavedTextAccountId) {
+      dispatch(unsavedText.accountChanged(userId));
+    }
+  }, [userId, unsavedTextAccountId, dispatch]);
 
   const genres = useGenres();
   // Empty covers all three cases the submenu must not appear in: loading,
@@ -61,7 +80,11 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      logout.mutate();
+      // Only an explicit Log out discards Unsaved text, and only once the
+      // server has ended the session.
+      logout.mutate(undefined, {
+        onSuccess: () => dispatch(unsavedText.discardAll()),
+      });
       return;
     }
     void navigate(key);
@@ -94,6 +117,22 @@ export const AppHeader: FC = () => {
       />
 
       <SearchBar />
+
+      {/* Offered to everyone, Guests included: a Device preference belongs
+          to the device, not to an Account. The header itself stays dark in
+          both themes. */}
+      <Button
+        type="text"
+        className={styles.onDark}
+        aria-label={
+          theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'
+        }
+        onClick={() => dispatch(devicePreferences.themeToggled())}
+      >
+        {/* A text glyph: @ant-design/icons is not a dependency. The label
+            carries the meaning, so the glyph is decorative. */}
+        <span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>
+      </Button>
 
       {session.isPending ? (
         // Not "Log in": showing it here would flash a logged-out header at a

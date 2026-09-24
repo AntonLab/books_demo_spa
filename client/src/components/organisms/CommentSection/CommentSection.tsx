@@ -1,6 +1,7 @@
 import { useState, type FC } from 'react';
 import { Alert, Button, Empty, Input, Skeleton, Space, Typography } from 'antd';
 import { Comment } from '@/components/molecules/Comment';
+import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
 import {
   useComments,
@@ -10,6 +11,12 @@ import {
 } from '@/queries/comments';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  entriesOfBook,
+  unsavedText,
+  unsavedTextKeys,
+} from '@/store/unsavedTextSlice';
 import type { CommentWithAuthor } from '@/types/comment';
 import styles from './CommentSection.module.css';
 
@@ -33,9 +40,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const remove = useDeleteComment(bookId);
   const toggleLike = useToggleLike(queryKeys.comments(bookId));
 
+  const dispatch = useAppDispatch();
+  const entries = useAppSelector((state) => state.unsavedText.entries);
+
   // `replyTo` and `editing` are mutually exclusive by construction: opening one
   // closes the other, so there is never more than one composer on screen.
-  const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
 
@@ -81,31 +90,95 @@ export const CommentSection: FC<CommentSectionProps> = ({
       (item.tombstone === null || liveReplies.has(item.id))
   );
 
+  // A target missing from the list, or a Tombstone, is gone: its composer
+  // cannot reopen, so its text is offered as a notice below instead.
+  const isGone = (id: number): boolean => {
+    const target = all.find((item) => item.id === id);
+    return target === undefined || target.tombstone !== null;
+  };
+  const activeEdit = editing !== null && !isGone(editing) ? editing : null;
+  const activeReply = replyTo !== null && !isGone(replyTo) ? replyTo : null;
+
+  const composerKey =
+    activeEdit !== null
+      ? unsavedTextKeys.commentEdit(bookId, activeEdit)
+      : activeReply !== null
+        ? unsavedTextKeys.reply(bookId, activeReply)
+        : unsavedTextKeys.comment(bookId);
+  const draft = entries[composerKey]?.text ?? '';
+
+  const orphans = session
+    ? entriesOfBook(entries, bookId).filter(([key]) => {
+        const [, , kind, id] = key.split(':');
+        return (
+          (kind === 'reply' || kind === 'commentEdit') && isGone(Number(id))
+        );
+      })
+    : [];
+
   const submit = () => {
     const text = draft.trim();
     if (text.length === 0) return;
 
-    if (editing !== null) {
-      update.mutate({ id: editing, text });
-    } else {
-      create.mutate({ bookId, parentId: replyTo, text });
-    }
+    const key = composerKey;
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the section unmounts before the mutation settles (the
+    // reader navigating away right after Post), but mutateAsync's own
+    // promise still settles, so the entry is still cleared instead of
+    // resurfacing in the next composer that reads this key.
+    const onFulfilled = () => {
+      // Only once the server has the text: a failed send keeps it.
+      dispatch(unsavedText.remove(key));
+      setReplyTo(null);
+      setEditing(null);
+    };
+    // Neither error is rendered anywhere in this section yet; this handler
+    // exists only so the rejection is not left unhandled.
+    const onRejected = () => {};
 
-    setDraft('');
-    setReplyTo(null);
-    setEditing(null);
+    if (activeEdit !== null) {
+      void update
+        .mutateAsync({ id: activeEdit, text })
+        .then(onFulfilled, onRejected);
+    } else {
+      void create
+        .mutateAsync({ bookId, parentId: activeReply, text })
+        .then(onFulfilled, onRejected);
+    }
   };
 
   const startEdit = (id: number) => {
     setEditing(id);
     setReplyTo(null);
-    setDraft(all.find((item) => item.id === id)?.text ?? '');
+    const key = unsavedTextKeys.commentEdit(bookId, id);
+    // Seeded into the store rather than a local copy: with one source,
+    // clearing the field leaves it empty instead of bringing the saved text
+    // back (an entry cleared to '' is removed, and the composer reads '').
+    if (entries[key] === undefined) {
+      dispatch(
+        unsavedText.upsert({
+          key,
+          text: all.find((item) => item.id === id)?.text ?? '',
+        })
+      );
+    }
   };
 
   const startReply = (id: number) => {
     setReplyTo(id);
     setEditing(null);
-    setDraft('');
+  };
+
+  const deleteComment = (id: number) => {
+    // mutateAsync over mutate's per-call onSuccess: see submit() above.
+    void remove.mutateAsync(id).then(
+      // The Account chose to delete it; its edit text is not worth offering.
+      () =>
+        dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id))),
+      // Neither error is rendered anywhere in this section yet; this handler
+      // exists only so the rejection is not left unhandled.
+      () => {}
+    );
   };
 
   const like = (comment: CommentWithAuthor) => {
@@ -131,15 +204,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
       canLike={canAct && session?.id !== comment.userId}
       onReply={startReply}
       onEdit={startEdit}
-      onDelete={(id) => remove.mutate(id)}
+      onDelete={deleteComment}
       onLike={like}
     />
   );
 
   const composerLabel =
-    editing !== null
+    activeEdit !== null
       ? 'Edit your comment'
-      : replyTo !== null
+      : activeReply !== null
         ? 'Write a reply'
         : 'Write a comment';
 
@@ -160,6 +233,14 @@ export const CommentSection: FC<CommentSectionProps> = ({
         </div>
       ))}
 
+      {orphans.map(([key, entry]) => (
+        <UnsavedTextNotice
+          key={key}
+          text={entry.text}
+          onDiscard={() => dispatch(unsavedText.remove(key))}
+        />
+      ))}
+
       {closed ? (
         <Typography.Text type="secondary">
           Comments are closed while this book is a draft.
@@ -170,10 +251,17 @@ export const CommentSection: FC<CommentSectionProps> = ({
             rows={3}
             value={draft}
             aria-label={composerLabel}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) =>
+              dispatch(
+                unsavedText.upsert({
+                  key: composerKey,
+                  text: event.target.value,
+                })
+              )
+            }
           />
           <Button type="primary" onClick={submit}>
-            {editing !== null ? 'Save' : 'Post'}
+            {activeEdit !== null ? 'Save' : 'Post'}
           </Button>
         </Space>
       ) : (

@@ -33,8 +33,11 @@ load-bearing:
   `TextEncoder`/`TextDecoder` (react-router builds one at import) and
   `MessageChannel` (every antd `Form.Item` mount).
 - `renderWithProviders` wraps the same providers as `App` around a
-  `MemoryRouter` and returns `{ queryClient }`, so a test seeds a session with
-  `queryClient.setQueryData(queryKeys.session, user)`. Pass `path` beside
+  `MemoryRouter` and returns `{ store, queryClient }`, so a test seeds a
+  session with `queryClient.setQueryData(queryKeys.session, user)` and client
+  state with `preloadedState`, or passes `store` to remount on the same state.
+  Without `preloadedState` the store starts from `{}`, never from
+  `localStorage`, which an earlier test may have written. Pass `path` beside
   `route` for a page that reads params, or `useParams()` is empty and the page
   queries `NaN`.
 - Its query client is **fresh per render** (a shared one leaks cache between
@@ -68,6 +71,19 @@ no MSW.
 - **An antd `Menu` item cannot be activated by keyboard in a test**: its handler
   checks `event.which === 13`, which user-event never sets. Click it instead.
 - A route test awaits `findByRole`, which also waits out the lazy chunk.
+- **`navigator.clipboard` exists only after `userEvent.setup()`**, which
+  installs user-event's stub; a direct `userEvent.click` installs none and
+  jsdom has no clipboard. Read what was copied with
+  `navigator.clipboard.readText()`.
+- **`UnsavedTextNotice`'s textarea is a fixed `rows={6}`, not antd's
+  `autoSize`**: `autoSize` logs a NaN-height `console.error` under jsdom.
+- **Tests run without StrictMode, but the app runs with it** (`index.tsx`).
+  Code whose effect cleanup flips a ref needs one test with
+  `renderWithProviders(ui, { reactStrictMode: true })`. A `<StrictMode>`
+  nested inside the providers does not double-run the effects.
+- **A persistence test uses fake timers**: Unsaved text is written 500 ms
+  after a change, so `await jest.advanceTimersByTimeAsync(500)` before reading
+  `localStorage`.
 
 ## What a component test covers
 
