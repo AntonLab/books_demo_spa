@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth';
 import type { LoginInput, RegisterInput } from '../api/auth';
@@ -20,9 +25,62 @@ const setSession = (client: QueryClient, session: Session): void => {
   client.setQueryData<Session>(queryKeys.session, session);
 };
 
+// What `watchSession` needs of a `BroadcastChannel`; a test passes a fake.
+export interface SessionChannel {
+  postMessage(message: null): void;
+  addEventListener(type: 'message', listener: () => void): void;
+}
+
+const sessionHash = hashKey(queryKeys.session);
+
+// A session is a cookie every tab of the browser shares, so a sign-in or Sign
+// out in one tab changes who every other tab is acting as — a tab still showing
+// the old Account would send its writes as the new one. Two duties, for the
+// app's one client:
+//
+// - A session this tab's own mutation wrote (`setQueryData`, so `manual`) is
+//   announced on the channel; a tab that hears it asks /auth/me again rather
+//   than trusting the message, since the cookie is the truth. `null` where the
+//   browser has no BroadcastChannel: `useSession`'s refetch on focus catches up.
+// - A different Account (Guest counts as one) invalidates every other query,
+//   from whichever path the change arrived: likes, Draft books and
+//   notifications are all answered for whoever asks.
+export const watchSession = (
+  client: QueryClient,
+  channel: SessionChannel | null
+): void => {
+  channel?.addEventListener('message', () => {
+    void client.invalidateQueries({ queryKey: queryKeys.session });
+  });
+
+  // undefined until the first answer: nothing to compare it with yet.
+  let accountId: number | null | undefined;
+  client.getQueryCache().subscribe((event) => {
+    if (
+      event.type !== 'updated' ||
+      event.action.type !== 'success' ||
+      event.query.queryHash !== sessionHash
+    ) {
+      return;
+    }
+    if (event.action.manual) channel?.postMessage(null);
+    const next = (event.action.data as Session)?.id ?? null;
+    if (accountId !== undefined && next !== accountId) {
+      void client.invalidateQueries({
+        predicate: (query) => query.queryHash !== sessionHash,
+      });
+    }
+    accountId = next;
+  });
+};
+
 export const useSession = () => {
   return useQuery({
     queryKey: queryKeys.session,
+    // Even when fresh: a tab that missed another tab's announcement (asleep,
+    // or no BroadcastChannel) catches up the moment it is looked at, and so
+    // notices a session that expired or was ended by a Block.
+    refetchOnWindowFocus: 'always',
     queryFn: async (): Promise<Session> => {
       try {
         return await authApi.me();

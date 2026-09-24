@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { ApiError } from '../api/client';
+import { watchSession } from './auth';
 
 const MAX_QUERY_RETRIES = 2;
 
@@ -44,3 +45,10 @@ export const createQueryClient = (): QueryClient => {
 };
 
 export const queryClient = createQueryClient();
+
+watchSession(
+  queryClient,
+  typeof BroadcastChannel === 'undefined'
+    ? null
+    : new BroadcastChannel('books.session')
+);
