@@ -14,12 +14,8 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise';
 import { logger } from '../logger.ts';
 import { parseConfig } from './config.ts';
+import { SAFE_IDENTIFIER } from './ensureDatabase.ts';
 import { connectionErrorText } from './mysqlProbe.testkit.ts';
-
-// The same guard ensureDatabase uses: a schema name cannot be a bind
-// parameter, so it is checked against an allowlist rather than interpolated
-// blindly.
-const SAFE_IDENTIFIER = /^[A-Za-z0-9_]+$/;
 
 const TEST_DB_BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
 
