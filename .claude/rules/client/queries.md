@@ -21,7 +21,10 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   `books.session` BroadcastChannel and the other tabs refetch `/auth/me`; a
   changed Account id invalidates every other query. So only a mutation's own
   answer may `setQueryData` the session, never a guess. `useSession` also
-  refetches on every focus (`'always'`).
+  refetches on every focus (`'always'`), and a 401 on any query or mutation
+  while an Account is shown refetches it too (a Lost session): never a
+  `setQueryData(null)`, since a sign-in elsewhere may have overtaken the
+  request.
 - **A disabled query reports `isPending: true` forever** (with
   `fetchStatus: 'idle'`). `useSearchBooks` is disabled on a blank term, which is
   why `SearchPage` returns `<Empty>` before rendering `CardList`.

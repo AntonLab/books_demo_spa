@@ -262,6 +262,53 @@ describe('watchSession', () => {
     expect(bookIsInvalidated()).toBe(true);
     expect(client.getQueryState(queryKeys.session)?.isInvalidated).toBe(false);
   });
+
+  describe('a failed request', () => {
+    const failQuery = (client: QueryClient, error: ApiError) =>
+      client
+        .fetchQuery({
+          queryKey: queryKeys.book(7),
+          queryFn: () => Promise.reject(error),
+        })
+        .catch(() => {});
+    const failMutation = (client: QueryClient, error: ApiError) =>
+      client
+        .getMutationCache()
+        .build(client, { mutationFn: () => Promise.reject(error) })
+        .execute(undefined)
+        .catch(() => {});
+    const sessionIsInvalidated = (client: QueryClient) =>
+      client.getQueryState(queryKeys.session)?.isInvalidated;
+
+    it.each([
+      ['query', failQuery],
+      ['mutation', failMutation],
+    ])(
+      'asks /auth/me again after a 401 on a %s while signed in',
+      async (_kind, fail) => {
+        const client = createTestQueryClient();
+        watchSession(client, null);
+        client.setQueryData(queryKeys.session, user);
+
+        await fail(client, new ApiError(401, 'Authentication required'));
+
+        expect(sessionIsInvalidated(client)).toBe(true);
+      }
+    );
+
+    it("leaves a Guest's session alone, and any status but 401", async () => {
+      const client = createTestQueryClient();
+      watchSession(client, null);
+      client.setQueryData(queryKeys.session, null);
+      await failMutation(client, new ApiError(401, 'Invalid credentials'));
+      expect(sessionIsInvalidated(client)).toBe(false);
+
+      client.setQueryData(queryKeys.session, user);
+      await failQuery(client, new ApiError(403, 'Forbidden'));
+      await failMutation(client, new ApiError(500, 'Server error'));
+      expect(sessionIsInvalidated(client)).toBe(false);
+    });
+  });
 });
 
 describe('useRequestReset', () => {
