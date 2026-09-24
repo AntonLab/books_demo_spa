@@ -80,3 +80,23 @@ test('listBooksQuerySchema takes genreId as a filter', () => {
   assert.equal(listBooksQuerySchema.parse({ genreId: '4' }).genreId, 4);
   assert.equal(listBooksQuerySchema.parse({}).genreId, undefined);
 });
+
+test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 of 20', () => {
+  const parsed = listBooksQuerySchema.parse({});
+  assert.equal(parsed.current, 1);
+  assert.equal(parsed.pageSize, 20);
+  assert.deepEqual(
+    (({ current, pageSize }) => ({ current, pageSize }))(
+      listBooksQuerySchema.parse({ current: '3', pageSize: '100' })
+    ),
+    { current: 3, pageSize: 100 }
+  );
+  for (const bad of [
+    { current: '0' },
+    { current: '1.5' },
+    { pageSize: '0' },
+    { pageSize: '101' },
+  ]) {
+    assert.equal(listBooksQuerySchema.safeParse(bad).success, false);
+  }
+});

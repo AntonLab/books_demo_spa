@@ -1,4 +1,4 @@
-import { BOOK_SORTS, BOOK_STATUSES } from 'shared';
+import { BOOK_SORTS, BOOK_STATUSES, PAGE_SIZE_MAX } from 'shared';
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
@@ -81,8 +81,8 @@ export const updateBookSchema = z
   });
 
 export const listBooksQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  current: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
   userId: idSchema.optional(),
   seriesId: idSchema.optional(),
   genreId: idSchema.optional(),

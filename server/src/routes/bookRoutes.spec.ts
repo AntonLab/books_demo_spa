@@ -275,7 +275,7 @@ test('POST against an unknown series blames the series, not the user', async () 
   );
 });
 
-test('GET list returns items with the paging envelope', async () => {
+test('GET list returns items with the page-numbered envelope', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },
     async (base) => {
@@ -283,17 +283,41 @@ test('GET list returns items with the paging envelope', async () => {
       const response = await fetch(`${base}/api/books`);
       const body = await json<{
         total: number;
-        limit: number;
-        offset: number;
+        current: number;
+        pageSize: number;
         items: unknown[];
       }>(response);
 
       assert.equal(response.status, 200);
       assert.deepEqual(
-        { total: body.total, limit: body.limit, offset: body.offset },
-        { total: 1, limit: 20, offset: 0 }
+        { total: body.total, current: body.current, pageSize: body.pageSize },
+        { total: 1, current: 1, pageSize: 20 }
       );
       assert.equal(body.items.length, 1);
+    }
+  );
+});
+
+test('GET list serves the last non-empty page past the end and refuses a bad page with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const past = await json<{ current: number; items: unknown[] }>(
+        await fetch(`${base}/api/books?current=5&pageSize=10`)
+      );
+      assert.deepEqual(
+        { current: past.current, count: past.items.length },
+        { current: 1, count: 1 }
+      );
+      for (const query of ['current=0', 'pageSize=101', 'pageSize=0']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?${query}`)).status,
+          400,
+          query
+        );
+      }
     }
   );
 });

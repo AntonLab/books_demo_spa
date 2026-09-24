@@ -27,6 +27,11 @@ code alone does not explain.
 - `POST /api/books` takes no status: every book starts `draft`. Only `draft`
   changes what anyone may do (see `access.md`).
 - `?q=` matches `title` or `description`.
+- `GET /api/books` pages by `current` / `pageSize` (1–`PAGE_SIZE_MAX`,
+  default 20), not `limit` / `offset`, and answers `PagedResponse`
+  (`{ items, total, current, pageSize }`). It counts first: past the end it
+  serves the last non-empty page, page 1 when nothing matches, and says so in
+  `current`. Every other list keeps `limit` / `offset` and `ListResponse`.
 - `?sort=popular|new|updated` ranks by Popularity, Release time or Last update
   (CONTEXT.md), best first, ties to the higher id, overriding Series order.
   Each is a correlated subquery on the book row; `new` and `updated` drop a
