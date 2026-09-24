@@ -19,22 +19,9 @@ import type {
 } from '../types/series.ts';
 import type { AddCoAuthorInput } from '../types/params.ts';
 
-export interface SeriesController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-  addCoAuthor: RequestHandler;
-  removeCoAuthor: RequestHandler;
-  removeBook: RequestHandler;
-}
-
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createSeriesController(
-  repository: SeriesRepository
-): SeriesController {
+export function createSeriesController(repository: SeriesRepository) {
   // The other half of enforcement. requirePermission already refused `none`;
   // `any` needs nothing more, and `own` is the only case that has to look at
   // the row — which is why this cannot live in the middleware, where the row
@@ -154,5 +141,5 @@ export function createSeriesController(
       if (!removed) throw new NotFoundError('Series', id);
       res.status(204).end();
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

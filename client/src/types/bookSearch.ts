@@ -8,7 +8,7 @@ import {
   type SearchableBookStatus,
 } from './book';
 
-export const SEARCH_PAGE_SIZE = 20;
+const SEARCH_PAGE_SIZE = 20;
 
 const TEXT_KEYS = ['q', 'author', 'seriesTitle'] as const;
 const DAY_KEYS = [

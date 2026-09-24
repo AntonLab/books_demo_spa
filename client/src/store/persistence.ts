@@ -18,7 +18,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 // A long Chapter would otherwise be serialised on every keystroke.
-export const UNSAVED_TEXT_WRITE_INTERVAL_MS = 500;
+const UNSAVED_TEXT_WRITE_INTERVAL_MS = 500;
 
 // Storage can be missing (a locked-down browser), full, or hold JSON that no
 // longer parses. Every access is guarded so the store carries on in memory

@@ -1,6 +1,6 @@
 import { hash, verify } from '@node-rs/argon2';
 
-export interface PasswordParams {
+interface PasswordParams {
   memoryCost: number;
   timeCost: number;
   parallelism: number;

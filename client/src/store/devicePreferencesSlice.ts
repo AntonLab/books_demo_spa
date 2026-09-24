@@ -5,7 +5,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 // to an Account, so signing out keeps them. Reading font size and the like
 // arrive with the reader as more fields here.
 export const THEMES = ['light', 'dark'] as const;
-export type Theme = (typeof THEMES)[number];
+type Theme = (typeof THEMES)[number];
 
 export const RESULTS_LAYOUTS = ['grid', 'list'] as const;
 export type ResultsLayout = (typeof RESULTS_LAYOUTS)[number];

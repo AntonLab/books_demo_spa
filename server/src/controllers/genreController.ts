@@ -8,13 +8,6 @@ import type { GenreRepository } from '../repositories/genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type { GenreInput, ListGenresQuery } from '../types/genre.ts';
 
-export interface GenreController {
-  list: RequestHandler;
-  create: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-}
-
 // No ownership check anywhere in this file, unlike every other controller here:
 // a Genre has no Owner (CONTEXT.md), so the matrix's `any` is the whole rule
 // (R1) and there is no row to compare a caller against. No Notification
@@ -22,9 +15,7 @@ export interface GenreController {
 //
 // No try/catch: the Express 5 router inspects the returned promise and calls
 // next(err) itself when it rejects.
-export function createGenreController(
-  repository: GenreRepository
-): GenreController {
+export function createGenreController(repository: GenreRepository) {
   return {
     // A1. Rides on `genres × read`, which `guest` holds, so the header's
     // Genres menu renders for a visitor with no session. No paging envelope:
@@ -58,5 +49,5 @@ export function createGenreController(
       if (!deleted) throw new NotFoundError('Genre', id);
       res.status(204).end();
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

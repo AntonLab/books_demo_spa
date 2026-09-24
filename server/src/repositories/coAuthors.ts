@@ -18,7 +18,7 @@ import { displayNameOf, notify, type Actor } from './notificationRepository.ts';
 // live in two tables, each with a real foreign key (sequelize.md), so each
 // repository hands these functions an adapter over its own table.
 
-export interface Credit {
+interface Credit {
   workId: number;
   userId: number;
   user?: User;
