@@ -8,7 +8,7 @@ import {
   useReorderSeriesBooks,
   useSeriesBooks,
 } from '@/queries/series';
-import { BOOK_STATUS_LABELS } from '@/types/book';
+import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import type { SeriesBookSummary } from '@/types/series';
 import styles from './SeriesOrderList.module.css';
 
@@ -56,7 +56,9 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
           ) : (
             <Typography.Text>{book.title}</Typography.Text>
           )}
-          <Tag>{BOOK_STATUS_LABELS[book.status]}</Tag>
+          <Tag color={BOOK_STATUS_COLORS[book.status]}>
+            {BOOK_STATUS_LABELS[book.status]}
+          </Tag>
           <Typography.Text type="secondary">
             {book.authors
               .map((author) => `${author.firstName} ${author.lastName}`)

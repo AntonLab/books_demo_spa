@@ -26,6 +26,14 @@ export const BOOK_STATUS_LABELS: Record<BookStatus, string> = {
   complete: 'Complete',
 };
 
+// antd Tag presets, so dark mode adapts them. `gold` rather than `yellow`:
+// yellow text on its light background fails WCAG AA contrast.
+export const BOOK_STATUS_COLORS: Record<BookStatus, string> = {
+  draft: 'red',
+  in_progress: 'gold',
+  complete: 'green',
+};
+
 // No userId: a book has no single owner (ADR-0005). Every Co-author comes
 // embedded as `authors`, in credit order, in the list as well as the detail,
 // so a card can name them without another request.

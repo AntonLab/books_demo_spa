@@ -22,7 +22,7 @@ import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
-import { BOOK_STATUS_LABELS } from '@/types/book';
+import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
 import styles from './BookPage.module.css';
 
@@ -99,7 +99,7 @@ export const BookPage: FC = () => {
                 </Space>
               ))}
             </Space>
-            <Tag color={isDraft ? 'orange' : undefined}>
+            <Tag color={BOOK_STATUS_COLORS[book.status]}>
               {BOOK_STATUS_LABELS[book.status]}
             </Tag>
             {/* Only for a Co-author: a Moderator reaches the edit page by
