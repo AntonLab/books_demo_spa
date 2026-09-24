@@ -28,6 +28,21 @@ describe('ThemedConfigProvider', () => {
     expect(screen.getByTestId('background').textContent).not.toBe(light);
   });
 
+  it('sets the page color-scheme to the theme, for native controls', () => {
+    const { unmount } = renderWithProviders(<TokenProbe />, {
+      preloadedState: { devicePreferences: { theme: 'dark' } },
+    });
+    expect(
+      document.documentElement.style.getPropertyValue('color-scheme')
+    ).toBe('dark');
+    unmount();
+
+    renderWithProviders(<TokenProbe />);
+    expect(
+      document.documentElement.style.getPropertyValue('color-scheme')
+    ).toBe('light');
+  });
+
   it('keeps the app quarks in the dark theme', () => {
     renderWithProviders(<TokenProbe />, {
       preloadedState: { devicePreferences: { theme: 'dark' } },
