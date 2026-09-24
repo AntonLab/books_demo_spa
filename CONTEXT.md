@@ -62,6 +62,18 @@ _Avoid_: treating Moderator as a Role
 An Account status that refuses sign-in and ends the Account's existing
 sessions.
 
+**Sign out**:
+An Account ending its own session on purpose. A session belongs to the device,
+not to one open tab, so every tab becomes a Guest's; the Account's Unsaved text
+on that device is discarded.
+_Avoid_: Logout (the button's label, not a different event)
+
+**Lost session**:
+A session that ended without a Sign out: it expired, the Account was Blocked,
+or its password was reset. Every tab on the device becomes a Guest's, but the
+Account's Unsaved text is kept for when it signs back in.
+_Avoid_: Sign out (for a session the Account did not end itself)
+
 **Pending**:
 An Account status reserved for a future email-verification step. Today it
 restricts nothing: a Pending Account signs in like an active one.
