@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createBookController } from '../controllers/bookController.ts';
 import { createSeriesController } from '../controllers/seriesController.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
@@ -6,6 +7,7 @@ import { validate } from '../middleware/validate.ts';
 import {
   createSeriesSchema,
   listSeriesQuerySchema,
+  reorderSeriesBooksSchema,
   seriesBookParamSchema,
   updateSeriesSchema,
 } from '../types/series.ts';
@@ -79,6 +81,23 @@ export function createSeriesRoutes(deps: RouteDeps): Router {
     requirePermission('series', 'update'),
     validate({ params: seriesBookParamSchema }),
     controller.removeBook
+  );
+
+  // The books of a series as its editor works with them — the full list,
+  // drafts included, and its Series order. Handled by the book controller,
+  // because both read and write books; both ride on `series × update`.
+  const bookController = createBookController(deps.bookRepository);
+  router.get(
+    '/:id/books',
+    requirePermission('series', 'update'),
+    validate({ params: idParamSchema }),
+    bookController.listInSeries
+  );
+  router.put(
+    '/:id/book-order',
+    requirePermission('series', 'update'),
+    validate({ params: idParamSchema, body: reorderSeriesBooksSchema }),
+    bookController.reorderInSeries
   );
 
   return router;

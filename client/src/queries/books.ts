@@ -12,7 +12,7 @@ import {
   type UpdateBookPayload,
 } from '../api/books';
 import type { BookSort } from '../types/book';
-import { PAGE_SIZE_MAX } from '../types/api';
+import { PAGE_SIZE_MAX } from 'shared';
 import { queryKeys } from './keys';
 
 const BOOKS_PAGE_SIZE = 20;

@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { PublicGenre } from '../types/genre';
+import type { PublicGenre } from 'shared';
 
 // Both writes send the same one-field body, so one payload type covers them.
 export interface GenrePayload {

@@ -1,6 +1,6 @@
 import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
-import type { PublicGenre } from '@/types/genre';
+import type { PublicGenre } from 'shared';
 
 // A select cannot hold `null` as an option value and stay clearable, so "No
 // genre" travels as 0 inside the form and becomes null on the way out.

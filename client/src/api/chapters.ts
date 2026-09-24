@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { ListResponse } from '../types/api';
+import type { ListResponse } from 'shared';
 import type { ChapterSummary, PublicChapter } from '../types/chapter';
 
 // The server caps limit at 100. A book with more chapters than that would need

@@ -11,7 +11,7 @@ import {
 } from '../api/chapters';
 import { queryKeys } from './keys';
 import { useOptimisticReorder } from './reorder';
-import type { ListResponse } from '../types/api';
+import type { ListResponse } from 'shared';
 import type { ChapterSummary } from '../types/chapter';
 
 // ChapterPage reads this same key, so arriving from BookPage costs no request:

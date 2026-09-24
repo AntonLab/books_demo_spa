@@ -9,7 +9,7 @@ import {
   BOOK_STATUSES,
   type BookStatus,
 } from '@/types/book';
-import type { PublicGenre } from '@/types/genre';
+import type { PublicGenre } from 'shared';
 import styles from './BookForm.module.css';
 
 export interface BookFormValues {

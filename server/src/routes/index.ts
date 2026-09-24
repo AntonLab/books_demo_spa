@@ -5,13 +5,11 @@ import type { Repositories } from '../repositories/sequelizeRepositories.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
-import { createChapterOrderRoutes } from './chapterOrderRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
 import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
-import { createSeriesBookRoutes } from './seriesBookRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoleRoutes } from './userRoleRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
@@ -37,13 +35,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/authors', createAuthorRoutes(deps));
   router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
-  // Neither path collides with seriesRoutes': GET /:id/books and
-  // PUT /:id/book-order are routes it does not have.
-  router.use('/series', createSeriesBookRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
-  // Like the role routes: `/:id` never matches `/:id/chapter-order`, so the
-  // order of these two is not load-bearing either.
-  router.use('/books', createChapterOrderRoutes(deps));
   router.use('/books', createBookRoutes(deps));
   router.use('/chapters', createChapterRoutes(deps));
   // Reference data for the catalogue: no path here collides with any above.

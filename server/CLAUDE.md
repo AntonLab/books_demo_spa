@@ -112,7 +112,7 @@ Most tutorials and generated snippets are still Express 4:
 - **`req.query` is a getter with no setter.** Put validated values on your own
   request property, and read it once into a local in a hot path.
 - **`app.listen` hands its callback the bind error** (`EADDRINUSE`), which
-  Express 4 never did; `src/listen.ts` reports it.
+  Express 4 never did; `index.ts` reports it.
 
 ## Layout traps
 

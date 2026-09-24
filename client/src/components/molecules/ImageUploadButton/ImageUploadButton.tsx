@@ -4,7 +4,7 @@ import {
   ACCEPTED_IMAGE_CONTENT_TYPES,
   IMAGE_MAX_BYTES,
   type AcceptedImageContentType,
-} from '@/types/api';
+} from 'shared';
 
 interface ImageUploadButtonProps {
   label: string;
