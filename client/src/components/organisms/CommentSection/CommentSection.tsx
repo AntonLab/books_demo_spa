@@ -14,6 +14,7 @@ import { useToggleLike } from '@/queries/likes';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   entriesOfBook,
+  ownEntries,
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
@@ -41,7 +42,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const toggleLike = useToggleLike(queryKeys.comments(bookId));
 
   const dispatch = useAppDispatch();
-  const entries = useAppSelector((state) => state.unsavedText.entries);
+  const entries = useAppSelector((state) => ownEntries(state, session?.id));
 
   // `replyTo` and `editing` are mutually exclusive by construction: opening one
   // closes the other, so there is never more than one composer on screen.

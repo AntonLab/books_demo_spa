@@ -1,7 +1,12 @@
 import { createAppStore } from './index';
 import { devicePreferences } from './devicePreferencesSlice';
 import { unsavedText } from './unsavedTextSlice';
-import { STORAGE_KEYS, loadPersistedState, persistNow } from './persistence';
+import {
+  STORAGE_KEYS,
+  loadPersistedState,
+  parsePersisted,
+  persistNow,
+} from './persistence';
 
 const savedAt = '2026-09-23T10:00:00.000Z';
 
@@ -70,6 +75,17 @@ describe('persistence', () => {
     expect(loadPersistedState()).toEqual({});
   });
 
+  it.each([
+    [STORAGE_KEYS.devicePreferences, { theme: 42 }],
+    [STORAGE_KEYS.unsavedText, { accountId: 1, entries: [] }],
+  ])('ignores valid JSON of the wrong shape under %s', (key, value) => {
+    const raw = JSON.stringify(value);
+    localStorage.setItem(key, raw);
+
+    expect(parsePersisted(key, raw)).toBeUndefined();
+    expect(loadPersistedState()).toEqual({});
+  });
+
   it('drops a stored entry whose text is not a string, keeping the rest', () => {
     localStorage.setItem(
       STORAGE_KEYS.unsavedText,
@@ -109,6 +125,26 @@ describe('persistence', () => {
     expect(JSON.parse(writes()[0]![1])).toMatchObject({
       entries: { 'book:1:comment': { text: 'Hello' } },
     });
+  });
+
+  it("does not write back another tab's Unsaved text", async () => {
+    jest.useFakeTimers();
+    const setItem = jest.spyOn(Storage.prototype, 'setItem');
+    const store = createAppStore({});
+
+    store.dispatch(
+      unsavedText.replaced({
+        accountId: 3,
+        entries: { 'book:1:comment': { text: 'From tab B', savedAt } },
+      })
+    );
+    await jest.advanceTimersByTimeAsync(500);
+
+    // The value came from storage; writing it back 500 ms later could
+    // overwrite a newer one the other tab wrote in between.
+    expect(
+      setItem.mock.calls.filter(([key]) => key === STORAGE_KEYS.unsavedText)
+    ).toHaveLength(0);
   });
 
   it('round-trips Unsaved text under the v1 key', async () => {

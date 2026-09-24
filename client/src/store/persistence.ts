@@ -1,7 +1,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { THEMES } from './devicePreferencesSlice';
 import type { DevicePreferencesState } from './devicePreferencesSlice';
-import { isBlank } from './unsavedTextSlice';
+import { isBlank, unsavedText } from './unsavedTextSlice';
 import type { UnsavedTextEntry, UnsavedTextState } from './unsavedTextSlice';
 import type { RootState } from './index';
 
@@ -53,7 +53,8 @@ const isUnsavedTextShape = (
   (value.accountId === null || typeof value.accountId === 'number') &&
   'entries' in value &&
   typeof value.entries === 'object' &&
-  value.entries !== null;
+  value.entries !== null &&
+  !Array.isArray(value.entries);
 
 // An entry with a non-string `text` (or `title`/`baseUpdatedAt`) would throw
 // inside `isBlank`/`entriesOfBook` once a page reads it, landing the page in
@@ -158,9 +159,12 @@ export const createPersistenceMiddleware = () => {
 
   // A throttle: the first change stops listening, waits out the interval,
   // writes whatever the state is by then and listens again. Changes inside
-  // the window are carried by that one write.
+  // the window are carried by that one write. `replaced` starts no write: its
+  // value came from storage, and writing it back 500 ms later could revert a
+  // newer value the other tab wrote in between.
   listener.startListening({
-    predicate: (_action, current, previous) =>
+    predicate: (action, current, previous) =>
+      !unsavedText.replaced.match(action) &&
       current.unsavedText !== previous.unsavedText,
     effect: async (_action, api) => {
       api.unsubscribe();

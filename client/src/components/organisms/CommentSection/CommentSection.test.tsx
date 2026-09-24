@@ -417,6 +417,20 @@ describe('CommentSection Unsaved text', () => {
     ).toHaveValue('Half a thought');
   });
 
+  it("never shows another signed-in Account's Unsaved text", async () => {
+    renderSignedIn({
+      unsavedText: {
+        accountId: 7,
+        entries: { 'book:1:comment': { text: 'Not yours', savedAt } },
+      },
+    });
+
+    await screen.findByText('A fine book');
+    expect(
+      screen.getByRole('textbox', { name: 'Write a comment' })
+    ).toHaveValue('');
+  });
+
   it('opens Edit on the Unsaved text rather than the saved comment', async () => {
     renderSignedIn(
       withEntries({

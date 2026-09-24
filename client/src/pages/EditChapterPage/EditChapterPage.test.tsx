@@ -445,10 +445,23 @@ describe('EditChapterPage', () => {
   });
 
   it('offers the Unsaved text to an Account that no longer co-authors the book', async () => {
-    renderPage(account({ id: 99, login: 'other' }), typedAgainst());
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      authors: book.authors.filter((author) => author.id !== 3),
+    });
+    renderPage(account(), typedAgainst());
 
     expect(
       await screen.findByRole('textbox', { name: 'Unsaved text' })
     ).toHaveValue('Chapter One\n\nMy text');
+  });
+
+  it("never seeds the form from another Account's Unsaved text", async () => {
+    // Account 3 lost its session without Log out; co-author 4 signs in on
+    // the same device before AppHeader's accountChanged clears the slice.
+    renderPage(account({ id: 4, login: 'cora' }), typedAgainst());
+
+    expect(await screen.findByLabelText('Text')).toHaveValue(chapter.text);
+    expect(screen.queryByText(conflictMessage)).not.toBeInTheDocument();
   });
 });

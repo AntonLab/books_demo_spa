@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { FC, ReactNode } from 'react';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import { useAppSelector } from '@/store/hooks';
@@ -18,6 +19,12 @@ export const ThemedConfigProvider: FC<ThemedConfigProviderProps> = ({
   zeroRuntime,
 }) => {
   const theme = useAppSelector((state) => state.devicePreferences.theme);
+
+  // antd's algorithm reaches only antd's own tokens; scrollbars, native
+  // pickers and autofill follow the page's color-scheme instead.
+  useEffect(() => {
+    document.documentElement.style.setProperty('color-scheme', theme);
+  }, [theme]);
 
   return (
     <ConfigProvider
