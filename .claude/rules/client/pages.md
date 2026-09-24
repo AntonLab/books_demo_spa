@@ -52,7 +52,9 @@ paths:
   than the base (compared as ISO strings), or a 409, shows the conflict: "Use
   their version" discards the entry and refetches; "Keep mine" refetches and
   rebases the entry, so the next Save is a deliberate overwrite. The form is
-  keyed by `updatedAt` plus a reset counter and seeds from the entry. It
+  keyed by `updatedAt` plus a reset counter and seeds from the entry. Each
+  edit passes the newest known version as `saved`, so text changed back to it
+  leaves no entry. It
   dispatches `saved` from `mutateAsync(...).then(...)`, not a per-call
   `mutate` callback, since TanStack skips that callback once the page has
   unmounted, which would otherwise leave a stale entry and show a false

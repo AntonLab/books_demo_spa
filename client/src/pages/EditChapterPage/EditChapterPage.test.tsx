@@ -435,6 +435,47 @@ describe('EditChapterPage', () => {
     expect(screen.queryByText(conflictMessage)).toBeNull();
   });
 
+  it('leaves no entry behind for text changed back to the saved chapter', async () => {
+    const { store } = renderPage();
+
+    await userEvent.type(await screen.findByLabelText('Text'), '!{Backspace}');
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('compares against a landed save, not the stale chapter', async () => {
+    mockedChapters.updateChapter.mockResolvedValue({
+      ...chapter,
+      text: 'A darker night.',
+      updatedAt: '2026-09-13T09:00:00.000Z',
+    });
+    const { store } = renderPage();
+
+    const text = await screen.findByLabelText('Text');
+    await userEvent.clear(text);
+    await userEvent.type(text, 'A darker night.');
+    await userEvent.click(screen.getByRole('button', { name: 'Save draft' }));
+    await screen.findByText('Saved.');
+    // getChapter still answers the pre-save version: the refetch lags.
+    await userEvent.type(text, '!{Backspace}');
+
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('keeps an entry cleared to nothing, with the version it was typed on', async () => {
+    const { store } = renderPage();
+
+    await userEvent.clear(await screen.findByLabelText('Title'));
+    await userEvent.clear(screen.getByLabelText('Text'));
+
+    expect(store.getState().unsavedText.entries['book:1:chapter:9']).toEqual({
+      title: '',
+      text: '',
+      baseUpdatedAt: chapter.updatedAt,
+      savedAt: expect.any(String),
+    });
+  });
+
   it('offers the Unsaved text of a chapter that no longer exists', async () => {
     mockedChapters.getChapter.mockRejectedValue(new ApiError(404, 'Not found'));
     renderPage(account(), typedAgainst());

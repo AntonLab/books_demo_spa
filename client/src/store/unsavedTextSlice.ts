@@ -32,8 +32,13 @@ export interface UnsavedTextState {
   entries: Record<string, UnsavedTextEntry>;
 }
 
+type SavedText = Pick<UnsavedTextEntry, 'text' | 'title'>;
+
 export type UnsavedTextInput = Omit<UnsavedTextEntry, 'savedAt'> & {
   key: string;
+  // What its place holds now: an edit's saved Comment or Chapter, nothing for
+  // a new one. Text equal to it is no Unsaved text, so the entry goes.
+  saved?: SavedText;
 };
 
 const initialState: UnsavedTextState = { accountId: null, entries: {} };
@@ -56,8 +61,11 @@ const slice = createSlice({
         state,
         action: PayloadAction<UnsavedTextInput & { savedAt: string }>
       ) {
-        const { key, ...entry } = action.payload;
-        if (entry.text === '' && (entry.title ?? '') === '') {
+        const { key, saved = { text: '' }, ...entry } = action.payload;
+        if (
+          entry.text === saved.text &&
+          (entry.title ?? '') === (saved.title ?? '')
+        ) {
           delete state.entries[key];
           return;
         }
