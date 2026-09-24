@@ -2,6 +2,11 @@
   display: flex;
   align-items: center;
   gap: var(--ant-margin);
+  /* Same column as App's `.content`; see the comment there. */
+  padding-inline: max(
+    var(--ant-padding-lg),
+    calc((100% - var(--ant-app-page-width)) / 2)
+  );
 }
 
 .nav {
