@@ -164,7 +164,9 @@ export function createFakeBookRepository(
             (credits.get(row.id) ?? []).includes(query.userId)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
           (query.genreId === undefined || row.genre?.id === query.genreId) &&
-          (!query.q || row.description.includes(query.q))
+          (!query.q ||
+            row.title.includes(query.q) ||
+            row.description.includes(query.q))
       );
       // Past the end, the last non-empty page, as the real repository serves it.
       const current = Math.min(

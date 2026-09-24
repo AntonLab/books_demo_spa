@@ -14,14 +14,18 @@ half. Nothing here lives in the permission table.
 
 ## Ownership
 
-- Checked on books, series, chapters, comments and likes, in each controller
-  (`assertMayTouch` / `assertOwned` / `assertCoAuthor`), not in a middleware:
-  the row must be loaded before an owner can be compared. A scope of `any`
-  (Moderators) skips the check outright. Every check answers 404 before 403.
+- Checked on books, series, chapters, comments and likes in the controllers,
+  not in a middleware: the row must be loaded before an owner can be compared.
+  A scope of `any` (Moderators) skips the check outright. Every check answers
+  404 before 403.
+- Books, series and chapters share one rule, `controllers/coAuthorGuard.ts`:
+  `assertMayChange` (a Co-author, or `any`) for edits and orders,
+  `assertCoAuthor` (a Co-author, whatever the scope) for the byline. Each
+  controller hands it a target: the resource, the id and its Co-author lookup.
+  Comments and likes (`assertOwner` / `assertOwned`) compare a single owner.
 - A book's or series' `own` means one of its Co-authors (`findCoAuthorIds`).
-  Chapters have no owner column and resolve through their book;
-  `assertMayChangeChaptersOf` covers a create and a reorder, where there is no
-  chapter to own.
+  Chapters have no owner column and resolve through their book; a chapter
+  create and reorder check the book, since there is no chapter to own.
 - **Filing a book into a series takes a Co-author of both**
   (`assertMayAddToSeries`), or an author could file into a stranger's series. A
   missing series is a 404 blaming the series, ahead of the book's 403. `null`
@@ -87,8 +91,9 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   is readable and `publishedAt` has passed. Co-authors and Moderators see all.
 - **Likes** exclude instead (`hiddenBookIds`); drafts are few, so the lists stay
   short.
-- **Listed is narrower than readable**: no book list shows a draft, a
-  Moderator's included, except `?userId=` naming the caller ("My books").
+- **Listed is narrower than readable** (`listedBookWhere`): no book list shows
+  a draft, a Moderator's included, except `?userId=` naming the caller ("My
+  books").
 - **Series** have no status: visible with at least one non-draft book, or to its
   Co-authors and Moderators (`visibleSeriesWhere`). The published side is a
   fixed subquery, because an id list would grow with the catalogue.

@@ -1,7 +1,5 @@
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
-import type { ResetDelivery } from './delivery/resetDelivery.ts';
-import type { AuthRateLimits } from './middleware/authRateLimit.ts';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
@@ -9,40 +7,15 @@ import {
 import { errorHandler } from './middleware/errorHandler.ts';
 import { notFound } from './middleware/notFound.ts';
 import { noSniff } from './middleware/securityHeaders.ts';
-import type { BookRepository } from './repositories/bookRepository.ts';
-import type { ChapterRepository } from './repositories/chapterRepository.ts';
-import type { CommentRepository } from './repositories/commentRepository.ts';
-import type { GenreRepository } from './repositories/genreRepository.ts';
-import type { LikeRepository } from './repositories/likeRepository.ts';
-import type { NotificationRepository } from './repositories/notificationRepository.ts';
-import type { PasswordResetRepository } from './repositories/passwordResetRepository.ts';
-import type { SeriesRepository } from './repositories/seriesRepository.ts';
-import type { SessionRepository } from './repositories/sessionRepository.ts';
-import type { UserRepository } from './repositories/userRepository.ts';
-import { createApiRouter } from './routes/index.ts';
+import { createApiRouter, type RouteDeps } from './routes/index.ts';
 
-export interface AppDeps {
-  userRepository: UserRepository;
-  seriesRepository: SeriesRepository;
-  bookRepository: BookRepository;
-  chapterRepository: ChapterRepository;
-  genreRepository: GenreRepository;
-  commentRepository: CommentRepository;
-  likeRepository: LikeRepository;
-  notificationRepository: NotificationRepository;
-  sessionRepository: SessionRepository;
-  passwordResetRepository: PasswordResetRepository;
-  resetDelivery: ResetDelivery;
+export interface AppDeps extends RouteDeps {
   // The client's origin (APP_BASE_URL): the one foreign origin a write may
   // come from. See middleware/csrfProtection.ts.
   trustedOrigin: string;
   // TRUST_PROXY: how many proxy hops in front of the API may name the client
   // in X-Forwarded-For. Governs req.ip.
   trustProxy: number;
-  // The sign-in rate limits (middleware/authRateLimit.ts). Required, so no
-  // app is ever built without them by accident; tests pass
-  // unlimitedAuthRateLimits() from the route test kit.
-  authRateLimits: AuthRateLimits;
 }
 
 // No listen() here: tests bind an ephemeral port themselves.
