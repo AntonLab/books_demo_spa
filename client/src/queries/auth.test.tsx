@@ -9,6 +9,7 @@ import {
   useRegister,
   useRequestReset,
   useSession,
+  watchSession,
 } from './auth';
 import { queryKeys } from './keys';
 import { createTestQueryClient } from '../test/queryClient';
@@ -185,6 +186,81 @@ describe('useLogout', () => {
     await result.current.mutateAsync();
 
     expect(client.getQueryData(queryKeys.session)).toBeNull();
+  });
+});
+
+describe('watchSession', () => {
+  // jsdom has no BroadcastChannel. `hear` plays a message from another tab.
+  const fakeChannel = () => {
+    let listener = () => {};
+    return {
+      postMessage: jest.fn(),
+      addEventListener: (_type: 'message', next: () => void) => {
+        listener = next;
+      },
+      hear: () => listener(),
+    };
+  };
+
+  it('announces a session its own mutation wrote, not one it fetched', async () => {
+    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const client = createTestQueryClient();
+    const channel = fakeChannel();
+    watchSession(client, channel);
+
+    const { result } = renderHook(
+      () => ({ session: useSession(), logout: useLogout() }),
+      {
+        wrapper: wrapper(client),
+      }
+    );
+    await waitFor(() => {
+      expect(result.current.session.data).toEqual(user);
+    });
+    expect(channel.postMessage).not.toHaveBeenCalled();
+
+    await result.current.logout.mutateAsync();
+
+    expect(channel.postMessage).toHaveBeenCalledWith(null);
+  });
+
+  it("asks /auth/me again on another tab's announcement", async () => {
+    mockedAuth.me.mockResolvedValue(user);
+    const client = createTestQueryClient();
+    const channel = fakeChannel();
+    watchSession(client, channel);
+    const { result } = renderHook(() => useSession(), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => {
+      expect(result.current.data).toEqual(user);
+    });
+
+    mockedAuth.me.mockRejectedValue(
+      new ApiError(401, 'Authentication required')
+    );
+    channel.hear();
+
+    await waitFor(() => {
+      expect(result.current.data).toBeNull();
+    });
+  });
+
+  it('invalidates every other query when the Account changes, and only then', () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.book(7), { id: 7 });
+    const bookIsInvalidated = () =>
+      client.getQueryState(queryKeys.book(7))?.isInvalidated;
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    expect(bookIsInvalidated()).toBe(false);
+
+    client.setQueryData(queryKeys.session, null);
+    expect(bookIsInvalidated()).toBe(true);
+    expect(client.getQueryState(queryKeys.session)?.isInvalidated).toBe(false);
   });
 });
 
