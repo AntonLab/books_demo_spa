@@ -25,6 +25,19 @@ function isModerator(viewer: Viewer): boolean {
   return isModeratorRole(viewer?.role);
 }
 
+// Listed is narrower than readable: a Draft book shows in exactly one list,
+// its own Co-author's `?userId=`, which is where "My books" finds it. Every
+// other list — a Moderator's included — leaves it out. null when the list may
+// hold drafts; readableBookWhere still decides which.
+export function listedBookWhere(
+  viewer: Viewer,
+  userId: number | undefined
+): WhereOptions | null {
+  const listingOwnBooks =
+    viewer !== null && userId !== undefined && userId === viewer.id;
+  return listingOwnBooks ? null : { status: { [Op.ne]: 'draft' } };
+}
+
 // The books a viewer may read, as a WHERE on `books`: every Published book,
 // plus the Draft books the viewer co-authors — or every book at all for a
 // Moderator. The one definition every read that can reach a book goes through:
