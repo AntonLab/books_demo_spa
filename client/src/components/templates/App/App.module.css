@@ -2,8 +2,12 @@
   min-height: 100vh;
 }
 
+/* Padding, not a max-width wrapper, centres the column: AppHeader uses the same
+   formula so its items line up with the content while its background still
+   spans the window. */
 .content {
-  padding: var(--ant-padding-lg);
+  padding: var(--ant-padding-lg)
+    max(var(--ant-padding-lg), calc((100% - var(--ant-app-page-width)) / 2));
 }
 
 .fallback {

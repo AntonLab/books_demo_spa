@@ -18,8 +18,10 @@ export interface CardListProps<T extends { id: number }> {
 
 const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
 
-// For `tile` cards: six to a row on a wide screen, two on a phone.
-export const TILE_COLUMNS: ColProps = { xs: 12, sm: 8, md: 6, xl: 4 };
+// For `tile` cards: six to a row on a wide screen, two on a phone. Six start
+// at `lg`, not `xl`: `appPageWidth` holds the page at 1024px up to a ~1365px
+// window, so at `xl` tiles would shrink as the window widens past 1200.
+export const TILE_COLUMNS: ColProps = { xs: 12, sm: 8, md: 6, lg: 4 };
 
 // Presentational on purpose: each page runs its own query (`useSortedBooks`,
 // `useSearchBooks`, `useSeriesInGenre`…) and hands the states down. A
