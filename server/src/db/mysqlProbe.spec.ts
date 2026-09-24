@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { skipWithoutMysql } from './mysqlProbe.testkit.ts';
+import { connectionErrorText, skipWithoutMysql } from './mysqlProbe.testkit.ts';
 
 // Port 1 is reserved and nothing listens on it, so the connection is refused
 // at once rather than waiting out the timeout.
@@ -18,7 +18,25 @@ test('skips with a reason when DB_USER is not set', async () => {
 test('skips with a reason when MySQL is unreachable', async () => {
   assert.match(
     String(await skipWithoutMysql(unreachable)),
-    /MySQL unreachable/
+    /MySQL unreachable: .*ECONNREFUSED/
+  );
+});
+
+test('names every refused address when localhost resolves to several', () => {
+  const refused = (address: string) =>
+    Object.assign(new Error(`connect ECONNREFUSED ${address}`), {
+      code: 'ECONNREFUSED',
+    });
+  // What mysql2 throws for `localhost` when MySQL is down: the aggregate's own
+  // message is empty.
+  const error = Object.assign(
+    new AggregateError([refused('::1:3306'), refused('127.0.0.1:3306')], ''),
+    { code: 'ECONNREFUSED' }
+  );
+
+  assert.equal(
+    connectionErrorText(error),
+    'connect ECONNREFUSED ::1:3306; connect ECONNREFUSED 127.0.0.1:3306'
   );
 });
 

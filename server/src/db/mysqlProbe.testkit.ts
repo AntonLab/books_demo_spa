@@ -39,6 +39,20 @@ async function unavailableReason(
     await connection.end();
     return null;
   } catch (error) {
-    return `MySQL unreachable: ${(error as Error).message}`;
+    return `MySQL unreachable: ${connectionErrorText(error)}`;
   }
+}
+
+// mysql2 tries every address `localhost` resolves to and, when all refuse,
+// throws an AggregateError whose own message is empty; the reasons are in
+// its `errors`.
+export function connectionErrorText(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.map(connectionErrorText).join('; ');
+  }
+  if (error instanceof Error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return error.message || code || error.name;
+  }
+  return String(error);
 }

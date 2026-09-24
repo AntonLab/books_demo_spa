@@ -14,6 +14,7 @@
 import mysql, { type RowDataPacket } from 'mysql2/promise';
 import { logger } from '../logger.ts';
 import { parseConfig } from './config.ts';
+import { connectionErrorText } from './mysqlProbe.testkit.ts';
 
 // The same guard ensureDatabase uses: a schema name cannot be a bind
 // parameter, so it is checked against an allowlist rather than interpolated
@@ -66,7 +67,7 @@ async function dropTestDatabases(): Promise<void> {
     // Unreachable MySQL means the suites skipped, exactly as an absent DB_USER
     // does. Warn and leave the run green rather than failing a passing build.
     logger.warn(
-      `Test schema cleanup skipped: MySQL unreachable — ${(error as Error).message}`
+      `Test schema cleanup skipped: MySQL unreachable — ${connectionErrorText(error)}`
     );
     return;
   }
