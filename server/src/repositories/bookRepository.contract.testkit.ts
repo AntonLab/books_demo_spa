@@ -330,6 +330,30 @@ export function bookRepositoryContract(
     );
   });
 
+  // Same-case text, so the fake's plain substring match and MySQL's
+  // case-insensitive LIKE agree; the collation is the real side's alone.
+  test('contract: ?q= finds a book by its title or its description', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    for (const fields of [
+      { title: 'Dragon Rising', description: 'A book' },
+      { title: 'Plain Title', description: 'Of a Dragon and a knight' },
+      { title: 'Unrelated', description: 'Nothing here' },
+    ]) {
+      const book = await aBook(repository, authorId, fields);
+      await repository.update(book.id, { status: 'in_progress' });
+    }
+
+    const found = await repository.list(
+      { q: 'Dragon', userId: authorId, current: 1, pageSize: 10 },
+      null
+    );
+    assert.deepEqual(found.items.map((book) => book.title).sort(), [
+      'Dragon Rising',
+      'Plain Title',
+    ]);
+  });
+
   test('contract: a missing series has no books to list or reorder', async () => {
     const { repository } = await setUp();
 

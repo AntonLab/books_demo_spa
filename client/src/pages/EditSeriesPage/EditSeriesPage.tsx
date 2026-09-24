@@ -13,7 +13,7 @@ import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthor
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { useSession } from '@/queries/auth';
-import { isCreditedTo, isModeratorRole } from '@/types/user';
+import { seriesCapabilities } from '@/types/capabilities';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
 import styles from './EditSeriesPage.module.css';
@@ -24,12 +24,6 @@ export const EditSeriesPage: FC = () => {
 
   const { data: session } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);
-  const isCoAuthor = isCreditedTo(series, session?.id);
-  // A Moderator may edit and delete any series, and order its books, but never
-  // change its byline — CoAuthorManager stays read-only for one.
-  const isModerator = isModeratorRole(session?.role);
-  const mayEdit = Boolean(session) && (isCoAuthor || isModerator);
-
   const genres = useGenres();
   const update = useUpdateSeries(seriesId);
   const remove = useDeleteSeries(seriesId);
@@ -39,7 +33,10 @@ export const EditSeriesPage: FC = () => {
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
 
-  // Mirrors the server, which refuses anyone else with a 403.
+  // A Moderator may edit and delete any series, and order its books, but never
+  // change its byline — CoAuthorManager stays read-only for one.
+  const { isCoAuthor, mayEdit } = seriesCapabilities(series, session);
+  // The server refuses anyone else with a 403.
   if (!session || !mayEdit) {
     return (
       <Alert type="warning" title="Only its co-authors can edit this series." />
@@ -81,8 +78,7 @@ export const EditSeriesPage: FC = () => {
       <SeriesOrderList
         seriesId={seriesId}
         mayEdit={mayEdit}
-        isModerator={isModerator}
-        viewerId={session.id}
+        session={session}
       />
 
       <Divider />

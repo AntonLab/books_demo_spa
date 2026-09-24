@@ -5,7 +5,11 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
-import { readableBookWhere, type Viewer } from './visibility.ts';
+import {
+  listedBookWhere,
+  readableBookWhere,
+  type Viewer,
+} from './visibility.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
@@ -311,14 +315,8 @@ function buildWhere(
     }
   }
 
-  // A Draft book shows in exactly one list: its own Co-author's `?userId=`,
-  // which is where "My books" finds it. Every other list — a Moderator's
-  // included — leaves it out; a Moderator reaches a draft by direct link only.
-  const listingOwnBooks =
-    viewer !== null && query.userId !== undefined && query.userId === viewer.id;
-  if (!listingOwnBooks) {
-    clauses.push({ status: { [Op.ne]: 'draft' } });
-  }
+  const listed = listedBookWhere(viewer, query.userId);
+  if (listed !== null) clauses.push(listed);
 
   if (query.seriesId !== undefined) {
     clauses.push({ seriesId: query.seriesId });

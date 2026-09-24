@@ -1,10 +1,15 @@
-import type { Request, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import {
   validatedBody,
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
 import { scopeFor } from '../permissions/permissionStore.ts';
+import {
+  assertCoAuthor,
+  assertMayChange,
+  type CoAuthorTarget,
+} from './coAuthorGuard.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
@@ -22,30 +27,13 @@ import type { AddCoAuthorInput } from '../types/params.ts';
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
 export function createSeriesController(repository: SeriesRepository) {
-  // The other half of enforcement. requirePermission already refused `none`;
-  // `any` needs nothing more, and `own` is the only case that has to look at
-  // the row — which is why this cannot live in the middleware, where the row
-  // is not loaded yet.
-  //
-  // Only `any` returns early. Every other value, a missing scope included,
-  // falls through to the owner comparison: a handler mounted without
-  // requirePermission fails closed rather than acting as `any`.
-  //
-  // 404 before 403, so a refusal cannot be used to probe which ids exist.
-  //
-  // `own` means "one of the series' Co-authors" (ADR-0005), as on a book.
-  const assertCoAuthor = async (req: Request, id: number): Promise<void> => {
-    const coAuthorIds = await repository.findCoAuthorIds(id);
-    if (coAuthorIds === null) throw new NotFoundError('Series', id);
-    if (req.user === undefined || !coAuthorIds.includes(req.user.id)) {
-      throw new ForbiddenError('You may only change series you co-author');
-    }
-  };
-
-  const assertMayTouch = async (req: Request, id: number): Promise<void> => {
-    if (req.permissionScope === 'any') return;
-    await assertCoAuthor(req, id);
-  };
+  // Row-level checks go through coAuthorGuard.ts, which holds the rule.
+  const seriesTarget = (id: number): CoAuthorTarget => ({
+    resource: 'Series',
+    id,
+    coAuthorIds: () => repository.findCoAuthorIds(id),
+  });
+  const MAY_ONLY_CHANGE_OWN = 'You may only change series you co-author';
 
   return {
     create: async (req, res) => {
@@ -76,7 +64,7 @@ export function createSeriesController(repository: SeriesRepository) {
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayTouch(req, id);
+      await assertMayChange(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const series = await repository.update(
         id,
@@ -88,7 +76,7 @@ export function createSeriesController(repository: SeriesRepository) {
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayTouch(req, id);
+      await assertMayChange(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const deleted = await repository.remove(id, actorOf(req));
       if (!deleted) throw new NotFoundError('Series', id);
@@ -100,7 +88,7 @@ export function createSeriesController(repository: SeriesRepository) {
     addCoAuthor: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       const { userId } = validatedBody<AddCoAuthorInput>(req);
-      await assertCoAuthor(req, id);
+      await assertCoAuthor(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const series = await repository.addCoAuthor(id, userId, actorOf(req));
       if (!series) throw new NotFoundError('Series', id);
@@ -120,7 +108,7 @@ export function createSeriesController(repository: SeriesRepository) {
         if (scopeFor(req.user.role, 'series', 'update') !== 'own') {
           throw new ForbiddenError('Only a co-author may remove a co-author');
         }
-        await assertCoAuthor(req, id);
+        await assertCoAuthor(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
       }
 
       const series = await repository.removeCoAuthor(id, userId, actorOf(req));
@@ -135,7 +123,7 @@ export function createSeriesController(repository: SeriesRepository) {
       const { id, bookId } = validatedParams<{ id: number; bookId: number }>(
         req
       );
-      await assertMayTouch(req, id);
+      await assertMayChange(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
 
       const removed = await repository.removeBook(id, bookId);
       if (!removed) throw new NotFoundError('Series', id);

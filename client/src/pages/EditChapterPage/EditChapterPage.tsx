@@ -15,7 +15,7 @@ import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/Unsa
 import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
 import type { ChapterFormValues } from '@/components/organisms/ChapterForm/ChapterForm';
 import { useSession } from '@/queries/auth';
-import { isCreditedTo, isModeratorRole } from '@/types/user';
+import { bookCapabilities } from '@/types/capabilities';
 import { useBook } from '@/queries/books';
 import {
   useChapter,
@@ -93,9 +93,7 @@ export const EditChapterPage: FC = () => {
     return <Skeleton active paragraph={{ rows: 10 }} />;
   }
 
-  const isCoAuthor = isCreditedTo(book.data, session?.id);
-  const isModerator = isModeratorRole(session?.role);
-  if (!isCoAuthor && !isModerator) {
+  if (!bookCapabilities(book.data, session).mayEdit) {
     return (
       <>
         <Alert

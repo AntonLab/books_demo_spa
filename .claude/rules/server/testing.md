@@ -33,9 +33,11 @@ Each answers a question the others cannot:
   belongs in its contract. `chapterRepository.findBookCoAuthorIds` has no
   `ORDER BY`, so its contract compares a set.
 - **`src/app.spec.ts`** is the one suite from HTTP through real repositories to
-  MySQL, on its own `_app` schema. It repeats `index.ts`'s startup steps, so a
-  startup change needs the same change there. Its admin comes from
-  `User.create`, since no API makes one.
+  MySQL, on its own `_app` schema. It takes its repositories from
+  `createSequelizeRepositories()` as `index.ts` does, but repeats the boot
+  steps around them (`initModels`, `sync`, `syncPermissions`), so a change to
+  those needs the same change there. Its admin comes from `User.create`, since
+  no API makes one.
 
 ## MySQL-backed suites
 

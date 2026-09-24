@@ -21,16 +21,7 @@ import {
 import { initModels } from './models/index.ts';
 import { User } from './models/User.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
-import { createSequelizeBookRepository } from './repositories/bookRepository.ts';
-import { createSequelizeChapterRepository } from './repositories/chapterRepository.ts';
-import { createSequelizeCommentRepository } from './repositories/commentRepository.ts';
-import { createSequelizeGenreRepository } from './repositories/genreRepository.ts';
-import { createSequelizeLikeRepository } from './repositories/likeRepository.ts';
-import { createSequelizeNotificationRepository } from './repositories/notificationRepository.ts';
-import { createSequelizePasswordResetRepository } from './repositories/passwordResetRepository.ts';
-import { createSequelizeSessionRepository } from './repositories/sessionRepository.ts';
-import { createSequelizeSeriesRepository } from './repositories/seriesRepository.ts';
-import { createSequelizeUserRepository } from './repositories/userRepository.ts';
+import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
 import type { BookDetail, PublicBook } from './types/book.ts';
 import type { PublicChapter } from './types/chapter.ts';
@@ -259,16 +250,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     await syncPermissions();
 
     const app = createApp({
-      userRepository: createSequelizeUserRepository(),
-      seriesRepository: createSequelizeSeriesRepository(),
-      bookRepository: createSequelizeBookRepository(),
-      chapterRepository: createSequelizeChapterRepository(),
-      genreRepository: createSequelizeGenreRepository(),
-      commentRepository: createSequelizeCommentRepository(),
-      likeRepository: createSequelizeLikeRepository(),
-      notificationRepository: createSequelizeNotificationRepository(),
-      sessionRepository: createSequelizeSessionRepository(),
-      passwordResetRepository: createSequelizePasswordResetRepository(),
+      ...createSequelizeRepositories(),
       resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
       trustedOrigin: config.appBaseUrl,
       trustProxy: config.trustProxy,

@@ -17,7 +17,7 @@ import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNo
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { useSession } from '@/queries/auth';
-import { isCreditedTo, isModeratorRole } from '@/types/user';
+import { bookCapabilities } from '@/types/capabilities';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
@@ -52,14 +52,13 @@ export const EditBookPage: FC = () => {
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
 
-  const isCoAuthor = isCreditedTo(book, session?.id);
   // A Moderator may edit and delete any book, but never change its byline —
   // CoAuthorManager stays read-only for one.
-  const isModerator = isModeratorRole(session?.role);
+  const { isCoAuthor, mayEdit } = bookCapabilities(book, session);
 
-  // Mirrors the server, which refuses anyone else with a 403: offering the
-  // form would only collect edits it cannot save.
-  if (!session || (!isCoAuthor && !isModerator)) {
+  // The server refuses anyone else with a 403: offering the form would only
+  // collect edits it cannot save.
+  if (!session || !mayEdit) {
     return (
       <Alert type="warning" title="Only its co-authors can edit this book." />
     );
