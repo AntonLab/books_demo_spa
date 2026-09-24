@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest",
+    "test": "npm exec --node-options=--experimental-vm-modules -- jest",
     "test:watch": "npm test -- --watch"
   },
   "dependencies": {
@@ -40,7 +40,6 @@
     "@types/jest": "30.0.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "cross-env": "10.1.0",
     "css-loader": "7.1.5",
     "css-minimizer-webpack-plugin": "8.0.0",
     "eslint-plugin-jsx-a11y": "6.10.2",

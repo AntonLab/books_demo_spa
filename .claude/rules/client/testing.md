@@ -13,8 +13,8 @@ no Babel config.
 
 ## The test script
 
-`cross-env NODE_OPTIONS=--experimental-vm-modules jest`, and each part is
-load-bearing:
+`npm exec --node-options=--experimental-vm-modules -- jest`, and each part
+is load-bearing:
 
 - `react-router` 8 is ESM-only and its root re-exports code using
   `import.meta`, which Jest's CJS loader cannot parse; without the flag most
@@ -23,8 +23,9 @@ load-bearing:
   outside `node_modules`, so neither needs a carve-out.
 - `jest` by bare name: workspaces hoist it to the root, so no
   `client/node_modules/jest/bin` path exists.
-- `cross-env`: npm runs scripts through `cmd.exe` on Windows, where a bare
-  `NODE_OPTIONS=…` prefix is a syntax error.
+- `--node-options`, npm's own way to set `NODE_OPTIONS`: npm runs scripts
+  through `cmd.exe` on Windows, where a bare `NODE_OPTIONS=…` prefix is a
+  syntax error, and this needs no `cross-env`.
 
 ## Setup
 
