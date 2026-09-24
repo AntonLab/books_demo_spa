@@ -2,10 +2,7 @@ import express, { Router } from 'express';
 import { createUserController } from '../controllers/userController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
-import {
-  ACCEPTED_IMAGE_CONTENT_TYPES,
-  IMAGE_MAX_BYTES,
-} from '../types/image.ts';
+import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import {
   createUserSchema,
   listUsersQuerySchema,

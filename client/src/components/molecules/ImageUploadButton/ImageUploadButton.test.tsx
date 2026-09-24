@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ImageUploadButton } from './ImageUploadButton';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { IMAGE_MAX_BYTES } from '@/types/api';
+import { IMAGE_MAX_BYTES } from 'shared';
 
 describe('ImageUploadButton', () => {
   it('renders a single button carrying the given label', () => {

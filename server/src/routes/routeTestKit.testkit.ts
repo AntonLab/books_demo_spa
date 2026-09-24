@@ -59,7 +59,6 @@ export function createUnusedRepository<T>(name: string): T {
 export function unlimitedAuthRateLimits(): AuthRateLimits {
   const unlimited = (): RateLimiter => ({
     hit: () => ({ allowed: true, retryAfterMs: 0 }),
-    peek: () => ({ allowed: true, retryAfterMs: 0 }),
     release: () => {},
     reset: () => {},
     size: () => 0,

@@ -22,7 +22,7 @@ import {
   useGenres,
   useRenameGenre,
 } from '@/queries/genres';
-import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from '@/types/genre';
+import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from 'shared';
 import styles from './AdminGenresPage.module.css';
 
 // The one refusal the fields explain themselves, rather than an Alert over the

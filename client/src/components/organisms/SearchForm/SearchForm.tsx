@@ -26,7 +26,7 @@ import type {
   BookSearchFormValues,
   SearchFieldError,
 } from '@/types/bookSearch';
-import type { PublicGenre } from '@/types/genre';
+import type { PublicGenre } from 'shared';
 import styles from './SearchForm.module.css';
 
 interface SearchFormProps {
