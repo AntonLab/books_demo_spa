@@ -45,6 +45,10 @@ const sessionHash = hashKey(queryKeys.session);
 // - A different Account (Guest counts as one) invalidates every other query,
 //   from whichever path the change arrived: likes, Draft books and
 //   notifications are all answered for whoever asks.
+// - A 401 on any request while this tab shows an Account is a Lost session
+//   noticed mid-page: /auth/me is asked again rather than the session guessed
+//   to be `null`, since a sign-in in another tab may have overtaken the
+//   request. Other tabs are not told: each asks on focus anyway.
 export const watchSession = (
   client: QueryClient,
   channel: SessionChannel | null
@@ -71,6 +75,26 @@ export const watchSession = (
       });
     }
     accountId = next;
+  });
+
+  const onError = (error: unknown): void => {
+    if (
+      error instanceof ApiError &&
+      error.status === 401 &&
+      client.getQueryData<Session>(queryKeys.session)
+    ) {
+      void client.invalidateQueries({ queryKey: queryKeys.session });
+    }
+  };
+  client.getQueryCache().subscribe((event) => {
+    if (event.type === 'updated' && event.action.type === 'error') {
+      onError(event.action.error);
+    }
+  });
+  client.getMutationCache().subscribe((event) => {
+    if (event.type === 'updated' && event.action.type === 'error') {
+      onError(event.action.error);
+    }
   });
 };
 
