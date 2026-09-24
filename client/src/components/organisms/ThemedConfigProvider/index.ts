@@ -1,1 +1,0 @@
-export { ThemedConfigProvider } from './ThemedConfigProvider';

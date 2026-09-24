@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-export interface RequestOptions {
+interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;

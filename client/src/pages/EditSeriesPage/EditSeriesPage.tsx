@@ -9,10 +9,11 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router';
-import { CoAuthorManager } from '@/components/organisms/CoAuthorManager';
-import { SeriesForm } from '@/components/organisms/SeriesForm';
-import { SeriesOrderList } from '@/components/organisms/SeriesOrderList';
+import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
+import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
+import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { useSession } from '@/queries/auth';
+import { isCreditedTo, isModeratorRole } from '@/types/user';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
 import styles from './EditSeriesPage.module.css';
@@ -23,12 +24,10 @@ export const EditSeriesPage: FC = () => {
 
   const { data: session } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);
-  const isCoAuthor =
-    series?.authors.some((author) => author.id === session?.id) ?? false;
+  const isCoAuthor = isCreditedTo(series, session?.id);
   // A Moderator may edit and delete any series, and order its books, but never
   // change its byline — CoAuthorManager stays read-only for one.
-  const isModerator =
-    session?.role === 'admin' || session?.role === 'superadmin';
+  const isModerator = isModeratorRole(session?.role);
   const mayEdit = Boolean(session) && (isCoAuthor || isModerator);
 
   const genres = useGenres();

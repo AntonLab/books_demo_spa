@@ -2,14 +2,15 @@ import type { FC } from 'react';
 import { Alert, Button, Empty, Flex, Skeleton } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { BookCard } from '@/components/organisms/BookCard';
-import { CardList } from '@/components/organisms/CardList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import { CardList } from '@/components/organisms/CardList/CardList';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
-} from '@/components/organisms/ResultsLayoutSwitch';
-import { SeriesCard } from '@/components/organisms/SeriesCard';
+} from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
+import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { useSession } from '@/queries/auth';
+import { isCreditedTo, isModeratorRole } from '@/types/user';
 import { useBooksInSeries } from '@/queries/books';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
@@ -44,11 +45,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
   const mayEdit =
-    session !== null &&
-    session !== undefined &&
-    (series.data.authors.some((author) => author.id === session.id) ||
-      session.role === 'admin' ||
-      session.role === 'superadmin');
+    isCreditedTo(series.data, session?.id) || isModeratorRole(session?.role);
 
   return (
     <>

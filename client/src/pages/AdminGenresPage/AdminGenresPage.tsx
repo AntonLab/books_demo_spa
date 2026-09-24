@@ -15,6 +15,7 @@ import {
 } from 'antd';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
+import { isModeratorRole } from '@/types/user';
 import {
   useCreateGenre,
   useDeleteGenre,
@@ -40,8 +41,7 @@ interface AddValues {
 // and, because the manager below is a separate component, no request at all.
 export const AdminGenresPage: FC = () => {
   const { data: session } = useSession();
-  const isModerator =
-    session?.role === 'admin' || session?.role === 'superadmin';
+  const isModerator = isModeratorRole(session?.role);
 
   if (!isModerator) {
     return (

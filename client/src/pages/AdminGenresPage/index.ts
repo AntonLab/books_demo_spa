@@ -1,1 +1,0 @@
-export { AdminGenresPage } from './AdminGenresPage';

@@ -8,9 +8,9 @@ import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
-import { AppHeader } from '@/components/organisms/AppHeader';
-import { ErrorBoundary } from '@/components/organisms/ErrorBoundary';
-import { ThemedConfigProvider } from '@/components/organisms/ThemedConfigProvider';
+import { AppHeader } from '@/components/organisms/AppHeader/AppHeader';
+import { ErrorBoundary } from '@/components/organisms/ErrorBoundary/ErrorBoundary';
+import { ThemedConfigProvider } from '@/components/organisms/ThemedConfigProvider/ThemedConfigProvider';
 import styles from './App.module.css';
 
 // Pages are the only code-split modules: AppHeader and the auth modals it holds
@@ -18,53 +18,75 @@ import styles from './App.module.css';
 // named export, so `lazy` has to remap it onto `default` — see
 // .claude/rules/client/pages.md.
 const AdminGenresPage = lazy(() =>
-  import('@/pages/AdminGenresPage').then((m) => ({
+  import('@/pages/AdminGenresPage/AdminGenresPage').then((m) => ({
     default: m.AdminGenresPage,
   }))
 );
 const BookPage = lazy(() =>
-  import('@/pages/BookPage').then((m) => ({ default: m.BookPage }))
+  import('@/pages/BookPage/BookPage').then((m) => ({ default: m.BookPage }))
 );
 const ChapterPage = lazy(() =>
-  import('@/pages/ChapterPage').then((m) => ({ default: m.ChapterPage }))
+  import('@/pages/ChapterPage/ChapterPage').then((m) => ({
+    default: m.ChapterPage,
+  }))
 );
 const EditChapterPage = lazy(() =>
-  import('@/pages/EditChapterPage').then((m) => ({
+  import('@/pages/EditChapterPage/EditChapterPage').then((m) => ({
     default: m.EditChapterPage,
   }))
 );
 const EditSeriesPage = lazy(() =>
-  import('@/pages/EditSeriesPage').then((m) => ({ default: m.EditSeriesPage }))
+  import('@/pages/EditSeriesPage/EditSeriesPage').then((m) => ({
+    default: m.EditSeriesPage,
+  }))
 );
 const EditBookPage = lazy(() =>
-  import('@/pages/EditBookPage').then((m) => ({ default: m.EditBookPage }))
+  import('@/pages/EditBookPage/EditBookPage').then((m) => ({
+    default: m.EditBookPage,
+  }))
 );
 const MainPage = lazy(() =>
-  import('@/pages/MainPage').then((m) => ({ default: m.MainPage }))
+  import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
 );
 const MyBooksPage = lazy(() =>
-  import('@/pages/MyBooksPage').then((m) => ({ default: m.MyBooksPage }))
+  import('@/pages/MyBooksPage/MyBooksPage').then((m) => ({
+    default: m.MyBooksPage,
+  }))
 );
 const NewBookPage = lazy(() =>
-  import('@/pages/NewBookPage').then((m) => ({ default: m.NewBookPage }))
+  import('@/pages/NewBookPage/NewBookPage').then((m) => ({
+    default: m.NewBookPage,
+  }))
 );
 const NewChapterPage = lazy(() =>
-  import('@/pages/NewChapterPage').then((m) => ({ default: m.NewChapterPage }))
+  import('@/pages/NewChapterPage/NewChapterPage').then((m) => ({
+    default: m.NewChapterPage,
+  }))
 );
 const NewSeriesPage = lazy(() =>
-  import('@/pages/NewSeriesPage').then((m) => ({ default: m.NewSeriesPage }))
+  import('@/pages/NewSeriesPage/NewSeriesPage').then((m) => ({
+    default: m.NewSeriesPage,
+  }))
 );
 const NotFoundPage = lazy(() =>
-  import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
+  import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({
+    default: m.NotFoundPage,
+  }))
 );
 const ProfilePage = lazy(() =>
-  import('@/pages/ProfilePage').then((m) => ({ default: m.ProfilePage }))
+  import('@/pages/ProfilePage/ProfilePage').then((m) => ({
+    default: m.ProfilePage,
+  }))
 );
 const SearchPage = lazy(() =>
-  import('@/pages/SearchPage').then((m) => ({ default: m.SearchPage }))
+  import('@/pages/SearchPage/SearchPage').then((m) => ({
+    default: m.SearchPage,
+  }))
 );
 const SeriesPage = lazy(() =>
-  import('@/pages/SeriesPage').then((m) => ({ default: m.SeriesPage }))
+  import('@/pages/SeriesPage/SeriesPage').then((m) => ({
+    default: m.SeriesPage,
+  }))
 );
 
 // Exported separately from `App` because `App` mounts BrowserRouter, which a

@@ -16,7 +16,7 @@ export interface ExpiryPurgeDeps {
   now?: () => number;
 }
 
-export interface ExpiryPurge {
+interface ExpiryPurge {
   stop(): void;
 }
 

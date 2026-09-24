@@ -2,7 +2,7 @@ import type { Server } from 'node:http';
 import type { Express } from 'express';
 import type { Logger } from './logger.ts';
 
-export interface ListenDeps {
+interface ListenDeps {
   logger: Logger;
   // Runs once when the port cannot be bound, after the failure is logged.
   onError: (error: Error) => void;

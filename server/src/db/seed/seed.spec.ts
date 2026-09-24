@@ -4,6 +4,7 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 import {
   QueryTypes,
   type Model,
@@ -74,8 +75,15 @@ function runSeed(
       stderr.push(chunk);
     });
     child.on('error', reject);
+    // Stripped of colour codes: under a terminal, node:test hands its children
+    // FORCE_COLOR, the seed inherits it, and console.info colours the counts
+    // it prints (`users: \x1b[33m1\x1b[39m`), which no pattern below matches.
     child.on('close', (code) => {
-      resolve({ code, stdout: stdout.join(''), stderr: stderr.join('') });
+      resolve({
+        code,
+        stdout: stripVTControlCharacters(stdout.join('')),
+        stderr: stripVTControlCharacters(stderr.join('')),
+      });
     });
   });
 }

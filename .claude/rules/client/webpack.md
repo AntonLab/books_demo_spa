@@ -10,9 +10,9 @@ paths:
 - The configs resolve every path against the package root (`context: root`),
   so they behave the same wherever webpack runs from. They are CommonJS;
   `eslint.config.mjs` gives them Node globals and allows `require`.
-- `webpack.common.js` exports `(isDevelopment) => Configuration` and holds
-  every loader rule. `dev`/`prod` spread it and extend by hand; there is no
-  merge helper, because `plugins` and `output` are the only keys both add to.
+- One `webpack.config.js` exports `(env, argv) => Configuration`; the `dev`
+  and `build` scripts pass `--mode`, and every difference between the two
+  builds branches on `argv.mode`. A run without `--mode` builds production.
 - **`swc-loader` strips types without checking them.**
   `fork-ts-checker-webpack-plugin` type-checks in parallel; errors fail the
   build and show in the dev overlay.
@@ -24,7 +24,9 @@ paths:
 - Dev: `historyApiFallback`, `static: false` (assets are imported from `src/`),
   `/api` proxied to `http://localhost:4000` so the browser sees one origin.
 - Prod: `[contenthash]` names, `runtimeChunk: 'single'` and a `vendors` cache
-  group so vendor hashes survive app-only changes.
+  group so vendor hashes survive app-only changes. The group takes
+  `chunks: 'initial'`: with `'all'` it also swallows the libraries only lazy
+  pages import, and the first load grows by about half.
 - `tsconfig.json` enables `allowImportingTsExtensions` for `shared`, whose
   relative imports end in `.ts` because Node loads it too; this package's own
   imports stay extensionless.

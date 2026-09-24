@@ -1,13 +1,13 @@
 import { useEffect, useMemo, type FC } from 'react';
 import { Alert, Empty, Flex, Pagination, Skeleton, Typography } from 'antd';
 import { useSearchParams } from 'react-router';
-import { BookCard } from '@/components/organisms/BookCard';
-import { CardList } from '@/components/organisms/CardList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import { CardList } from '@/components/organisms/CardList/CardList';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
-} from '@/components/organisms/ResultsLayoutSwitch';
-import { SearchForm } from '@/components/organisms/SearchForm';
+} from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
+import { SearchForm } from '@/components/organisms/SearchForm/SearchForm';
 import { useBookSearch } from '@/queries/books';
 import { useGenresWithBooks } from '@/queries/genres';
 import { useAppSelector } from '@/store/hooks';

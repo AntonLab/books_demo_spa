@@ -1,1 +1,0 @@
-export { BookPage } from './BookPage';

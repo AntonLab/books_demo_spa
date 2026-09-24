@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { Alert, Typography } from 'antd';
 import { useNavigate } from 'react-router';
-import { SeriesForm } from '@/components/organisms/SeriesForm';
+import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import { useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { useCreateSeries } from '@/queries/series';

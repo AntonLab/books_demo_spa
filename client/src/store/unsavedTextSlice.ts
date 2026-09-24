@@ -34,7 +34,7 @@ export interface UnsavedTextState {
 
 type SavedText = Pick<UnsavedTextEntry, 'text' | 'title'>;
 
-export type UnsavedTextInput = Omit<UnsavedTextEntry, 'savedAt'> & {
+type UnsavedTextInput = Omit<UnsavedTextEntry, 'savedAt'> & {
   key: string;
   // What its place holds now: an edit's saved Comment or Chapter, nothing for
   // a new one. Text equal to it is no Unsaved text, so the entry goes.

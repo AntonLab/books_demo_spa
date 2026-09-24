@@ -1,5 +1,9 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Input, Radio, Select } from 'antd';
+import { Alert, Button, Form, Radio, Select } from 'antd';
+import {
+  NO_GENRE,
+  WorkFields,
+} from '@/components/molecules/WorkFields/WorkFields';
 import {
   BOOK_STATUS_LABELS,
   BOOK_STATUSES,
@@ -33,11 +37,8 @@ interface BookFormProps {
   error?: string | null;
 }
 
-// A select cannot hold `null` as an option value and stay clearable, so "No
-// series" travels as 0 inside the form and becomes null on the way out. "No
-// genre" works the same way.
+// "No series" travels as 0 inside the form, like WorkFields' "No genre".
 const NO_SERIES = 0;
-const NO_GENRE = 0;
 
 interface FieldValues extends Omit<BookFormValues, 'seriesId' | 'genreId'> {
   seriesId: number;
@@ -88,59 +89,20 @@ export const BookForm: FC<BookFormProps> = ({
         }}
         onFinish={handleFinish}
       >
-        <Form.Item
-          name="title"
-          label="Title"
-          rules={[
-            { required: true, whitespace: true, message: 'Enter a title' },
-          ]}
-        >
-          <Input maxLength={255} />
-        </Form.Item>
-
-        <Form.Item
-          name="description"
-          label="Description"
-          rules={[
-            {
-              required: true,
-              whitespace: true,
-              message: 'Enter a description',
-            },
-          ]}
-        >
-          <Input.TextArea rows={4} maxLength={5000} />
-        </Form.Item>
-
-        <Form.Item name="tags" label="Tags">
-          <Select mode="tags" aria-label="Tags" tokenSeparators={[',']} />
-        </Form.Item>
-
-        <Form.Item name="seriesId" label="Series">
-          <Select
-            aria-label="Series"
-            options={[
-              { value: NO_SERIES, label: 'No series' },
-              ...seriesOptions.map((series) => ({
-                value: series.id,
-                label: series.title,
-              })),
-            ]}
-          />
-        </Form.Item>
-
-        <Form.Item name="genreId" label="Genre">
-          <Select
-            aria-label="Genre"
-            options={[
-              { value: NO_GENRE, label: 'No genre' },
-              ...genreOptions.map((genre) => ({
-                value: genre.id,
-                label: genre.name,
-              })),
-            ]}
-          />
-        </Form.Item>
+        <WorkFields genreOptions={genreOptions}>
+          <Form.Item name="seriesId" label="Series">
+            <Select
+              aria-label="Series"
+              options={[
+                { value: NO_SERIES, label: 'No series' },
+                ...seriesOptions.map((series) => ({
+                  value: series.id,
+                  label: series.title,
+                })),
+              ]}
+            />
+          </Form.Item>
+        </WorkFields>
 
         {showStatus && (
           <Form.Item name="status" label="Status">

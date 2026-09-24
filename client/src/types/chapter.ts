@@ -11,7 +11,7 @@ export type PublicChapter = Wire<Shared.PublicChapter>;
 // chapters cannot drag a MEDIUMTEXT column per row across the wire.
 export type ChapterSummary = Wire<Shared.ChapterSummary>;
 
-export type ChapterState = 'draft' | 'scheduled' | 'published';
+type ChapterState = 'draft' | 'scheduled' | 'published';
 
 // A chapter's state at a given moment. Nothing on the server flips a flag when
 // a scheduled time passes — every read compares it with the clock — so the

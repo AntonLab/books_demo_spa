@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import { Alert, Skeleton, Typography } from 'antd';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ChapterForm } from '@/components/organisms/ChapterForm';
-import type { ChapterFormValues } from '@/components/organisms/ChapterForm';
-import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice';
+import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
+import type { ChapterFormValues } from '@/components/organisms/ChapterForm/ChapterForm';
+import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useCreateChapter } from '@/queries/chapters';
@@ -15,6 +15,7 @@ import {
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
+import { isCreditedTo } from '@/types/user';
 import styles from './NewChapterPage.module.css';
 
 export const NewChapterPage: FC = () => {
@@ -48,7 +49,7 @@ export const NewChapterPage: FC = () => {
 
   // Only a Co-author adds chapters: a Moderator may edit and delete them, but
   // the matrix gives no role but author a create on chapters.
-  if (!book.authors.some((author) => author.id === session?.id)) {
+  if (!isCreditedTo(book, session?.id)) {
     return (
       <>
         <Alert

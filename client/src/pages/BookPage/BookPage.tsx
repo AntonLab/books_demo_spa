@@ -11,12 +11,12 @@ import {
 } from 'antd';
 import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar';
-import { BookCover } from '@/components/molecules/BookCover';
-import { LikeButton } from '@/components/molecules/LikeButton';
-import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices';
-import { ChapterList } from '@/components/organisms/ChapterList';
-import { CommentSection } from '@/components/organisms/CommentSection';
+import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
+import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
+import { CommentSection } from '@/components/organisms/CommentSection/CommentSection';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
@@ -24,6 +24,7 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
+import { isCreditedTo } from '@/types/user';
 import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
@@ -58,10 +59,7 @@ export const BookPage: FC = () => {
   // likes a book they co-author. The server answers 403 either way — this only
   // avoids offering what would fail.
   const isDraft = book.status === 'draft';
-  const isCoAuthor =
-    session !== null &&
-    session !== undefined &&
-    book.authors.some((author) => author.id === session.id);
+  const isCoAuthor = isCreditedTo(book, session?.id);
   const canLike =
     !isDraft && session !== null && session !== undefined && !isCoAuthor;
 

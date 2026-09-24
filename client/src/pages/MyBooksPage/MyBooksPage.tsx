@@ -11,8 +11,8 @@ import {
   Typography,
 } from 'antd';
 import { Link, useNavigate } from 'react-router';
-import { BookCard } from '@/components/organisms/BookCard';
-import { CardList } from '@/components/organisms/CardList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import { CardList } from '@/components/organisms/CardList/CardList';
 import { useSession } from '@/queries/auth';
 import { useMyBooks } from '@/queries/books';
 import { useMySeries } from '@/queries/series';

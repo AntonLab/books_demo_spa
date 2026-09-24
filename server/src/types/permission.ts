@@ -6,6 +6,7 @@ import { USER_ROLES } from 'shared';
 // The roles an account can hold, and the two registration may set, are the
 // client's business too, so they come from the shared workspace (ADR-0006).
 export {
+  isModeratorRole,
   REGISTRABLE_ROLES,
   USER_ROLES,
   type RegistrableRole,

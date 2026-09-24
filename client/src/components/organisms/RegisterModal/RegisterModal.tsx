@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Alert, Button, Checkbox, Form, Input, Modal } from 'antd';
 import { useRegister } from '@/queries/auth';
 import { ApiError } from '@/api/client';
-import type { AuthModalProps } from '@/components/organisms/AuthModals';
+import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
+import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
 import styles from './RegisterModal.module.css';
 
 interface RegisterValues {
@@ -122,41 +123,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           <Input autoComplete="family-name" />
         </Form.Item>
 
-        <Form.Item
-          name="password"
-          label="Password"
-          rules={[
-            { required: true, message: 'Enter a password' },
-            {
-              min: 8,
-              max: 128,
-              message: 'Password must be 8 to 128 characters',
-            },
-          ]}
-        >
-          <Input.Password autoComplete="new-password" />
-        </Form.Item>
-
-        <Form.Item
-          name="confirm"
-          label="Confirm password"
-          dependencies={['password']}
-          rules={[
-            { required: true, message: 'Repeat the password' },
-            ({ getFieldValue }) => ({
-              validator: (_rule, value: string) => {
-                if (!value || getFieldValue('password') === value) {
-                  return Promise.resolve();
-                }
-                return Promise.reject(
-                  new Error('The two passwords do not match')
-                );
-              },
-            }),
-          ]}
-        >
-          <Input.Password autoComplete="new-password" />
-        </Form.Item>
+        <NewPasswordFields label="Password" />
 
         <Form.Item name="isAuthor" valuePropName="checked">
           <Checkbox>I&apos;m author</Checkbox>

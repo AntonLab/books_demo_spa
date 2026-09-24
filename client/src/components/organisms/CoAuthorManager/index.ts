@@ -1,1 +1,0 @@
-export { CoAuthorManager } from './CoAuthorManager';
