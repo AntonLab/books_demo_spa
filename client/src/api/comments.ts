@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { ListResponse } from '../types/api';
+import type { ListResponse } from 'shared';
 import type { CommentWithAuthor, PublicComment } from '../types/comment';
 
 const COMMENTS_PAGE_SIZE = 100;

@@ -465,27 +465,17 @@ test('a refusal leaves no count behind on either budget, including the one that 
       (response) => response.status
     );
     assert.deepEqual(inFlightStatuses, Array<number>(50).fill(400));
-    // Every 'finish' handler has settled its request once neither budget
-    // holds a window any longer.
+    // None of the 50 in-flight requests was a 401, so settling them as 400
+    // must free both budgets completely — back to no window at all, not
+    // merely back down to 50. A residual left behind by the 5 refusals would
+    // keep a window open and this would time out. The per-name budget
+    // refused none of them: each refused name gave its claim back with the
+    // refusal, and each held name with its 400.
     await waitUntil(
       () =>
         limits.loginByIp.size() === 0 && limits.loginByIpAndLogin.size() === 0,
       'both budgets to hold no window once every held request has settled'
     );
-
-    // None of the 50 in-flight requests was a 401, so settling them as 400
-    // must free the per-IP budget completely — back to no window at all,
-    // not merely back down to 50. A residual left behind by the 5 refusals
-    // would show up here as a window that is still open (a non-zero
-    // retryAfterMs) rather than fully forgotten.
-    assert.deepEqual(limits.loginByIp.peek(CLIENT), {
-      allowed: true,
-      retryAfterMs: 0,
-    });
-    // The per-name budget, which refused none of them, keeps nothing either:
-    // each of the 5 refused names gave its claim back with the refusal, and
-    // each of the 50 held names with its 400, so not one window is left.
-    assert.equal(limits.loginByIpAndLogin.size(), 0);
   } finally {
     limits.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));

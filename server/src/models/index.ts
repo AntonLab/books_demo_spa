@@ -11,30 +11,12 @@ import {
   initPasswordResetTokenModel,
   PasswordResetToken,
 } from './PasswordResetToken.ts';
-import { initPermissionModel, Permission } from './Permission.ts';
+import { initPermissionModel } from './Permission.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
 import { initUserAvatarModel, UserAvatar } from './UserAvatar.ts';
-
-export interface Models {
-  User: typeof User;
-  UserAvatar: typeof UserAvatar;
-  Series: typeof Series;
-  SeriesAuthor: typeof SeriesAuthor;
-  Book: typeof Book;
-  BookCover: typeof BookCover;
-  BookAuthor: typeof BookAuthor;
-  Chapter: typeof Chapter;
-  Genre: typeof Genre;
-  Comment: typeof Comment;
-  Like: typeof Like;
-  Notification: typeof Notification;
-  Session: typeof Session;
-  PasswordResetToken: typeof PasswordResetToken;
-  Permission: typeof Permission;
-}
 
 // Phase one: every model registered on the connection. initModels calls this
 // before declareAssociations, so the ordering the two phases depend on is
@@ -317,25 +299,7 @@ function declareAssociations(): void {
   Notification.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
 }
 
-export function initModels(sequelize: Sequelize): Models {
+export function initModels(sequelize: Sequelize): void {
   initEachModel(sequelize);
   declareAssociations();
-
-  return {
-    User,
-    UserAvatar,
-    Series,
-    SeriesAuthor,
-    Book,
-    BookCover,
-    BookAuthor,
-    Chapter,
-    Genre,
-    Comment,
-    Like,
-    Notification,
-    Session,
-    PasswordResetToken,
-    Permission,
-  };
 }

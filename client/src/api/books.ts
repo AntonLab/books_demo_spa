@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { PagedResponse } from '../types/api';
+import type { PagedResponse } from 'shared';
 import type {
   BookDetail,
   BookSort,

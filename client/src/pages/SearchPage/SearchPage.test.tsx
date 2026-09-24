@@ -11,7 +11,7 @@ import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
-import type { PagedResponse } from '@/types/api';
+import type { PagedResponse } from 'shared';
 import type { RootState } from '@/store';
 
 jest.mock('@/api/books');
