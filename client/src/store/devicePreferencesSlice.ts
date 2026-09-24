@@ -7,24 +7,34 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
 
+export const RESULTS_LAYOUTS = ['grid', 'list'] as const;
+export type ResultsLayout = (typeof RESULTS_LAYOUTS)[number];
+
 export interface DevicePreferencesState {
   theme: Theme;
+  resultsLayout: ResultsLayout;
 }
 
-const initialState: DevicePreferencesState = { theme: 'light' };
+export const initialDevicePreferences: DevicePreferencesState = {
+  theme: 'light',
+  resultsLayout: 'grid',
+};
 
 const slice = createSlice({
   name: 'devicePreferences',
-  initialState,
+  initialState: initialDevicePreferences,
   reducers: {
     themeToggled(state) {
       state.theme = state.theme === 'light' ? 'dark' : 'light';
+    },
+    resultsLayoutChanged(state, action: PayloadAction<ResultsLayout>) {
+      state.resultsLayout = action.payload;
     },
     // Another tab's write, relayed by the `storage` event: that tab's value
     // wins here too. `null` means that tab cleared the key (a corrupt value
     // is filtered out before this dispatches, so it never arrives here).
     replaced(_state, action: PayloadAction<DevicePreferencesState | null>) {
-      return action.payload ?? initialState;
+      return action.payload ?? initialDevicePreferences;
     },
   },
 });

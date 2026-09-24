@@ -1,0 +1,9 @@
+.bar {
+  margin-bottom: var(--ant-margin);
+}
+
+/* The bar spaces the heading from the results, so the heading's own margins
+   would only push the switch off its line. */
+.heading {
+  margin: 0;
+}

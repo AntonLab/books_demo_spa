@@ -4,6 +4,21 @@
   margin-bottom: var(--ant-margin);
 }
 
+/* Fills its grid cell, so the tiles of one row share a height. */
+.tile {
+  height: 100%;
+}
+
+/* Space is inline, so in a narrow tile a short byline would share its line
+   with the footer's status. */
+.tile .line {
+  display: flex;
+}
+
+.media {
+  display: block;
+}
+
 .row {
   width: 100%;
 }

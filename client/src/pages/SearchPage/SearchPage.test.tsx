@@ -64,7 +64,9 @@ describe('SearchPage', () => {
 
     renderWithProviders(<SearchPage />, { route: '/search?q=dragon' });
 
-    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
       limit: 20,
@@ -162,7 +164,7 @@ describe('SearchPage', () => {
     const elfBook: PublicBook = {
       ...book,
       id: 2,
-      description: 'An elf journey',
+      title: 'An Elf Journey',
     };
     mockedBooks.listBooks
       .mockResolvedValueOnce({ items: [book], total: 1, limit: 20, offset: 0 })
@@ -191,12 +193,18 @@ describe('SearchPage', () => {
 
     renderWithProviders(<Harness />, { route: '/search?q=dragon' });
 
-    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'go to elf' }));
 
-    expect(await screen.findByText('An elf journey')).toBeInTheDocument();
-    expect(screen.queryByText('A tale of dragons')).toBeNull();
+    expect(
+      await screen.findByRole('link', { name: 'An Elf Journey' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeNull();
     expect(mockedBooks.listBooks).toHaveBeenCalledTimes(2);
     expect(mockedBooks.listBooks).toHaveBeenNthCalledWith(1, {
       q: 'dragon',
@@ -206,6 +214,76 @@ describe('SearchPage', () => {
       q: 'elf',
       limit: 20,
     });
+  });
+});
+
+describe('SearchPage results layout', () => {
+  const oneBook = {
+    items: [book],
+    total: 1,
+    limit: 20,
+    offset: 0,
+  };
+
+  it('shows tiles by default and switches to a list the device keeps', async () => {
+    mockedBooks.listBooks.mockResolvedValue(oneBook);
+
+    const { store } = renderWithProviders(<SearchPage />, {
+      route: '/search?q=dragon',
+    });
+
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+    // A tile leaves the description out; the list's card shows it.
+    expect(screen.queryByText('A tale of dragons')).toBeNull();
+    expect(screen.getByRole('radio', { name: 'Grid' })).toBeChecked();
+
+    await userEvent.click(screen.getByRole('radio', { name: 'List' }));
+
+    expect(screen.getByText('A tale of dragons')).toBeInTheDocument();
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+  });
+
+  it('starts from the layout this device chose', async () => {
+    mockedBooks.listBooks.mockResolvedValue(oneBook);
+
+    renderWithProviders(<SearchPage />, {
+      route: '/search?q=dragon',
+      preloadedState: {
+        devicePreferences: { theme: 'light', resultsLayout: 'list' },
+      },
+    });
+
+    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'List' })).toBeChecked();
+  });
+
+  it('offers no switch before there is anything to search for', () => {
+    renderWithProviders(<SearchPage />, { route: '/search' });
+
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Results layout' })
+    ).toBeNull();
+  });
+
+  it('offers the switch while a series’ books are still loading', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      id: 12,
+      authors: book.authors,
+      title: 'The Ashgrove Chronicles',
+      description: 'Letters found in a manor that should have stayed shut.',
+      tags: [],
+      genre: null,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    });
+    mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
+
+    renderWithProviders(<SearchPage />, { route: '/search?series=12' });
+
+    await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+    expect(
+      screen.getByRole('radiogroup', { name: 'Results layout' })
+    ).toBeInTheDocument();
   });
 });
 
@@ -238,7 +316,9 @@ describe('SearchPage for one series', () => {
     expect(
       screen.getByText('Letters found in a manor that should have stayed shut.')
     ).toBeInTheDocument();
-    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
     expect(mockedSeries.getSeries).toHaveBeenCalledWith(12);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       seriesId: 12,
@@ -350,7 +430,9 @@ describe('SearchPage for one genre', () => {
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Gothic' })
     ).toBeInTheDocument();
-    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       genreId: 4,
       limit: 20,
@@ -384,6 +466,10 @@ describe('SearchPage for one genre', () => {
     expect(
       screen.getByRole('heading', { level: 3, name: 'Series' })
     ).toBeInTheDocument();
+    // One switch lays out the books and the series alike.
+    expect(
+      screen.getAllByRole('radiogroup', { name: 'Results layout' })
+    ).toHaveLength(1);
   });
 
   it('leaves the Series block out when the genre holds none', async () => {
@@ -403,7 +489,7 @@ describe('SearchPage for one genre', () => {
 
     renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
 
-    await screen.findByText('A tale of dragons');
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
     // The block shows while the series load, so wait for it to go.
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: 'Series' })).toBeNull()
@@ -423,7 +509,9 @@ describe('SearchPage for one genre', () => {
     renderWithProviders(<SearchPage />, { route: '/search?genre=4' });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Network down');
-    expect(await screen.findByText('A tale of dragons')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
   });
 
   it('says so when the genre holds no books yet', async () => {

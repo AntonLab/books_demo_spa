@@ -118,6 +118,17 @@ describe('SeriesCard', () => {
     );
   });
 
+  it('as a tile, keeps the description but leaves out genre and tags', () => {
+    renderWithProviders(<SeriesCard series={series} linked tile />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
+    ).toHaveAttribute('href', '/search?series=12');
+    expect(screen.getByText(series.description)).toBeInTheDocument();
+    expect(screen.queryByText('Gothic')).toBeNull();
+    expect(screen.queryByText('gothic')).toBeNull();
+  });
+
   it('shows no genre link when the series has none', () => {
     renderWithProviders(<SeriesCard series={{ ...series, genre: null }} />);
 

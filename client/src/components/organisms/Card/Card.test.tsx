@@ -48,4 +48,41 @@ describe('Card', () => {
     expect(screen.getByText('Cover')).toBeInTheDocument();
     expect(screen.getByText('Draft')).toBeInTheDocument();
   });
+
+  it('as a tile, also links its media, out of reach of keyboard and screen reader', () => {
+    renderWithProviders(
+      <Card {...props} href="/books/1" tile media={<span>Cover</span>} />
+    );
+
+    // The title is the one link assistive technology meets.
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    const mediaLink = screen.getByText('Cover').closest('a');
+    expect(mediaLink).toHaveAttribute('href', '/books/1');
+    expect(mediaLink).toHaveAttribute('aria-hidden', 'true');
+    expect(mediaLink).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('as a tile, leaves out the genre and the tags', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        href="/books/1"
+        tile
+        genre={{ id: 4, name: 'Gothic' }}
+        tags={['epic']}
+      />
+    );
+
+    expect(screen.queryByText('Gothic')).toBeNull();
+    expect(screen.queryByText('epic')).toBeNull();
+    expect(screen.getByText(props.description)).toBeInTheDocument();
+  });
+
+  it('leaves out the description when it is given none', () => {
+    renderWithProviders(
+      <Card {...props} description={undefined} href="/books/1" tile />
+    );
+
+    expect(screen.queryByText(props.description)).toBeNull();
+  });
 });
