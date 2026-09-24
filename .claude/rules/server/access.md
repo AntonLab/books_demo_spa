@@ -36,8 +36,9 @@ half. Nothing here lives in the permission table.
 
 ## Co-authors (ADR-0005)
 
-Every rule holds for books and for series, each in its own controller and
-repository.
+Every rule holds for books and for series. Each has its own controller; the
+repository rules are written once in `repositories/coAuthors.ts`, which each
+repository hands an adapter over its own credit table.
 
 - **Adding** rides on `× update` and then requires the caller to be credited,
   which a Moderator never is: Moderators edit or delete any work but never
