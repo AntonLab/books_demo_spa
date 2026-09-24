@@ -100,3 +100,70 @@ test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 o
     assert.equal(listBooksQuerySchema.safeParse(bad).success, false);
   }
 });
+
+test('listBooksQuerySchema trims text filters and refuses a blank or over-long one', () => {
+  const parsed = listBooksQuerySchema.parse({
+    q: '  dragon ',
+    author: ' ann ',
+    seriesTitle: ' ash ',
+  });
+  assert.deepEqual(
+    [parsed.q, parsed.author, parsed.seriesTitle],
+    ['dragon', 'ann', 'ash']
+  );
+  for (const key of ['q', 'author', 'seriesTitle']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ [key]: '   ' }).success,
+      false
+    );
+    assert.equal(
+      listBooksQuerySchema.safeParse({ [key]: 'a'.repeat(201) }).success,
+      false
+    );
+  }
+});
+
+test('listBooksQuerySchema takes in_progress or complete, never draft', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ status: 'complete' }).status,
+    'complete'
+  );
+  assert.equal(
+    listBooksQuerySchema.safeParse({ status: 'draft' }).success,
+    false
+  );
+});
+
+test('listBooksQuerySchema reads each date bound as an instant and refuses a start after its end', () => {
+  const parsed = listBooksQuerySchema.parse({
+    releasedFrom: '2026-01-01T00:00:00.000Z',
+    releasedTo: '2026-01-31T23:59:59.999Z',
+    updatedTo: '2026-02-01T00:00:00+03:00',
+  });
+  assert.deepEqual(parsed.releasedFrom, new Date('2026-01-01T00:00:00.000Z'));
+  assert.deepEqual(parsed.updatedTo, new Date('2026-01-31T21:00:00.000Z'));
+  assert.equal(
+    listBooksQuerySchema.safeParse({ releasedFrom: '2026-01-01' }).success,
+    false
+  );
+
+  for (const [from, to] of [
+    ['releasedFrom', 'releasedTo'],
+    ['updatedFrom', 'updatedTo'],
+  ] as const) {
+    const result = listBooksQuerySchema.safeParse({
+      [from]: '2026-02-01T00:00:00.000Z',
+      [to]: '2026-01-01T00:00:00.000Z',
+    });
+    assert.equal(result.success, false);
+    assert.deepEqual(result.error?.issues[0]?.path, [from]);
+    // Either bound alone is an open range, and equal bounds are one instant.
+    assert.equal(
+      listBooksQuerySchema.safeParse({
+        [from]: '2026-01-01T00:00:00.000Z',
+        [to]: '2026-01-01T00:00:00.000Z',
+      }).success,
+      true
+    );
+  }
+});

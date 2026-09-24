@@ -681,30 +681,30 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.match(matches.items[0]?.description ?? '', /100% real/);
   });
 
+  const DAY = 24 * 60 * 60 * 1000;
+  const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
+
+  const publishedBook = (title: string) =>
+    createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title,
+      description: title,
+      tags: [],
+    });
+
+  const addChapters = (bookId: number, publishedAt: (Date | null)[]) =>
+    Chapter.bulkCreate(
+      publishedAt.map((at, index) => ({
+        bookId,
+        title: `Chapter ${index + 1}`,
+        text: 'text',
+        publishedAt: at,
+        position: index + 1,
+      }))
+    );
+
   describe('sorted lists', () => {
-    const DAY = 24 * 60 * 60 * 1000;
-    const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
-
-    const publishedBook = (title: string) =>
-      createPublished({
-        userId: ownerId,
-        seriesId: null,
-        title,
-        description: title,
-        tags: [],
-      });
-
-    const addChapters = (bookId: number, publishedAt: (Date | null)[]) =>
-      Chapter.bulkCreate(
-        publishedAt.map((at, index) => ({
-          bookId,
-          title: `Chapter ${index + 1}`,
-          text: 'text',
-          publishedAt: at,
-          position: index + 1,
-        }))
-      );
-
     const reactTo = async (bookId: number, isLikes: boolean[]) => {
       for (const [index, isLike] of isLikes.entries()) {
         const reader = await User.create({
@@ -766,6 +766,119 @@ describe('bookRepository against real MySQL', { skip }, () => {
         titles: ['Older', 'Newer'],
         total: 2,
       });
+    });
+  });
+
+  describe('search filters', () => {
+    const titles = async (
+      query: Omit<Parameters<typeof repository.list>[0], 'current' | 'pageSize'>
+    ) =>
+      (await listAsGuest({ current: 1, pageSize: 20, ...query })).items
+        .map((book) => book.title)
+        .sort();
+
+    test('status keeps only the books in that status', async () => {
+      const done = await publishedBook('Done');
+      await repository.update(done.id, { status: 'complete' });
+      await publishedBook('Ongoing');
+
+      assert.deepEqual(await titles({ status: 'complete' }), ['Done']);
+      assert.deepEqual(await titles({ status: 'in_progress' }), ['Ongoing']);
+    });
+
+    test('the release range compares the earliest published chapter, bounds inclusive, and drops a book with none', async () => {
+      const early = await publishedBook('Early');
+      const late = await publishedBook('Late');
+      const scheduled = await publishedBook('Scheduled only');
+      await publishedBook('Nothing out');
+      const earlyAt = daysFromNow(-10);
+      const lateAt = daysFromNow(-2);
+      await addChapters(early.id, [earlyAt, daysFromNow(-1)]);
+      await addChapters(late.id, [lateAt]);
+      await addChapters(scheduled.id, [daysFromNow(1)]);
+
+      assert.deepEqual(
+        await titles({ releasedFrom: earlyAt, releasedTo: earlyAt }),
+        ['Early']
+      );
+      assert.deepEqual(await titles({ releasedFrom: daysFromNow(-5) }), [
+        'Late',
+      ]);
+      assert.deepEqual(await titles({ releasedTo: daysFromNow(-5) }), [
+        'Early',
+      ]);
+    });
+
+    test('the update range compares the latest published chapter, a scheduled one aside', async () => {
+      const recent = await publishedBook('Recent');
+      const stale = await publishedBook('Stale');
+      await publishedBook('Nothing out');
+      const recentAt = daysFromNow(-1);
+      await addChapters(recent.id, [daysFromNow(-20), recentAt]);
+      await addChapters(stale.id, [daysFromNow(-20), daysFromNow(2)]);
+
+      assert.deepEqual(await titles({ updatedFrom: recentAt }), ['Recent']);
+      assert.deepEqual(await titles({ updatedTo: daysFromNow(-10) }), [
+        'Stale',
+      ]);
+    });
+
+    test('author matches any co-author by login, first or last name, ignoring case', async () => {
+      const coAuthorId = (await User.create({ ...coAuthor, role: 'author' }))
+        .id;
+      const shared = await publishedBook('Shared');
+      await repository.addCoAuthor(shared.id, coAuthorId, asOwner());
+      await publishedBook('Solo');
+
+      // `login` is case-sensitive in the column; search is not.
+      assert.deepEqual(await titles({ author: 'coauthor' }), ['Shared']);
+      assert.deepEqual(await titles({ author: 'Cora' }), ['Shared']);
+      // BookOwner / Ola Owner is credited on both.
+      assert.deepEqual(await titles({ author: 'owner' }), ['Shared', 'Solo']);
+      assert.deepEqual(await titles({ author: 'nobody' }), []);
+    });
+
+    test('seriesTitle matches the title of the series a book is filed in', async () => {
+      await createPublished({
+        userId: ownerId,
+        seriesId,
+        title: 'Filed',
+        description: 'x',
+        tags: [],
+      });
+      await publishedBook('Standalone');
+
+      assert.deepEqual(await titles({ seriesTitle: 'test ser' }), ['Filed']);
+      assert.deepEqual(await titles({ seriesTitle: 'Missing' }), []);
+    });
+
+    test('every filter combines with the others by AND', async () => {
+      const match = await createPublished({
+        userId: ownerId,
+        seriesId,
+        title: 'Dragon Filed',
+        description: 'x',
+        tags: [],
+      });
+      await repository.update(match.id, { status: 'complete' });
+      await createPublished({
+        userId: ownerId,
+        seriesId,
+        title: 'Dragon Ongoing',
+        description: 'x',
+        tags: [],
+      });
+      await publishedBook('Dragon Alone');
+
+      assert.deepEqual(
+        await titles({
+          q: 'Dragon',
+          status: 'complete',
+          seriesTitle: 'Test',
+          author: 'Ola',
+        }),
+        ['Dragon Filed']
+      );
     });
   });
 

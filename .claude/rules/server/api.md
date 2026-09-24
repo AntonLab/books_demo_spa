@@ -26,7 +26,15 @@ code alone does not explain.
   the Co-author picker for the same reason.
 - `POST /api/books` takes no status: every book starts `draft`. Only `draft`
   changes what anyone may do (see `access.md`).
-- `?q=` matches `title` or `description`.
+- The search filters combine by AND: `q` (title or description), `status`
+  (`in_progress` | `complete`; `draft` is a 400), `releasedFrom`/`releasedTo`
+  and `updatedFrom`/`updatedTo` (ISO instants, both bounds inclusive, compared
+  with the same `publicationEdge` subqueries the `new` / `updated` sorts use,
+  so a book with no Published chapter drops out once any bound is set),
+  `author` (login, first or last name of any Co-author, `login` compared
+  `COLLATE utf8mb4_0900_ai_ci`) and `seriesTitle`. Text is trimmed, 1–200. A
+  start after its end is a 400 pinned to the "from" key. `author` and
+  `seriesTitle` are looked up as id lists first, like `userId`.
 - `GET /api/books` pages by `current` / `pageSize` (1–`PAGE_SIZE_MAX`,
   default 20), not `limit` / `offset`, and answers `PagedResponse`
   (`{ items, total, current, pageSize }`). It counts first: past the end it

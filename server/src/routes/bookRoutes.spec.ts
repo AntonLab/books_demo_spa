@@ -460,6 +460,51 @@ test('GET list takes a known sort and refuses any other with 400', async () => {
   );
 });
 
+test('GET list takes every search filter together and refuses a bad one with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const everyFilter = new URLSearchParams({
+        q: 'dragon',
+        status: 'complete',
+        releasedFrom: '2026-01-01T00:00:00.000Z',
+        releasedTo: '2026-01-31T23:59:59.999Z',
+        updatedFrom: '2026-01-01T00:00:00.000Z',
+        author: 'ann',
+        seriesTitle: 'cycle',
+        genreId: String(KNOWN_GENRE_ID),
+        sort: 'new',
+        current: '1',
+        pageSize: '20',
+      });
+      assert.equal(
+        (await fetch(`${base}/api/books?${everyFilter}`)).status,
+        200
+      );
+
+      for (const query of [
+        'status=draft',
+        'q=%20%20',
+        `author=${'a'.repeat(201)}`,
+        'releasedFrom=2026-01-01',
+      ]) {
+        assert.equal(
+          (await fetch(`${base}/api/books?${query}`)).status,
+          400,
+          query
+        );
+      }
+
+      const reversed = await fetch(
+        `${base}/api/books?updatedFrom=2026-02-01T00:00:00.000Z&updatedTo=2026-01-01T00:00:00.000Z`
+      );
+      const body = await json<{ details: { path: string[] }[] }>(reversed);
+      assert.equal(reversed.status, 400);
+      assert.deepEqual(body.details[0]?.path, ['updatedFrom']);
+    }
+  );
+});
+
 test('GET by id embeds the co-authors and series, and never an email', async () => {
   // Seeded through the authenticated harness because POST is guarded, then read
   // back with no cookie at all: that is what proves the detail read stays
