@@ -3,7 +3,7 @@ import type { DbConfig } from './config.ts';
 
 // A schema name cannot be a bind parameter, so it is checked against an
 // allowlist instead of being interpolated blindly.
-const SAFE_IDENTIFIER = /^[A-Za-z0-9_]+$/;
+export const SAFE_IDENTIFIER = /^[A-Za-z0-9_]+$/;
 
 export async function ensureDatabase(db: DbConfig): Promise<void> {
   if (!SAFE_IDENTIFIER.test(db.database)) {
