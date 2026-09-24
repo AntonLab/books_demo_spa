@@ -25,22 +25,9 @@ import type { UserRole } from '../types/permission.ts';
 // other admins, every superadmin — is a superadmin's call. See CONTEXT.md.
 const ADMIN_MANAGEABLE_ROLES: readonly UserRole[] = ['user', 'author'];
 
-export interface UserController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-  uploadAvatar: RequestHandler;
-  removeAvatar: RequestHandler;
-  getAvatar: RequestHandler;
-}
-
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createUserController(
-  repository: UserRepository
-): UserController {
+export function createUserController(repository: UserRepository) {
   // The other half of enforcement. requirePermission already refused `none`.
   //
   // Anything but `any` — `own`, or a handler mounted without
@@ -207,5 +194,5 @@ export function createUserController(
         })
         .send(avatar.data);
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

@@ -5,7 +5,7 @@ import type { ChapterSummary, PublicChapter } from '../types/chapter';
 // The server caps limit at 100. A book with more chapters than that would need
 // paging; the reader's previous/next navigation reads this same list, so the
 // cap bounds both.
-export const CHAPTERS_PAGE_SIZE = 100;
+const CHAPTERS_PAGE_SIZE = 100;
 
 export const listChapters = (
   bookId: number

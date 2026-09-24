@@ -2,7 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import { ZodError, type ZodType } from 'zod';
 import { ValidationError } from '../types/errors.ts';
 
-export interface ValidationSchemas {
+interface ValidationSchemas {
   body?: ZodType;
   query?: ZodType;
   params?: ZodType;

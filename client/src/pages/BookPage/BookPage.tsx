@@ -24,6 +24,7 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
+import { isCreditedTo } from '@/types/user';
 import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
@@ -58,10 +59,7 @@ export const BookPage: FC = () => {
   // likes a book they co-author. The server answers 403 either way — this only
   // avoids offering what would fail.
   const isDraft = book.status === 'draft';
-  const isCoAuthor =
-    session !== null &&
-    session !== undefined &&
-    book.authors.some((author) => author.id === session.id);
+  const isCoAuthor = isCreditedTo(book, session?.id);
   const canLike =
     !isDraft && session !== null && session !== undefined && !isCoAuthor;
 

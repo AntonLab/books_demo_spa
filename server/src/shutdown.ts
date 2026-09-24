@@ -4,18 +4,18 @@ import type { Logger } from './logger.ts';
 export const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 // What the shutdown needs of the HTTP server; node:http's Server has it all.
-export interface ShutdownServer {
+interface ShutdownServer {
   close(callback: (error?: Error) => void): unknown;
   closeIdleConnections(): void;
   closeAllConnections(): void;
 }
 
 // Anything holding an interval the process must not outlive.
-export interface Stoppable {
+interface Stoppable {
   stop(): void;
 }
 
-export interface ShutdownTimer {
+interface ShutdownTimer {
   unref(): unknown;
 }
 

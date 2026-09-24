@@ -19,15 +19,6 @@ import type {
   UpdateCommentInput,
 } from '../types/comment.ts';
 
-export interface CommentController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-  restore: RequestHandler;
-}
-
 // requirePermission guarantees req.user on every write — `guest` has no write
 // grant on comments, so an anonymous write is a 401 before it gets here — but
 // the type is optional because most requests legitimately have none. This
@@ -39,9 +30,7 @@ function actorId(req: Request): number {
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createCommentController(
-  repository: CommentRepository
-): CommentController {
+export function createCommentController(repository: CommentRepository) {
   // 404 before 403: reporting "forbidden" for a comment that does not exist
   // would leak which ids are real.
   const findOrThrow = async (
@@ -141,5 +130,5 @@ export function createCommentController(
       if (!restored) throw new NotFoundError('Comment', id);
       res.json(restored);
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

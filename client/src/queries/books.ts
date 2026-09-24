@@ -15,7 +15,7 @@ import type { BookSort } from '../types/book';
 import { PAGE_SIZE_MAX } from '../types/api';
 import { queryKeys } from './keys';
 
-export const BOOKS_PAGE_SIZE = 20;
+const BOOKS_PAGE_SIZE = 20;
 
 // A ranking's first `pageSize` books, for the main page's sections; the search
 // page pages through `useBookSearch` instead.

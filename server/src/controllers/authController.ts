@@ -37,15 +37,6 @@ export interface AuthControllerDeps {
   verify?: (hashed: string, plaintext: string) => Promise<boolean>;
 }
 
-export interface AuthController {
-  register: RequestHandler;
-  login: RequestHandler;
-  logout: RequestHandler;
-  me: RequestHandler;
-  requestReset: RequestHandler;
-  confirmReset: RequestHandler;
-}
-
 // One hour, far shorter than a session's seven days: a reset link sits in a
 // mailbox, which is a much likelier place to leak from than a cookie jar.
 const RESET_TTL_MS = 60 * 60 * 1000;
@@ -60,7 +51,7 @@ function dummyPasswordHash(): Promise<string> {
   return dummyHash;
 }
 
-export function createAuthController(deps: AuthControllerDeps): AuthController {
+export function createAuthController(deps: AuthControllerDeps) {
   const verify = deps.verify ?? verifyPassword;
 
   // register's only: a brand-new account has nothing in flight that could
@@ -209,5 +200,5 @@ export function createAuthController(deps: AuthControllerDeps): AuthController {
 
       res.status(204).end();
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

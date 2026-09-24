@@ -14,20 +14,9 @@ import type {
   UpdateChapterInput,
 } from '../types/chapter.ts';
 
-export interface ChapterController {
-  create: RequestHandler;
-  list: RequestHandler;
-  getById: RequestHandler;
-  update: RequestHandler;
-  remove: RequestHandler;
-  reorder: RequestHandler;
-}
-
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createChapterController(
-  repository: ChapterRepository
-): ChapterController {
+export function createChapterController(repository: ChapterRepository) {
   // The other half of enforcement. requirePermission already refused `none`;
   // `any` needs nothing more, and `own` is the only case that has to look at
   // the row — which is why this cannot live in the middleware, where the row
@@ -132,5 +121,5 @@ export function createChapterController(
       if (!found) throw new NotFoundError('Book', bookId);
       res.status(204).end();
     },
-  };
+  } satisfies Record<string, RequestHandler>;
 }

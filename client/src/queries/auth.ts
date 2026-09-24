@@ -26,7 +26,7 @@ const setSession = (client: QueryClient, session: Session): void => {
 };
 
 // What `watchSession` needs of a `BroadcastChannel`; a test passes a fake.
-export interface SessionChannel {
+interface SessionChannel {
   postMessage(message: null): void;
   addEventListener(type: 'message', listener: () => void): void;
 }

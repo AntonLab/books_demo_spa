@@ -15,6 +15,7 @@ import {
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
+import { isCreditedTo } from '@/types/user';
 import styles from './NewChapterPage.module.css';
 
 export const NewChapterPage: FC = () => {
@@ -48,7 +49,7 @@ export const NewChapterPage: FC = () => {
 
   // Only a Co-author adds chapters: a Moderator may edit and delete them, but
   // the matrix gives no role but author a create on chapters.
-  if (!book.authors.some((author) => author.id === session?.id)) {
+  if (!isCreditedTo(book, session?.id)) {
     return (
       <>
         <Alert

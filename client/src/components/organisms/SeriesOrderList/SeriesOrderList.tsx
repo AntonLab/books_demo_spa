@@ -10,6 +10,7 @@ import {
 } from '@/queries/series';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import type { SeriesBookSummary } from '@/types/series';
+import { isCreditedTo } from '@/types/user';
 import styles from './SeriesOrderList.module.css';
 
 interface SeriesOrderListProps {
@@ -44,9 +45,7 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
   // anyone else it is named rather than linked.
   const bookRow = (book: SeriesBookSummary) => {
     const readable =
-      book.status !== 'draft' ||
-      isModerator ||
-      book.authors.some((author) => author.id === viewerId);
+      book.status !== 'draft' || isModerator || isCreditedTo(book, viewerId);
 
     return (
       <Flex justify="space-between" align="center" gap="small">

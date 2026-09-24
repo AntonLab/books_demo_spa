@@ -10,7 +10,7 @@ import {
 } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { useSession } from '@/queries/auth';
-import { isModeratorRole } from '@/types/user';
+import { isCreditedTo, isModeratorRole } from '@/types/user';
 import { useBooksInSeries } from '@/queries/books';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
@@ -45,10 +45,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
   const mayEdit =
-    session !== null &&
-    session !== undefined &&
-    (series.data.authors.some((author) => author.id === session.id) ||
-      isModeratorRole(session.role));
+    isCreditedTo(series.data, session?.id) || isModeratorRole(session?.role);
 
   return (
     <>
