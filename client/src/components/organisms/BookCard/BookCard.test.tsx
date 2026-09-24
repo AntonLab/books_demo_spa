@@ -137,6 +137,25 @@ describe('BookCard', () => {
     expect(screen.queryByText('epic')).not.toBeInTheDocument();
   });
 
+  it('as a tile, links both the cover and the title to the book page', () => {
+    const { container } = renderWithProviders(<BookCard book={book} tile />);
+
+    expect(container.querySelectorAll('a[href="/books/1"]')).toHaveLength(2);
+    expect(
+      screen.getByRole('link', { name: 'A Tale of Dragons' })
+    ).toHaveAttribute('href', '/books/1');
+  });
+
+  it('as a tile, keeps the status but leaves out description, genre, tags and date', () => {
+    renderWithProviders(<BookCard book={book} tile />);
+
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+    expect(screen.queryByText(book.description)).toBeNull();
+    expect(screen.queryByText('Gothic')).toBeNull();
+    expect(screen.queryByText('epic')).toBeNull();
+    expect(screen.queryByText(formatDate(book.createdAt))).toBeNull();
+  });
+
   it('formats createdAt with the app date helper, not the raw ISO string', () => {
     renderWithProviders(<BookCard book={book} />);
 

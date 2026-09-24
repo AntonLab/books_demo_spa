@@ -22,7 +22,9 @@ describe('ThemedConfigProvider', () => {
     unmount();
 
     renderWithProviders(<TokenProbe />, {
-      preloadedState: { devicePreferences: { theme: 'dark' } },
+      preloadedState: {
+        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+      },
     });
 
     expect(screen.getByTestId('background').textContent).not.toBe(light);
@@ -30,7 +32,9 @@ describe('ThemedConfigProvider', () => {
 
   it('sets the page color-scheme to the theme, for native controls', () => {
     const { unmount } = renderWithProviders(<TokenProbe />, {
-      preloadedState: { devicePreferences: { theme: 'dark' } },
+      preloadedState: {
+        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+      },
     });
     expect(
       document.documentElement.style.getPropertyValue('color-scheme')
@@ -45,7 +49,9 @@ describe('ThemedConfigProvider', () => {
 
   it('keeps the app quarks in the dark theme', () => {
     renderWithProviders(<TokenProbe />, {
-      preloadedState: { devicePreferences: { theme: 'dark' } },
+      preloadedState: {
+        devicePreferences: { theme: 'dark', resultsLayout: 'grid' },
+      },
     });
 
     expect(screen.getByTestId('cover-width')).toHaveTextContent('96');

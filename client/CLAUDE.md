@@ -13,16 +13,16 @@ its own when you Read a file its `paths:` names — writing or editing one does
 not. Before creating a file, or changing a topic whose files you have not
 read, read the rule first:
 
-| Rule            | Covers                                                                |
-| --------------- | --------------------------------------------------------------------- |
-| `api.md`        | `request()`, its body and CSRF traps, the per-module request contract |
-| `queries.md`    | retries, the session shape, mutation wrapping, invalidation           |
-| `store.md`      | the two slices, `localStorage` persistence, binding to the Account    |
-| `components.md` | component-level traps: antd menus, comments, sortable lists, images   |
-| `pages.md`      | routing, lazy loading and the error boundary, page-level rules        |
-| `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                |
-| `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover      |
-| `webpack.md`    | the three webpack configs                                             |
+| Rule            | Covers                                                                 |
+| --------------- | ---------------------------------------------------------------------- |
+| `api.md`        | `request()`, its body and CSRF traps, the per-module request contract  |
+| `queries.md`    | retries, the session shape, mutation wrapping, invalidation            |
+| `store.md`      | the two slices, `localStorage` persistence, binding to the Account     |
+| `components.md` | component traps: menus, comments, cards, images, icons, sortable lists |
+| `pages.md`      | routing, lazy loading and the error boundary, page-level rules         |
+| `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                 |
+| `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
+| `webpack.md`    | the three webpack configs                                              |
 
 ## Commands
 

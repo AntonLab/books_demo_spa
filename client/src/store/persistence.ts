@@ -1,12 +1,17 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
-import { THEMES } from './devicePreferencesSlice';
+import {
+  initialDevicePreferences,
+  RESULTS_LAYOUTS,
+  THEMES,
+} from './devicePreferencesSlice';
 import type { DevicePreferencesState } from './devicePreferencesSlice';
 import { isBlank, unsavedText } from './unsavedTextSlice';
 import type { UnsavedTextEntry, UnsavedTextState } from './unsavedTextSlice';
 import type { RootState } from './index';
 
-// The `v1` suffix: a later change of shape bumps it, so old data is dropped
-// instead of misread.
+// The `v1` suffix: a change that would misread old data (a renamed or retyped
+// field) bumps it, so that data is dropped instead. An added field with a
+// default does not; the reader fills it in.
 export const STORAGE_KEYS = {
   devicePreferences: 'books.devicePreferences.v1',
   unsavedText: 'books.unsavedText.v1',
@@ -35,11 +40,23 @@ const write = (key: string, value: unknown): void => {
   }
 };
 
-const isDevicePreferences = (value: unknown): value is DevicePreferencesState =>
-  typeof value === 'object' &&
-  value !== null &&
-  'theme' in value &&
-  (THEMES as readonly unknown[]).includes(value.theme);
+// A field added since the value was stored reads as its default rather than
+// failing the whole value, so an addition needs no new key and nobody loses
+// the theme they chose. Only a bad `theme` drops the value.
+const toDevicePreferences = (
+  value: unknown
+): DevicePreferencesState | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const stored = value as Record<string, unknown>;
+  const theme = THEMES.find((known) => known === stored.theme);
+  if (theme === undefined) return undefined;
+  return {
+    theme,
+    resultsLayout:
+      RESULTS_LAYOUTS.find((known) => known === stored.resultsLayout) ??
+      initialDevicePreferences.resultsLayout,
+  };
+};
 
 // Only the top shape: `accountId` and an `entries` object. Each entry is
 // checked separately by `isValidEntry`, since a single malformed entry (from
@@ -85,8 +102,10 @@ const validEntries = (
 
 export const loadPersistedState = (): Partial<RootState> => {
   const state: Partial<RootState> = {};
-  const devicePreferences = read(STORAGE_KEYS.devicePreferences);
-  if (isDevicePreferences(devicePreferences)) {
+  const devicePreferences = toDevicePreferences(
+    read(STORAGE_KEYS.devicePreferences)
+  );
+  if (devicePreferences !== undefined) {
     state.devicePreferences = devicePreferences;
   }
   const unsavedText = read(STORAGE_KEYS.unsavedText);
@@ -114,8 +133,9 @@ export const parsePersisted = (
   } catch {
     return undefined;
   }
-  if (key === STORAGE_KEYS.devicePreferences && isDevicePreferences(value)) {
-    return { devicePreferences: value };
+  if (key === STORAGE_KEYS.devicePreferences) {
+    const devicePreferences = toDevicePreferences(value);
+    return devicePreferences && { devicePreferences };
   }
   if (key === STORAGE_KEYS.unsavedText && isUnsavedTextShape(value)) {
     return {

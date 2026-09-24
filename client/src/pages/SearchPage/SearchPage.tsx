@@ -1,5 +1,8 @@
-import type { FC } from 'react';
-import { Alert, Empty, Skeleton, Typography } from 'antd';
+import type { FC, ReactNode } from 'react';
+import { Alert, Empty, Flex, Segmented, Skeleton, Typography } from 'antd';
+import type { ColProps } from 'antd';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faList, faTableCellsLarge } from '@fortawesome/free-solid-svg-icons';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCard } from '@/components/organisms/BookCard';
@@ -12,10 +15,66 @@ import {
 } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useSeries, useSeriesInGenre } from '@/queries/series';
+import {
+  devicePreferences,
+  type ResultsLayout,
+} from '@/store/devicePreferencesSlice';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import type { PublicGenre } from '@/types/genre';
+import styles from './SearchPage.module.css';
 
 const SERIES_GONE = 'This series no longer exists.';
 const GENRE_GONE = 'This genre no longer exists.';
+
+const RESULTS_COLUMNS: Record<ResultsLayout, ColProps> = {
+  grid: { xs: 12, sm: 8, md: 6, xl: 4 },
+  list: { span: 24 },
+};
+
+// A Device preference, so it holds across every term, Genre and Series
+// searched on this device.
+const useResultsLayout = () =>
+  useAppSelector((state) => state.devicePreferences.resultsLayout);
+
+// Shown whenever the page has something to search for, loading or failed
+// included, so it never jumps in late or leaves.
+const ResultsBar: FC<{ heading?: ReactNode }> = ({ heading }) => {
+  const layout = useResultsLayout();
+  const dispatch = useAppDispatch();
+
+  return (
+    <Flex
+      justify={heading === undefined ? 'end' : 'space-between'}
+      align="center"
+      gap="middle"
+      wrap
+      className={styles.bar}
+    >
+      {heading}
+      <Segmented<ResultsLayout>
+        aria-label="Results layout"
+        value={layout}
+        onChange={(value) =>
+          dispatch(devicePreferences.resultsLayoutChanged(value))
+        }
+        options={[
+          {
+            value: 'grid',
+            icon: (
+              <FontAwesomeIcon icon={faTableCellsLarge} aria-label="Grid" />
+            ),
+            tooltip: 'Grid',
+          },
+          {
+            value: 'list',
+            icon: <FontAwesomeIcon icon={faList} aria-label="List" />,
+            tooltip: 'List',
+          },
+        ]}
+      />
+    </Flex>
+  );
+};
 
 // One filter per visit, and when several are present `series` wins, then
 // `genre`, then `q`: the header's search bar navigates to a bare `?q=` and a
@@ -56,6 +115,7 @@ const TermResults: FC<{ q: string }> = ({ q }) => {
   // the cache key, so changing it is what starts the next search — and
   // returning to a term searched a moment ago is served from cache.
   const { data, isPending, isError, error } = useSearchBooks(q);
+  const layout = useResultsLayout();
   const total = data?.total ?? 0;
 
   // Load-bearing, not cosmetic. `useSearchBooks` is disabled on a blank term,
@@ -67,18 +127,23 @@ const TermResults: FC<{ q: string }> = ({ q }) => {
 
   return (
     <>
-      <Typography.Title level={2}>
-        {isError
-          ? `Search failed for "${q}"`
-          : isPending
-            ? `Searching for "${q}"`
-            : `${total} ${total === 1 ? 'result' : 'results'} for "${q}"`}
-      </Typography.Title>
+      <ResultsBar
+        heading={
+          <Typography.Title level={2} className={styles.heading}>
+            {isError
+              ? `Search failed for "${q}"`
+              : isPending
+                ? `Searching for "${q}"`
+                : `${total} ${total === 1 ? 'result' : 'results'} for "${q}"`}
+          </Typography.Title>
+        }
+      />
 
       <CardList
         noun="books"
         items={data?.items ?? []}
-        renderItem={(book) => <BookCard book={book} />}
+        renderItem={(book) => <BookCard book={book} tile={layout === 'grid'} />}
+        columns={RESULTS_COLUMNS[layout]}
         isPending={isPending}
         isError={isError}
         error={error}
@@ -94,6 +159,7 @@ const TermResults: FC<{ q: string }> = ({ q }) => {
 const SeriesResults: FC<{ seriesId: number }> = ({ seriesId }) => {
   const series = useSeries(seriesId);
   const books = useBooksInSeries(seriesId);
+  const layout = useResultsLayout();
 
   if (series.isError) {
     // A link from a book page outlives the series it names.
@@ -108,10 +174,12 @@ const SeriesResults: FC<{ seriesId: number }> = ({ seriesId }) => {
   return (
     <>
       <SeriesCard series={series.data} />
+      <ResultsBar />
       <CardList
         noun="books"
         items={books.data?.items ?? []}
-        renderItem={(book) => <BookCard book={book} />}
+        renderItem={(book) => <BookCard book={book} tile={layout === 'grid'} />}
+        columns={RESULTS_COLUMNS[layout]}
         isPending={books.isPending}
         isError={books.isError}
         error={books.error}
@@ -148,15 +216,23 @@ const GenreResults: FC<{ genreId: number }> = ({ genreId }) => {
 const GenreBooks: FC<{ genre: PublicGenre }> = ({ genre }) => {
   const books = useBooksInGenre(genre.id);
   const series = useSeriesInGenre(genre.id);
+  const layout = useResultsLayout();
 
   return (
     <>
-      <Typography.Title level={2}>{genre.name}</Typography.Title>
+      <ResultsBar
+        heading={
+          <Typography.Title level={2} className={styles.heading}>
+            {genre.name}
+          </Typography.Title>
+        }
+      />
 
       <CardList
         noun="books"
         items={books.data?.items ?? []}
-        renderItem={(book) => <BookCard book={book} />}
+        renderItem={(book) => <BookCard book={book} tile={layout === 'grid'} />}
+        columns={RESULTS_COLUMNS[layout]}
         isPending={books.isPending}
         isError={books.isError}
         error={books.error}
@@ -171,7 +247,10 @@ const GenreBooks: FC<{ genre: PublicGenre }> = ({ genre }) => {
           <CardList
             noun="series"
             items={series.data?.items ?? []}
-            renderItem={(entry) => <SeriesCard series={entry} linked />}
+            renderItem={(entry) => (
+              <SeriesCard series={entry} linked tile={layout === 'grid'} />
+            )}
+            columns={RESULTS_COLUMNS[layout]}
             isPending={series.isPending}
             isError={series.isError}
             error={series.error}

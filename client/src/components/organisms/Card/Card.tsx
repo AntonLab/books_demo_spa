@@ -12,8 +12,11 @@ interface CardProps {
   // and clamps the description. Without one it heads a page of its own: its
   // title *is* that page's level-2 heading and the description shows in full.
   href?: string;
+  // A narrow grid cell: the media above the text, linked like the title, and
+  // no genre or tags. Always one of several, so it comes with an `href`.
+  tile?: boolean;
   authors: AuthorSummary[];
-  description: string;
+  description?: string;
   genre: PublicGenre | null;
   tags: string[];
   media?: ReactNode;
@@ -25,6 +28,7 @@ interface CardProps {
 export const Card: FC<CardProps> = ({
   title,
   href,
+  tile = false,
   authors,
   description,
   genre,
@@ -37,7 +41,9 @@ export const Card: FC<CardProps> = ({
   return (
     <AntCard
       size="small"
-      className={href === undefined ? styles.pageHeading : undefined}
+      className={
+        tile ? styles.tile : href === undefined ? styles.pageHeading : undefined
+      }
     >
       {/* Flex, not Space: Space wraps each child in a div.ant-space-item
           that carries no flex rule of its own, so a flex style on a child
@@ -45,8 +51,27 @@ export const Card: FC<CardProps> = ({
           themselves, so the text column below really takes the rest of the
           row and can shrink at phone width, while the media keeps its
           size. */}
-      <Flex align="start" gap={token.margin} className={styles.row}>
-        {media}
+      <Flex
+        vertical={tile}
+        align={tile ? 'stretch' : 'start'}
+        gap={token.margin}
+        className={styles.row}
+      >
+        {tile && href !== undefined && media !== undefined ? (
+          // A bigger target for a pointer. The title is the same link, so
+          // this one is kept from the keyboard and from screen readers,
+          // which would otherwise meet it twice, once with no name.
+          <Link
+            to={href}
+            aria-hidden="true"
+            tabIndex={-1}
+            className={styles.media}
+          >
+            {media}
+          </Link>
+        ) : (
+          media
+        )}
         <div className={styles.body}>
           {href === undefined ? (
             <Typography.Title level={2} className={styles.title}>
@@ -75,20 +100,22 @@ export const Card: FC<CardProps> = ({
             ))}
           </Space>
 
-          <Typography.Paragraph
-            ellipsis={href === undefined ? false : { rows: 3 }}
-            className={styles.description}
-          >
-            {description}
-          </Typography.Paragraph>
+          {description !== undefined && (
+            <Typography.Paragraph
+              ellipsis={href === undefined ? false : { rows: 3 }}
+              className={styles.description}
+            >
+              {description}
+            </Typography.Paragraph>
+          )}
 
-          {genre !== null && (
+          {!tile && genre !== null && (
             <div className={styles.line}>
               <Link to={`/search?genre=${genre.id}`}>{genre.name}</Link>
             </div>
           )}
 
-          {tags.length > 0 && (
+          {!tile && tags.length > 0 && (
             <Space wrap size={[0, token.marginXS]} className={styles.line}>
               {tags.map((tag) => (
                 <Tag key={tag}>{tag}</Tag>

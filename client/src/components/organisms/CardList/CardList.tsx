@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Alert, Col, Empty, Row, Skeleton } from 'antd';
+import type { ColProps } from 'antd';
 
 export interface CardListProps<T extends { id: number }> {
   items: T[];
@@ -11,7 +12,11 @@ export interface CardListProps<T extends { id: number }> {
   isError: boolean;
   error: Error | null;
   emptyText?: string;
+  // Each item's `Col` spans; SearchPage's results layout sets them.
+  columns?: ColProps;
 }
+
+const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
 
 // Presentational on purpose: each page runs its own query (`useBooks`,
 // `useSearchBooks`, `useSeriesInGenre`…) and hands the states down. A
@@ -31,6 +36,7 @@ export const CardList = <T extends { id: number }>({
   isError,
   error,
   emptyText = `No ${noun} yet.`,
+  columns = CARD_COLUMNS,
 }: CardListProps<T>) => {
   if (isError) {
     return (
@@ -57,7 +63,7 @@ export const CardList = <T extends { id: number }>({
   return (
     <Row gutter={[16, 16]}>
       {items.map((item) => (
-        <Col key={item.id} xs={24} sm={12} lg={8}>
+        <Col key={item.id} {...columns}>
           {renderItem(item)}
         </Col>
       ))}

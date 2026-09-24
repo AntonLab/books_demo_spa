@@ -47,6 +47,14 @@ that read like mistakes and are not.
   success. A reply or edit whose target is gone or a Tombstone falls back to
   the root composer, and its text shows as an `UnsavedTextNotice`.
 
+## Cards (`Card`, `BookCard`, `SeriesCard`)
+
+- A `tile` puts the media above the text and links it too, with
+  `aria-hidden` and `tabIndex={-1}`: the Cover's image is `alt=""`, so a
+  reachable Cover link would have no name and repeat the title's link. A tile
+  shows no genre or tags; BookCard also drops the description and date.
+  A Series has no Cover, so its tile keeps the description.
+
 ## Images (`BookCover`, `AccountAvatar`, `ImageUploadButton`)
 
 - `BookCover`'s image is `alt=""` (the title always sits beside it). A failed
@@ -74,8 +82,10 @@ that read like mistakes and are not.
   the URL alone, never by state. `RegisterModal`'s "I'm author" maps to
   `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
-  deletes the right row. It uses a text glyph: `@ant-design/icons` is not a
-  dependency.
+  deletes the right row. It predates the icons and still uses a text glyph.
+- Icons come from Font Awesome, not `@ant-design/icons` (ADR-0011). FA 7
+  icons are decorative by default: an icon that is a control's only content
+  takes `aria-label` (its `title` prop is deprecated).
 - `NotificationBell` marks unread items read when opened but keeps them
   highlighted until it closes.
 

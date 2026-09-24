@@ -12,9 +12,12 @@ and that the server never sees: Unsaved text and Device preferences
 - **Persistence is ours, not `redux-persist`.** `createAppStore()` reads both
   slices from `localStorage` once, as `preloadedState`; a listener middleware
   writes each back on change, under `books.unsavedText.v1` and
-  `books.devicePreferences.v1`. Changing a slice's shape bumps its `v` suffix,
-  so old data is dropped instead of misread. A stored value that fails the
-  shape check is ignored (an array is not an `entries` object).
+  `books.devicePreferences.v1`. A change that would misread old data (a
+  renamed or retyped field) bumps its `v` suffix, so that data is dropped
+  instead. An added field with a default does not: the reader fills it in
+  (`resultsLayout` reads as `grid`), so nobody loses a stored theme. A stored
+  value that fails the shape check is ignored (an array is not an `entries`
+  object).
 - **Every storage access is in `try/catch`.** Missing storage, a full quota or
   corrupt JSON leave the store working in memory.
 - **Unsaved text is written at most once per 500 ms**: the listener
