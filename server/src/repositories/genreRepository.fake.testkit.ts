@@ -6,6 +6,9 @@ export interface FakeGenreRepositoryOptions {
   // The Genres that already exist, in any order — the repository sorts them
   // itself. Copied in, so a caller's array is never written to.
   seeds?: readonly PublicGenre[];
+  // Spy: what each list call asked for. The fake holds no books, so it
+  // cannot tell which Genres are non-empty and returns them all.
+  listCalls?: { nonEmpty: boolean }[];
 }
 
 // Alphabetical, case-insensitively, which is what MySQL's
@@ -42,7 +45,8 @@ export function createFakeGenreRepository(
     );
 
   return {
-    async list() {
+    async list({ nonEmpty = false } = {}) {
+      options.listCalls?.push({ nonEmpty });
       return [...rows.values()].sort(byName).map((row) => ({ ...row }));
     },
 

@@ -2,9 +2,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
-  useBooksInGenre,
+  useBookSearch,
   useDeleteBookCover,
-  useSearchBooks,
   useSortedBooks,
   useUploadBookCover,
 } from './books';
@@ -55,8 +54,8 @@ describe('useSortedBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
 
     const { result } = renderHook(() => useSortedBooks('new'), {
@@ -69,7 +68,7 @@ describe('useSortedBooks', () => {
     expect(result.current.data?.items).toEqual([book]);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'new',
-      limit: 20,
+      pageSize: 20,
     });
   });
 
@@ -77,8 +76,8 @@ describe('useSortedBooks', () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 6,
-      offset: 0,
+      current: 1,
+      pageSize: 6,
     });
     const client = createTestQueryClient();
     const wrap = wrapper(client);
@@ -92,7 +91,7 @@ describe('useSortedBooks', () => {
 
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'popular',
-      limit: 6,
+      pageSize: 6,
     });
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
@@ -111,111 +110,53 @@ describe('useSortedBooks', () => {
   });
 });
 
-describe('useSearchBooks', () => {
-  it('passes the term through to the API', async () => {
-    mockedBooks.listBooks.mockResolvedValue({
-      items: [book],
-      total: 1,
-      limit: 20,
-      offset: 0,
-    });
+describe('useBookSearch', () => {
+  const page = { items: [book], total: 1, current: 1, pageSize: 20 };
 
-    const { result } = renderHook(() => useSearchBooks('dragon'), {
-      wrapper: wrapper(),
-    });
+  it('asks for the page of the search it is given', async () => {
+    mockedBooks.listBooks.mockResolvedValue(page);
 
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
+    const { result } = renderHook(
+      () => useBookSearch({ q: 'dragon', current: 2, pageSize: 20 }, true),
+      { wrapper: wrapper() }
+    );
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'dragon',
-      limit: 20,
+      current: 2,
+      pageSize: 20,
     });
   });
 
-  it('does not hit the network for a blank term', () => {
-    renderHook(() => useSearchBooks(''), { wrapper: wrapper() });
+  it('asks nothing while disabled', () => {
+    const { result } = renderHook(() => useBookSearch({ genreId: 4 }, false), {
+      wrapper: wrapper(),
+    });
 
+    // A disabled query reports isPending forever: SearchPage must not render
+    // CardList for it.
+    expect(result.current.fetchStatus).toBe('idle');
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
-  it('stays pending with an idle fetch while disabled', () => {
-    const { result } = renderHook(() => useSearchBooks(''), {
-      wrapper: wrapper(),
-    });
-
-    // This is why SearchPage's early return on a blank term is load-bearing
-    // rather than cosmetic: a disabled query reports isPending forever, so
-    // rendering CardList here would show an endless skeleton.
-    expect(result.current.isPending).toBe(true);
-    expect(result.current.fetchStatus).toBe('idle');
-  });
-
-  it('caches each term separately, so a search cannot clobber the list', async () => {
+  it('keeps a search apart from the ranked list', async () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [book],
       total: 1,
-      limit: 20,
-      offset: 0,
-    });
-    const client = createTestQueryClient();
-    const wrap = wrapper(client);
-
-    const list = renderHook(() => useSortedBooks('popular'), { wrapper: wrap });
-    await waitFor(() => {
-      expect(list.result.current.isSuccess).toBe(true);
-    });
-
-    const search = renderHook(() => useSearchBooks('dragon'), {
-      wrapper: wrap,
-    });
-    await waitFor(() => {
-      expect(search.result.current.isSuccess).toBe(true);
-    });
-
-    // Two entries, not one overwritten twice. searchSlice existed as its own
-    // slice to guarantee exactly this; the cache keys guarantee it now.
-    expect(client.getQueryCache().getAll()).toHaveLength(2);
-  });
-});
-
-describe('useBooksInGenre', () => {
-  it('asks for one page of the genre, by id', async () => {
-    mockedBooks.listBooks.mockResolvedValue({
-      items: [book],
-      total: 1,
-      limit: 20,
-      offset: 0,
-    });
-
-    const { result } = renderHook(() => useBooksInGenre(4), {
-      wrapper: wrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
-      genreId: 4,
-      limit: 20,
-    });
-  });
-
-  it('keeps its own cache entry, distinct from the ranked list', async () => {
-    mockedBooks.listBooks.mockResolvedValue({
-      items: [book],
-      total: 1,
-      limit: 20,
-      offset: 0,
+      current: 1,
+      pageSize: 20,
     });
     const client = createTestQueryClient();
     const wrap = wrapper(client);
 
     const list = renderHook(() => useSortedBooks('popular'), { wrapper: wrap });
     await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
-
-    const genre = renderHook(() => useBooksInGenre(4), { wrapper: wrap });
-    await waitFor(() => expect(genre.result.current.isSuccess).toBe(true));
+    const search = renderHook(
+      () => useBookSearch({ q: 'dragon', pageSize: 20 }, true),
+      { wrapper: wrap }
+    );
+    await waitFor(() => expect(search.result.current.isSuccess).toBe(true));
 
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });
@@ -242,6 +183,7 @@ describe('useUploadBookCover', () => {
     expect(mockedBooks.uploadBookCover).toHaveBeenCalledWith(1, file);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
   });
 });
 
@@ -260,5 +202,6 @@ describe('useDeleteBookCover', () => {
     expect(mockedBooks.deleteBookCover).toHaveBeenCalledWith(1);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
   });
 });

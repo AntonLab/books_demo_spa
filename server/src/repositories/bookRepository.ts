@@ -50,6 +50,8 @@ function sequelizeOf(): Sequelize {
 export interface BookListResult {
   items: PublicBook[];
   total: number;
+  // The page served, which is lower than the one asked for past the end.
+  current: number;
 }
 
 export interface BookRepository {
@@ -228,29 +230,90 @@ async function withAuthors(
   );
 }
 
-// What `?sort=` ranks a book row by, as a correlated subquery (CONTEXT.md).
-// Chapters count once their Publication time has passed on this process's
-// clock, as readableChapterScope judges them; the escaped Date is the only
-// value spliced in.
+// The Publication time of a book's earliest (MIN) or latest (MAX) Published
+// Chapter — its Release time or Last update (CONTEXT.md) — as a correlated
+// subquery, NULL for a book with none. Chapters count once their Publication
+// time has passed on this process's clock, as readableChapterScope judges
+// them; the escaped Date is the only value spliced in.
+function publicationEdge(edge: 'MIN' | 'MAX'): Utils.Literal {
+  const now = sequelizeOf().escape(new Date());
+  return literal(
+    `(SELECT ${edge}(\`publishedAt\`) FROM \`chapters\` WHERE \`chapters\`.\`bookId\` = \`Book\`.\`id\` AND \`publishedAt\` <= ${now})`
+  );
+}
+
+// `sequelize.escape(Date)` truncates to whole seconds, which drops a filter's
+// millisecond bound below a chapter's DATETIME(3) `publishedAt` and makes an
+// inclusive bound miss its own exact instant. Formatted by hand instead, in
+// the same UTC the connection assumes (no `timezone` override in db/sequelize.ts).
+function escapeInstant(value: Date): string {
+  return sequelizeOf().escape(
+    value.toISOString().replace('T', ' ').replace('Z', '')
+  );
+}
+
+// What `?sort=` ranks a book row by (CONTEXT.md).
 function rankOf(sort: BookSort): Utils.Literal {
   if (sort === 'popular') {
     return literal(
       '(SELECT COUNT(*) FROM `likes` WHERE `likes`.`bookId` = `Book`.`id` AND `likes`.`isLike` = true)'
     );
   }
-  const now = sequelizeOf().escape(new Date());
-  const edge = sort === 'new' ? 'MIN' : 'MAX';
-  return literal(
-    `(SELECT ${edge}(\`publishedAt\`) FROM \`chapters\` WHERE \`chapters\`.\`bookId\` = \`Book\`.\`id\` AND \`publishedAt\` <= ${now})`
-  );
+  return publicationEdge(sort === 'new' ? 'MIN' : 'MAX');
 }
 
-// creditedBookIds is the books `?userId=` names, looked up beforehand: a book
-// matches through any of its Co-authors, and a plain id list keeps the LIMIT
-// paging over books, which an include on the credits would not.
+// Ids looked up before the page query, one list per filter that matches
+// through another table: a plain id list keeps the LIMIT paging over books,
+// which an include would not. Undefined means the filter was not asked for;
+// an empty list becomes `IN (NULL)`, which matches nothing, as it should.
+interface IdLookups {
+  creditedBookIds?: number[];
+  authorBookIds?: number[];
+  seriesIds?: number[];
+}
+
+// The books any of whose Co-authors matches by login, first or last name.
+// `login` carries a case-sensitive collation, so it is compared under the
+// case-insensitive one, as userRepository's search does.
+// ponytail: an id list grows with the matches; switch to an EXISTS subquery if
+// a common name ever matches thousands of books.
+async function booksByAuthor(author: string): Promise<number[]> {
+  const pattern = containsPattern(author);
+  const credits = await BookAuthor.findAll({
+    attributes: ['bookId'],
+    include: [
+      {
+        model: User,
+        as: 'user',
+        attributes: [],
+        required: true,
+        where: {
+          [Op.or]: [
+            sequelizeWhere(
+              literal('`user`.`login` COLLATE utf8mb4_0900_ai_ci'),
+              { [Op.like]: pattern }
+            ),
+            { firstName: { [Op.like]: pattern } },
+            { lastName: { [Op.like]: pattern } },
+          ],
+        },
+      },
+    ],
+  });
+  return credits.map((credit) => credit.bookId);
+}
+
+async function seriesTitled(title: string): Promise<number[]> {
+  const series = await Series.findAll({
+    where: { title: { [Op.like]: containsPattern(title) } },
+    attributes: ['id'],
+  });
+  return series.map((entry) => entry.id);
+}
+
 function buildWhere(
   query: ListBooksQuery,
-  creditedBookIds: number[] | undefined,
+  lookups: IdLookups,
   viewer: Viewer,
   rank: Utils.Literal | undefined
 ): WhereOptions {
@@ -262,9 +325,37 @@ function buildWhere(
     clauses.push(sequelizeWhere(rank, Op.ne, null));
   }
 
-  if (creditedBookIds !== undefined) {
-    // An empty list becomes `IN (NULL)`, which matches nothing, as it should.
-    clauses.push({ id: creditedBookIds });
+  // `?userId=`: a book matches through any of its Co-authors.
+  if (lookups.creditedBookIds !== undefined) {
+    clauses.push({ id: lookups.creditedBookIds });
+  }
+  if (lookups.authorBookIds !== undefined) {
+    clauses.push({ id: lookups.authorBookIds });
+  }
+  if (lookups.seriesIds !== undefined) {
+    clauses.push({ seriesId: lookups.seriesIds });
+  }
+
+  if (query.status !== undefined) {
+    clauses.push({ status: query.status });
+  }
+
+  // Both bounds inclusive. A book with nothing published has a NULL edge,
+  // which no comparison matches, so any bound set leaves it out.
+  for (const [edge, from, to] of [
+    ['MIN', query.releasedFrom, query.releasedTo],
+    ['MAX', query.updatedFrom, query.updatedTo],
+  ] as const) {
+    if (from !== undefined) {
+      clauses.push(
+        literal(`${publicationEdge(edge).val} >= ${escapeInstant(from)}`)
+      );
+    }
+    if (to !== undefined) {
+      clauses.push(
+        literal(`${publicationEdge(edge).val} <= ${escapeInstant(to)}`)
+      );
+    }
   }
 
   // A Draft book shows in exactly one list: its own Co-author's `?userId=`,
@@ -341,21 +432,40 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async list(query, viewer) {
-      const creditedBookIds =
-        query.userId === undefined
-          ? undefined
-          : (
-              await BookAuthor.findAll({
-                where: { userId: query.userId },
-                attributes: ['bookId'],
-              })
-            ).map((credit) => credit.bookId);
+      const lookups: IdLookups = {
+        creditedBookIds:
+          query.userId === undefined
+            ? undefined
+            : (
+                await BookAuthor.findAll({
+                  where: { userId: query.userId },
+                  attributes: ['bookId'],
+                })
+              ).map((credit) => credit.bookId),
+        authorBookIds:
+          query.author === undefined
+            ? undefined
+            : await booksByAuthor(query.author),
+        seriesIds:
+          query.seriesTitle === undefined
+            ? undefined
+            : await seriesTitled(query.seriesTitle),
+      };
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);
-      const { rows, count } = await Book.findAndCountAll({
-        where: buildWhere(query, creditedBookIds, viewer, rank),
-        limit: query.limit,
-        offset: query.offset,
+      const where = buildWhere(query, lookups, viewer, rank);
+      // Counted first, so a page past the end can be served as the last
+      // non-empty one (page 1 when nothing matches) rather than as an empty
+      // page the client would have to page back from.
+      const total = await Book.count({ where });
+      const current = Math.min(
+        query.current,
+        Math.max(1, Math.ceil(total / query.pageSize))
+      );
+      const rows = await Book.findAll({
+        where,
+        limit: query.pageSize,
+        offset: (current - 1) * query.pageSize,
         // A ranked list goes best first, ties to the newer book; otherwise a
         // series' books come in Series order and every other list by id.
         order:
@@ -386,7 +496,8 @@ export function createSequelizeBookRepository(): BookRepository {
             genreOf(row.genreId, genres)
           )
         ),
-        total: count,
+        total,
+        current,
       };
     },
 

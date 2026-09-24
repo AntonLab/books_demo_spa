@@ -24,7 +24,7 @@ const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
 export const TILE_COLUMNS: ColProps = { xs: 12, sm: 8, md: 6, lg: 4 };
 
 // Presentational on purpose: each page runs its own query (`useSortedBooks`,
-// `useSearchBooks`, `useSeriesInGenre`…) and hands the states down. A
+// `useBookSearch`, `useBooksInSeries`…) and hands the states down. A
 // component that ran the query itself could not serve them all.
 //
 // It takes TanStack's own flags rather than a `LoadStatus` string so there is
