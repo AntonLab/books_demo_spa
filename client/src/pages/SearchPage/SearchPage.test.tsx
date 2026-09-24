@@ -471,7 +471,7 @@ describe('SearchPage for one genre', () => {
 
     expect(
       await screen.findByRole('link', { name: 'The Ashgrove Chronicles' })
-    ).toHaveAttribute('href', '/search?series=12');
+    ).toHaveAttribute('href', '/series/12');
     expect(
       screen.getByRole('heading', { level: 3, name: 'Series' })
     ).toBeInTheDocument();

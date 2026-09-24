@@ -4,9 +4,8 @@ import type { PublicSeries } from '@/types/series';
 
 interface SeriesCardProps {
   series: PublicSeries;
-  // One of several cards in a list, it links to the series' own results —
-  // there is no series page to send a reader to. Unlinked, it heads those
-  // results itself.
+  // One of several cards in a list, it links to the series' page. Unlinked,
+  // it heads that page itself.
   linked?: boolean;
   // A grid cell, beside Book tiles. A Series has no Cover, so its
   // description stands where one would.
@@ -22,7 +21,7 @@ export const SeriesCard: FC<SeriesCardProps> = ({
 }) => (
   <Card
     title={series.title}
-    href={linked ? `/search?series=${series.id}` : undefined}
+    href={linked ? `/series/${series.id}` : undefined}
     tile={tile}
     authors={series.authors}
     description={series.description}

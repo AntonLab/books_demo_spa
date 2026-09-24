@@ -27,8 +27,13 @@ paths:
 
 ## Page rules
 
-- **There is no series page.** A series' books are `/search?series=<id>`;
-  `/series` is `NotFoundPage`.
+- `SeriesPage` (`/series/:id`) shows the `SeriesCard`, then the series' books
+  in Series order: one page at `PAGE_SIZE_MAX`, no pagination, drafts left
+  out by the server. The books are asked for only once the series loads, so a
+  404, like an id that is not a positive integer, shows "This series no
+  longer exists." and nothing else is requested. "Edit series" shows for its
+  Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
+  link points here, and old `/search?series=` links are not redirected.
 - `SearchPage` takes one filter per visit, by precedence `series`, then
   `genre`, then `q`, then `sort`. An id that is not a positive integer, or
   names nothing, gets "This series no longer exists." / "This genre no longer
