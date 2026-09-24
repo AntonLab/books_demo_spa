@@ -6,6 +6,7 @@ import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
 import type { SeriesBookSummary } from '@/types/series';
+import type { PublicUser } from '@/types/user';
 
 jest.mock('@/api/series');
 
@@ -26,6 +27,15 @@ const cora = {
   avatarUrl: null,
 };
 
+const sessionOf = (role: PublicUser['role']): PublicUser => ({
+  ...ann,
+  email: 'ann@example.com',
+  role,
+  status: 'active',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+});
+
 const bookNamed = (
   id: number,
   title: string,
@@ -38,16 +48,14 @@ const listing = (items: SeriesBookSummary[]) => ({ items });
 const renderList = (
   overrides: Partial<{
     mayEdit: boolean;
-    isModerator: boolean;
-    viewerId: number;
+    session: PublicUser;
   }> = {}
 ) =>
   renderWithProviders(
     <SeriesOrderList
       seriesId={7}
       mayEdit
-      isModerator={false}
-      viewerId={ann.id}
+      session={sessionOf('author')}
       {...overrides}
     />
   );
@@ -87,7 +95,7 @@ describe('SeriesOrderList', () => {
     mockedSeries.listSeriesBooks.mockResolvedValue(
       listing([bookNamed(2, 'Someone Else’s Draft', 'draft', [cora])])
     );
-    renderList({ isModerator: true });
+    renderList({ session: { ...sessionOf('admin'), id: 99 } });
 
     expect(
       await screen.findByRole('link', { name: 'Someone Else’s Draft' })

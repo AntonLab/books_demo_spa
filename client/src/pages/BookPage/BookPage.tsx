@@ -24,7 +24,7 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
-import { isCreditedTo } from '@/types/user';
+import { bookCapabilities } from '@/types/capabilities';
 import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
@@ -55,13 +55,9 @@ export const BookPage: FC = () => {
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
 
-  // Mirrors the server: nobody likes or comments on a Draft book, and nobody
-  // likes a book they co-author. The server answers 403 either way — this only
-  // avoids offering what would fail.
+  // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
-  const isCoAuthor = isCreditedTo(book, session?.id);
-  const canLike =
-    !isDraft && session !== null && session !== undefined && !isCoAuthor;
+  const { isCoAuthor, mayLike } = bookCapabilities(book, session);
 
   return (
     <article>
@@ -111,7 +107,7 @@ export const BookPage: FC = () => {
                 {book.genre.name}
               </Link>
             )}
-            {canLike && (
+            {mayLike && (
               <LikeButton
                 count={book.likeCount}
                 likedId={book.viewerLikeId}
