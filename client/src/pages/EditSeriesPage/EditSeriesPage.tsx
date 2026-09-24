@@ -35,10 +35,7 @@ export const EditSeriesPage: FC = () => {
 
   // A Moderator may edit and delete any series, and order its books, but never
   // change its byline — CoAuthorManager stays read-only for one.
-  const { isCoAuthor, mayEdit, mayManageByline } = seriesCapabilities(
-    series,
-    session
-  );
+  const { isCoAuthor, mayEdit } = seriesCapabilities(series, session);
   // The server refuses anyone else with a 403.
   if (!session || !mayEdit) {
     return (
@@ -90,7 +87,7 @@ export const EditSeriesPage: FC = () => {
         work={{ kind: 'series', id: series.id }}
         authors={series.authors}
         viewerId={session.id}
-        canManage={mayManageByline}
+        canManage={isCoAuthor}
         onLeave={() => void navigate('/my-books')}
       />
 

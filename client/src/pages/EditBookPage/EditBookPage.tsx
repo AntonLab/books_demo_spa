@@ -54,10 +54,7 @@ export const EditBookPage: FC = () => {
 
   // A Moderator may edit and delete any book, but never change its byline —
   // CoAuthorManager stays read-only for one.
-  const { isCoAuthor, mayEdit, mayManageByline } = bookCapabilities(
-    book,
-    session
-  );
+  const { isCoAuthor, mayEdit } = bookCapabilities(book, session);
 
   // The server refuses anyone else with a 403: offering the form would only
   // collect edits it cannot save.
@@ -138,7 +135,7 @@ export const EditBookPage: FC = () => {
         work={{ kind: 'book', id: book.id }}
         authors={book.authors}
         viewerId={session.id}
-        canManage={mayManageByline}
+        canManage={isCoAuthor}
         onLeave={() => void navigate('/my-books')}
       />
 

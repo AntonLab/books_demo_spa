@@ -49,7 +49,7 @@ export const NewChapterPage: FC = () => {
 
   // Only a Co-author adds chapters: a Moderator may edit and delete them, but
   // the matrix gives no role but author a create on chapters.
-  if (!bookCapabilities(book, session).mayAddChapter) {
+  if (!bookCapabilities(book, session).isCoAuthor) {
     return (
       <>
         <Alert
