@@ -3,7 +3,6 @@ paths:
   - 'server/src/index.ts'
   - 'server/src/app.ts'
   - 'server/src/shutdown.ts'
-  - 'server/src/listen.ts'
   - 'server/src/expiryPurge.ts'
   - 'server/src/logger.ts'
   - 'server/src/middleware/securityHeaders.ts'
@@ -32,7 +31,7 @@ as its first middleware, so errors, 404s and parse failures carry it too.
 - `npm run dev` restarts with `SIGTERM`, so every dev restart takes this path.
   `shutdown.spec.ts` uses fakes, not real signals.
 
-## Bind errors (`listen.ts`)
+## Bind errors (`index.ts`)
 
 A failed bind logs `Could not start the HTTP server`, never "listening";
 `index.ts` sets `exitCode = 1` and runs the graceful shutdown so the pool

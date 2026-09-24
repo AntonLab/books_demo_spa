@@ -29,27 +29,12 @@ test('lets `limit` hits through in a window and refuses the next', (t) => {
   );
 });
 
-test('peek counts nothing, and says whether one more hit would pass', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
-
-  for (let look = 0; look < 10; look += 1) {
-    assert.equal(limiter.peek('a').allowed, true);
-  }
-  limiter.hit('a');
-  limiter.hit('a');
-  assert.equal(limiter.peek('a').allowed, true);
-  limiter.hit('a');
-  assert.equal(limiter.peek('a').allowed, false);
-});
-
-test('retryAfterMs is the time left in the window, and 0 without one', (t) => {
+test('retryAfterMs is the time left in the window', (t) => {
   const clock = { now: 0 };
   const limiter = limiterOn(t, clock);
 
-  assert.equal(limiter.peek('a').retryAfterMs, 0);
-  limiter.hit('a');
+  assert.equal(limiter.hit('a').retryAfterMs, WINDOW_MS);
   clock.now = 400;
-  assert.equal(limiter.peek('a').retryAfterMs, 600);
   assert.equal(limiter.hit('a').retryAfterMs, 600);
 });
 
@@ -61,11 +46,12 @@ test('the window ends on time, and the key starts again with a full budget', (t)
   }
 
   clock.now = WINDOW_MS - 1;
-  assert.equal(limiter.peek('a').allowed, false);
+  assert.equal(limiter.hit('a').allowed, false);
   clock.now = WINDOW_MS;
-  assert.deepEqual(limiter.peek('a'), { allowed: true, retryAfterMs: 0 });
-  // Touching the expired key dropped its window.
-  assert.equal(limiter.size(), 0);
+  assert.deepEqual(limiter.hit('a'), {
+    allowed: true,
+    retryAfterMs: WINDOW_MS,
+  });
 });
 
 test('release decrements the key’s count, freeing the slot for another hit', (t) => {
@@ -105,7 +91,6 @@ test('release forgets the key once its count reaches zero, rather than leaving a
   limiter.release('a');
 
   assert.equal(limiter.size(), 0);
-  assert.deepEqual(limiter.peek('a'), { allowed: true, retryAfterMs: 0 });
 });
 
 test('release does nothing when the key has no open window', (t) => {
@@ -113,10 +98,6 @@ test('release does nothing when the key has no open window', (t) => {
   const limiter = limiterOn(t, clock);
 
   limiter.release('never-hit');
-  assert.deepEqual(limiter.peek('never-hit'), {
-    allowed: true,
-    retryAfterMs: 0,
-  });
   assert.equal(limiter.size(), 0);
 
   // An expired window counts as none: releasing it neither revives it nor
@@ -139,7 +120,7 @@ test('release does not move the window’s end', (t) => {
   clock.now = 400;
   limiter.release('a');
 
-  assert.equal(limiter.peek('a').retryAfterMs, 600);
+  assert.equal(limiter.hit('a').retryAfterMs, 600);
 });
 
 test('reset forgets one key and leaves the others alone', (t) => {
@@ -151,8 +132,8 @@ test('reset forgets one key and leaves the others alone', (t) => {
 
   limiter.reset('a');
 
-  assert.equal(limiter.peek('a').allowed, true);
-  assert.equal(limiter.peek('b').allowed, false);
+  assert.equal(limiter.hit('a').allowed, true);
+  assert.equal(limiter.hit('b').allowed, false);
 });
 
 test('each key is counted apart', (t) => {

@@ -5,7 +5,6 @@ paths:
   - 'server/src/models/UserAvatar.ts'
   - 'server/src/routes/bookRoutes.ts'
   - 'server/src/routes/userRoutes.ts'
-  - 'server/src/types/image.ts'
 ---
 
 # Covers and Avatars (ADR-0007)

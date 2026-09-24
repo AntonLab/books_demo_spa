@@ -2,18 +2,15 @@
 // counts live in this process only, and a restart forgets them.
 
 interface RateLimitState {
-  // For hit: whether this request is within the limit. For peek: whether one
-  // more request would be.
+  // Whether this request is within the limit.
   allowed: boolean;
-  // Milliseconds until the key's window closes; 0 when it has none open.
+  // Milliseconds until the key's window closes.
   retryAfterMs: number;
 }
 
 export interface RateLimiter {
   // Counts one request against the key and reports the state after it.
   hit(key: string): RateLimitState;
-  // Reports the key's state without counting anything.
-  peek(key: string): RateLimitState;
   // Gives back one hit that turned out not to count, such as a request that
   // was tentatively counted on arrival but did not end in the outcome the
   // budget tracks. Floors at 0, deleting the key once its count reaches 0
@@ -85,18 +82,6 @@ export function createRateLimiter({
       };
       windows.set(key, next);
       return { allowed: next.count <= limit, retryAfterMs: next.endsAt - at };
-    },
-
-    peek(key) {
-      const at = now();
-      const window = current(key, at);
-      if (window === undefined) {
-        return { allowed: true, retryAfterMs: 0 };
-      }
-      return {
-        allowed: window.count < limit,
-        retryAfterMs: window.endsAt - at,
-      };
     },
 
     release(key) {

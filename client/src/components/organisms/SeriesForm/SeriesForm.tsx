@@ -4,7 +4,7 @@ import {
   NO_GENRE,
   WorkFields,
 } from '@/components/molecules/WorkFields/WorkFields';
-import type { PublicGenre } from '@/types/genre';
+import type { PublicGenre } from 'shared';
 import styles from './SeriesForm.module.css';
 
 interface SeriesFormValues {

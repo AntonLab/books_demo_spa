@@ -1,4 +1,4 @@
-import type { ApiErrorBody } from '../types/api';
+import type { ApiErrorBody } from 'shared';
 
 export class ApiError extends Error {
   readonly status: number;
