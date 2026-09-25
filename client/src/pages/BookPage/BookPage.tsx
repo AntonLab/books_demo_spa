@@ -25,6 +25,7 @@ import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
 import { bookCapabilities } from '@/types/capabilities';
+import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
@@ -45,7 +46,7 @@ export const BookPage: FC = () => {
         <Alert
           type="error"
           message="Could not load this book."
-          className={styles.alert}
+          className={spacing.gapBelow}
         />
         {error instanceof ApiError && error.status === 404 && (
           <BookUnsavedTextNotices bookId={bookId} />

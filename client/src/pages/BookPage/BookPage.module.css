@@ -18,7 +18,3 @@
 .description {
   margin-top: var(--ant-margin-sm);
 }
-
-.alert {
-  margin-bottom: var(--ant-margin);
-}

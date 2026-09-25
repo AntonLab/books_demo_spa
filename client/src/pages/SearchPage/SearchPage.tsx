@@ -20,6 +20,7 @@ import {
   searchOf,
   toSearchParams,
 } from '@/types/bookSearch';
+import spacing from '@/theme/spacing.module.css';
 import styles from './SearchPage.module.css';
 
 const GENRE_GONE = 'This genre no longer exists.';
@@ -97,7 +98,7 @@ export const SearchPage: FC = () => {
             align="center"
             gap="middle"
             wrap
-            className={styles.bar}
+            className={spacing.gapBelow}
           >
             <Typography.Text>
               {books.isPending

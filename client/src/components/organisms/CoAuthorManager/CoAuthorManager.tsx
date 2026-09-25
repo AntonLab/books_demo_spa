@@ -21,6 +21,7 @@ import {
 } from '@/queries/coAuthors';
 import type { AuthorSummary } from '@/types/api';
 import type { DefaultOptionType } from 'antd/es/select';
+import spacing from '@/theme/spacing.module.css';
 import styles from './CoAuthorManager.module.css';
 
 // A typed stand-in for antd's own `DefaultOptionType`, whose extra fields
@@ -83,7 +84,11 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
       <Typography.Title level={4}>Co-authors</Typography.Title>
 
       {failure && (
-        <Alert type="error" title={failure.message} className={styles.error} />
+        <Alert
+          type="error"
+          title={failure.message}
+          className={spacing.gapBelow}
+        />
       )}
 
       <Listy

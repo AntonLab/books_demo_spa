@@ -29,6 +29,7 @@ import {
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
+import spacing from '@/theme/spacing.module.css';
 import styles from './EditChapterPage.module.css';
 
 export const EditChapterPage: FC = () => {
@@ -83,7 +84,7 @@ export const EditChapterPage: FC = () => {
         <Alert
           type="error"
           title="Could not load this chapter."
-          className={styles.alert}
+          className={spacing.gapBelow}
         />
         {gone && notice}
       </>
@@ -99,7 +100,7 @@ export const EditChapterPage: FC = () => {
         <Alert
           type="warning"
           title="Only its co-authors can edit this chapter."
-          className={styles.alert}
+          className={spacing.gapBelow}
         />
         {notice}
       </>
@@ -228,11 +229,11 @@ export const EditChapterPage: FC = () => {
                 </Button>
               </Space>
             }
-            className={styles.alert}
+            className={spacing.gapBelow}
           />
         )}
         {update.isSuccess && (
-          <Alert type="success" title="Saved." className={styles.alert} />
+          <Alert type="success" title="Saved." className={spacing.gapBelow} />
         )}
         <ChapterForm
           // Remounts on each new server version and on "Use their version".
@@ -258,7 +259,7 @@ export const EditChapterPage: FC = () => {
         <Alert
           type="error"
           title={remove.error.message}
-          className={styles.alert}
+          className={spacing.gapBelow}
         />
       )}
       <Popconfirm
