@@ -1,5 +1,10 @@
 import type { Request } from 'express';
-import { ForbiddenError, NotFoundError } from '../types/errors.ts';
+import { scopeFor } from '../permissions/permissionStore.ts';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../types/errors.ts';
 
 // The other half of enforcement for Books, Series and Chapters.
 // requirePermission already refused `none`; `own` has to look at the row —
@@ -61,4 +66,26 @@ export async function assertCoAuthor(
   refusal: string
 ): Promise<void> {
   refuseUncredited(req, await coAuthorsOf(target), refusal);
+}
+
+// Taking a credit off a work. The route sits behind requireAuth alone, so a
+// Co-author who switched Role to `user` (`none` on the module) can still
+// leave; that is why the matrix is read here rather than stamped by
+// requirePermission. Leaving needs no check: the repository answers 404 for
+// an uncredited account and 409 for the last Co-author. Removing someone else
+// takes exactly `own` — `none` is no longer an author and `any` is a
+// Moderator, who never changes a byline (ADR-0005) — and a credit.
+export async function assertMayRemoveCredit(
+  req: Request,
+  target: CoAuthorTarget,
+  module: 'books' | 'series',
+  userId: number,
+  refusal: string
+): Promise<void> {
+  if (!req.user) throw new UnauthorizedError();
+  if (userId === req.user.id) return;
+  if (scopeFor(req.user.role, module, 'update') !== 'own') {
+    throw new ForbiddenError('Only a co-author may remove a co-author');
+  }
+  await assertCoAuthor(req, target, refusal);
 }
