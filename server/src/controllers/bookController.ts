@@ -188,7 +188,7 @@ export function createBookController(repository: BookRepository) {
       res.status(204).end();
     },
 
-    // A1: books x update, then the same Co-author check PATCH uses.
+    // Books x update, then the same Co-author check PATCH uses.
     uploadCover: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       if (!Buffer.isBuffer(req.body)) {
@@ -205,7 +205,7 @@ export function createBookController(repository: BookRepository) {
       res.json(book);
     },
 
-    // A2: same guards as uploadCover; 204 whether or not a Cover existed, but
+    // Same guards as uploadCover; 204 whether or not a Cover existed, but
     // 404 for a missing Book. assertMayChange alone cannot catch a missing
     // Book under `any` scope — it returns immediately for a Moderator — so
     // this checks removeCover's own report of whether the row was there.
@@ -218,7 +218,7 @@ export function createBookController(repository: BookRepository) {
       res.status(204).end();
     },
 
-    // A3: rides on books x read, which a guest holds; goes through the
+    // Rides on books x read, which a guest holds; goes through the
     // repository's own readableBookWhere, so a Draft book's Cover is a 404
     // to anyone who may not read the book — the same 404 as a missing one.
     getCover: async (req, res) => {
@@ -231,7 +231,7 @@ export function createBookController(repository: BookRepository) {
         .set({
           'Content-Type': 'image/webp',
           'X-Content-Type-Options': 'nosniff',
-          // Versioned by the URL's own ?v=, so immutable is safe (A3).
+          // Versioned by the URL's own ?v=, so immutable is safe.
           'Cache-Control': 'private, max-age=31536000, immutable',
         })
         .send(cover.data);

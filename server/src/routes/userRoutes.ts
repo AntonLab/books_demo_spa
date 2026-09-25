@@ -47,8 +47,6 @@ export function createUserRoutes(deps: RouteDeps): Router {
     controller.getById
   );
 
-  // requirePermission goes before validate on every write, so a refused
-  // request is never parsed or echoed back in a 400.
   //
   // POST stays guarded here even though POST /api/auth/register is the open
   // door to account creation: this is the administrative create, which accepts
@@ -116,7 +114,7 @@ export function createUserRoutes(deps: RouteDeps): Router {
     controller.remove
   );
 
-  // A4/A5: the raw body parser is mounted on this PUT alone, never app-wide,
+  // The raw body parser is mounted on this PUT alone, never app-wide,
   // and after requirePermission so a refused request's 2 MiB is never read.
   router.put(
     '/:id/avatar',
@@ -134,7 +132,7 @@ export function createUserRoutes(deps: RouteDeps): Router {
     validate({ params: idParamSchema }),
     controller.removeAvatar
   );
-  // A6: deliberately no requirePermission here — an avatar is public.
+  // Deliberately no requirePermission here — an avatar is public.
   // /:id/avatar cannot collide with /:id, the same reason /:id/role cannot.
   router.get(
     '/:id/avatar',

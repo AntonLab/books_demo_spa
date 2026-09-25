@@ -4,8 +4,8 @@
 [![CodeQL](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml/badge.svg)](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml)
 
 A demo single-page application for browsing books: a React 19 + TypeScript
-frontend and an Express 5 + Sequelize/MySQL API, kept in one repository as two
-npm workspaces.
+frontend and an Express 5 + Sequelize/MySQL API, kept in one repository as three
+npm workspaces (the third, `shared/`, holds the API types both read).
 
 ## Stack
 
@@ -20,9 +20,10 @@ npm workspaces.
 ```
 client/   React SPA bundled with webpack 5   — see client/CLAUDE.md
 server/   Express API on Sequelize/MySQL     — see server/CLAUDE.md
+shared/   API types and string unions both use, .ts source with no build step
 ```
 
-One root `package.json` declares both as npm workspaces, so a single
+One root `package.json` declares all three as npm workspaces, so a single
 `npm install` at the repo root covers the whole repo and writes one lockfile.
 
 ## Prerequisites
@@ -106,13 +107,13 @@ Run these from the repo root.
 | `npm run dev`          | client on :3000 and server on :4000 together, under `concurrently`  |
 | `npm run build`        | both: client bundle into `client/build/`, `tsc` into `server/dist/` |
 | `npm test`             | both: Jest (client) and `node:test` (server)                        |
-| `npm run typecheck`    | both: `tsc --noEmit`                                                |
-| `npm run lint`         | both: ESLint                                                        |
+| `npm run typecheck`    | every workspace: `tsc --noEmit`                                     |
+| `npm run lint`         | every workspace: ESLint                                             |
 | `npm run format:check` | Prettier over the whole repo                                        |
 
 `npm run lint:fix` and `npm run format` apply fixes.
 
-Every script except the Prettier pair fans out over both workspaces; target one
+Every script except the Prettier pair fans out over every workspace that defines it; target one
 with npm's `-w` flag (`npm run dev -w client`, `npm run build -w server`). The
 root deliberately defines no single-package aliases, so `-w` is the one way to
 narrow any script. Prettier is root-only because its config is repo-wide — the
@@ -127,30 +128,16 @@ configured before `npm test` there.
 ## Quality gates
 
 Before committing, run `npm run typecheck`, `npm run lint`,
-`npm run format:check` and `npm test` from the repo root; each covers both
-workspaces. Commit messages follow the conventional-commit prefixes (`feat:`,
-`fix:`, `chore:`, `docs:`, `test:`, `ci:`).
+`npm run format:check` and `npm test` from the repo root. Commit messages use
+conventional-commit prefixes. `npm install` enables the `.githooks/` hooks
+(ESLint and Prettier on staged files, a commit-message check); they never run
+`typecheck` or the tests. `CLAUDE.md` (Quality Gates) holds the full rules.
 
 ### Continuous integration
 
 Feature branches start from `dev` and open their PR against it; `dev` is merged
 into `main` for a release. Every PR into and push to either branch runs
-`.github/workflows/ci.yml` — `lint` (ESLint and Prettier), `typecheck`,
-`test-client`, `test-server` against a MySQL 8.4 service container, and `build`
-— and `.github/workflows/codeql.yml`. All seven checks must pass before a PR
-merges. Dependabot opens weekly update PRs for npm packages and for the
-workflows' actions.
-
-### Pre-commit hook
-
-`.githooks/pre-commit` lints and formats the staged files on every commit:
-ESLint `--fix` and Prettier `--write`, re-staged automatically, with the commit
-blocked if an ESLint error survives the fix. `npm install` turns it on via the
-root `prepare` script; to enable it by hand:
-
-```bash
-git config core.hooksPath .githooks
-```
-
-Skip it for a single commit with `git commit --no-verify`. It does not run
-`typecheck` or the tests, so the gates above still apply.
+`.github/workflows/ci.yml` and `.github/workflows/codeql.yml`, and every check
+must pass before a PR merges; `.claude/rules/repo/ci.md` lists the jobs and the
+branch protection. Dependabot opens weekly update PRs for npm packages and for
+the workflows' actions.

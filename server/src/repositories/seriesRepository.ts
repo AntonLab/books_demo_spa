@@ -124,7 +124,7 @@ function buildWhere(
     clauses.push({ id: creditedSeriesIds });
   }
 
-  // A5: ANDed with the other filters. An id that names no Genre matches
+  // ANDed with the other filters. An id that names no Genre matches
   // nothing and yields an empty list, as an unknown `?tag=` does.
   if (query.genreId !== undefined) {
     clauses.push({ genreId: query.genreId });

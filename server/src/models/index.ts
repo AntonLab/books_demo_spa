@@ -27,7 +27,7 @@ function initEachModel(sequelize: Sequelize): void {
   // Reference data, unrelated to any row — no association block follows it.
   initPermissionModel(sequelize);
   // The catalogue's Genres. Initialised before series and books, which
-  // reference it (M2).
+  // reference it.
   initGenreModel(sequelize);
   initSeriesModel(sequelize);
   initSeriesAuthorModel(sequelize);
@@ -46,7 +46,7 @@ function initEachModel(sequelize: Sequelize): void {
 // the target is always a registered model no matter what order the files load
 // in.
 function declareAssociations(): void {
-  // An Account's Avatar (S1/S3, ADR-0007): one row, cascading with the
+  // An Account's Avatar (ADR-0007): one row, cascading with the
   // Account — deleting a User removes its Avatar with no application code.
   User.hasOne(UserAvatar, {
     as: 'avatar',
@@ -108,7 +108,7 @@ function declareAssociations(): void {
   });
   BookAuthor.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
-  // A Book's Cover (S1/S3, ADR-0007): one row, cascading with the Book —
+  // A Book's Cover (ADR-0007): one row, cascading with the Book —
   // deleting a Book removes its Cover with no application code.
   Book.hasOne(BookCover, {
     as: 'cover',
@@ -120,7 +120,7 @@ function declareAssociations(): void {
 
   // A Book's Genre (ADR-0008). SET NULL rather than CASCADE: a Genre is a
   // label on the Book, not part of it, so deleting the Genre leaves the Book
-  // without one instead of destroying a record nobody asked to delete (A4).
+  // without one instead of destroying a record nobody asked to delete.
   // The alias is unread — nothing eager-loads a Genre, because
   // genreRepository.loadGenres batches them — but declaring both sides is what
   // creates the foreign key.
@@ -135,7 +135,7 @@ function declareAssociations(): void {
   Book.belongsTo(Genre, { as: 'genre', foreignKey: 'genreId' });
 
   // A Series' own Genre (ADR-0008), on the same terms as a Book's: SET NULL,
-  // so deleting the Genre leaves the Series without one (A4).
+  // so deleting the Genre leaves the Series without one.
   Genre.hasMany(Series, {
     as: 'series',
     foreignKey: { name: 'genreId', allowNull: true },

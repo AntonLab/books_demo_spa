@@ -30,7 +30,7 @@ const PUBLIC_READS: RoleGrants = {
   comments: { read: 'any' },
   likes: { read: 'any' },
   // A Genre list nobody can read would leave the header's Genres menu empty
-  // for a visitor who has not signed in (A1).
+  // for a visitor who has not signed in.
   genres: { read: 'any' },
 };
 

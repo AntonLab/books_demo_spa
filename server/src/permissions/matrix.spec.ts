@@ -116,7 +116,7 @@ test('no role is granted own on read, which no read handler would honour', () =>
   assert.deepEqual(ownReads, []);
 });
 
-// R1. A Genre has no Owner, so no grant here is `own`: either a role may keep
+// A Genre has no Owner, so no grant here is `own`: either a role may keep
 // the list or it may not. Everyone reads it, guests included, because the
 // header's Genres menu renders before anyone signs in.
 test('everyone reads genres and only admins keep the list', () => {

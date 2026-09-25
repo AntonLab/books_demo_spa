@@ -28,10 +28,8 @@ export const LikeButton: FC<LikeButtonProps> = ({
       aria-label={liked ? 'Unlike' : 'Like'}
       onClick={() => onToggle(likedId)}
     >
-      {/* A text glyph rather than @ant-design/icons: that package is not a
-          dependency of this workspace, and one button does not justify adding
-          one. aria-pressed and the label carry the state for a screen reader,
-          so the glyph is decorative. */}
+      {/* aria-pressed and the label carry the state for a screen reader, so
+          the glyph is decorative. */}
       <span aria-hidden="true">{liked ? '♥' : '♡'}</span> {count}
     </Button>
   );

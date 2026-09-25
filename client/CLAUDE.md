@@ -22,7 +22,7 @@ read, read the rule first:
 | `pages.md`      | routing, lazy loading and the error boundary, page-level rules         |
 | `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                 |
 | `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
-| `webpack.md`    | the three webpack configs                                              |
+| `webpack.md`    | the one webpack config                                                 |
 
 ## Commands
 

@@ -60,7 +60,7 @@ describe('genreRepository against real MySQL', { skip }, () => {
     await Genre.destroy({ where: {}, truncate: false });
   });
 
-  // A4, and the one rule here that only MySQL can prove: the deletion and the
+  // The one rule here that only MySQL can prove: the deletion and the
   // unlinking are the same statement, so no Book or Series is ever left
   // pointing at a Genre that is gone.
   test('a deleted Genre leaves its books and series without one, in the same statement', async () => {
