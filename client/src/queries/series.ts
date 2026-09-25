@@ -11,6 +11,7 @@ import {
   type SeriesPayload,
 } from '../api/series';
 import type { SeriesBookSummary } from '../types/api';
+import { SUGGESTIONS_SIZE } from './books';
 import { queryKeys } from './keys';
 import { useOptimisticReorder } from './reorder';
 
@@ -21,6 +22,16 @@ export const useMySeries = (userId: number | undefined) => {
     queryKey: queryKeys.series({ userId, limit: 100 }),
     queryFn: () => listSeries({ userId, limit: 100 }),
     enabled: userId !== undefined,
+  });
+};
+
+// The search form's Series suggestions, as `useBookSuggestions`.
+export const useSeriesSuggestions = (term: string) => {
+  const params = { q: term, limit: SUGGESTIONS_SIZE };
+  return useQuery({
+    queryKey: queryKeys.series(params),
+    queryFn: () => listSeries(params),
+    enabled: term !== '',
   });
 };
 

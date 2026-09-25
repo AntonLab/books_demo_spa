@@ -54,6 +54,72 @@ describe('parseBookSearch', () => {
   });
 });
 
+describe('picked author and series ids', () => {
+  it('reads an id only beside its text, and only a positive integer', () => {
+    expect(
+      parse('author=annlee&authorId=3&seriesTitle=Saga&seriesId=2')
+    ).toMatchObject({ authorId: 3, seriesId: 2 });
+
+    const orphaned = parse('authorId=3&seriesId=2');
+    expect(orphaned.authorId).toBeUndefined();
+    expect(orphaned.seriesId).toBeUndefined();
+
+    for (const bad of ['0', '-1', '2.5', 'abc', '01']) {
+      expect(parse(`author=a&authorId=${bad}`).authorId).toBeUndefined();
+    }
+  });
+
+  it('round-trips through the URL and the form', () => {
+    const search: BookSearch = {
+      author: 'annlee',
+      authorId: 3,
+      seriesTitle: 'Saga',
+      seriesId: 2,
+      sort: 'popular',
+      page: 1,
+    };
+
+    expect(parseBookSearch(toSearchParams(search))).toEqual(search);
+    expect(searchOf(formValuesOf(search, undefined))).toEqual(search);
+  });
+
+  it('drops a submitted id whose text was cleared', () => {
+    expect(
+      searchOf({ author: ' ', authorId: 3, sort: 'popular' }).authorId
+    ).toBeUndefined();
+  });
+
+  it('asks the server by id instead of text', () => {
+    const params = listParamsOf(
+      {
+        author: 'annlee',
+        authorId: 3,
+        seriesTitle: 'Saga',
+        seriesId: 2,
+        sort: 'popular',
+        page: 1,
+      },
+      undefined
+    );
+
+    expect(params).toMatchObject({ userId: 3, seriesId: 2 });
+    expect(params.author).toBeUndefined();
+    expect(params.seriesTitle).toBeUndefined();
+  });
+
+  it("puts the server's complaints about an id on its text field", () => {
+    const error = new ApiError(400, 'Request validation failed', [
+      { path: ['userId'], message: 'Bad user' },
+      { path: ['seriesId'], message: 'Bad series' },
+    ]);
+
+    expect(fieldErrorsOf(error)).toEqual([
+      { name: 'author', errors: ['Bad user'] },
+      { name: 'seriesTitle', errors: ['Bad series'] },
+    ]);
+  });
+});
+
 describe('toSearchParams', () => {
   it('writes only what is set, leaving out the default sort and page 1', () => {
     expect(toSearchParams({ sort: 'popular', page: 1 }).toString()).toBe('');

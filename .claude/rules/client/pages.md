@@ -38,7 +38,11 @@ paths:
   paginated book results. The URL is its only state, read and written through
   `types/bookSearch.ts`: days stay `YYYY-MM-DD` in the URL and become instants
   only in `listParamsOf`; the default sort and page 1 are never written;
-  `?series=` and an unknown `status` / `sort` / day are ignored. The form is
+  `?series=` and an unknown `status` / `sort` / day are ignored. Picking an
+  Author or Series suggestion adds its id beside the text
+  (`authorId` / `seriesId`); the server is then asked by id (`userId` /
+  `seriesId`), typing in the field drops the id, and an id without its text
+  is ignored. Picking a Text suggestion opens that book instead. The form is
   keyed by the URL plus the resolved Genre, because antd reads
   `initialValues` once. A `genre` the non-empty Genre list does not hold
   shows "This genre no longer exists." and asks for no books. When the
