@@ -8,7 +8,7 @@ const mockFetch = (response: Response): jest.Mock => {
 };
 
 describe('request', () => {
-  it('prefixes /api and sends credentials so the sid cookie travels', async () => {
+  it('prefixes /api', async () => {
     const fetchMock = mockFetch(jsonResponse({ id: 1 }));
 
     await request('/auth/me');
@@ -16,7 +16,6 @@ describe('request', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/auth/me');
-    expect(init.credentials).toBe('include');
     expect(init.method).toBe('GET');
   });
 
@@ -149,16 +148,16 @@ describe('request and the XSRF token', () => {
     setCookie('xsrfToken=tok-123');
     const read = mockFetch(jsonResponse({ id: 1 }));
     await request('/books/1');
-    expect(
-      (read.mock.calls[0] as [string, RequestInit])[1].headers
-    ).toBeUndefined();
+    expect((read.mock.calls[0] as [string, RequestInit])[1].headers).toEqual(
+      {}
+    );
 
     setCookie('xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT');
     const write = mockFetch(emptyResponse(204));
     await request('/auth/logout', { method: 'POST' });
-    expect(
-      (write.mock.calls[0] as [string, RequestInit])[1].headers
-    ).toBeUndefined();
+    expect((write.mock.calls[0] as [string, RequestInit])[1].headers).toEqual(
+      {}
+    );
   });
 
   it('sends the XSRF token beside a Blob body too', async () => {

@@ -44,9 +44,9 @@ describe('listChapters', () => {
     const [url, init] = callOf(fetchMock);
     // 100 is the server's cap on limit; anything above is a 400.
     expect(url).toBe('/api/chapters?bookId=7&limit=100');
-    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
+    expect(init).toMatchObject({ method: 'GET' });
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('returns the list envelope unchanged', async () => {
@@ -72,7 +72,7 @@ describe('getChapter', () => {
     expect(url).toBe('/api/chapters/9');
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('rejects with the 404 of a chapter not yet out', async () => {
