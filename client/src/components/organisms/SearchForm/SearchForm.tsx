@@ -66,6 +66,17 @@ const startsBefore =
     },
   });
 
+// The pickers' side of `startsBefore`: each end greys out the days past the
+// other. The rule stays, for a range the URL brings in already reversed.
+const after =
+  (limit: Dayjs | null | undefined) =>
+  (day: Dayjs): boolean =>
+    limit != null && day.isAfter(limit, 'day');
+const before =
+  (limit: Dayjs | null | undefined) =>
+  (day: Dayjs): boolean =>
+    limit != null && day.isBefore(limit, 'day');
+
 export const SearchForm: FC<SearchFormProps> = ({
   id,
   initialValues,
@@ -75,6 +86,10 @@ export const SearchForm: FC<SearchFormProps> = ({
   onReset,
 }) => {
   const [form] = Form.useForm<BookSearchFormValues>();
+  const releasedFrom = Form.useWatch('releasedFrom', form);
+  const releasedTo = Form.useWatch('releasedTo', form);
+  const updatedFrom = Form.useWatch('updatedFrom', form);
+  const updatedTo = Form.useWatch('updatedTo', form);
 
   useEffect(() => {
     form.setFields(fieldErrors);
@@ -146,12 +161,18 @@ export const SearchForm: FC<SearchFormProps> = ({
               dependencies={['releasedTo']}
               rules={[startsBefore('releasedTo')]}
             >
-              <DatePicker className={styles.picker} />
+              <DatePicker
+                className={styles.picker}
+                disabledDate={after(releasedTo)}
+              />
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="releasedTo" label="Released to">
-              <DatePicker className={styles.picker} />
+              <DatePicker
+                className={styles.picker}
+                disabledDate={before(releasedFrom)}
+              />
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>
@@ -161,12 +182,18 @@ export const SearchForm: FC<SearchFormProps> = ({
               dependencies={['updatedTo']}
               rules={[startsBefore('updatedTo')]}
             >
-              <DatePicker className={styles.picker} />
+              <DatePicker
+                className={styles.picker}
+                disabledDate={after(updatedTo)}
+              />
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="updatedTo" label="Updated to">
-              <DatePicker className={styles.picker} />
+              <DatePicker
+                className={styles.picker}
+                disabledDate={before(updatedFrom)}
+              />
             </Form.Item>
           </Col>
         </Row>

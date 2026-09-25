@@ -97,6 +97,26 @@ describe('SearchForm', () => {
     expect(onSearch).not.toHaveBeenCalled();
   });
 
+  it('greys out the days on the wrong side of the other end', async () => {
+    renderForm({
+      initialValues: {
+        releasedFrom: dayjs('2026-01-05'),
+        // Opens the picker on January.
+        releasedTo: dayjs('2026-01-20'),
+        sort: 'popular',
+      },
+    });
+
+    await userEvent.click(screen.getByLabelText('Released to'));
+
+    expect(await screen.findByTitle('2026-01-04')).toHaveClass(
+      'ant-picker-cell-disabled'
+    );
+    expect(screen.getByTitle('2026-01-05')).not.toHaveClass(
+      'ant-picker-cell-disabled'
+    );
+  });
+
   it('does not search with an over-long text', async () => {
     const { onSearch } = renderForm({
       initialValues: { seriesTitle: 'a'.repeat(201), sort: 'popular' },
