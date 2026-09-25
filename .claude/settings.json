@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "claudeMdExcludes": ["**/.claude/worktrees/**/CLAUDE.md"],
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx jest *)",
+      "Bash(node --test *)",
+      "Bash(node --env-file-if-exists=.env.local --test *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git fetch *)",
+      "Bash(git check-ignore *)"
+    ],
+    "ask": [
+      "Bash(npm *seed*)",
+      "Bash(node *seed.ts*)",
+      "PowerShell(npm *seed*)",
+      "PowerShell(node *seed.ts*)"
+    ],
+    "deny": ["Edit(**/.env.local)", "Edit(package-lock.json)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-edited.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}
