@@ -13,15 +13,16 @@ paths:
 - One `webpack.config.js` exports `(env, argv) => Configuration`; the `dev`
   and `build` scripts pass `--mode`, and every difference between the two
   builds branches on `argv.mode`. A run without `--mode` builds production.
-- **`swc-loader` strips types without checking them.**
-  `fork-ts-checker-webpack-plugin` type-checks in parallel; errors fail the
-  build and show in the dev overlay.
+- **`swc-loader` strips types without checking them**, and nothing in the
+  build checks them either: a type error still bundles. `npm run typecheck`
+  (and CI's `typecheck` job) is the check.
 - **The loader `include` names `shared`'s real path** via
   `require.resolve('shared')`: `shared` ships TypeScript, and webpack follows
   the workspace link before matching a rule.
 - **Fast Refresh needs both** `@pmmmwh/react-refresh-webpack-plugin` and swc's
   `transform.react.refresh`; with one alone it silently breaks.
-- Dev: `historyApiFallback`, `static: false` (assets are imported from `src/`),
+- Dev: `historyApiFallback`, `static: false` (everything is bundled from `src/`,
+  which imports no image or font, so there is no asset rule),
   `/api` proxied to `http://localhost:4000` so the browser sees one origin.
 - Prod: `[contenthash]` names, `runtimeChunk: 'single'` and a `vendors` cache
   group so vendor hashes survive app-only changes. The group takes
