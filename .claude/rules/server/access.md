@@ -16,10 +16,12 @@ half. Nothing here lives in the permission table.
 
 - Checked on books, series, chapters, comments and likes in the controllers,
   not in a middleware: the row must be loaded before an owner can be compared.
-  A scope of `any` (Moderators) skips the check outright. Every check answers
+  The row is looked up under every scope, so a missing one is 404 before
+  anything else, a Moderator's Cover upload included (no image is processed);
+  a scope of `any` then skips only the owner comparison. Every check answers
   404 before 403.
 - Books, series and chapters share one rule, `controllers/coAuthorGuard.ts`:
-  `assertMayChange` (a Co-author, or `any`) for edits and orders,
+  `assertMayChange` (a Co-author, or `any` once the row exists) for edits and orders,
   `assertCoAuthor` (a Co-author, whatever the scope) for the byline. Each
   controller hands it a target: the resource, the id and its Co-author lookup.
   Comments and likes (`assertOwner` / `assertOwned`) compare a single owner.

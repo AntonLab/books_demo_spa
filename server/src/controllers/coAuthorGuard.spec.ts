@@ -20,7 +20,7 @@ const requestAs = (
     permissionScope,
   }) as Request;
 
-// Counts lookups, so a test can tell `any` skipped the row entirely.
+// Counts lookups, so a test can tell whether the row was resolved.
 const bookCreditedTo = (coAuthorIds: number[] | null) => {
   const target = {
     resource: 'Book' as const,
@@ -53,10 +53,19 @@ describe('assertMayChange', () => {
     );
   });
 
-  test('skips the lookup under `any`, even for a missing row', async () => {
+  test('answers 404 under `any` for a missing row', async () => {
     const target = bookCreditedTo(null);
+    await assert.rejects(
+      assertMayChange(requestAs(3, 'any'), target, REFUSAL),
+      NotFoundError
+    );
+    assert.equal(target.lookups, 1);
+  });
+
+  test('lets `any` through a row it is not credited on, after one lookup', async () => {
+    const target = bookCreditedTo([1]);
     await assertMayChange(requestAs(3, 'any'), target, REFUSAL);
-    assert.equal(target.lookups, 0);
+    assert.equal(target.lookups, 1);
   });
 
   test('fails closed when no scope was stamped', async () => {
