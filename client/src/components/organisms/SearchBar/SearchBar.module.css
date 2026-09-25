@@ -1,0 +1,7 @@
+.search {
+  width: 100%;
+  max-width: var(--ant-app-search-bar-max-width);
+  /* The header's 64px line-height reaches through AutoComplete into the
+     input, which would grow to fill the header. */
+  line-height: var(--ant-line-height);
+}
