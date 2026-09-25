@@ -6,8 +6,8 @@ import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { useBookSuggestions } from '@/queries/books';
 import { useSeriesSuggestions } from '@/queries/series';
 import { searchPath } from '@/types/bookSearch';
+import { authorLabelOf } from '@/queries/suggestions';
 import {
-  authorLabelOf,
   matchingAuthors,
   matchingTitles,
   suggestionTermOf,

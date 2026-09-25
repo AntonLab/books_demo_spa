@@ -40,6 +40,3 @@ export const matchingAuthors = (
       .map((author) => [author.id, author])
   ).values(),
 ];
-
-export const authorLabelOf = (author: AuthorSummary): string =>
-  `${author.firstName} ${author.lastName} (${author.login})`;
