@@ -3,20 +3,14 @@
 // would run the seed. Only the target check moves here; the dry run, the other
 // half of the seed's safety, is the shape of main() itself and stays there.
 
-import { logger as defaultLogger, type Logger } from '../../logger.ts';
+import { logger } from '../../logger.ts';
 import type { AppConfig } from '../config.ts';
 
 // The schema this seed is written for. Any other name needs --force, which is
 // the same flag that authorises the delete — one gesture, two guards.
 export const DEMO_DATABASE = 'books_demo_spa';
 
-// The logger is a parameter only so a spec can record the warning; the seed
-// passes nothing and logs through the shared one.
-export function assertSafeTarget(
-  config: AppConfig,
-  force: boolean,
-  logger: Logger = defaultLogger
-): void {
+export function assertSafeTarget(config: AppConfig, force: boolean): void {
   // Unconditional: no flag makes wiping a production database this script's
   // business.
   if (config.env === 'production') {

@@ -4,7 +4,8 @@ import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { UnauthorizedError } from '../types/errors.ts';
-import { isModeratorRole, type Role } from '../types/permission.ts';
+import { isModeratorRole } from 'shared';
+import type { Role } from '../types/permission.ts';
 
 // Who is reading, as far as Draft books are concerned: the signed-in account's
 // id and Role, or null for a Guest. Passed to every repository read that can

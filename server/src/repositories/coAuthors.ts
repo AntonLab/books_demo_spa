@@ -11,7 +11,7 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { AuthorSummary } from 'shared';
 import { displayNameOf, notify, type Actor } from './notificationRepository.ts';
 
 // The Co-author rules (ADR-0005), written once for Books and Series. Credits

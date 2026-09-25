@@ -12,11 +12,10 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
+import type { ChapterSummary, PublicChapter } from 'shared';
 import type {
-  ChapterSummary,
   CreateChapterInput,
   ListChaptersQuery,
-  PublicChapter,
   PublishedAtInput,
   UpdateChapterInput,
 } from '../types/chapter.ts';

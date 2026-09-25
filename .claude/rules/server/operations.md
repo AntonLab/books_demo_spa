@@ -5,7 +5,6 @@ paths:
   - 'server/src/shutdown.ts'
   - 'server/src/expiryPurge.ts'
   - 'server/src/logger.ts'
-  - 'server/src/middleware/securityHeaders.ts'
   - 'server/src/middleware/errorHandler.ts'
 ---
 

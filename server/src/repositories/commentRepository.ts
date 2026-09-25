@@ -10,12 +10,10 @@ import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { loadAvatarUrls } from './userRepository.ts';
+import type { CommentWithAuthor, PublicComment, Tombstone } from 'shared';
 import type {
-  CommentWithAuthor,
   CreateCommentInput,
   ListCommentsQuery,
-  PublicComment,
-  Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
 import { readableBookInclude, type Viewer } from './visibility.ts';

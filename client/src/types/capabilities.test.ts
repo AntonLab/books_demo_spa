@@ -1,4 +1,4 @@
-import type { BookStatus } from './book';
+import type { BookStatus } from 'shared';
 import { bookCapabilities, seriesCapabilities } from './capabilities';
 import type { PublicUser } from './user';
 

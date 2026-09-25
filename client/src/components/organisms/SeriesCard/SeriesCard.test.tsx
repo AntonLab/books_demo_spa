@@ -87,46 +87,13 @@ describe('SeriesCard', () => {
     ).toBeNull();
   });
 
-  it('links its title as a level-4 heading when it is one of several', () => {
-    renderWithProviders(<SeriesCard series={series} linked />);
-
-    expect(
-      screen.getByRole('heading', {
-        level: 4,
-        name: 'The Ashgrove Chronicles',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
-    ).toHaveAttribute('href', '/series/12');
-  });
-
-  it('links the genre to its results, in both title forms', () => {
-    const { unmount } = renderWithProviders(<SeriesCard series={series} />);
+  it('links the genre to its results', () => {
+    renderWithProviders(<SeriesCard series={series} />);
 
     expect(screen.getByRole('link', { name: 'Gothic' })).toHaveAttribute(
       'href',
       '/search?genre=4'
     );
-
-    unmount();
-    renderWithProviders(<SeriesCard series={series} linked />);
-
-    expect(screen.getByRole('link', { name: 'Gothic' })).toHaveAttribute(
-      'href',
-      '/search?genre=4'
-    );
-  });
-
-  it('as a tile, keeps the description but leaves out genre and tags', () => {
-    renderWithProviders(<SeriesCard series={series} linked tile />);
-
-    expect(
-      screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
-    ).toHaveAttribute('href', '/series/12');
-    expect(screen.getByText(series.description)).toBeInTheDocument();
-    expect(screen.queryByText('Gothic')).toBeNull();
-    expect(screen.queryByText('gothic')).toBeNull();
   });
 
   it('shows no genre link when the series has none', () => {

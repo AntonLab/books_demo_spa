@@ -8,7 +8,7 @@ import {
 } from '../repositories/userRepository.fake.testkit.ts';
 import { hashPassword } from '../password.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
-import type { PublicUser } from '../types/user.ts';
+import type { PublicUser } from 'shared';
 import {
   AUTH_COOKIE,
   json,

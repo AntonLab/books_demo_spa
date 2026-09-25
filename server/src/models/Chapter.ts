@@ -9,7 +9,7 @@ import {
   type Sequelize,
 } from 'sequelize';
 import type { Book } from './Book.ts';
-import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
+import type { ChapterSummary, PublicChapter } from 'shared';
 
 export class Chapter extends Model<
   InferAttributes<Chapter>,

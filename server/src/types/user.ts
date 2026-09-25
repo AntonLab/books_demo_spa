@@ -1,15 +1,6 @@
 import { AUTHOR_SEARCH_MAX_LENGTH, USER_ROLES, USER_STATUSES } from 'shared';
 import { z } from 'zod';
 
-// The response shapes and the status union are the client's contract too, so
-// they live in the shared workspace (ADR-0006); the schemas stay here.
-export {
-  USER_STATUSES,
-  type AuthorSummary,
-  type PublicUser,
-  type UserStatus,
-} from 'shared';
-
 // No `role` here, and none in updateUserSchema below, which is derived from
 // this one with `.partial()` — a field added here appears there for free, and
 // PATCH /api/users/:id would then let any signed-in caller promote themselves.

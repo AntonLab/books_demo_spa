@@ -1,12 +1,11 @@
 import { request } from './client';
-import type { PagedResponse } from 'shared';
 import type {
-  BookDetail,
+  PagedResponse,
   BookSort,
   BookStatus,
-  PublicBook,
   SearchableBookStatus,
-} from '../types/book';
+} from 'shared';
+import type { BookDetail, PublicBook } from '../types/book';
 
 export interface ListBooksParams {
   // Title or description.

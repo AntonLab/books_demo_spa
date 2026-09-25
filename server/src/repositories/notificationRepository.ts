@@ -3,11 +3,11 @@ import { Notification, toPublicNotification } from '../models/Notification.ts';
 import { User } from '../models/User.ts';
 import type {
   ActorKind,
-  ListNotificationsQuery,
   NotificationKind,
   PublicNotification,
   WorkType,
-} from '../types/notification.ts';
+} from 'shared';
+import type { ListNotificationsQuery } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
 
 interface NotificationListResult {

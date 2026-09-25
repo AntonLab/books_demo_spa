@@ -1,5 +1,5 @@
 import { ConflictError } from '../types/errors.ts';
-import type { PublicGenre } from '../types/genre.ts';
+import type { PublicGenre } from 'shared';
 import type { GenreRepository } from './genreRepository.ts';
 
 export interface FakeGenreRepositoryOptions {

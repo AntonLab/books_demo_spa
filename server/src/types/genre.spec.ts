@@ -1,10 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  GENRE_NAME_MAX_LENGTH,
-  genreBodySchema,
-  listGenresQuerySchema,
-} from './genre.ts';
+import { GENRE_NAME_MAX_LENGTH } from 'shared';
+import { genreBodySchema, listGenresQuerySchema } from './genre.ts';
 
 test('a name is trimmed before it is stored or compared', () => {
   assert.equal(genreBodySchema.parse({ name: '  Gothic  ' }).name, 'Gothic');

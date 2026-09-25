@@ -1,12 +1,8 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import { ApiError } from '../api/client';
 import type { ListBooksParams } from '../api/books';
-import {
-  BOOK_SORTS,
-  SEARCHABLE_BOOK_STATUSES,
-  type BookSort,
-  type SearchableBookStatus,
-} from './book';
+import type { BookSort, SearchableBookStatus } from 'shared';
+import { BOOK_SORTS, SEARCHABLE_BOOK_STATUSES } from 'shared';
 
 const SEARCH_PAGE_SIZE = 20;
 

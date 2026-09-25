@@ -4,7 +4,7 @@ import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
-import { isModeratorRole } from '@/types/user';
+import { isModeratorRole } from 'shared';
 import { useGenresWithBooks } from '@/queries/genres';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';

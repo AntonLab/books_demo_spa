@@ -1,5 +1,5 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
+import type { ChapterSummary, PublicChapter } from 'shared';
 import type {
   ChapterListResult,
   ChapterRepository,

@@ -1,4 +1,4 @@
-import type { Logger } from '../logger.ts';
+import { logger } from '../logger.ts';
 
 export interface ResetDelivery {
   send(email: string, token: string): Promise<void>;
@@ -15,10 +15,7 @@ export function resetUrl(baseUrl: string, token: string): string {
 // The only implementation. Real mail delivery is a second implementation of
 // this interface, and RESET_DELIVERY (db/config.ts) then gains a second value
 // to choose between them.
-export function createLoggerResetDelivery(
-  logger: Logger,
-  baseUrl: string
-): ResetDelivery {
+export function createLoggerResetDelivery(baseUrl: string): ResetDelivery {
   return {
     async send(email, token) {
       // The address is logged, the token only inside the URL — there is no

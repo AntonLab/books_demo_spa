@@ -25,10 +25,12 @@ import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import type {
   BookDetail,
   BookSort,
-  CreateBookInput,
-  ListBooksQuery,
   PublicBook,
   SeriesBookSummary,
+} from 'shared';
+import type {
+  CreateBookInput,
+  ListBooksQuery,
   UpdateBookInput,
 } from '../types/book.ts';
 import { containsPattern } from './likePattern.ts';

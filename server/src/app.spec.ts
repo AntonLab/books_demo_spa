@@ -13,7 +13,6 @@ import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { createLoggerResetDelivery } from './delivery/resetDelivery.ts';
-import { logger } from './logger.ts';
 import {
   XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
@@ -23,12 +22,16 @@ import { User } from './models/User.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
-import type { BookDetail, PublicBook } from './types/book.ts';
-import type { PublicChapter } from './types/chapter.ts';
-import type { CommentWithAuthor, PublicComment } from './types/comment.ts';
-import type { RegistrableRole } from './types/permission.ts';
-import type { PublicSeries } from './types/series.ts';
-import type { PublicUser } from './types/user.ts';
+import type {
+  BookDetail,
+  PublicBook,
+  PublicChapter,
+  CommentWithAuthor,
+  PublicComment,
+  RegistrableRole,
+  PublicSeries,
+  PublicUser,
+} from 'shared';
 
 // The route specs run createApp on fake repositories and the repository specs
 // run the real repositories without HTTP, so neither proves the two meet. This
@@ -251,7 +254,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
 
     const app = createApp({
       ...createSequelizeRepositories(),
-      resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
+      resetDelivery: createLoggerResetDelivery(config.appBaseUrl),
       trustedOrigin: config.appBaseUrl,
       trustProxy: config.trustProxy,
       authRateLimits: unlimitedAuthRateLimits(),

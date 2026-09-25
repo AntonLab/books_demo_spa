@@ -11,7 +11,7 @@ import {
   type ListBooksParams,
   type UpdateBookPayload,
 } from '../api/books';
-import type { BookSort } from '../types/book';
+import type { BookSort } from 'shared';
 import { PAGE_SIZE_MAX } from 'shared';
 import { queryKeys } from './keys';
 

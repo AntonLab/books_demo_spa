@@ -53,13 +53,12 @@ async function main(): Promise<void> {
   const expiryPurge = startExpiryPurge({
     sessionRepository,
     passwordResetRepository,
-    logger,
   });
   const authRateLimits = createAuthRateLimits();
 
   const app = createApp({
     ...repositories,
-    resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
+    resetDelivery: createLoggerResetDelivery(config.appBaseUrl),
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
     authRateLimits,
@@ -82,7 +81,6 @@ async function main(): Promise<void> {
     server,
     sequelize,
     stoppables: [expiryPurge, authRateLimits],
-    logger,
     exit: (code) => process.exit(code),
   });
   registerShutdownSignals(shutdown);

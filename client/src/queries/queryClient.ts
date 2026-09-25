@@ -36,10 +36,6 @@ export const createQueryClient = (): QueryClient => {
         // anything looking frozen.
         staleTime: 30_000,
       },
-      // A write is never repeated behind the user's back: a retried request
-      // that did land the first time would land twice. TanStack's default is
-      // already no retry; this says so.
-      mutations: { retry: false },
     },
   });
 };

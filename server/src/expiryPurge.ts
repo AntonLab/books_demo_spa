@@ -1,4 +1,4 @@
-import type { Logger } from './logger.ts';
+import { logger } from './logger.ts';
 import {
   RESET_TOKEN_RETENTION_MS,
   type PasswordResetRepository,
@@ -10,10 +10,6 @@ export const EXPIRY_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 export interface ExpiryPurgeDeps {
   sessionRepository: Pick<SessionRepository, 'deleteExpired'>;
   passwordResetRepository: Pick<PasswordResetRepository, 'deleteExpiredBefore'>;
-  logger: Logger;
-  intervalMs?: number;
-  // Date.now, injectable for the spec.
-  now?: () => number;
 }
 
 interface ExpiryPurge {
@@ -24,17 +20,17 @@ interface ExpiryPurge {
 // their own expiry. Never rejects — a failure is logged and the next pass
 // tries again, so a database hiccup cannot take the process down.
 export async function purgeExpiredRows(deps: ExpiryPurgeDeps): Promise<void> {
-  const now = deps.now?.() ?? Date.now();
+  const now = Date.now();
   try {
     const sessions = await deps.sessionRepository.deleteExpired(new Date(now));
     const resetTokens = await deps.passwordResetRepository.deleteExpiredBefore(
       new Date(now - RESET_TOKEN_RETENTION_MS)
     );
     if (sessions > 0 || resetTokens > 0) {
-      deps.logger.info('Purged expired rows', { sessions, resetTokens });
+      logger.info('Purged expired rows', { sessions, resetTokens });
     }
   } catch (error) {
-    deps.logger.error(
+    logger.error(
       'Expiry purge failed',
       error instanceof Error ? error.message : String(error)
     );
@@ -50,7 +46,7 @@ export function startExpiryPurge(deps: ExpiryPurgeDeps): ExpiryPurge {
   };
 
   run();
-  const timer = setInterval(run, deps.intervalMs ?? EXPIRY_PURGE_INTERVAL_MS);
+  const timer = setInterval(run, EXPIRY_PURGE_INTERVAL_MS);
   timer.unref();
 
   return {

@@ -1,13 +1,24 @@
 import cookieParser from 'cookie-parser';
-import express, { type Express } from 'express';
+import express, { type Express, type RequestHandler } from 'express';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
 } from './middleware/csrfProtection.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
-import { notFound } from './middleware/notFound.ts';
-import { noSniff } from './middleware/securityHeaders.ts';
 import { createApiRouter, type RouteDeps } from './routes/index.ts';
+
+// Stops a browser second-guessing a response's Content-Type: sniffing a JSON
+// error or an uploaded image as HTML is how a stored payload becomes script.
+// Set on every response rather than per route, so a route added later cannot
+// forget it.
+const noSniff: RequestHandler = (_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+};
+
+const notFound: RequestHandler = (req, res) => {
+  res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
+};
 
 export interface AppDeps extends RouteDeps {
   // The client's origin (APP_BASE_URL): the one foreign origin a write may

@@ -11,10 +11,10 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../types/errors.ts';
+import type { PublicLike } from 'shared';
 import type {
   CreateLikeInput,
   ListLikesQuery,
-  PublicLike,
   UpdateLikeInput,
 } from '../types/like.ts';
 

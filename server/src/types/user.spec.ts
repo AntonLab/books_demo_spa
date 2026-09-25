@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
+import { AUTHOR_SEARCH_MAX_LENGTH, USER_STATUSES } from 'shared';
 import {
   createUserSchema,
   listAuthorsQuerySchema,
   listUsersQuerySchema,
   updateUserSchema,
-  USER_STATUSES,
 } from './user.ts';
 import {
   AppError,

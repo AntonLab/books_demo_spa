@@ -1,4 +1,4 @@
-import type { UserRole } from '../../types/permission.ts';
+import type { UserRole } from 'shared';
 import { GOTHIC, HARD_SF, URBAN_FANTASY, type ContentBank } from './content.ts';
 
 export interface AccountSpec {

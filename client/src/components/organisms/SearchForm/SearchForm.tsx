@@ -15,13 +15,12 @@ import type { Dayjs } from 'dayjs';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
-  BOOK_SORT_LABELS,
   BOOK_SORTS,
-  BOOK_STATUS_LABELS,
   RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
-} from '@/types/book';
+} from 'shared';
+import { BOOK_SORT_LABELS, BOOK_STATUS_LABELS } from '@/types/book';
 import type {
   BookSearchFormValues,
   SearchFieldError,
