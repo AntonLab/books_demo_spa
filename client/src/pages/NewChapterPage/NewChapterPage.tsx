@@ -8,13 +8,8 @@ import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/Unsa
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useCreateChapter } from '@/queries/chapters';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  isBlank,
-  ownEntries,
-  unsavedText,
-  unsavedTextKeys,
-} from '@/store/unsavedTextSlice';
+import { isBlank, unsavedTextKeys } from '@/store/unsavedTextSlice';
+import { useUnsavedText } from '@/store/useUnsavedText';
 import { bookCapabilities } from '@/types/capabilities';
 import styles from './NewChapterPage.module.css';
 
@@ -24,11 +19,8 @@ export const NewChapterPage: FC = () => {
   const { data: session } = useSession();
   const { data: book, isPending, isError } = useBook(bookId);
   const create = useCreateChapter(bookId);
-  const dispatch = useAppDispatch();
-  const unsavedKey = unsavedTextKeys.chapterNew(bookId);
-  const entry = useAppSelector(
-    (state) => ownEntries(state, session?.id)[unsavedKey]
-  );
+  const unsaved = useUnsavedText(unsavedTextKeys.chapterNew(bookId));
+  const { entry } = unsaved;
   // A create can land after the Account has already moved to an unrelated
   // route; without this, the delayed navigate() below would still fire and
   // pull them back here.
@@ -60,7 +52,7 @@ export const NewChapterPage: FC = () => {
           <UnsavedTextNotice
             title={entry.title}
             text={entry.text}
-            onDiscard={() => dispatch(unsavedText.remove(unsavedKey))}
+            onDiscard={unsaved.discard}
           />
         )}
       </>
@@ -76,7 +68,7 @@ export const NewChapterPage: FC = () => {
       .mutateAsync({ bookId, title, text, publishedAt: publishedAt ?? null })
       .then(
         () => {
-          dispatch(unsavedText.remove(unsavedKey));
+          unsaved.discard();
           // Only while still here: the Account may have already moved to
           // an unrelated route, and forcing them back here now would be
           // jarring.
@@ -100,9 +92,7 @@ export const NewChapterPage: FC = () => {
           initialValues={
             entry ? { title: entry.title ?? '', text: entry.text } : undefined
           }
-          onValuesChange={(values) =>
-            dispatch(unsavedText.upsert({ key: unsavedKey, ...values }))
-          }
+          onValuesChange={unsaved.write}
         />
       </div>
     </>
