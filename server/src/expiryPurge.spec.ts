@@ -1,6 +1,6 @@
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Logger } from './logger.ts';
+import { recordLogs } from './logger.testkit.ts';
 import {
   EXPIRY_PURGE_INTERVAL_MS,
   purgeExpiredRows,
@@ -11,25 +11,15 @@ import { RESET_TOKEN_RETENTION_MS } from './repositories/passwordResetRepository
 
 const NOW = Date.parse('2026-09-18T12:00:00.000Z');
 
-interface Line {
-  level: string;
-  message: string;
-  meta: unknown;
-}
-
 // Fake repositories that record the moment each was asked about and answer
-// with a fixed count, or fail.
+// with a fixed count, or fail. The shared logger is recorded, not printed.
 function fakes(
+  t: TestContext,
   answer: { sessions?: number; resetTokens?: number; failure?: Error } = {}
 ) {
-  const lines: Line[] = [];
+  const lines = recordLogs(t);
   const sessionMoments: Date[] = [];
   const resetCutoffs: Date[] = [];
-  const logger: Logger = {
-    info: (message, meta) => lines.push({ level: 'info', message, meta }),
-    warn: (message, meta) => lines.push({ level: 'warn', message, meta }),
-    error: (message, meta) => lines.push({ level: 'error', message, meta }),
-  };
   const deps: ExpiryPurgeDeps = {
     sessionRepository: {
       async deleteExpired(now) {
@@ -44,14 +34,13 @@ function fakes(
         return answer.resetTokens ?? 0;
       },
     },
-    logger,
   };
   return { deps, lines, sessionMoments, resetCutoffs };
 }
 
 test('deletes the sessions expired by now and the reset tokens 30 days past their expiry', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: NOW });
-  const { deps, sessionMoments, resetCutoffs } = fakes();
+  const { deps, sessionMoments, resetCutoffs } = fakes(t);
 
   await purgeExpiredRows(deps);
 
@@ -60,8 +49,8 @@ test('deletes the sessions expired by now and the reset tokens 30 days past thei
   assert.equal(RESET_TOKEN_RETENTION_MS, 30 * 24 * 60 * 60 * 1000);
 });
 
-test('logs the counts at info when it deleted something', async () => {
-  const { deps, lines } = fakes({ sessions: 3, resetTokens: 1 });
+test('logs the counts at info when it deleted something', async (t) => {
+  const { deps, lines } = fakes(t, { sessions: 3, resetTokens: 1 });
 
   await purgeExpiredRows(deps);
 
@@ -74,16 +63,16 @@ test('logs the counts at info when it deleted something', async () => {
   ]);
 });
 
-test('logs nothing when nothing had expired', async () => {
-  const { deps, lines } = fakes();
+test('logs nothing when nothing had expired', async (t) => {
+  const { deps, lines } = fakes(t);
 
   await purgeExpiredRows(deps);
 
   assert.deepEqual(lines, []);
 });
 
-test('a failed pass is logged at error and does not reject', async () => {
-  const { deps, lines } = fakes({ failure: new Error('connection lost') });
+test('a failed pass is logged at error and does not reject', async (t) => {
+  const { deps, lines } = fakes(t, { failure: new Error('connection lost') });
 
   await purgeExpiredRows(deps);
 
@@ -94,7 +83,7 @@ test('a failed pass is logged at error and does not reject', async () => {
 
 test('runs once at start, then once per interval until stopped', (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] });
-  const { deps, sessionMoments } = fakes();
+  const { deps, sessionMoments } = fakes(t);
 
   const purge = startExpiryPurge(deps);
   assert.equal(sessionMoments.length, 1);
@@ -111,7 +100,7 @@ test('runs once at start, then once per interval until stopped', (t) => {
 
 test('runs hourly by default', (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] });
-  const { deps, sessionMoments } = fakes();
+  const { deps, sessionMoments } = fakes(t);
 
   const purge = startExpiryPurge(deps);
   t.mock.timers.tick(EXPIRY_PURGE_INTERVAL_MS - 1);

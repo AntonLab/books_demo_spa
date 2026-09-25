@@ -13,7 +13,6 @@ import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { createLoggerResetDelivery } from './delivery/resetDelivery.ts';
-import { logger } from './logger.ts';
 import {
   XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
@@ -255,7 +254,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
 
     const app = createApp({
       ...createSequelizeRepositories(),
-      resetDelivery: createLoggerResetDelivery(logger, config.appBaseUrl),
+      resetDelivery: createLoggerResetDelivery(config.appBaseUrl),
       trustedOrigin: config.appBaseUrl,
       trustProxy: config.trustProxy,
       authRateLimits: unlimitedAuthRateLimits(),

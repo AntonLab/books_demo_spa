@@ -1,7 +1,7 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import type { Logger } from './logger.ts';
+import { recordLogs } from './logger.testkit.ts';
 import {
   createShutdown,
   registerShutdownSignals,
@@ -13,7 +13,8 @@ interface Harness {
   deps: ShutdownDeps;
   // Every call the shutdown made on its collaborators, in order.
   calls: string[];
-  logs: string[];
+  // What the shutdown logged, as `<level> <message>`.
+  readonly logs: string[];
   exits: number[];
   // Runs the callback the shutdown handed server.close().
   finishClose(): void;
@@ -28,15 +29,9 @@ function harness(
 ): Harness {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const calls: string[] = [];
-  const logs: string[] = [];
+  const lines = recordLogs(t);
   const exits: number[] = [];
   let closeCallback: (() => void) | undefined;
-
-  const logger: Logger = {
-    info: (message) => logs.push(`info ${message}`),
-    warn: (message) => logs.push(`warn ${message}`),
-    error: (message) => logs.push(`error ${message}`),
-  };
 
   const deps: ShutdownDeps = {
     server: {
@@ -61,7 +56,6 @@ function harness(
       { stop: () => calls.push('purge.stop') },
       { stop: () => calls.push('limits.stop') },
     ],
-    logger,
     exit: (code) => {
       exits.push(code);
     },
@@ -70,7 +64,9 @@ function harness(
   return {
     deps,
     calls,
-    logs,
+    get logs() {
+      return lines.map((line) => `${line.level} ${line.message}`);
+    },
     exits,
     finishClose() {
       assert.ok(closeCallback, 'server.close was never called');
