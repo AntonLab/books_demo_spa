@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
-import type { ChapterSummary, PublicChapter } from '../types/chapter.ts';
+import type { ChapterSummary, PublicChapter } from 'shared';
 import {
   json,
   ROLE_COOKIES,

@@ -11,13 +11,13 @@ import {
 import type { Genre } from './Genre.ts';
 import type { Series } from './Series.ts';
 import { toTagArray } from './tagArray.ts';
-import {
-  BOOK_STATUSES,
-  type BookStatus,
-  type PublicBook,
-} from '../types/book.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type {
+  BookStatus,
+  PublicBook,
+  PublicGenre,
+  AuthorSummary,
+} from 'shared';
+import { BOOK_STATUSES } from 'shared';
 
 export class Book extends Model<
   InferAttributes<Book>,

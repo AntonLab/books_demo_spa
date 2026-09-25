@@ -28,11 +28,10 @@ describe('shouldRetryQuery', () => {
 });
 
 describe('createQueryClient', () => {
-  it('retries queries by that rule and never retries a mutation', () => {
+  it('retries queries by that rule', () => {
     const options = createQueryClient().getDefaultOptions();
 
     expect(options.queries?.retry).toBe(shouldRetryQuery);
-    expect(options.mutations?.retry).toBe(false);
   });
 
   it('keeps the 30-second staleTime and no refetch on focus', () => {

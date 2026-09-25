@@ -1,4 +1,4 @@
-import { hash, verify } from '@node-rs/argon2';
+import { hash } from '@node-rs/argon2';
 
 interface PasswordParams {
   memoryCost: number;
@@ -21,10 +21,6 @@ const TEST_PARAMS: PasswordParams = {
   parallelism: 1,
 };
 
-export function passwordParams(env: string): PasswordParams {
-  return env === 'test' ? { ...TEST_PARAMS } : { ...DEFAULT_PARAMS };
-}
-
 export async function hashPassword(
   plaintext: string,
   env: string = process.env.NODE_ENV ?? 'development'
@@ -33,12 +29,7 @@ export async function hashPassword(
   // it would take the package's `Algorithm`, an ambient const enum, which
   // `verbatimModuleSyntax` refuses to import. password.spec.ts pins the
   // variant and the cost through the hash's PHC prefix.
-  return hash(plaintext, passwordParams(env));
+  return hash(plaintext, env === 'test' ? TEST_PARAMS : DEFAULT_PARAMS);
 }
 
-export async function verifyPassword(
-  hashed: string,
-  plaintext: string
-): Promise<boolean> {
-  return verify(hashed, plaintext);
-}
+export { verify as verifyPassword } from '@node-rs/argon2';

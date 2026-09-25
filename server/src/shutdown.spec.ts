@@ -1,7 +1,7 @@
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import type { Logger } from './logger.ts';
+import { recordLogs } from './logger.testkit.ts';
 import {
   createShutdown,
   registerShutdownSignals,
@@ -13,31 +13,25 @@ interface Harness {
   deps: ShutdownDeps;
   // Every call the shutdown made on its collaborators, in order.
   calls: string[];
-  logs: string[];
+  // What the shutdown logged, as `<level> <message>`.
+  readonly logs: string[];
   exits: number[];
   // Runs the callback the shutdown handed server.close().
   finishClose(): void;
-  // The deadline the shutdown set, once it has set one.
-  deadline(): { callback: () => void; ms: number; unrefed: boolean };
 }
 
-// Fakes for the server, the pool and the timer: no real signal, socket or
-// clock is involved, so each test decides when the server finishes closing
-// and whether the deadline fires.
+// Fakes for the server and the pool, and setTimeout mocked: no real signal,
+// socket or clock is involved, so each test decides when the server finishes
+// closing and whether the deadline fires.
 function harness(
+  t: TestContext,
   closeSequelize: () => Promise<void> = async () => {}
 ): Harness {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
   const calls: string[] = [];
-  const logs: string[] = [];
+  const lines = recordLogs(t);
   const exits: number[] = [];
   let closeCallback: (() => void) | undefined;
-  let timer: { callback: () => void; ms: number; unrefed: boolean } | undefined;
-
-  const logger: Logger = {
-    info: (message) => logs.push(`info ${message}`),
-    warn: (message) => logs.push(`warn ${message}`),
-    error: (message) => logs.push(`error ${message}`),
-  };
 
   const deps: ShutdownDeps = {
     server: {
@@ -62,39 +56,27 @@ function harness(
       { stop: () => calls.push('purge.stop') },
       { stop: () => calls.push('limits.stop') },
     ],
-    logger,
     exit: (code) => {
       exits.push(code);
-    },
-    setTimer: (callback, ms) => {
-      const created = { callback, ms, unrefed: false };
-      timer = created;
-      return {
-        unref: () => {
-          created.unrefed = true;
-        },
-      };
     },
   };
 
   return {
     deps,
     calls,
-    logs,
+    get logs() {
+      return lines.map((line) => `${line.level} ${line.message}`);
+    },
     exits,
     finishClose() {
       assert.ok(closeCallback, 'server.close was never called');
       closeCallback();
     },
-    deadline() {
-      assert.ok(timer, 'no deadline was set');
-      return timer;
-    },
   };
 }
 
-test('stops every interval, closes the server, then the pool, and exits 0', async () => {
-  const h = harness();
+test('stops every interval, closes the server, then the pool, and exits 0', async (t) => {
+  const h = harness(t);
   const exitCodeBefore = process.exitCode;
   const done = createShutdown(h.deps)('SIGTERM');
 
@@ -118,8 +100,8 @@ test('stops every interval, closes the server, then the pool, and exits 0', asyn
   ]);
 });
 
-test('a second call joins the shutdown already under way', async () => {
-  const h = harness();
+test('a second call joins the shutdown already under way', async (t) => {
+  const h = harness(t);
   const shutdown = createShutdown(h.deps);
 
   const first = shutdown('SIGTERM');
@@ -132,23 +114,28 @@ test('a second call joins the shutdown already under way', async () => {
   assert.equal(h.calls.filter((call) => call === 'sequelize.close').length, 1);
 });
 
-test('a shutdown that overruns its deadline drops every connection and exits 1', () => {
-  const h = harness();
+test('a shutdown that overruns its deadline drops every connection and exits 1', (t) => {
+  const h = harness(t);
+  // The shutdown keeps no handle to its deadline, so unref() is watched on
+  // the prototype the mocked handles share.
+  const unref = t.mock.method(
+    Object.getPrototypeOf(setTimeout(() => {}, 0)) as { unref(): unknown },
+    'unref'
+  );
   void createShutdown(h.deps)('SIGTERM');
-
-  const deadline = h.deadline();
-  assert.equal(deadline.ms, SHUTDOWN_TIMEOUT_MS);
+  assert.equal(unref.mock.callCount(), 1);
   assert.equal(SHUTDOWN_TIMEOUT_MS, 10_000);
-  assert.equal(deadline.unrefed, true);
 
-  deadline.callback();
+  t.mock.timers.tick(SHUTDOWN_TIMEOUT_MS - 1);
+  assert.deepEqual(h.exits, []);
+  t.mock.timers.tick(1);
   assert.ok(h.calls.includes('server.closeAllConnections'));
   assert.deepEqual(h.exits, [1]);
   assert.ok(h.logs.some((line) => line.startsWith('error Shutdown did not')));
 });
 
-test('a pool that fails to close is logged and exits 1', async () => {
-  const h = harness(async () => {
+test('a pool that fails to close is logged and exits 1', async (t) => {
+  const h = harness(t, async () => {
     throw new Error('pool gone');
   });
   const done = createShutdown(h.deps)('SIGTERM');

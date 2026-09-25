@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFakeGenreRepository } from '../repositories/genreRepository.fake.testkit.ts';
-import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from '../types/genre.ts';
+import type { PublicGenre } from 'shared';
+import { GENRE_NAME_MAX_LENGTH } from 'shared';
 import {
   json,
   ROLE_COOKIES,

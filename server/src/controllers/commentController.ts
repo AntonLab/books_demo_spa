@@ -11,11 +11,10 @@ import {
   NotFoundError,
   UnauthorizedError,
 } from '../types/errors.ts';
+import type { PublicComment, Tombstone } from 'shared';
 import type {
   CreateCommentInput,
   ListCommentsQuery,
-  PublicComment,
-  Tombstone,
   UpdateCommentInput,
 } from '../types/comment.ts';
 

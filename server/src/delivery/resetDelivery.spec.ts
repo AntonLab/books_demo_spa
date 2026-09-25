@@ -1,16 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLoggerResetDelivery, resetUrl } from './resetDelivery.ts';
-import type { Logger } from '../logger.ts';
-
-function recordingLogger(): { logger: Logger; lines: string[] } {
-  const lines: string[] = [];
-  const record = (message: string) => lines.push(message);
-  return {
-    logger: { info: record, warn: record, error: record },
-    lines,
-  };
-}
+import { recordLogs } from '../logger.testkit.ts';
 
 test('the reset URL matches the client route the companion spec defines', () => {
   assert.equal(
@@ -33,16 +24,16 @@ test('a trailing slash on the base URL does not double up', () => {
   );
 });
 
-test('the logger delivery emits the address and the link', async () => {
-  const { logger, lines } = recordingLogger();
-  await createLoggerResetDelivery(logger, 'http://localhost:3000').send(
+test('the logger delivery emits the address and the link', async (t) => {
+  const lines = recordLogs(t);
+  await createLoggerResetDelivery('http://localhost:3000').send(
     'bob@example.com',
     'abc'
   );
 
   assert.equal(lines.length, 1);
   assert.match(
-    lines[0] ?? '',
+    lines[0]?.message ?? '',
     /^Password reset for bob@example\.com: .*reset-password\?token=abc$/
   );
 });

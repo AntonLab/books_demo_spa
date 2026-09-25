@@ -12,7 +12,7 @@ import type {
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
-import type { PublicUser } from '../types/user.ts';
+import type { PublicUser } from 'shared';
 
 const registration = {
   login: 'Bob',

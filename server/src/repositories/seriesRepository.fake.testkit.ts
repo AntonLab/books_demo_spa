@@ -1,7 +1,5 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { PublicSeries } from '../types/series.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
 import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
 import type { SeriesListResult, SeriesRepository } from './seriesRepository.ts';

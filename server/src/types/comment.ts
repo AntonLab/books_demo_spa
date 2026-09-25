@@ -1,15 +1,6 @@
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-// The response shapes and the tombstone union are the client's contract too, so
-// they live in the shared workspace (ADR-0006); the schemas stay here.
-export {
-  TOMBSTONES,
-  type CommentWithAuthor,
-  type PublicComment,
-  type Tombstone,
-} from 'shared';
-
 // `text` is a TEXT column, which holds 65,535 *bytes* — as few as ~16k
 // characters under utf8mb4 — so the bound sits well inside it rather than at
 // it, or MySQL truncates (or, in strict mode, rejects) the write. Chapters take

@@ -13,7 +13,7 @@ import { Chapter } from '../models/Chapter.ts';
 import { Notification } from '../models/Notification.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
-import type { PublicNotification } from '../types/notification.ts';
+import type { PublicNotification } from 'shared';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import { createSequelizeNotificationRepository } from './notificationRepository.ts';

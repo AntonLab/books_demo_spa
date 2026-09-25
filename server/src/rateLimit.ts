@@ -31,8 +31,6 @@ export interface RateLimiter {
 interface RateLimiterOptions {
   limit: number;
   windowMs: number;
-  // Date.now, injectable so a spec moves time by hand.
-  now?: () => number;
 }
 
 interface Window {
@@ -43,7 +41,6 @@ interface Window {
 export function createRateLimiter({
   limit,
   windowMs,
-  now = Date.now,
 }: RateLimiterOptions): RateLimiter {
   const windows = new Map<string, Window>();
 
@@ -62,7 +59,7 @@ export function createRateLimiter({
   // memory stays bounded by the keys seen in one window. unref() so the
   // interval never holds the process open.
   const sweep = (): void => {
-    const at = now();
+    const at = Date.now();
     for (const [key, window] of windows) {
       if (window.endsAt <= at) {
         windows.delete(key);
@@ -74,7 +71,7 @@ export function createRateLimiter({
 
   return {
     hit(key) {
-      const at = now();
+      const at = Date.now();
       const window = current(key, at);
       const next: Window = {
         count: (window?.count ?? 0) + 1,
@@ -85,7 +82,7 @@ export function createRateLimiter({
     },
 
     release(key) {
-      const at = now();
+      const at = Date.now();
       const window = current(key, at);
       if (window === undefined) {
         return;

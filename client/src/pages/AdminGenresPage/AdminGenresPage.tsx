@@ -15,14 +15,17 @@ import {
 } from 'antd';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
-import { isModeratorRole } from '@/types/user';
 import {
   useCreateGenre,
   useDeleteGenre,
   useGenres,
   useRenameGenre,
 } from '@/queries/genres';
-import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from 'shared';
+import {
+  GENRE_NAME_MAX_LENGTH,
+  type PublicGenre,
+  isModeratorRole,
+} from 'shared';
 import styles from './AdminGenresPage.module.css';
 
 // The one refusal the fields explain themselves, rather than an Alert over the

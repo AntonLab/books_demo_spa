@@ -7,13 +7,8 @@ import {
   type Sequelize,
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
-import {
-  USER_STATUSES,
-  type AuthorSummary,
-  type PublicUser,
-  type UserStatus,
-} from '../types/user.ts';
-import { USER_ROLES, type UserRole } from '../types/permission.ts';
+import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
+import { USER_STATUSES, USER_ROLES } from 'shared';
 
 export class User extends Model<
   InferAttributes<User>,

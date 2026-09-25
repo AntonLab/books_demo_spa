@@ -10,15 +10,13 @@ import {
 import type { Book } from './Book.ts';
 import type { Series } from './Series.ts';
 import type { User } from './User.ts';
-import {
-  ACTOR_KINDS,
-  NOTIFICATION_KINDS,
-  WORK_TYPES,
-  type ActorKind,
-  type NotificationKind,
-  type PublicNotification,
-  type WorkType,
-} from '../types/notification.ts';
+import type {
+  ActorKind,
+  NotificationKind,
+  PublicNotification,
+  WorkType,
+} from 'shared';
+import { ACTOR_KINDS, NOTIFICATION_KINDS, WORK_TYPES } from 'shared';
 
 // A snapshot, not a view: everything a notification says is copied onto the
 // row when it is raised, so it reads the same after the work is renamed or

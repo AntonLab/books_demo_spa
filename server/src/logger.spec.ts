@@ -1,27 +1,24 @@
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { createLogger, type LogSink } from './logger.ts';
+import { logger } from './logger.ts';
 
-function makeSink(): {
-  calls: Array<{ level: string; args: unknown[] }>;
-  sink: LogSink;
-} {
+function spyOnConsole(t: TestContext) {
+  const levels = ['info', 'warn', 'error'] as const;
   const calls: Array<{ level: string; args: unknown[] }> = [];
-  const sink: LogSink = {
-    info: (...args: unknown[]) => calls.push({ level: 'info', args }),
-    warn: (...args: unknown[]) => calls.push({ level: 'warn', args }),
-    error: (...args: unknown[]) => calls.push({ level: 'error', args }),
-  };
-  return { calls, sink };
+  for (const level of levels) {
+    t.mock.method(console, level, (...args: unknown[]) => {
+      calls.push({ level, args });
+    });
+  }
+  return calls;
 }
 
-test('routes each level to the matching sink method', () => {
-  const { calls, sink } = makeSink();
-  const log = createLogger(sink);
+test('routes each level to the matching console method', (t) => {
+  const calls = spyOnConsole(t);
 
-  log.info('started');
-  log.warn('careful');
-  log.error('broken');
+  logger.info('started');
+  logger.warn('careful');
+  logger.error('broken');
 
   assert.deepEqual(
     calls.map((c) => c.level),
@@ -29,21 +26,20 @@ test('routes each level to the matching sink method', () => {
   );
 });
 
-test('includes the level and the message in the formatted line', () => {
-  const { calls, sink } = makeSink();
-  createLogger(sink).info('listening on 4000');
+test('includes the level and the message in the formatted line', (t) => {
+  const calls = spyOnConsole(t);
+  logger.info('listening on 4000');
 
   assert.equal(calls.length, 1);
   assert.match(String(calls[0]!.args[0]), /INFO/);
   assert.match(String(calls[0]!.args[0]), /listening on 4000/);
 });
 
-test('passes meta through as a second argument only when given', () => {
-  const { calls, sink } = makeSink();
-  const log = createLogger(sink);
+test('passes meta through as a second argument only when given', (t) => {
+  const calls = spyOnConsole(t);
 
-  log.info('no meta');
-  log.error('with meta', { code: 'E_TEST' });
+  logger.info('no meta');
+  logger.error('with meta', { code: 'E_TEST' });
 
   assert.equal(calls[0]!.args.length, 1);
   assert.equal(calls[1]!.args.length, 2);

@@ -9,17 +9,6 @@ import {
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-// The response shapes and the Book status union are the client's contract too,
-// so they live in the shared workspace (ADR-0006); the schemas stay here.
-export {
-  BOOK_STATUSES,
-  type BookDetail,
-  type BookSort,
-  type BookStatus,
-  type PublicBook,
-  type SeriesBookSummary,
-} from 'shared';
-
 const BOOK_TAG_MAX_LENGTH = 32;
 const BOOK_MAX_TAGS = 20;
 const BOOK_DESCRIPTION_MAX_LENGTH = 5000;

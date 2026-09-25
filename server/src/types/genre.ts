@@ -1,11 +1,6 @@
 import { GENRE_NAME_MAX_LENGTH } from 'shared';
 import { z } from 'zod';
 
-// The response shape and the length the client validates against are the
-// client's contract too, so they live in the shared workspace (ADR-0006); the
-// schemas stay here.
-export { GENRE_NAME_MAX_LENGTH, type PublicGenre } from 'shared';
-
 // Trimmed before the length checks, as every title in this codebase is, so a
 // whitespace-only name fails min(1) rather than landing as an empty string.
 // Case is kept exactly as typed: "Hard SF" is stored as written, and the

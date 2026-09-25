@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-// The response shape is the client's contract too, so it lives in the shared
-// workspace (ADR-0006); the schemas stay here.
-export type { PublicSeries } from 'shared';
-
 const SERIES_TAG_MAX_LENGTH = 32;
 const SERIES_MAX_TAGS = 20;
 const SERIES_DESCRIPTION_MAX_LENGTH = 5000;

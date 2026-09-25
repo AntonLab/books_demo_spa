@@ -1,5 +1,6 @@
 import { request } from './client';
-import type { PublicUser, RegistrableRole } from '../types/user';
+import type { RegistrableRole } from 'shared';
+import type { PublicUser } from '../types/user';
 
 export interface RegisterInput {
   login: string;

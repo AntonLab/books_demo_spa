@@ -1,21 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Logger } from '../../logger.ts';
+import { recordLogs } from '../../logger.testkit.ts';
 import { parseConfig, type AppConfig } from '../config.ts';
 import { DEMO_DATABASE, assertSafeTarget } from './seedGuards.ts';
-
-function makeLogger(): {
-  calls: Array<{ level: string; message: string; meta: unknown }>;
-  logger: Logger;
-} {
-  const calls: Array<{ level: string; message: string; meta: unknown }> = [];
-  const logger: Logger = {
-    info: (message, meta) => calls.push({ level: 'info', message, meta }),
-    warn: (message, meta) => calls.push({ level: 'warn', message, meta }),
-    error: (message, meta) => calls.push({ level: 'error', message, meta }),
-  };
-  return { calls, logger };
-}
 
 function configFor(env: string, database: string): AppConfig {
   // RESET_DELIVERY is set so a production config parses at all: the refusal
@@ -29,36 +16,34 @@ function configFor(env: string, database: string): AppConfig {
   });
 }
 
-test('production is refused without --force', () => {
-  const { calls, logger } = makeLogger();
+test('production is refused without --force', (t) => {
+  const calls = recordLogs(t);
 
   assert.throws(
-    () =>
-      assertSafeTarget(configFor('production', DEMO_DATABASE), false, logger),
+    () => assertSafeTarget(configFor('production', DEMO_DATABASE), false),
     /NODE_ENV is production/
   );
   assert.deepEqual(calls, []);
 });
 
-test('production is refused with --force, even against the demo database', () => {
-  const { calls, logger } = makeLogger();
+test('production is refused with --force, even against the demo database', (t) => {
+  const calls = recordLogs(t);
 
   assert.throws(
-    () =>
-      assertSafeTarget(configFor('production', DEMO_DATABASE), true, logger),
+    () => assertSafeTarget(configFor('production', DEMO_DATABASE), true),
     /NODE_ENV is production/
   );
   assert.throws(
-    () => assertSafeTarget(configFor('production', 'elsewhere'), true, logger),
+    () => assertSafeTarget(configFor('production', 'elsewhere'), true),
     /NODE_ENV is production/
   );
   assert.deepEqual(calls, []);
 });
 
-test('--force against another database warns, naming it, and does not throw', () => {
-  const { calls, logger } = makeLogger();
+test('--force against another database warns, naming it, and does not throw', (t) => {
+  const calls = recordLogs(t);
 
-  assertSafeTarget(configFor('development', 'elsewhere'), true, logger);
+  assertSafeTarget(configFor('development', 'elsewhere'), true);
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0]!.level, 'warn');
@@ -66,19 +51,19 @@ test('--force against another database warns, naming it, and does not throw', ()
   assert.deepEqual(calls[0]!.meta, { database: 'elsewhere' });
 });
 
-test('--force against the demo database passes silently', () => {
-  const { calls, logger } = makeLogger();
+test('--force against the demo database passes silently', (t) => {
+  const calls = recordLogs(t);
 
-  assertSafeTarget(configFor('development', DEMO_DATABASE), true, logger);
+  assertSafeTarget(configFor('development', DEMO_DATABASE), true);
 
   assert.deepEqual(calls, []);
 });
 
-test('without --force any non-production database passes silently', () => {
-  const { calls, logger } = makeLogger();
+test('without --force any non-production database passes silently', (t) => {
+  const calls = recordLogs(t);
 
-  assertSafeTarget(configFor('development', DEMO_DATABASE), false, logger);
-  assertSafeTarget(configFor('test', 'elsewhere'), false, logger);
+  assertSafeTarget(configFor('development', DEMO_DATABASE), false);
+  assertSafeTarget(configFor('test', 'elsewhere'), false);
 
   assert.deepEqual(calls, []);
 });
