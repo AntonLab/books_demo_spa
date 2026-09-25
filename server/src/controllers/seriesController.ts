@@ -4,25 +4,16 @@ import {
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
-import { scopeFor } from '../permissions/permissionStore.ts';
-import {
-  assertCoAuthor,
-  assertMayChange,
-  type CoAuthorTarget,
-} from './coAuthorGuard.ts';
+import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import { creditHandlers } from './creditHandlers.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
-import {
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-} from '../types/errors.ts';
+import { NotFoundError, UnauthorizedError } from '../types/errors.ts';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
   UpdateSeriesInput,
 } from '../types/series.ts';
-import type { AddCoAuthorInput } from '../types/params.ts';
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
@@ -83,38 +74,12 @@ export function createSeriesController(repository: SeriesRepository) {
       res.status(204).end();
     },
 
-    // Rides on `series × update`, then requires a Co-author: a Moderator's
-    // `any` reaches every series but never its byline.
-    addCoAuthor: async (req, res) => {
-      const { id } = validatedParams<{ id: number }>(req);
-      const { userId } = validatedBody<AddCoAuthorInput>(req);
-      await assertCoAuthor(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
-
-      const series = await repository.addCoAuthor(id, userId, actorOf(req));
-      if (!series) throw new NotFoundError('Series', id);
-      res.json(series);
-    },
-
-    // Behind requireAuth alone, as on a book: leaving is always allowed to a
-    // credited account whatever its Role, and removing someone else takes a
-    // Co-author holding exactly `own` on series.
-    removeCoAuthor: async (req, res) => {
-      if (!req.user) throw new UnauthorizedError();
-      const { id, userId } = validatedParams<{ id: number; userId: number }>(
-        req
-      );
-
-      if (userId !== req.user.id) {
-        if (scopeFor(req.user.role, 'series', 'update') !== 'own') {
-          throw new ForbiddenError('Only a co-author may remove a co-author');
-        }
-        await assertCoAuthor(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
-      }
-
-      const series = await repository.removeCoAuthor(id, userId, actorOf(req));
-      if (!series) throw new NotFoundError('Series', id);
-      res.json(series);
-    },
+    ...creditHandlers({
+      target: seriesTarget,
+      module: 'series',
+      refusal: MAY_ONLY_CHANGE_OWN,
+      repository,
+    }),
 
     // Taking a book out changes the series, so it is the series that answers:
     // one of its Co-authors, or a Moderator under `any`. The book's own

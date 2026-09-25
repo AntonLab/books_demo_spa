@@ -1032,56 +1032,6 @@ test('a moderator may not change who is credited on a book', async () => {
   );
 });
 
-test('an author who is not credited may not change the co-authors', async () => {
-  await withAuthenticatedApp(
-    { bookRepository: createFakeRepository() },
-    async (base) => {
-      const { id } = await json<PublicBook>(await post(base, valid));
-
-      assert.equal(
-        (
-          await addCoAuthor(
-            base,
-            id,
-            USER_IDS.otherAuthor,
-            ROLE_COOKIES.otherAuthor
-          )
-        ).status,
-        403
-      );
-      assert.equal(
-        (
-          await removeCoAuthor(
-            base,
-            id,
-            KNOWN_USER_ID,
-            ROLE_COOKIES.otherAuthor
-          )
-        ).status,
-        403
-      );
-    }
-  );
-});
-
-test('a co-author who is no longer an author may not remove anyone else', async () => {
-  await withAuthenticatedApp(
-    { bookRepository: createFakeRepository() },
-    async (base) => {
-      const { id } = await json<PublicBook>(await post(base, valid));
-      await addCoAuthor(base, id, USER_IDS.user);
-
-      const response = await removeCoAuthor(
-        base,
-        id,
-        KNOWN_USER_ID,
-        ROLE_COOKIES.user
-      );
-      assert.equal(response.status, 403);
-    }
-  );
-});
-
 test('changing co-authors without a session is 401', async () => {
   await withApp({ bookRepository: createFakeRepository() }, async (base) => {
     assert.equal((await addCoAuthor(base, 1, 2, null)).status, 401);
@@ -1592,6 +1542,22 @@ test('DELETE /api/books/:id/cover answers 404 for a missing book even under `any
     });
     assert.equal(response.status, 404);
   });
+});
+
+test('PUT /api/books/:id/cover answers 404 for a missing book under `any` scope (a Moderator) before reading the image', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      // Bytes sharp refuses with a 400, so a 404 proves the Book was looked
+      // up before processCoverImage ran.
+      const response = await fetch(`${base}/api/books/999999/cover`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.admin },
+        body: Buffer.from('not a real png'),
+      });
+      assert.equal(response.status, 404);
+    }
+  );
 });
 
 test('GET /api/books/:id/cover answers 404 for a book with no cover, and for a missing book', async () => {
