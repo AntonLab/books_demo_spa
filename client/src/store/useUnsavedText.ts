@@ -89,10 +89,15 @@ export const useSignOut = (): (() => void) => {
   const dispatch = useAppDispatch();
 
   return () => {
-    logout.mutate(undefined, {
-      onSuccess: () => {
-        dispatch(unsavedText.discardAll());
-      },
-    });
+    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
+    // callback if the caller unmounts before the mutation settles, but
+    // mutateAsync's own promise still settles, so the entries are still
+    // discarded. A rejection is not surfaced here, so a failed sign out
+    // keeps every entry; this handler exists only so it is not left
+    // unhandled.
+    void logout.mutateAsync(undefined).then(
+      () => dispatch(unsavedText.discardAll()),
+      () => {}
+    );
   };
 };
