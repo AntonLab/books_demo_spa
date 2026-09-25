@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryKey } from '@tanstack/react-query';
 import { createLike, deleteLike } from '../api/likes';
-import type { CreateLikePayload } from '../types/like';
+import type { CreateLikePayload } from '../types/api';
 
 // One hook for both directions, because the button has one job. `existingId` is
 // what the caller already holds from viewerLikeId: null means "like", a number
