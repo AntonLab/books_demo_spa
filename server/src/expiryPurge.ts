@@ -11,7 +11,6 @@ export interface ExpiryPurgeDeps {
   sessionRepository: Pick<SessionRepository, 'deleteExpired'>;
   passwordResetRepository: Pick<PasswordResetRepository, 'deleteExpiredBefore'>;
   logger: Logger;
-  intervalMs?: number;
   // Date.now, injectable for the spec.
   now?: () => number;
 }
@@ -50,7 +49,7 @@ export function startExpiryPurge(deps: ExpiryPurgeDeps): ExpiryPurge {
   };
 
   run();
-  const timer = setInterval(run, deps.intervalMs ?? EXPIRY_PURGE_INTERVAL_MS);
+  const timer = setInterval(run, EXPIRY_PURGE_INTERVAL_MS);
   timer.unref();
 
   return {

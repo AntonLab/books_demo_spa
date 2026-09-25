@@ -96,16 +96,16 @@ test('runs once at start, then once per interval until stopped', (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   const { deps, sessionMoments } = fakes();
 
-  const purge = startExpiryPurge({ ...deps, intervalMs: 1_000 });
+  const purge = startExpiryPurge(deps);
   assert.equal(sessionMoments.length, 1);
 
-  t.mock.timers.tick(1_000);
+  t.mock.timers.tick(EXPIRY_PURGE_INTERVAL_MS);
   assert.equal(sessionMoments.length, 2);
-  t.mock.timers.tick(2_000);
+  t.mock.timers.tick(2 * EXPIRY_PURGE_INTERVAL_MS);
   assert.equal(sessionMoments.length, 4);
 
   purge.stop();
-  t.mock.timers.tick(5_000);
+  t.mock.timers.tick(5 * EXPIRY_PURGE_INTERVAL_MS);
   assert.equal(sessionMoments.length, 4);
 });
 
