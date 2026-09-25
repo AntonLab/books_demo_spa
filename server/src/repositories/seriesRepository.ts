@@ -14,7 +14,7 @@ import {
 } from './coAuthors.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { PublicSeries } from 'shared';
+import type { ListResponse, PublicSeries } from 'shared';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -24,10 +24,10 @@ import { containsPattern } from './likePattern.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
 import { visibleSeriesWhere, type Viewer } from './visibility.ts';
 
-export interface SeriesListResult {
-  items: PublicSeries[];
-  total: number;
-}
+export type SeriesListResult = Pick<
+  ListResponse<PublicSeries>,
+  'items' | 'total'
+>;
 
 export interface SeriesRepository {
   // userId is the series' first Co-author. It is not part of

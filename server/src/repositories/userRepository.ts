@@ -16,7 +16,13 @@ import { UserAvatar } from '../models/UserAvatar.ts';
 import { containsPattern } from './likePattern.ts';
 import { notify } from './notificationRepository.ts';
 import { ConflictError } from '../types/errors.ts';
-import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
+import type {
+  AuthorSummary,
+  ListResponse,
+  PublicUser,
+  UserRole,
+  UserStatus,
+} from 'shared';
 import type {
   CreateUserInput,
   ListAuthorsQuery,
@@ -24,10 +30,7 @@ import type {
   UserChanges,
 } from '../types/user.ts';
 
-export interface UserListResult {
-  items: PublicUser[];
-  total: number;
-}
+export type UserListResult = Pick<ListResponse<PublicUser>, 'items' | 'total'>;
 
 export interface UserRepository {
   // The role is a separate argument rather than part of CreateUserInput, so
