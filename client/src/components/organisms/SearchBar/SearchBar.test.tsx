@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { SearchBar } from './SearchBar';
@@ -31,6 +31,13 @@ const LocationProbe = () => {
 // URL, which also makes a "did nothing" assertion mean it.
 const settle = () => act(async () => {});
 
+// One settle() is not enough to see a navigation that did happen: under a
+// loaded full run the render lands later, and the URL still reads '/'.
+const expectLocation = (path: string) =>
+  waitFor(() => {
+    expect(screen.getByTestId('location').textContent).toBe(path);
+  });
+
 const renderBar = (route = '/') => {
   return renderWithProviders(
     <>
@@ -51,11 +58,8 @@ describe('SearchBar', () => {
       screen.getByLabelText('Search books'),
       'dragon riders{Enter}'
     );
-    await settle();
 
-    expect(screen.getByTestId('location')).toHaveTextContent(
-      '/search?q=dragon%20riders'
-    );
+    await expectLocation('/search?q=dragon%20riders');
   });
 
   it('trims surrounding whitespace from the term', async () => {
@@ -65,9 +69,8 @@ describe('SearchBar', () => {
       screen.getByLabelText('Search books'),
       '  elf  {Enter}'
     );
-    await settle();
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/search?q=elf');
+    await expectLocation('/search?q=elf');
   });
 
   it('does nothing when the term is empty', async () => {
@@ -233,8 +236,7 @@ describe('SearchBar suggestions', () => {
     await userEvent.type(screen.getByLabelText('Search books'), 'drag');
     await screen.findByTitle('Dragon Tale 1');
     await userEvent.keyboard('{Enter}');
-    await settle();
 
-    expect(screen.getByTestId('location').textContent).toBe('/search?q=drag');
+    await expectLocation('/search?q=drag');
   });
 });
