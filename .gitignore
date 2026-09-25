@@ -1,50 +1,29 @@
-# `client/`, `server/` and `shared/` are npm workspaces under one root
-# package.json, but each still builds into its own directory, so the rules
-# below are written to match at any depth rather than being repeated per package.
-#
-# Only what this repo's own tools produce, or a secret, belongs here. Files a
-# contributor's OS or editor leaves behind (.DS_Store, Thumbs.db, .vscode/)
-# go in their global excludes file, ~/.config/git/ignore.
+# Only what this repo's own tools produce, or a secret. OS and editor files
+# (.DS_Store, .vscode/) go in ~/.config/git/ignore. Unanchored rules match in
+# every workspace.
 
-# dependencies
 node_modules/
-
-# testing — Jest writes coverage/ when run with --coverage
+# Jest --coverage; client webpack; server tsc
 coverage/
-
-# build output — `client` emits build/, `server` emits dist/
 build/
 dist/
 
-# local environment / secrets — any .env file, however it is named, stays out
-# (the server reads .env.local); the example is the one checked in
+# every .env variant (the server reads .env.local) except the example
 .env
 .env.*
 !.env.example
 
-# agent skills — materialized from skills-lock.json via `npm run skills`
-# (.claude/skills/ holds the machine-specific absolute links into .agents/
-# that scripts/link-skills.mjs makes, and .claude/ also holds the git
-# worktrees created for isolated task execution). The exceptions are
-# .claude/agents/, the checked-in plan pipeline agents, .claude/rules/, the
-# path-scoped topic rules, the shared settings.json and the hooks it runs, and
-# the one hand-written skill; `/.claude/*` matches direct children only, so
-# un-ignoring a directory lets its files through. settings.local.json stays out.
-/.agents
-/.claude/*
-!/.claude/agents/
-!/.claude/rules/
-!/.claude/hooks/
-!/.claude/settings.json
-!/.claude/skills/
+# Claude Code, per clone: skills restored by `npm run skills` (.agents/ plus
+# the machine-specific junctions scripts/link-skills.mjs makes in
+# .claude/skills/; db-reset is hand-written and checked in), task worktrees,
+# personal settings. Everything else under .claude/ is shared.
+/.agents/
 /.claude/skills/*
 !/.claude/skills/db-reset/
+/.claude/worktrees/
+/.claude/settings.local.json
 
-# agent working notes — plans and specs generated per task, not project docs.
-# Two exceptions are checked in: docs/agents/ configures the engineering skills,
-# and docs/adr/ holds the architecture decision records those skills are told to
-# read. `/docs/*` matches direct children only, so un-ignoring a directory is
-# enough to let the files inside it through.
+# agent working notes (plans, specs); docs/agents/ and docs/adr/ are real docs
 /docs/*
 !/docs/agents/
 !/docs/adr/
