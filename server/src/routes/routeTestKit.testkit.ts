@@ -17,38 +17,23 @@ import type { UserRole, PublicUser } from 'shared';
 
 // The five route specs each drive one resource; createApp still requires the
 // others. Stubs that throw keep that assumption honest rather than silently
-// returning undefined.
+// returning undefined. A Proxy answers every method name, so a new repository
+// method needs no edit here. `then` stays undefined, or `await` on the stub
+// would call it as a thenable.
 export function createUnusedRepository<T>(name: string): T {
-  const unreachable = (): never => {
-    throw new Error(`the ${name} repository must not be used by these tests`);
-  };
-
-  return {
-    create: unreachable,
-    list: unreachable,
-    findById: unreachable,
-    findDetailById: unreachable,
-    update: unreachable,
-    remove: unreachable,
-    restore: unreachable,
-    markRead: unreachable,
-    // The auth-era methods. The stub is built from a fixed key list and cast,
-    // so a method missing here is a runtime "not a function" rather than a
-    // compile error — every repository method any route can reach must appear.
-    createIfCredentialCurrent: unreachable,
-    findValidByTokenHash: unreachable,
-    deleteByTokenHash: unreachable,
-    deleteAllForUser: unreachable,
-    invalidateAllForUser: unreachable,
-    redeem: unreachable,
-    findByLoginWithPassword: unreachable,
-    listAuthors: unreachable,
-    findByEmail: unreachable,
-    findPasswordHashById: unreachable,
-    // The expiry purge's. Unreachable from any route, like the rest.
-    deleteExpired: unreachable,
-    deleteExpiredBefore: unreachable,
-  } as T;
+  return new Proxy(
+    {},
+    {
+      get: (_target, key) =>
+        key === 'then'
+          ? undefined
+          : (): never => {
+              throw new Error(
+                `the ${name} repository's ${String(key)} must not be used by these tests`
+              );
+            },
+    }
+  ) as T;
 }
 
 // Never refuses: the route specs sign in far more often than the real limits
