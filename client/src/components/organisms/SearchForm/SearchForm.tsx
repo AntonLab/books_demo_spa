@@ -42,8 +42,8 @@ interface SearchFormProps {
   onReset: () => void;
 }
 
-// One column on a phone, two on a tablet, three from `lg`.
-const FIELD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
+// One column on a phone, two on a tablet, four from `lg`.
+const FIELD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 6 };
 
 // The server trims before it counts, so the rule does too.
 const textRule: FormRule = {
