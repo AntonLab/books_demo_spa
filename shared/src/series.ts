@@ -9,7 +9,7 @@ export interface PublicSeries {
   title: string;
   description: string;
   tags: string[];
-  // A7: the Series' own Genre, or null. Set independently of its Books' — a
+  // The Series' own Genre, or null. Set independently of its Books' — a
   // Book never takes its Genre from its Series (CONTEXT.md, ADR-0008).
   genre: PublicGenre | null;
   createdAt: Date;

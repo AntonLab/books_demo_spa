@@ -56,7 +56,7 @@ export interface UserRepository {
   // currentPassword against. As narrow as findByLoginWithPassword, for the
   // same reason: the hash must not travel further than the check.
   findPasswordHashById(id: number): Promise<string | null>;
-  // The Avatar's bytes never ride along with any other read (S2). null/false
+  // The Avatar's bytes never ride along with any other read. null/false
   // mean "no such account or no such picture" — always public, so unlike a
   // book's Cover this takes no Viewer.
   setAvatar(id: number, data: Buffer): Promise<boolean>;
@@ -83,8 +83,8 @@ function asConflict(error: unknown): never {
   throw error;
 }
 
-// The URL every embedded AuthorSummary or PublicUser resolves an Avatar to
-// (A7), versioned by the picture's own updatedAt so a replace is never
+// The URL every embedded AuthorSummary or PublicUser resolves an Avatar to,
+// versioned by the picture's own updatedAt so a replace is never
 // served stale under the immutable cache header. Exported for
 // bookRepository, seriesRepository and commentRepository, which each embed
 // AuthorSummary the same batched way loadAuthors already does.

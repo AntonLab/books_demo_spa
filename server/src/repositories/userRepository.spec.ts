@@ -664,7 +664,7 @@ describe('userRepository against real MySQL', { skip }, () => {
     );
   });
 
-  // --- Avatar storage (S1-S4, T2). ---
+  // --- Avatar storage. ---
 
   test('an avatar round-trips through setAvatar/getAvatarData, and a second upload replaces the first', async () => {
     const created = await repository.create({

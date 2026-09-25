@@ -64,7 +64,7 @@ test('createBookSchema takes a genreId, coerced, or an explicit null', () => {
   );
 });
 
-// A6: .partial() must not turn an absent key into null, or a PATCH that only
+// .partial() must not turn an absent key into null, or a PATCH that only
 // renames a book would clear its Genre.
 test('updateBookSchema keeps an absent genreId absent and an explicit null null', () => {
   assert.deepEqual(updateBookSchema.parse({ title: 'Dragons' }), {

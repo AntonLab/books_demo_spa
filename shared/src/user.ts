@@ -13,7 +13,7 @@ export interface PublicUser {
   lastName: string;
   status: UserStatus;
   role: UserRole;
-  // A7: the same versioned-URL shape as a Book's Cover.
+  // The same versioned-URL shape as a Book's Cover.
   avatarUrl: string | null;
   createdAt: Date;
   updatedAt: Date;

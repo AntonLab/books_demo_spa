@@ -358,7 +358,7 @@ test('GET list filters by tag, owner and series', async () => {
   );
 });
 
-// R2: the caller here is the `author` persona, which holds `none` on every
+// The caller here is the `author` persona, which holds `none` on every
 // genres action — choosing a Genre rides on the book's own create grant and
 // needs no grant on genres at all. That is why this case asserts 201 as
 // `author` rather than as `admin`.
@@ -379,7 +379,7 @@ test('POST files a book under a genre, and leaves it without one when genreId is
   );
 });
 
-// A6: choosing a Genre rides on the book's own create/update grant (R2), so
+// Choosing a Genre rides on the book's own create/update grant, so
 // nothing extra is checked — but an id that names no Genre is a 400.
 test('a genreId that names no genre is 400 on create and on update', async () => {
   await withAuthenticatedApp(

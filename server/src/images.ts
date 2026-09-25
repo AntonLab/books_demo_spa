@@ -1,8 +1,7 @@
 import sharp, { type Sharp } from 'sharp';
 import { BadRequestError } from './types/errors.ts';
 
-// P1/P2 (docs/superpowers/specs/2026-09-14-covers-and-avatars-design.md):
-// every sharp call for a Cover or an Avatar lives here, one function each.
+// Every sharp call for a Cover or an Avatar lives here, one function each.
 // sharp's own defaults do most of the refusing for us — the input-pixel
 // limit stays on and multi-page input reads only its first frame — so
 // nothing here turns either off.

@@ -12,7 +12,7 @@ export function createGenreRoutes(deps: RouteDeps): Router {
   const router = Router();
 
   // Every route runs through the matrix, the read included: `guest` has
-  // `read: any` on genres, which is what keeps this list public (A1).
+  // `read: any` on genres, which is what keeps this list public.
   router.get(
     '/',
     requirePermission('genres', 'read'),
@@ -20,8 +20,6 @@ export function createGenreRoutes(deps: RouteDeps): Router {
     controller.list
   );
 
-  // requirePermission goes before validate on every write, so a refused
-  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
     requirePermission('genres', 'create'),

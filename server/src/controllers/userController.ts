@@ -152,7 +152,7 @@ export function createUserController(repository: UserRepository) {
       res.status(204).end();
     },
 
-    // A4: users x update, then the same rank check PATCH uses.
+    // Users x update, then the same rank check PATCH uses.
     uploadAvatar: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       if (!Buffer.isBuffer(req.body)) {
@@ -169,7 +169,7 @@ export function createUserController(repository: UserRepository) {
       res.json(user);
     },
 
-    // A5: same guards as uploadAvatar; 204 whether or not an Avatar existed.
+    // Same guards as uploadAvatar; 204 whether or not an Avatar existed.
     removeAvatar: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayTouch(req, id);
@@ -178,7 +178,7 @@ export function createUserController(repository: UserRepository) {
       res.status(204).end();
     },
 
-    // A6: fully public — mounted with no permission middleware at all, not
+    // Fully public — mounted with no permission middleware at all, not
     // even users x read, which a guest lacks.
     getAvatar: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
