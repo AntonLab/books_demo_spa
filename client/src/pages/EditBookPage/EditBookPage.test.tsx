@@ -15,7 +15,7 @@ import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { RootState } from '@/store';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/books');

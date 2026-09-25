@@ -5,7 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import type { RootState } from '@/store';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 const viewer: PublicUser = {
   id: 3,

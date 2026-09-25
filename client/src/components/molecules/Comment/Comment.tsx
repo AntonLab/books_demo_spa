@@ -5,7 +5,7 @@ import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { formatDate } from '@/format/date';
 import styles from './Comment.module.css';
 import type { Tombstone } from 'shared';
-import type { CommentWithAuthor } from '@/types/comment';
+import type { CommentWithAuthor } from '@/types/api';
 
 const TOMBSTONE_LABELS: Record<Tombstone, string> = {
   deleted: '[deleted]',

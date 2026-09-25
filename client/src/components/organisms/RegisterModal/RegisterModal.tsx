@@ -5,7 +5,7 @@ import { useRegister } from '@/queries/auth';
 import { ApiError } from '@/api/client';
 import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
-import styles from './RegisterModal.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface RegisterValues {
   login: string;
@@ -68,7 +68,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   return (
     <Modal open title="Create an account" onCancel={onClose} footer={null}>
       {formError !== null && (
-        <Alert type="error" title={formError} className={styles.error} />
+        <Alert type="error" title={formError} className={spacing.gapBelow} />
       )}
 
       {/* void: handleFinish reports its own failure in the form, so nothing

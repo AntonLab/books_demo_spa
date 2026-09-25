@@ -16,7 +16,7 @@ import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
 import { useGenres } from '@/queries/genres';
 import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
-import styles from './EditSeriesPage.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 export const EditSeriesPage: FC = () => {
   const navigate = useNavigate();
@@ -54,7 +54,7 @@ export const EditSeriesPage: FC = () => {
       <Typography.Title level={2}>Edit series</Typography.Title>
 
       {update.isSuccess && (
-        <Alert type="success" title="Saved." className={styles.alert} />
+        <Alert type="success" title="Saved." className={spacing.gapBelow} />
       )}
       <SeriesForm
         // Keyed by the last save, so the fields reset to what the server

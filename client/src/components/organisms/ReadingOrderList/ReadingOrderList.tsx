@@ -6,7 +6,7 @@ import { ApiError } from '@/api/client';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
 import { formatDate } from '@/format/date';
 import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
-import styles from './ReadingOrderList.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 // One row of the book's chapter list: a link to the chapter's editor, a badge
 // for what is not out yet, and the date it came out or will.
@@ -71,7 +71,7 @@ export const ReadingOrderList: FC<ReadingOrderListProps> = ({
               ? 'A co-author changed the chapters while you were reordering them. This is their current order.'
               : 'Could not save the new chapter order.'
           }
-          className={styles.error}
+          className={spacing.gapBelow}
         />
       )}
       {/* Every chapter, drafts and scheduled ones included: the server returns

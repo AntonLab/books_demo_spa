@@ -9,10 +9,9 @@ import {
   useSeriesBooks,
 } from '@/queries/series';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
-import type { SeriesBookSummary } from '@/types/series';
+import type { PublicUser, SeriesBookSummary } from '@/types/api';
 import { bookCapabilities } from '@/types/capabilities';
-import type { PublicUser } from '@/types/user';
-import styles from './SeriesOrderList.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface SeriesOrderListProps {
   seriesId: number;
@@ -92,14 +91,14 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
               ? 'A co-author changed the books of this series while you were reordering them. This is their current order.'
               : 'Could not save the new book order.'
           }
-          className={styles.error}
+          className={spacing.gapBelow}
         />
       )}
       {takeOut.error && (
         <Alert
           type="error"
           title={takeOut.error.message}
-          className={styles.error}
+          className={spacing.gapBelow}
         />
       )}
       <SortableList

@@ -10,8 +10,7 @@ import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries, SeriesBookSummary } from '@/types/series';
-import type { PublicUser } from '@/types/user';
+import type { PublicSeries, PublicUser, SeriesBookSummary } from '@/types/api';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/genres');

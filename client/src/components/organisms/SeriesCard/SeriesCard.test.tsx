@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { SeriesCard } from './SeriesCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import type { PublicSeries } from '@/types/series';
+import type { PublicSeries } from '@/types/api';
 
 const series: PublicSeries = {
   id: 12,

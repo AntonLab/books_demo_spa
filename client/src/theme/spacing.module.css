@@ -1,0 +1,5 @@
+/* The one gap every alert, notice and toolbar keeps from what follows it,
+   shared so a component with no other style needs no module of its own. */
+.gapBelow {
+  margin-bottom: var(--ant-margin);
+}

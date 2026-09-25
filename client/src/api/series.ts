@@ -1,6 +1,6 @@
 import { request } from './client';
 import type { ListResponse } from 'shared';
-import type { PublicSeries, SeriesBookSummary } from '../types/series';
+import type { PublicSeries, SeriesBookSummary } from '../types/api';
 
 export interface ListSeriesParams {
   userId?: number;
