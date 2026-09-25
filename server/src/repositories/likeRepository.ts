@@ -13,7 +13,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
-import type { PublicLike } from 'shared';
+import type { ListResponse, PublicLike } from 'shared';
 import type {
   CreateLikeInput,
   ListLikesQuery,
@@ -24,10 +24,7 @@ import { hiddenBookIds, type Viewer } from './visibility.ts';
 // Not to be confused with likePattern.ts next door, which is about the SQL
 // LIKE operator and has nothing to do with this resource.
 
-export interface LikeListResult {
-  items: PublicLike[];
-  total: number;
-}
+export type LikeListResult = Pick<ListResponse<PublicLike>, 'items' | 'total'>;
 
 export interface LikeRepository {
   // actorId is separate from the input rather than folded into it, so the type
