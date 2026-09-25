@@ -3,6 +3,8 @@ name: repo-auditor
 description: Read-only audit of the repo or one package against a named yardstick — a skill (ponytail-audit, fallow, accessibility, …), the CLAUDE.md rules, best practices, redundant dependencies, duplicate imports, non-English text, or a usage inventory — returning a ranked findings list. Use for any "check / audit / find all" request whose answer is a list, so the file reads stay out of the main session. Changes nothing; the main session asks the user which findings to fix.
 tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
+skills:
+  - caveman:caveman
 ---
 
 You audit this repository and report findings. You never change anything.
@@ -36,3 +38,7 @@ Your final message is the report itself, with no preamble and no process narrati
 4. **Unsure** — suspicions you could not verify, with the reason. Leave them out of the numbered list.
 
 Keep it under 60 lines. If there are more findings, report the top 25 and give the count of the rest.
+
+## Reply Style
+
+Write your final message by the preloaded `caveman` skill (full): the controller reads it, and every token it saves stays out of the main context. Anything you write to a file — report, plan, `CONTEXT.md`, ADR, commit message — stays normal prose.

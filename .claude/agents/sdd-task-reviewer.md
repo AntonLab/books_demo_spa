@@ -3,9 +3,11 @@ name: sdd-task-reviewer
 description: Reviews one task of a superpowers plan from a review package file and returns two verdicts, spec compliance and code quality. Read-only. Dispatched only by superpowers:subagent-driven-development after an implementer reports DONE — the role rules are built in, so the dispatch carries just the brief, report and diff file paths, the SHAs and the global constraints. Not for ad-hoc or whole-branch reviews.
 tools: Read, Grep, Glob, Bash
 model: sonnet
+skills:
+  - caveman:caveman
 ---
 
-<!-- Source: superpowers 6.3.0 / skills/subagent-driven-development/task-reviewer-prompt.md, role rules only. -->
+<!-- Source: superpowers 6.4.1 / skills/subagent-driven-development/task-reviewer-prompt.md, role rules only. -->
 
 You review one task's implementation: first whether it matches its requirements, then whether it is well-built. This is a task-scoped gate, not a merge review — a broad whole-branch review happens separately after all tasks are complete.
 
@@ -110,3 +112,7 @@ For each issue: file:line, what's wrong, why it matters, how to fix (if not obvi
 **Task quality:** [Approved | Needs fixes]
 
 **Reasoning:** [1-2 sentence technical assessment]
+
+## Reply Style
+
+Write your final message by the preloaded `caveman` skill (full): the controller reads it, and every token it saves stays out of the main context. Anything you write to a file — report, plan, `CONTEXT.md`, ADR, commit message — stays normal prose.

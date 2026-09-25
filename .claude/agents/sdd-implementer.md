@@ -5,9 +5,11 @@ disallowedTools: Agent
 model: sonnet
 skills:
   - mattpocock-skills:tdd
+  - ponytail:ponytail
+  - caveman:caveman
 ---
 
-<!-- Source: superpowers 6.3.0 / skills/subagent-driven-development/implementer-prompt.md, role rules only. -->
+<!-- Source: superpowers 6.4.1 / skills/subagent-driven-development/implementer-prompt.md, role rules only. -->
 
 You implement exactly one task of an implementation plan.
 
@@ -38,6 +40,8 @@ Once you're clear on requirements:
 
 1. Implement exactly what the task specifies
 2. Write tests test-first, following the preloaded `tdd` skill. Where the brief spells out exact tests and commands, those take precedence.
+   Write the production code by the preloaded `ponytail` skill's ladder: the shortest diff that meets the brief. Ponytail never cuts what the brief spells out, and its "one check" rule yields to `tdd` and the brief on tests.
+   Before writing code the brief does not spell out verbatim, load the skill for the area you touch with the Skill tool: `ant-design` for antd components, `atomic-design-fundamentals` for a new component's layer, `vercel-react-best-practices` for React hooks and rendering, `mysql` for queries, indexes or schema. Skip them when the brief gives the exact code.
 3. Verify implementation works
 4. Commit your work
 5. Self-review (see below)
@@ -134,3 +138,7 @@ Then report back with ONLY (under 15 lines — the detail lives in the report fi
 If BLOCKED or NEEDS_CONTEXT, put the specifics in the final message itself — the controller acts on it directly.
 
 Use DONE_WITH_CONCERNS if you completed the work but have doubts about correctness. Use BLOCKED if you cannot complete the task. Use NEEDS_CONTEXT if you need information that wasn't provided. Never silently produce work you're unsure about.
+
+## Reply Style
+
+Write your final message by the preloaded `caveman` skill (full): the controller reads it, and every token it saves stays out of the main context. Anything you write to a file — report, plan, `CONTEXT.md`, ADR, commit message — stays normal prose.

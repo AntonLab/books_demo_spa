@@ -23,7 +23,7 @@
       "source": "fallow-rs/fallow-skills",
       "sourceType": "github",
       "skillPath": "fallow/skills/fallow/SKILL.md",
-      "computedHash": "51052d5339bae02c3bb56542382685ebcc6438ba693c837da1d16ec68618a04b"
+      "computedHash": "3fd87f702fd25942788e6267f540e887e322191225b8eefd7e377cb95efe8a83"
     },
     "fallow-review": {
       "source": "fallow-rs/fallow-skills",
@@ -42,12 +42,6 @@
       "sourceType": "github",
       "skillPath": "skills/mysql/SKILL.md",
       "computedHash": "a74d7d018c4a9cfe4fd6e37f8758ef03272cde3f3dc2444c4f299636f4b3d275"
-    },
-    "ponytail": {
-      "source": "dietrichgebert/ponytail",
-      "sourceType": "github",
-      "skillPath": "skills/ponytail/SKILL.md",
-      "computedHash": "9e8d05cbbaf6dc38f0cffc924c09b3cbe76d94ba4ba0d09bde803da2f8c6b5a0"
     },
     "typescript-advanced-types": {
       "source": "wshobson/agents",
