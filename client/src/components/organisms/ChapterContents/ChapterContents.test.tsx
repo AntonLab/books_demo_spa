@@ -62,24 +62,30 @@ describe('ChapterContents', () => {
   it('lists the chapters and marks the one being read', () => {
     renderOpen();
 
-    expect(screen.getByRole('link', { name: 'One' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '1. One' })).toHaveAttribute(
       'href',
       '/books/1/chapters/9'
     );
-    expect(screen.getByRole('link', { name: 'Two' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '2. Two' })).toHaveAttribute(
       'aria-current',
       'page'
     );
-    expect(screen.getByRole('link', { name: 'One' })).not.toHaveAttribute(
+    expect(screen.getByRole('link', { name: '1. One' })).not.toHaveAttribute(
       'aria-current'
     );
+  });
+
+  it('divides the chapters from each other', () => {
+    renderOpen();
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1);
   });
 
   it('closes once a chapter is picked', async () => {
     const onClose = jest.fn();
     renderOpen(onClose);
 
-    await userEvent.click(screen.getByRole('link', { name: 'One' }));
+    await userEvent.click(screen.getByRole('link', { name: '1. One' }));
 
     expect(onClose).toHaveBeenCalled();
   });
