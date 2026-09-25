@@ -5,11 +5,12 @@ paths:
 
 # `src/api/`
 
-- `client.ts`'s `request<T>()` prefixes `/api` and turns non-2xx into a typed
-  `ApiError`. It relies on fetch's default `credentials: 'same-origin'` to send
-  the httpOnly `sid`: the API must stay same-origin (the server has no CORS),
-  and an API on another origin would need `credentials: 'include'` back. Only
-  `src/queries/` calls these functions.
+- `client.ts`'s `request<T>()` prefixes `/api`, sends
+  `credentials: 'include'` and turns non-2xx into a typed `ApiError`. Keep
+  `include` even though `/api` is same-origin today: fetch's default
+  `same-origin` would silently drop the httpOnly `sid` the day the API moves
+  to another origin. `client.test.ts` pins it. Only `src/queries/` calls these
+  functions.
 - **`body` is an object, not a string**: `request()` stringifies it and sets
   `Content-Type` itself. A JSON string would be double-encoded.
 - **A `Blob` body (a `File`: Covers, Avatars) is sent as-is**, with the blob's

@@ -22,6 +22,18 @@ describe('listComments', () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/comments?bookId=7&limit=100');
   });
+
+  it('sends the session cookie', async () => {
+    const fetchMock = mockFetch(jsonResponse(envelope));
+
+    await listComments(7);
+
+    // Without credentials the browser withholds the httpOnly `sid` cookie, and
+    // viewerLikeId would come back null for a signed-in reader.
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      credentials: 'include',
+    });
+  });
 });
 
 describe('createComment', () => {

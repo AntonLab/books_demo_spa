@@ -130,7 +130,7 @@ describe('listBooks', () => {
     await listBooks();
 
     const [, init] = callOf(fetchMock);
-    expect(init).toMatchObject({ method: 'GET' });
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({});
   });

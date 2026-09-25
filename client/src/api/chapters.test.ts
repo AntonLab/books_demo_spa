@@ -44,7 +44,7 @@ describe('listChapters', () => {
     const [url, init] = callOf(fetchMock);
     // 100 is the server's cap on limit; anything above is a 400.
     expect(url).toBe('/api/chapters?bookId=7&limit=100');
-    expect(init).toMatchObject({ method: 'GET' });
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({});
   });
