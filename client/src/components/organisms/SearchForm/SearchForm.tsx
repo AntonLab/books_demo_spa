@@ -23,6 +23,12 @@ import { useSeriesSuggestions } from '@/queries/series';
 import type { AuthorSummary, PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import {
+  authorLabelOf,
+  matchingAuthors,
+  matchingTitles,
+  suggestionTermOf,
+} from '@/types/searchSuggestions';
+import {
   BOOK_SORTS,
   RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
@@ -85,24 +91,12 @@ const before =
   (day: Dayjs): boolean =>
     limit != null && day.isBefore(limit, 'day');
 
-// Fewer characters match too much to be worth a request.
-const SUGGEST_MIN_LENGTH = 3;
-
-// A term too short, or too long for the server, asks for nothing.
-const termOf = (value: string): string => {
-  const term = value.trim();
-  return term.length >= SUGGEST_MIN_LENGTH &&
-    term.length <= SEARCH_TEXT_MAX_LENGTH
-    ? term
-    : '';
-};
-
 // The server already matched the term, so antd must not filter again: it
 // would drop a login matched by first name. Fires on typing only, never on a
 // pick.
 const suggestOn = (onType: (term: string) => void) => ({
   filterOption: false as const,
-  onSearch: (value: string) => onType(termOf(value)),
+  onSearch: (value: string) => onType(suggestionTermOf(value)),
 });
 
 // What a pick hands back beside the text it fills in.
@@ -116,16 +110,6 @@ interface IdOption extends DefaultOptionType {
 // lands with nothing, the list stays shut.
 const pendingOf = (isFetching: boolean) =>
   isFetching ? <Spin size="small" aria-label="Loading suggestions" /> : null;
-
-const contains = (text: string, term: string): boolean =>
-  text.toLowerCase().includes(term.toLowerCase());
-
-// A book found by its description, or a series by its, would suggest a title
-// that does not hold the term.
-const matchingTitles = <T extends { id: number; title: string }>(
-  entries: T[],
-  term: string
-): T[] => entries.filter((entry) => contains(entry.title, term));
 
 // Picking a book opens it, so its option's value is its id and never lands
 // in the field; two books sharing a title stay two options.
@@ -145,23 +129,12 @@ const seriesOptions = (series: PublicSeries[], term: string): IdOption[] => {
     .map((entry) => ({ value: entry.title, id: entry.id }));
 };
 
-// A matched book's other Co-authors are left out. Each author is offered by
-// login: the server matches `author` against login, first or last name one at
-// a time, so "First Last" would find nothing.
+// Each author is offered by login: the server matches `author` against
+// login, first or last name one at a time, so "First Last" would find nothing.
 const authorOptions = (authors: AuthorSummary[], term: string): IdOption[] =>
-  [
-    ...new Map(
-      authors
-        .filter((author) =>
-          [author.login, author.firstName, author.lastName].some((text) =>
-            contains(text, term)
-          )
-        )
-        .map((author) => [author.id, author])
-    ).values(),
-  ].map((author) => ({
+  matchingAuthors(authors, term).map((author) => ({
     value: author.login,
-    label: `${author.firstName} ${author.lastName} (${author.login})`,
+    label: authorLabelOf(author),
     id: author.id,
   }));
 
