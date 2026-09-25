@@ -7,7 +7,7 @@ import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
-import type { AuthorSummary } from '@/types/user';
+import type { AuthorSummary } from '@/types/api';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/books');

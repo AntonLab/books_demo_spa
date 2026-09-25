@@ -5,7 +5,7 @@ import {
   WorkFields,
 } from '@/components/molecules/WorkFields/WorkFields';
 import type { PublicGenre } from 'shared';
-import styles from './SeriesForm.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface SeriesFormValues {
   title: string;
@@ -51,7 +51,7 @@ export const SeriesForm: FC<SeriesFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert type="error" title={error} className={styles.error} />
+        <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
       <Form<FieldValues>

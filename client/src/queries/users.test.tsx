@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useDeleteAvatar, useUploadAvatar } from './users';
 import { createTestQueryClient } from '../test/queryClient';
 import * as usersApi from '../api/users';
-import type { PublicUser } from '../types/user';
+import type { PublicUser } from '../types/api';
 
 jest.mock('../api/users');
 const mockedUsers = jest.mocked(usersApi);

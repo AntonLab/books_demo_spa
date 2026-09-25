@@ -4,7 +4,7 @@ import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
-import type { PublicNotification } from '@/types/notification';
+import type { PublicNotification } from '@/types/api';
 
 jest.mock('@/api/notifications');
 

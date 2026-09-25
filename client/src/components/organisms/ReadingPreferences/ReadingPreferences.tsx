@@ -1,7 +1,10 @@
 import type { FC, ReactNode } from 'react';
 import { Button, Flex, Popover, Segmented, theme, Typography } from 'antd';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGear, faMinus, faPlus } from '@fortawesome/free-solid-svg-icons';
+import {
+  MinusOutlined,
+  PlusOutlined,
+  SettingOutlined,
+} from '@ant-design/icons';
 import {
   devicePreferences,
   READING_FONT_SIZE,
@@ -72,14 +75,14 @@ export const ReadingPreferences: FC = () => {
         <Flex align="center" gap={token.marginSM}>
           <Button
             aria-label="Smaller text"
-            icon={<FontAwesomeIcon icon={faMinus} />}
+            icon={<MinusOutlined />}
             disabled={reading.fontSize <= min}
             onClick={() => change({ fontSize: reading.fontSize - step })}
           />
           <Typography.Text>{reading.fontSize}</Typography.Text>
           <Button
             aria-label="Larger text"
-            icon={<FontAwesomeIcon icon={faPlus} />}
+            icon={<PlusOutlined />}
             disabled={reading.fontSize >= max}
             onClick={() => change({ fontSize: reading.fontSize + step })}
           />
@@ -117,10 +120,7 @@ export const ReadingPreferences: FC = () => {
 
   return (
     <Popover content={form} trigger="click" placement="bottomRight">
-      <Button
-        aria-label="Reading preferences"
-        icon={<FontAwesomeIcon icon={faGear} />}
-      />
+      <Button aria-label="Reading preferences" icon={<SettingOutlined />} />
     </Popover>
   );
 };

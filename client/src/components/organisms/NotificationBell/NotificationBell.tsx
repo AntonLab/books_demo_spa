@@ -7,7 +7,7 @@ import {
   useNotifications,
 } from '@/queries/notifications';
 import { formatDateTime } from '@/format/date';
-import type { PublicNotification } from '@/types/notification';
+import type { PublicNotification } from '@/types/api';
 import styles from './NotificationBell.module.css';
 
 interface NotificationBellProps {

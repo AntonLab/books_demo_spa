@@ -3,7 +3,7 @@ import { Card as AntCard, Flex, Space, Tag, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import type { PublicGenre } from 'shared';
-import type { AuthorSummary } from '@/types/user';
+import type { AuthorSummary } from '@/types/api';
 import styles from './Card.module.css';
 
 interface CardProps {

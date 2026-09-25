@@ -7,7 +7,7 @@ import {
 import { BOOK_STATUSES } from 'shared';
 import { BOOK_STATUS_LABELS } from '@/types/book';
 import type { PublicGenre, BookStatus } from 'shared';
-import styles from './BookForm.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 export interface BookFormValues {
   title: string;
@@ -73,7 +73,7 @@ export const BookForm: FC<BookFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert type="error" title={error} className={styles.error} />
+        <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
       <Form<FieldValues>

@@ -7,8 +7,7 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
-import type { CommentWithAuthor } from '@/types/comment';
-import type { PublicUser } from '@/types/user';
+import type { CommentWithAuthor, PublicUser } from '@/types/api';
 import type { RootState } from '@/store';
 
 jest.mock('@/api/comments');

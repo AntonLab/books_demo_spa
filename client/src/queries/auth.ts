@@ -9,7 +9,7 @@ import * as authApi from '../api/auth';
 import type { LoginInput, RegisterInput } from '../api/auth';
 import { ApiError } from '../api/client';
 import { queryKeys } from './keys';
-import type { PublicUser } from '../types/user';
+import type { PublicUser } from '../types/api';
 
 // `null` means "asked, and nobody is signed in"; `undefined` means "not asked
 // yet". TanStack enforces the distinction for us — it rejects an `undefined`

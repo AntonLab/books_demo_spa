@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { PublicUser } from '../types/user';
+import type { PublicUser } from '../types/api';
 
 // K2: the Account's Avatar. Its own module, the way authors.ts is — the
 // users resource has no other writes reachable from this client yet.

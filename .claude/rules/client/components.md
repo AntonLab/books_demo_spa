@@ -84,9 +84,10 @@ that read like mistakes and are not.
   `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
   deletes the right row. It predates the icons and still uses a text glyph.
-- Icons come from Font Awesome, not `@ant-design/icons` (ADR-0011). FA 7
-  icons are decorative by default: an icon that is a control's only content
-  takes `aria-label` (its `title` prop is deprecated).
+- Icons come from `@ant-design/icons` (ADR-0012). Each renders `role="img"`
+  named after itself: an icon beside visible text takes `aria-hidden`, and an
+  icon-only control takes `aria-label` on the control (or on the icon, for a
+  `Segmented` option).
 - `NotificationBell` marks unread items read when opened but keeps them
   highlighted until it closes.
 

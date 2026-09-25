@@ -16,7 +16,7 @@ import { CardList } from '@/components/organisms/CardList/CardList';
 import { useSession } from '@/queries/auth';
 import { useMyBooks } from '@/queries/books';
 import { useMySeries } from '@/queries/series';
-import styles from './MyBooksPage.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 // Every book the signed-in author co-authors, in any status, and every series
 // they co-author. The books come from `?userId=` naming the caller, which is
@@ -100,7 +100,7 @@ export const MyBooksPage: FC = () => {
             label: 'Series',
             children: (
               <>
-                <Flex justify="flex-end" className={styles.toolbar}>
+                <Flex justify="flex-end" className={spacing.gapBelow}>
                   <Button onClick={() => void navigate('/series/new')}>
                     Create series
                   </Button>

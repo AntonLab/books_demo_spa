@@ -12,7 +12,7 @@ import type { RootState } from '@/store';
 import type { UnsavedTextEntry } from '@/store/unsavedTextSlice';
 import type { BookDetail } from '@/types/book';
 import type { PublicChapter } from '@/types/chapter';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');

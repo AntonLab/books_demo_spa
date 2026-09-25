@@ -8,7 +8,7 @@ import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 import type { RootState } from '@/store';
 
 jest.mock('@/api/auth');

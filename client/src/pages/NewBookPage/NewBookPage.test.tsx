@@ -10,7 +10,7 @@ import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/genres');

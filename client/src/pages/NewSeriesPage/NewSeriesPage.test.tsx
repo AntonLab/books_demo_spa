@@ -8,8 +8,7 @@ import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries } from '@/types/series';
-import type { PublicUser } from '@/types/user';
+import type { PublicSeries, PublicUser } from '@/types/api';
 
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
