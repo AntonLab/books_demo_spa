@@ -36,8 +36,9 @@ paths:
   link points here, and old `/search?series=` links are not redirected.
 - `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
   paginated book results. The URL is its only state, read and written through
-  `types/bookSearch.ts`: days stay `YYYY-MM-DD` in the URL and become instants
-  only in `listParamsOf`; the default sort and page 1 are never written;
+  `useSearchPage` (beside the page) and `types/bookSearch.ts`; every link into
+  it is built by `searchPath`. Days stay `YYYY-MM-DD` in the URL and become
+  instants only in the request; the default sort and page 1 are never written;
   `?series=` and an unknown `status` / `sort` / day are ignored. Picking an
   Author or Series suggestion adds its id beside the text
   (`authorId` / `seriesId`); the server is then asked by id (`userId` /
@@ -45,9 +46,12 @@ paths:
   is ignored. Picking a Text suggestion opens that book instead. The form is
   keyed by the URL plus the resolved Genre, because antd reads
   `initialValues` once. A `genre` the non-empty Genre list does not hold
-  shows "This genre no longer exists." and asks for no books. When the
-  server serves a lower `current` than asked, the page `replace`s the URL. A
-  400's zod issues land on their fields (`fieldErrorsOf`). The form is
+  shows "This genre no longer exists." and asks for no books; `useSearchPage`
+  then reports a status that carries no `books`, because the disabled query is
+  keyed like the same search without a genre and may hold its cached page.
+  When the server serves a lower `current` than asked, the hook `replace`s the
+  URL. A 400's zod issues land on their fields. The page renders by
+  `results.status` and holds no search logic of its own. The form is
   shown or hidden (never unmounted, so field errors still land) by the
   `SearchFiltersToggle` button beside the layout switch, through the
   `searchFormExpanded` Device preference, open by default. Results show as tiles or a list by `resultsLayout`
