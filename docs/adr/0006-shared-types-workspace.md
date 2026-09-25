@@ -9,9 +9,9 @@ types. It holds what the API returns, written in the server's shape (dates as
 `Date`), and the `as const` arrays behind the string unions both packages use,
 with each union derived from its array. The client reads every shape through
 `Wire<T>`, which turns each `Date` into the ISO string it arrives as, so no
-copy with string dates is left to drift. `client/src/types` and
-`server/src/types` stay the modules each package imports, re-exporting from
-`shared`. zod stays out of it: the server's schemas build their enums from the
+copy with string dates is left to drift. Both packages import from `shared`
+directly; `client/src/types` keeps the `Wire<T>` aliases and `server/src/types`
+the zod schemas. zod stays out of it: the server's schemas build their enums from the
 shared arrays, but no schema is shared, so zod never enters the client bundle.
 
 ## Considered Options

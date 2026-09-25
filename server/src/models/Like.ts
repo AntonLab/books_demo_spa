@@ -11,7 +11,7 @@ import {
 import type { Book } from './Book.ts';
 import type { Comment } from './Comment.ts';
 import type { User } from './User.ts';
-import type { PublicLike } from '../types/like.ts';
+import type { PublicLike } from 'shared';
 
 export class Like extends Model<
   InferAttributes<Like>,

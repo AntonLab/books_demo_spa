@@ -2,7 +2,8 @@ import { screen, within } from '@testing-library/react';
 import { MainPage } from './MainPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
-import type { BookSort, PublicBook } from '@/types/book';
+import type { BookSort } from 'shared';
+import type { PublicBook } from '@/types/book';
 
 jest.mock('@/api/books');
 

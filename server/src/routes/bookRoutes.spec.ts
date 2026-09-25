@@ -10,9 +10,12 @@ import {
 } from '../repositories/bookRepository.fake.testkit.ts';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { Viewer } from '../repositories/visibility.ts';
-import type { BookDetail, PublicBook } from '../types/book.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type {
+  BookDetail,
+  PublicBook,
+  PublicGenre,
+  AuthorSummary,
+} from 'shared';
 import {
   AUTH_COOKIE,
   json,

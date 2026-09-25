@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-// The response shapes are the client's contract too, so they live in the shared
-// workspace (ADR-0006); the schemas stay here.
-export type { ChapterSummary, PublicChapter } from 'shared';
-
 export const CHAPTER_TITLE_MAX_LENGTH = 255;
 // Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
 // were a 4-byte astral one, a million of them reach 4 MB.

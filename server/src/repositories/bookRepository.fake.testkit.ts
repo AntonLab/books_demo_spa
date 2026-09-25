@@ -1,7 +1,10 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { BookDetail, PublicBook } from '../types/book.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type {
+  BookDetail,
+  PublicBook,
+  PublicGenre,
+  AuthorSummary,
+} from 'shared';
 import type { BookListResult, BookRepository } from './bookRepository.ts';
 import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';

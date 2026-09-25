@@ -1,5 +1,6 @@
-import type { BookStatus } from './book';
-import { isModeratorRole, type PublicUser } from './user';
+import type { BookStatus } from 'shared';
+import { isModeratorRole } from 'shared';
+import type { PublicUser } from './user';
 
 // What the viewer may do with a Book or Series, so a page shows only what the
 // server would allow. The server refuses the rest regardless: it decides from

@@ -13,8 +13,7 @@ import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { hashToken } from '../tokens.ts';
-import type { UserRole } from '../types/permission.ts';
-import type { PublicUser } from '../types/user.ts';
+import type { UserRole, PublicUser } from 'shared';
 
 // The five route specs each drive one resource; createApp still requires the
 // others. Stubs that throw keep that assumption honest rather than silently

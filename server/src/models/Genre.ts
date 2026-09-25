@@ -6,7 +6,7 @@ import {
   type InferCreationAttributes,
   type Sequelize,
 } from 'sequelize';
-import type { PublicGenre } from '../types/genre.ts';
+import type { PublicGenre } from 'shared';
 
 // A category of the catalogue, from the list Admins and Superadmins keep
 // (CONTEXT.md, ADR-0008). A Book or a Series points at one or at none; nothing

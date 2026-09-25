@@ -1,6 +1,5 @@
 import { describe } from 'node:test';
-import type { PublicGenre } from '../types/genre.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { PublicGenre, AuthorSummary } from 'shared';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import { createFakeSeriesRepository } from './seriesRepository.fake.testkit.ts';
 

@@ -3,7 +3,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
-import type { PublicLike } from '../types/like.ts';
+import type { PublicLike } from 'shared';
 import type { LikeListResult, LikeRepository } from './likeRepository.ts';
 
 export interface FakeLikeRepositoryOptions {

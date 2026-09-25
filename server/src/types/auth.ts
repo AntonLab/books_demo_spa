@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { REGISTRABLE_ROLES } from './permission.ts';
+import { REGISTRABLE_ROLES } from 'shared';
 
 // The field rules match createUserSchema in ./user.ts, minus `status`: a
 // registrant does not get to choose their own account state, so the key is

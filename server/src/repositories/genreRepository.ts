@@ -2,7 +2,8 @@ import { literal, Op, UniqueConstraintError } from 'sequelize';
 import type { Transaction } from 'sequelize';
 import { Genre, toPublicGenre } from '../models/Genre.ts';
 import { BadRequestError, ConflictError } from '../types/errors.ts';
-import type { GenreInput, PublicGenre } from '../types/genre.ts';
+import type { PublicGenre } from 'shared';
+import type { GenreInput } from '../types/genre.ts';
 
 export interface GenreRepository {
   // Every Genre, alphabetically. No paging envelope, unlike the books and

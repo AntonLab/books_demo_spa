@@ -1,10 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { NotificationRepository } from '../repositories/notificationRepository.ts';
-import type {
-  ListNotificationsQuery,
-  PublicNotification,
-} from '../types/notification.ts';
+import type { PublicNotification } from 'shared';
+import type { ListNotificationsQuery } from '../types/notification.ts';
 import {
   json,
   ROLE_COOKIES,

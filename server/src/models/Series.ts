@@ -11,9 +11,7 @@ import {
 import type { Book } from './Book.ts';
 import type { Genre } from './Genre.ts';
 import { toTagArray } from './tagArray.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { PublicSeries } from '../types/series.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
 
 export class Series extends Model<
   InferAttributes<Series>,

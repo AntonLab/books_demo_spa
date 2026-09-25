@@ -1,5 +1,5 @@
 import { describe } from 'node:test';
-import type { AuthorSummary } from '../types/user.ts';
+import type { AuthorSummary } from 'shared';
 import { commentRepositoryContract } from './commentRepository.contract.testkit.ts';
 import { createFakeCommentRepository } from './commentRepository.fake.testkit.ts';
 
