@@ -1,20 +1,27 @@
-import { useEffect, type FC } from 'react';
+import { useEffect, useState, type FC } from 'react';
 import {
+  AutoComplete,
   Button,
   Card,
   Col,
   DatePicker,
   Flex,
   Form,
-  Input,
   Row,
   Select,
+  Spin,
 } from 'antd';
 import type { ColProps, FormRule } from 'antd';
+import type { DefaultOptionType } from 'antd/es/select';
+import { useNavigate } from 'react-router';
 import { FilterOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useBookSuggestions } from '@/queries/books';
+import { useSeriesSuggestions } from '@/queries/series';
+import type { AuthorSummary, PublicSeries } from '@/types/api';
+import type { PublicBook } from '@/types/book';
 import {
   BOOK_SORTS,
   RANGE_ORDER,
@@ -77,6 +84,86 @@ const before =
   (day: Dayjs): boolean =>
     limit != null && day.isBefore(limit, 'day');
 
+// Fewer characters match too much to be worth a request.
+const SUGGEST_MIN_LENGTH = 3;
+
+// A term too short, or too long for the server, asks for nothing.
+const termOf = (value: string): string => {
+  const term = value.trim();
+  return term.length >= SUGGEST_MIN_LENGTH &&
+    term.length <= SEARCH_TEXT_MAX_LENGTH
+    ? term
+    : '';
+};
+
+// The server already matched the term, so antd must not filter again: it
+// would drop a login matched by first name. Fires on typing only, never on a
+// pick.
+const suggestOn = (onType: (term: string) => void) => ({
+  filterOption: false as const,
+  onSearch: (value: string) => onType(termOf(value)),
+});
+
+// What a pick hands back beside the text it fills in.
+interface IdOption extends DefaultOptionType {
+  value: string;
+  id: number;
+}
+
+// AutoComplete takes no `loading`. A term's options are empty until its
+// request lands, so the empty-list slot is where the spinner shows; once it
+// lands with nothing, the list stays shut.
+const pendingOf = (isFetching: boolean) =>
+  isFetching ? <Spin size="small" aria-label="Loading suggestions" /> : null;
+
+const contains = (text: string, term: string): boolean =>
+  text.toLowerCase().includes(term.toLowerCase());
+
+// A book found by its description, or a series by its, would suggest a title
+// that does not hold the term.
+const matchingTitles = <T extends { id: number; title: string }>(
+  entries: T[],
+  term: string
+): T[] => entries.filter((entry) => contains(entry.title, term));
+
+// Picking a book opens it, so its option's value is its id and never lands
+// in the field; two books sharing a title stay two options.
+const bookOptions = (books: PublicBook[], term: string) =>
+  matchingTitles(books, term).map((book) => ({
+    value: String(book.id),
+    label: book.title,
+  }));
+
+// The value is the title the field shows, so it must be unique.
+// ponytail: series sharing a title offer only the first; label them apart
+// (by author) if that ever happens.
+const seriesOptions = (series: PublicSeries[], term: string): IdOption[] => {
+  const seen = new Set<string>();
+  return matchingTitles(series, term)
+    .filter((entry) => !seen.has(entry.title) && seen.add(entry.title))
+    .map((entry) => ({ value: entry.title, id: entry.id }));
+};
+
+// A matched book's other Co-authors are left out. Each author is offered by
+// login: the server matches `author` against login, first or last name one at
+// a time, so "First Last" would find nothing.
+const authorOptions = (authors: AuthorSummary[], term: string): IdOption[] =>
+  [
+    ...new Map(
+      authors
+        .filter((author) =>
+          [author.login, author.firstName, author.lastName].some((text) =>
+            contains(text, term)
+          )
+        )
+        .map((author) => [author.id, author])
+    ).values(),
+  ].map((author) => ({
+    value: author.login,
+    label: `${author.firstName} ${author.lastName} (${author.login})`,
+    id: author.id,
+  }));
+
 export const SearchForm: FC<SearchFormProps> = ({
   id,
   initialValues,
@@ -86,10 +173,19 @@ export const SearchForm: FC<SearchFormProps> = ({
   onReset,
 }) => {
   const [form] = Form.useForm<BookSearchFormValues>();
+  const navigate = useNavigate();
   const releasedFrom = Form.useWatch('releasedFrom', form);
   const releasedTo = Form.useWatch('releasedTo', form);
   const updatedFrom = Form.useWatch('updatedFrom', form);
   const updatedTo = Form.useWatch('updatedTo', form);
+  // Set only by typing, not by the values the URL fills in, so opening a
+  // search asks for no suggestions.
+  const [textTerm, setTextTerm] = useState('');
+  const [authorTerm, setAuthorTerm] = useState('');
+  const [seriesTerm, setSeriesTerm] = useState('');
+  const texts = useBookSuggestions('q', textTerm);
+  const byAuthor = useBookSuggestions('author', authorTerm);
+  const series = useSeriesSuggestions(seriesTerm);
 
   useEffect(() => {
     form.setFields(fieldErrors);
@@ -107,18 +203,51 @@ export const SearchForm: FC<SearchFormProps> = ({
         <Row gutter={16}>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="q" label="Text" rules={[textRule]}>
-              <Input placeholder="Title or description" />
+              <AutoComplete
+                placeholder="Title or description"
+                showSearch={suggestOn(setTextTerm)}
+                notFoundContent={pendingOf(texts.isFetching)}
+                options={bookOptions(texts.data?.items ?? [], textTerm)}
+                onSelect={(bookId) => void navigate(`/books/${bookId}`)}
+              />
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="author" label="Author" rules={[textRule]}>
-              <Input placeholder="Login or name" />
+              <AutoComplete<string, IdOption>
+                placeholder="Login or name"
+                showSearch={suggestOn((term) => {
+                  setAuthorTerm(term);
+                  form.setFieldValue('authorId', undefined);
+                })}
+                notFoundContent={pendingOf(byAuthor.isFetching)}
+                options={authorOptions(
+                  (byAuthor.data?.items ?? []).flatMap((book) => book.authors),
+                  authorTerm
+                )}
+                onSelect={(_login, option) =>
+                  form.setFieldValue('authorId', option.id)
+                }
+              />
             </Form.Item>
+            <Form.Item name="authorId" hidden noStyle />
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="seriesTitle" label="Series" rules={[textRule]}>
-              <Input placeholder="Series title" />
+              <AutoComplete<string, IdOption>
+                placeholder="Series title"
+                showSearch={suggestOn((term) => {
+                  setSeriesTerm(term);
+                  form.setFieldValue('seriesId', undefined);
+                })}
+                notFoundContent={pendingOf(series.isFetching)}
+                options={seriesOptions(series.data?.items ?? [], seriesTerm)}
+                onSelect={(_title, option) =>
+                  form.setFieldValue('seriesId', option.id)
+                }
+              />
             </Form.Item>
+            <Form.Item name="seriesId" hidden noStyle />
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="genre" label="Genre">

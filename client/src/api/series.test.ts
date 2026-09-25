@@ -77,6 +77,14 @@ describe('listSeries', () => {
     expect(callOf(fetchMock)[0]).toBe('/api/series?genreId=4&limit=20');
   });
 
+  it('form-encodes the q term, so spaces and & cannot split the query', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({ q: 'Dark & Deep', limit: 8 });
+
+    expect(callOf(fetchMock)[0]).toBe('/api/series?limit=8&q=Dark+%26+Deep');
+  });
+
   it('returns the list envelope unchanged', async () => {
     const page = {
       items: [{ id: 2, title: 'Saga' }],
