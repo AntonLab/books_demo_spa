@@ -22,8 +22,8 @@ import { useBookSuggestions } from '@/queries/books';
 import { useSeriesSuggestions } from '@/queries/series';
 import type { AuthorSummary, PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
+import { authorLabelOf } from '@/queries/suggestions';
 import {
-  authorLabelOf,
   matchingAuthors,
   matchingTitles,
   suggestionTermOf,
