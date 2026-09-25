@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Result } from 'antd';
 import { useRequestReset } from '@/queries/auth';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
-import styles from './ResetRequestModal.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface ResetRequestValues {
   email: string;
@@ -42,7 +42,11 @@ export const ResetRequestModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
       ) : (
         <>
           {formError !== null && (
-            <Alert type="error" title={formError} className={styles.error} />
+            <Alert
+              type="error"
+              title={formError}
+              className={spacing.gapBelow}
+            />
           )}
 
           {/* void: handleFinish reports its own failure in the form, so nothing

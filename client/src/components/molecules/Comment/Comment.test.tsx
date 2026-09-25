@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Comment } from './Comment';
 import { formatDate } from '@/format/date';
-import type { CommentWithAuthor } from '@/types/comment';
+import type { CommentWithAuthor } from '@/types/api';
 
 const comment: CommentWithAuthor = {
   id: 5,

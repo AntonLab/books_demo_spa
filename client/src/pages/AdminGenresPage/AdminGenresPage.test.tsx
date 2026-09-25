@@ -6,7 +6,7 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/genres');

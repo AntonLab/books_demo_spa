@@ -1,6 +1,6 @@
 import type { BookStatus } from 'shared';
 import { bookCapabilities, seriesCapabilities } from './capabilities';
-import type { PublicUser } from './user';
+import type { PublicUser } from './api';
 
 const account = (id: number, role: PublicUser['role']): PublicUser => ({
   id,

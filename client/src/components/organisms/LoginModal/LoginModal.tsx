@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Alert, Button, Form, Input, Modal, Space } from 'antd';
 import { useLogin } from '@/queries/auth';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
-import styles from './LoginModal.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface LoginValues {
   login: string;
@@ -33,7 +33,7 @@ export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   return (
     <Modal open title="Log in" onCancel={onClose} footer={null}>
       {formError !== null && (
-        <Alert type="error" title={formError} className={styles.error} />
+        <Alert type="error" title={formError} className={spacing.gapBelow} />
       )}
 
       {/* void: handleFinish reports its own failure in the form, so nothing

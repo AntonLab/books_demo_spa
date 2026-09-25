@@ -19,7 +19,7 @@ import {
   useRemoveCoAuthor,
   type CreditedWork,
 } from '@/queries/coAuthors';
-import type { AuthorSummary } from '@/types/user';
+import type { AuthorSummary } from '@/types/api';
 import type { DefaultOptionType } from 'antd/es/select';
 import styles from './CoAuthorManager.module.css';
 

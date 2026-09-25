@@ -13,6 +13,9 @@ paths:
   transform). A boolean state is a modifier class
   (`` `${styles.item} ${fresh ? styles.fresh : ''}` ``). Prefer an antd prop
   (`Flex justify`/`gap`) over a class when one exists.
+- **The `var(--ant-margin)` gap below an alert, notice or toolbar is
+  `spacing.gapBelow`** (`src/theme/spacing.module.css`). A component whose only
+  style would be that gap imports it and has no module of its own.
 - **Values come from antd tokens**: `var(--ant-<kebab-name>)` in CSS (in px),
   `theme.useToken()` where a prop needs the number. No arbitrary hex or pixels.
 - **A missing token becomes a quark** in `src/theme/tokens.ts`, prefixed `app`
