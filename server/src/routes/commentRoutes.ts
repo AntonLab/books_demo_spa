@@ -32,8 +32,6 @@ export function createCommentRoutes(deps: RouteDeps): Router {
     controller.getById
   );
 
-  // requirePermission goes before validate on every write, so a refused
-  // request is never parsed or echoed back in a 400.
   //
   // PATCH and DELETE also check ownership in the controller, as books, series,
   // chapters and likes do — see controllers/commentController.ts. There, `own`

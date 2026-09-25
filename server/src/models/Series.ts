@@ -62,7 +62,7 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
         allowNull: false,
       },
       // Must match genres.id exactly (INTEGER UNSIGNED), or MySQL rejects the
-      // foreign key with errno 3780 on incompatible column types (M2).
+      // foreign key with errno 3780 on incompatible column types.
       genreId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
@@ -79,7 +79,7 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
       charset: 'utf8mb4',
       collate: 'utf8mb4_0900_ai_ci',
       // `?userId=` goes through series_authors_user_id; this one serves
-      // `?genreId=` (A5), and is the leftmost prefix of the foreign key's
+      // `?genreId=`, and is the leftmost prefix of the foreign key's
       // column, so InnoDB reuses it instead of creating a second index.
       indexes: [
         {

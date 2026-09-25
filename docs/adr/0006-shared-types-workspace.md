@@ -37,7 +37,7 @@ shared arrays, but no schema is shared, so zod never enters the client bundle.
   is outside `node_modules`. If the package is copied into `node_modules`
   instead, Node refuses it with `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`.
   A deployment must therefore keep the workspace link and run a Node that
-  strips types (>= 22.18); an image that prunes or flattens `node_modules`
+  strips types (the repo's floor, >= 24); an image that prunes or flattens `node_modules`
   needs a build step for `shared` first.
 - `shared` follows Node's rules even though the client is bundled: relative
   imports carry `.ts`, and only erasable syntax is allowed (no `enum` or

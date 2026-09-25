@@ -31,7 +31,7 @@ export const createSeriesSchema = z.object({
   // on a JSON column, so the empty array has to come from the application.
   tags: tagListSchema.default([]),
   // A Genre is optional, and an absent key means the same as an explicit null:
-  // no Genre (A6). A Series' Genre is its own — nothing is inherited in either
+  // no Genre. A Series' Genre is its own — nothing is inherited in either
   // direction between a Series and its Books (ADR-0008).
   genreId: idSchema.nullable().optional(),
 });
@@ -47,7 +47,7 @@ export const updateSeriesSchema = z
     description: descriptionSchema,
     tags: tagListSchema,
     // An explicit null clears the Genre, and an absent key leaves it alone,
-    // because `.partial()` adds no default (A6).
+    // because `.partial()` adds no default.
     genreId: idSchema.nullable(),
   })
   .partial()

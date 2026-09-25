@@ -51,7 +51,7 @@ test('the timestamps are NOT NULL, as every other table declares them', () => {
   assert.match(createTableSql, /`updatedAt` DATETIME NOT NULL/);
 });
 
-// M1: the table's default collation is what makes "fantasy" collide with
+// The table's default collation is what makes "fantasy" collide with
 // "Fantasy" under the unique index, so the collation is part of the rule
 // rather than a formatting choice.
 test('the table is InnoDB with the case-insensitive utf8mb4 default collation', () => {

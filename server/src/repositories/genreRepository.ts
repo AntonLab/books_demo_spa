@@ -7,7 +7,7 @@ import type { GenreInput } from '../types/genre.ts';
 
 export interface GenreRepository {
   // Every Genre, alphabetically. No paging envelope, unlike the books and
-  // series lists: the list is short, the header shows it whole, and A1 says so.
+  // series lists: the list is short, and the header shows it whole.
   // `nonEmpty` keeps only Genres holding a Book in progress or complete, so a
   // Draft book never reveals its Genre.
   list(options?: { nonEmpty?: boolean }): Promise<PublicGenre[]>;
@@ -19,7 +19,7 @@ export interface GenreRepository {
 }
 
 // The unique index on `genres.name` is the only constraint here, so there is
-// nothing to disambiguate: a violation is always the name (M1).
+// nothing to disambiguate: a violation is always the name.
 function asConflict(error: unknown): never {
   if (error instanceof UniqueConstraintError) {
     throw new ConflictError('name');
@@ -28,12 +28,12 @@ function asConflict(error: unknown): never {
 }
 
 // Both the real repository and the fakes answer a genreId that names no Genre
-// with this exact error, so a contract case can assert the message once (A6).
+// with this exact error, so a contract case can assert the message once.
 export function missingGenre(genreId: number): BadRequestError {
   return new BadRequestError(`Genre ${genreId} does not exist`);
 }
 
-// A6: a genreId the caller chose that names no Genre is a 400, not a 404 — the
+// A genreId the caller chose that names no Genre is a 400, not a 404 — the
 // missing row is a field of the request, not the resource it addresses, which
 // is why this is a BadRequestError rather than the NotFoundError a missing
 // series gets. Checked before the write rather than left to the foreign key,
@@ -87,7 +87,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
   return {
     async list({ nonEmpty = false } = {}) {
       // ORDER BY name under the column's utf8mb4_0900_ai_ci collation, so the
-      // order ignores case exactly as the uniqueness does (M1). The non-empty
+      // order ignores case exactly as the uniqueness does. The non-empty
       // side is a fixed subquery, as visibleSeriesWhere's is: it carries no
       // caller-supplied value.
       const genres = await Genre.findAll({
@@ -128,7 +128,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
     async remove(id) {
       // The foreign keys do the rest: books.genreId and series.genreId are
       // ON DELETE SET NULL, so this one statement also leaves every Book and
-      // Series in the Genre without one (A4, M2).
+      // Series in the Genre without one.
       return (await Genre.destroy({ where: { id } })) > 0;
     },
   };

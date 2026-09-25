@@ -15,8 +15,7 @@ export interface ApiErrorBody {
   details?: unknown;
 }
 
-// P1 (docs/superpowers/specs/2026-09-14-covers-and-avatars-design.md): the
-// three formats a Cover or Avatar upload must decode as, and the request
+// The three formats a Cover or Avatar upload must decode as, and the request
 // body's byte ceiling. The server checks both for real; the client uses
 // them only to fail fast before the request leaves.
 export const ACCEPTED_IMAGE_CONTENT_TYPES = [

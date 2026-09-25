@@ -130,8 +130,7 @@ export const AppHeader: FC = () => {
         }
         onClick={() => dispatch(devicePreferences.themeToggled())}
       >
-        {/* A text glyph: @ant-design/icons is not a dependency. The label
-            carries the meaning, so the glyph is decorative. */}
+        {/* The label carries the meaning, so the glyph is decorative. */}
         <span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>
       </Button>
 

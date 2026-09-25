@@ -75,7 +75,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       },
       // Must match genres.id exactly (INTEGER UNSIGNED), as seriesId matches
       // series.id, or MySQL rejects the foreign key with errno 3780 on
-      // incompatible column types (M2).
+      // incompatible column types.
       genreId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
@@ -128,7 +128,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
           name: 'books_series_id_series_position',
           fields: ['seriesId', 'seriesPosition'],
         },
-        // Serves the `?genreId=` filter (A5), and is the leftmost prefix of the
+        // Serves the `?genreId=` filter, and is the leftmost prefix of the
         // foreign key's column, so InnoDB reuses it instead of creating a
         // second index for the constraint. Not unique: any number of books
         // share a Genre.

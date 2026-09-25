@@ -13,7 +13,7 @@ import type { Book } from './Book.ts';
 // out of the books table itself so no list or detail query can drag the
 // bytes along — the same reason chapters.text is left out of the chapter
 // list. bookId is the primary key: there is at most one Cover per Book, and
-// last write wins (R2) is the deliberate answer to two Co-authors replacing
+// last write wins is the deliberate answer to two Co-authors replacing
 // it at once, so there is no application-level lock here.
 export class BookCover extends Model<
   InferAttributes<BookCover>,
@@ -34,7 +34,7 @@ export function initBookCoverModel(sequelize: Sequelize): typeof BookCover {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,
       },
-      // Always re-encoded WebP (src/images.ts, P2), so there is no
+      // Always re-encoded WebP (src/images.ts), so there is no
       // content-type column to carry — every stored picture is the same
       // format. MEDIUMBLOB holds up to 16 MB, far past a 600x900 WebP.
       data: {
@@ -43,7 +43,7 @@ export function initBookCoverModel(sequelize: Sequelize): typeof BookCover {
       },
       // Millisecond precision for the same reason chapters.updatedAt has
       // it: two Co-authors replacing the Cover within one second would
-      // otherwise version-tie, and A7's cache-busting URL depends on this
+      // otherwise version-tie, and the cache-busting coverUrl depends on this
       // value actually changing.
       updatedAt: { type: DataTypes.DATE(3), allowNull: false },
     },
@@ -51,7 +51,7 @@ export function initBookCoverModel(sequelize: Sequelize): typeof BookCover {
       sequelize,
       tableName: 'book_covers',
       // A replace overwrites in place, so only the moment of the current
-      // version matters — no createdAt (S1).
+      // version matters — no createdAt.
       timestamps: true,
       createdAt: false,
       charset: 'utf8mb4',

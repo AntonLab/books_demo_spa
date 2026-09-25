@@ -39,8 +39,6 @@ export function createSeriesRoutes(deps: RouteDeps): Router {
     controller.getById
   );
 
-  // requirePermission goes before validate on every write, so a refused
-  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
     requirePermission('series', 'create'),

@@ -59,7 +59,7 @@ export function createFakeBookRepository(
   } = options;
   const rows = new Map<number, PublicBook>();
   // bookId -> its stored Cover. Visibility is the real repository's domain
-  // rule (readableBookWhere) — the fake stays rule-free (T3) and answers for
+  // rule (readableBookWhere) — the fake stays rule-free and answers for
   // whatever book exists in `rows`, mirroring findById.
   const covers = new Map<number, { data: Buffer; updatedAt: Date }>();
   // bookId -> co-author ids, in credit order.
@@ -68,7 +68,7 @@ export function createFakeBookRepository(
   const positions = new Map<number, number>();
   let nextId = 1;
 
-  // Mirrors loadCoverUrls in the real repository (T3-safe: it reads the
+  // Mirrors loadCoverUrls in the real repository (it reads the
   // fake's own covers map, no visibility rule attached), so a route spec can
   // see coverUrl change after a PUT/DELETE on /:id/cover.
   const coverUrlOf = (bookId: number): string | null => {
@@ -95,7 +95,7 @@ export function createFakeBookRepository(
   };
 
   // Stands in for the genres row the real repository looks up before it
-  // writes, which answers a missing one with this same BadRequestError (A6).
+  // writes, which answers a missing one with this same BadRequestError.
   const assertGenre = (genreId: number | null | undefined): void => {
     if (genreId !== null && genreId !== undefined && !genres.has(genreId)) {
       throw missingGenre(genreId);

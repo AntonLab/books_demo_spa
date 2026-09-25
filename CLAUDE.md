@@ -13,7 +13,7 @@ of them read.
   server's shape (dates as `Date`); the client reads each through `Wire<T>`,
   which turns every `Date` into a string. Each union derives from an
   `as const` array (`BOOK_STATUSES`, `USER_ROLES`, …) that the server's zod
-  schemas also build from. No zod schema lives here, so zod never reaches the
+  schemas or Sequelize `ENUM`s also build from. No zod schema lives here, so zod never reaches the
   client bundle. Node loads it too, so relative imports carry `.ts` and only
   erasable syntax is allowed.
 - `.claude/rules/` — topic rules for Claude Code, split by `server/`,
@@ -62,8 +62,8 @@ and Prettier over staged files only. It refuses a partially staged file, and it
 never runs `typecheck` or tests. `.githooks/commit-msg` rejects a subject that
 is not a conventional commit. `git commit --no-verify` bypasses both.
 
-CI (`.github/workflows/`) runs seven required checks on every PR into `dev` or
-`main`; see `.claude/rules/repo/ci.md` before renaming a job.
+CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
+`.claude/rules/repo/ci.md` before renaming or adding a job.
 
 ## Anti-Patterns
 

@@ -86,7 +86,7 @@ export default createConfig(
     },
   },
   {
-    files: ['src/api/client.ts', 'src/api/client/client.ts'],
+    files: ['src/api/client.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
   // Jest's CSS mapping and the CSS Modules declaration need a default export.

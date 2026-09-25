@@ -28,12 +28,12 @@ export function createFakeUserRepository(
 ): UserRepository {
   const { seed = [], authorQueries = [] } = options;
   const rows = new Map<number, FakeUserRow>(seed.map((row) => [row.id, row]));
-  // userId -> its stored Avatar. Rule-free, like the book fake's covers map
-  // (T3): it answers for whatever account exists in `rows`.
+  // userId -> its stored Avatar. Rule-free, like the book fake's covers map:
+  // it answers for whatever account exists in `rows`.
   const avatars = new Map<number, { data: Buffer; updatedAt: Date }>();
   let nextId = 1;
 
-  // Mirrors loadAvatarUrls in the real repository (T3-safe: it reads the
+  // Mirrors loadAvatarUrls in the real repository (it reads the
   // fake's own avatars map, no visibility rule attached), so a route spec can
   // see avatarUrl change after a PUT/DELETE on /:id/avatar.
   const avatarUrlOf = (id: number): string | null => {

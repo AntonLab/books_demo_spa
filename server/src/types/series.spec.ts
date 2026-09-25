@@ -124,7 +124,7 @@ test('createSeriesSchema takes a genreId, coerced, or an explicit null', () => {
   );
 });
 
-// A6: .partial() must not turn an absent key into null, or a PATCH that only
+// .partial() must not turn an absent key into null, or a PATCH that only
 // renames a series would clear its Genre.
 test('updateSeriesSchema keeps an absent genreId absent and an explicit null null', () => {
   assert.deepEqual(updateSeriesSchema.parse({ title: 'Renamed' }), {

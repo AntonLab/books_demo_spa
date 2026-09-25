@@ -42,7 +42,7 @@ export const createBookSchema = z.object({
   // on a JSON column, so the empty array has to come from the application.
   tags: tagListSchema.default([]),
   // A Genre is optional, and an absent key means the same as an explicit null:
-  // no Genre (A6). `.optional()` rather than the `.default(null)` seriesId
+  // no Genre. `.optional()` rather than the `.default(null)` seriesId
   // above carries, so the parsed input holds the key only when the caller
   // named one — the column is nullable, so an absent key already lands as
   // NULL, and the repository has one less value to tell apart.
@@ -68,7 +68,7 @@ export const updateBookSchema = z
     // draft, whatever the body says.
     status: z.enum(BOOK_STATUSES),
     // As seriesId: an explicit null clears the Genre, and an absent key leaves
-    // it alone, because `.partial()` adds no default (A6).
+    // it alone, because `.partial()` adds no default.
     genreId: idSchema.nullable(),
   })
   .partial()
