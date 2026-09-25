@@ -69,22 +69,22 @@ paths:
   Role combined in the page. A Moderator gets a work's form but a read-only
   byline, and no "Add chapter". `BookPage`'s "Edit" link reads `isCoAuthor`,
   not `mayEdit`, on purpose.
-- `EditChapterPage` saves against the Unsaved text's `baseUpdatedAt`, the
-  version the typing started from, and against the loaded `updatedAt` only
-  when nothing was typed; otherwise a reload would refetch a Co-author's save
-  and overwrite it with no 409. After a save, the version comes from its
-  response, since `chapter.data` lags until the refetch; a landed save
-  dispatches `saved`, which keeps text typed during it. A loaded version newer
-  than the base (compared as ISO strings), or a 409, shows the conflict: "Use
-  their version" discards the entry and refetches; "Keep mine" refetches and
-  rebases the entry, so the next Save is a deliberate overwrite. The form is
-  keyed by `updatedAt` plus a reset counter and seeds from the entry. Each
-  edit passes the newest known version as `saved`, so text changed back to it
-  leaves no entry. It
-  dispatches `saved` from `mutateAsync(...).then(...)`, not a per-call
-  `mutate` callback, since TanStack skips that callback once the page has
-  unmounted, which would otherwise leave a stale entry and show a false
-  conflict on the Account's own save.
+- `EditChapterPage` is layout and button wiring; its rules live in
+  `useChapterEdit` beside it and are tested there. It saves against the
+  Unsaved text's `baseUpdatedAt`, the version the typing started from, and
+  against the loaded `updatedAt` only when nothing was typed; otherwise a
+  reload would refetch a Co-author's save and overwrite it with no 409. After
+  a save, the version comes from its response, since `chapter.data` lags until
+  the refetch; a landed save dispatches `saved`, which keeps text typed during
+  it. A loaded version newer than the base (compared as ISO strings), or a
+  409, is the conflict: `takeTheirs` discards the entry and refetches;
+  `keepMine` refetches and rebases the entry, so the next Save is a deliberate
+  overwrite. `formKey` is `updatedAt` plus a reset counter, and the form seeds
+  from the entry. Each edit passes the newest known version as `saved`, so
+  text changed back to it leaves no entry. `save` and `remove` go through
+  `mutateAsync(...).then(...)`, not a per-call `mutate` callback, since
+  TanStack skips that callback once the page has unmounted. Navigation after
+  a delete, and its `mountedRef` guard, stay in the page.
 - A page that finds its place gone (a 404 on the Chapter or Book, or an
   Account no longer a Co-author) shows the Unsaved text in
   `UnsavedTextNotice`; only Discard removes it.

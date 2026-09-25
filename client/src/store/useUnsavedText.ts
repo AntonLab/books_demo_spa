@@ -1,12 +1,37 @@
 import { useEffect } from 'react';
 import { useLogout, useSession } from '@/queries/auth';
 import { useAppDispatch, useAppSelector } from './hooks';
-import { ownEntries, unsavedText } from './unsavedTextSlice';
-import type { UnsavedTextEntry, UnsavedTextInput } from './unsavedTextSlice';
+import { unsavedText } from './unsavedTextSlice';
+import type {
+  UnsavedTextEntry,
+  UnsavedTextInput,
+  UnsavedTextState,
+} from './unsavedTextSlice';
 
 // The client-side life cycle of Unsaved text (CONTEXT.md). Components read
 // and write entries only through these hooks, never `state.unsavedText`, so
 // none of them can show one Account's text to another.
+
+const NO_ENTRIES: Record<string, UnsavedTextEntry> = {};
+
+// The entries the signed-in Account may see. After a Lost session another
+// Account can sign in with the slice still holding the first one's entries,
+// and `useUnsavedTextAccountBinding`'s `accountChanged` clears them only
+// after that render: a form seeded from them in the meantime would show the
+// first Account's text. `null` on either side is no mismatch, as in
+// `accountChanged`. The constant keeps the result stable for
+// `useAppSelector`. Private, so nothing reads entries around these hooks.
+const ownEntries = (
+  state: { unsavedText: UnsavedTextState },
+  sessionId: number | undefined
+): Record<string, UnsavedTextEntry> => {
+  const { accountId, entries } = state.unsavedText;
+  return accountId !== null &&
+    sessionId !== undefined &&
+    accountId !== sessionId
+    ? NO_ENTRIES
+    : entries;
+};
 
 export interface UnsavedText {
   entry: UnsavedTextEntry | undefined;
