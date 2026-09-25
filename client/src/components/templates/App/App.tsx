@@ -8,6 +8,7 @@ import { Provider } from 'react-redux';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
+import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
 import { AppHeader } from '@/components/organisms/AppHeader/AppHeader';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary/ErrorBoundary';
 import { ThemedConfigProvider } from '@/components/organisms/ThemedConfigProvider/ThemedConfigProvider';
@@ -94,6 +95,7 @@ const SeriesPage = lazy(() =>
 // MemoryRouter instead.
 export const AppShell: FC = () => {
   const { pathname } = useLocation();
+  useUnsavedTextAccountBinding();
 
   return (
     <Layout className={styles.layout}>
