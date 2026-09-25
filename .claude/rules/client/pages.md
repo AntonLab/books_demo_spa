@@ -59,7 +59,8 @@ paths:
   always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
   their default columns.
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
-  more" (`/search?sort=`) shows only once the section has loaded more than six.
+  more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
+  the section has loaded more than six.
 - Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
