@@ -29,7 +29,7 @@ describe('searchAuthors', () => {
 
     const [url, init] = callOf(fetchMock);
     expect(url).toBe('/api/authors?q=ann');
-    expect(init).toMatchObject({ method: 'GET' });
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({});
   });

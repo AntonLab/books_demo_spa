@@ -8,7 +8,7 @@ const mockFetch = (response: Response): jest.Mock => {
 };
 
 describe('request', () => {
-  it('prefixes /api', async () => {
+  it('prefixes /api and sends credentials so the sid cookie travels', async () => {
     const fetchMock = mockFetch(jsonResponse({ id: 1 }));
 
     await request('/auth/me');
@@ -16,7 +16,19 @@ describe('request', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('/api/auth/me');
+    expect(init.credentials).toBe('include');
     expect(init.method).toBe('GET');
+  });
+
+  // A write without the cookie reaches the server as a Guest and is refused
+  // as a 401 before the XSRF check even runs.
+  it('sends credentials on a write too', async () => {
+    const fetchMock = mockFetch(emptyResponse(204));
+
+    await request('/auth/logout', { method: 'POST' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.credentials).toBe('include');
   });
 
   it('serialises a body and sets the JSON content type', async () => {

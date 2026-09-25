@@ -70,10 +70,12 @@ export const request = async <T>(
     ...(token === undefined ? {} : { 'X-XSRF-Token': token }),
   };
 
-  // `/api` is same-origin (webpack's dev proxy in development), so fetch's
-  // default `credentials: 'same-origin'` already sends the `sid` cookie.
   const response = await fetch(`/api${path}`, {
     method,
+    // Explicit, though fetch's default `same-origin` covers `/api` today: an
+    // API moved to another origin would otherwise drop the httpOnly `sid`
+    // cookie and every authenticated call would fail as a 401.
+    credentials: 'include',
     headers,
     body:
       body === undefined ? undefined : isBlobBody ? body : JSON.stringify(body),
