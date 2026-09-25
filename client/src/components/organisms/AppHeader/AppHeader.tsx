@@ -6,6 +6,7 @@ import type { MenuProps } from 'antd';
 import { useLogout, useSession } from '@/queries/auth';
 import { isModeratorRole } from 'shared';
 import { useGenresWithBooks } from '@/queries/genres';
+import { searchPath } from '@/types/bookSearch';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { unsavedText } from '@/store/unsavedTextSlice';
@@ -58,7 +59,7 @@ export const AppHeader: FC = () => {
             // Each child is keyed by its own target path, so the menu's
             // onClick navigates to the key like every other item.
             children: genreItems.map((genre) => ({
-              key: `/search?genre=${genre.id}`,
+              key: searchPath({ genre: String(genre.id) }),
               label: genre.name,
             })),
           },

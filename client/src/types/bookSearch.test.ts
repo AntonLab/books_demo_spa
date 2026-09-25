@@ -7,6 +7,7 @@ import {
   listParamsOf,
   parseBookSearch,
   searchOf,
+  searchPath,
   toSearchParams,
   type BookSearch,
 } from './bookSearch';
@@ -240,5 +241,27 @@ describe('fieldErrorsOf', () => {
     expect(fieldErrorsOf(new ApiError(500, 'Boom'))).toEqual([]);
     expect(fieldErrorsOf(new Error('Network down'))).toEqual([]);
     expect(fieldErrorsOf(null)).toEqual([]);
+  });
+});
+
+describe('searchPath', () => {
+  it('is a bare /search for the whole catalogue, leaving the defaults out', () => {
+    expect(searchPath({})).toBe('/search');
+    expect(searchPath({ sort: 'popular', page: 1 })).toBe('/search');
+  });
+
+  it('links a genre, a ranking or a picked author as the search page writes them', () => {
+    expect(searchPath({ genre: '3' })).toBe('/search?genre=3');
+    expect(searchPath({ sort: 'new' })).toBe('/search?sort=new');
+    expect(searchPath({ author: 'annlee', authorId: 3 })).toBe(
+      '/search?author=annlee&authorId=3'
+    );
+  });
+
+  it('writes a space as %20 and a plus as %2B', () => {
+    expect(searchPath({ q: 'dragon riders' })).toBe(
+      '/search?q=dragon%20riders'
+    );
+    expect(searchPath({ q: 'a+b' })).toBe('/search?q=a%2Bb');
   });
 });
