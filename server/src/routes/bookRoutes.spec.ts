@@ -1594,6 +1594,22 @@ test('DELETE /api/books/:id/cover answers 404 for a missing book even under `any
   });
 });
 
+test('PUT /api/books/:id/cover answers 404 for a missing book under `any` scope (a Moderator) before reading the image', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      // Bytes sharp refuses with a 400, so a 404 proves the Book was looked
+      // up before processCoverImage ran.
+      const response = await fetch(`${base}/api/books/999999/cover`, {
+        method: 'PUT',
+        headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.admin },
+        body: Buffer.from('not a real png'),
+      });
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
 test('GET /api/books/:id/cover answers 404 for a book with no cover, and for a missing book', async () => {
   const repository = createFakeRepository();
   const created = await repository.create({

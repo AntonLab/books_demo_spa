@@ -206,9 +206,8 @@ export function createBookController(repository: BookRepository) {
     },
 
     // Same guards as uploadCover; 204 whether or not a Cover existed, but
-    // 404 for a missing Book. assertMayChange alone cannot catch a missing
-    // Book under `any` scope — it returns immediately for a Moderator — so
-    // this checks removeCover's own report of whether the row was there.
+    // 404 for a missing Book. The repository's report still counts: the row
+    // can vanish between the guard's lookup and the write.
     removeCover: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayChange(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
