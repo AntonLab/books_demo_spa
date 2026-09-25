@@ -40,7 +40,7 @@ types only from a file whose real path lies outside `node_modules`.
 - **A dev database older than the current schema must be dropped and rebuilt.**
   `sync()` creates a missing table but never alters an existing one, and
   `permissions.module` is an `ENUM` built from `MODULES`. CI and the test
-  schemas are built fresh.
+  schemas are built fresh. `/db-reset` drops it and reseeds.
 - `npm run seed -w server -- --force` loads the demo data. **The flag is
   mandatory**, and with it the script first deletes every row in the ten
   content tables, Covers and Avatars with them.
