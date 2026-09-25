@@ -51,3 +51,6 @@ dist/
 
 # subagent-driven-development scratch (ledger, briefs, review packages)
 /.superpowers
+
+# Playwright MCP (.mcp.json) writes page snapshots and console logs here
+/.playwright-mcp
