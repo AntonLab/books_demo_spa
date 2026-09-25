@@ -16,16 +16,13 @@ import { UserAvatar } from '../models/UserAvatar.ts';
 import { containsPattern } from './likePattern.ts';
 import { notify } from './notificationRepository.ts';
 import { ConflictError } from '../types/errors.ts';
+import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
 import type {
-  AuthorSummary,
   CreateUserInput,
   ListAuthorsQuery,
   ListUsersQuery,
-  PublicUser,
   UserChanges,
-  UserStatus,
 } from '../types/user.ts';
-import type { UserRole } from '../types/permission.ts';
 
 export interface UserListResult {
   items: PublicUser[];

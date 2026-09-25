@@ -14,10 +14,10 @@ import {
 } from './coAuthors.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
+import type { PublicSeries } from 'shared';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
-  PublicSeries,
   UpdateSeriesInput,
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';

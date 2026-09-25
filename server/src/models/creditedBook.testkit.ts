@@ -2,7 +2,7 @@ import { Book } from './Book.ts';
 import { BookAuthor } from './BookAuthor.ts';
 import { Series } from './Series.ts';
 import { SeriesAuthor } from './SeriesAuthor.ts';
-import type { BookStatus } from '../types/book.ts';
+import type { BookStatus } from 'shared';
 
 interface BookFixture {
   title: string;

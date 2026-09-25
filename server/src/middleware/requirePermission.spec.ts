@@ -8,8 +8,7 @@ import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { hashToken } from '../tokens.ts';
 import { ForbiddenError, UnauthorizedError } from '../types/errors.ts';
-import type { PublicUser } from '../types/user.ts';
-import type { UserRole } from '../types/permission.ts';
+import type { PublicUser, UserRole } from 'shared';
 
 loadMatrix(buildMatrixRows());
 

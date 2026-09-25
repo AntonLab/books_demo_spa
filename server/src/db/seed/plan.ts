@@ -13,8 +13,7 @@ import {
   type AuthorSpec,
 } from './personas.ts';
 import { itemAt, type Rng } from './rng.ts';
-import type { BookStatus } from '../../types/book.ts';
-import type { Tombstone } from '../../types/comment.ts';
+import type { BookStatus, Tombstone } from 'shared';
 
 // The span each author's back catalogue is stretched over, ending a few days
 // ago. The chapter cadence is *derived* from this rather than fixed: an author

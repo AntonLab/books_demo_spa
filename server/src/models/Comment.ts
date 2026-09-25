@@ -10,13 +10,13 @@ import {
 } from 'sequelize';
 import type { Book } from './Book.ts';
 import type { User } from './User.ts';
-import {
-  TOMBSTONES,
-  type CommentWithAuthor,
-  type PublicComment,
-  type Tombstone,
-} from '../types/comment.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type {
+  CommentWithAuthor,
+  PublicComment,
+  Tombstone,
+  AuthorSummary,
+} from 'shared';
+import { TOMBSTONES } from 'shared';
 
 export class Comment extends Model<
   InferAttributes<Comment>,

@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
 import { createFakeCommentRepository } from '../repositories/commentRepository.fake.testkit.ts';
-import type { CommentWithAuthor, PublicComment } from '../types/comment.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { CommentWithAuthor, PublicComment, AuthorSummary } from 'shared';
 import {
   AUTH_COOKIE,
   json,

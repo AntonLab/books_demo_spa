@@ -10,7 +10,7 @@ import { hashToken } from '../tokens.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
-import type { PublicUser } from '../types/user.ts';
+import type { PublicUser } from 'shared';
 
 const USER: PublicUser = {
   id: 7,

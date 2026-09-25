@@ -4,12 +4,9 @@ import {
   NO_GENRE,
   WorkFields,
 } from '@/components/molecules/WorkFields/WorkFields';
-import {
-  BOOK_STATUS_LABELS,
-  BOOK_STATUSES,
-  type BookStatus,
-} from '@/types/book';
-import type { PublicGenre } from 'shared';
+import { BOOK_STATUSES } from 'shared';
+import { BOOK_STATUS_LABELS } from '@/types/book';
+import type { PublicGenre, BookStatus } from 'shared';
 import styles from './BookForm.module.css';
 
 export interface BookFormValues {

@@ -5,7 +5,7 @@ import { Book } from './Book.ts';
 import { initModels } from './index.ts';
 import { User } from './User.ts';
 import { Comment, toCommentWithAuthor, toPublicComment } from './Comment.ts';
-import { TOMBSTONES } from '../types/comment.ts';
+import { TOMBSTONES } from 'shared';
 
 // Sequelize's query generator is not part of the public typings, so it is
 // reached through a narrow structural cast rather than `any`.

@@ -1,6 +1,7 @@
 import { hashPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
-import type { ListAuthorsQuery, PublicUser } from '../types/user.ts';
+import type { PublicUser } from 'shared';
+import type { ListAuthorsQuery } from '../types/user.ts';
 import type { UserListResult, UserRepository } from './userRepository.ts';
 
 // A row as the fake stores it: the public user plus the one thing PublicUser

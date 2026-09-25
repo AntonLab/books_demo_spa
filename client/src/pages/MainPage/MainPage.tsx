@@ -7,7 +7,9 @@ import {
   TILE_COLUMNS,
 } from '@/components/organisms/CardList/CardList';
 import { useSortedBooks } from '@/queries/books';
-import { BOOK_SORT_LABELS, BOOK_SORTS, type BookSort } from '@/types/book';
+import type { BookSort } from 'shared';
+import { BOOK_SORTS } from 'shared';
+import { BOOK_SORT_LABELS } from '@/types/book';
 import styles from './MainPage.module.css';
 
 const SECTION_SIZE = 6;

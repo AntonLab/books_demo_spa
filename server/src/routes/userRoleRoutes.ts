@@ -7,7 +7,7 @@ import {
 } from '../middleware/validate.ts';
 import { updateRoleSchema, type UpdateRoleInput } from '../types/user.ts';
 import { idParamSchema } from '../types/params.ts';
-import { REGISTRABLE_ROLES } from '../types/permission.ts';
+import { REGISTRABLE_ROLES } from 'shared';
 import {
   ForbiddenError,
   NotFoundError,

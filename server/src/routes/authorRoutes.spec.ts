@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
-import type { AuthorSummary, ListAuthorsQuery } from '../types/user.ts';
+import type { AuthorSummary } from 'shared';
+import type { ListAuthorsQuery } from '../types/user.ts';
 import {
   json,
   ROLE_COOKIES,

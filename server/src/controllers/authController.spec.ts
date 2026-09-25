@@ -11,7 +11,7 @@ import type {
 } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { ForbiddenError, UnauthorizedError } from '../types/errors.ts';
-import type { PublicUser, UserStatus } from '../types/user.ts';
+import type { PublicUser, UserStatus } from 'shared';
 
 function loginRequest(login: string, password: string): Request {
   return {

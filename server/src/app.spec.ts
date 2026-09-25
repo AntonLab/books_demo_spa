@@ -23,12 +23,16 @@ import { User } from './models/User.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
-import type { BookDetail, PublicBook } from './types/book.ts';
-import type { PublicChapter } from './types/chapter.ts';
-import type { CommentWithAuthor, PublicComment } from './types/comment.ts';
-import type { RegistrableRole } from './types/permission.ts';
-import type { PublicSeries } from './types/series.ts';
-import type { PublicUser } from './types/user.ts';
+import type {
+  BookDetail,
+  PublicBook,
+  PublicChapter,
+  CommentWithAuthor,
+  PublicComment,
+  RegistrableRole,
+  PublicSeries,
+  PublicUser,
+} from 'shared';
 
 // The route specs run createApp on fake repositories and the repository specs
 // run the real repositories without HTTP, so neither proves the two meet. This

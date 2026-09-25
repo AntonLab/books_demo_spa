@@ -19,7 +19,7 @@ import type {
   ListUsersQuery,
   UpdateUserInput,
 } from '../types/user.ts';
-import type { UserRole } from '../types/permission.ts';
+import type { UserRole } from 'shared';
 
 // The accounts an admin manages besides their own. Everything above them —
 // other admins, every superadmin — is a superadmin's call. See CONTEXT.md.

@@ -5,7 +5,7 @@ import type {
   LikeRepository,
 } from '../repositories/likeRepository.ts';
 import { createFakeLikeRepository } from '../repositories/likeRepository.fake.testkit.ts';
-import type { PublicLike } from '../types/like.ts';
+import type { PublicLike } from 'shared';
 import {
   AUTH_COOKIE,
   json,

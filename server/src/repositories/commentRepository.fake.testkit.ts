@@ -1,6 +1,5 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { CommentWithAuthor, PublicComment } from '../types/comment.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { CommentWithAuthor, PublicComment, AuthorSummary } from 'shared';
 import type {
   CommentListResult,
   CommentRepository,

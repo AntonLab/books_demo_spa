@@ -1,10 +1,6 @@
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-// The response shape is the client's contract too, so it lives in the shared
-// workspace (ADR-0006); the schemas stay here.
-export type { PublicLike } from 'shared';
-
 // Nullable *and* defaulted to null, so an omitted key and an explicit null
 // reach the refine below as the same value — otherwise the XOR check would
 // have to distinguish two spellings of "absent". ZodNullable and ZodDefault

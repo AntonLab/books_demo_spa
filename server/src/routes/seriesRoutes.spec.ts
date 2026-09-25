@@ -3,9 +3,7 @@ import assert from 'node:assert/strict';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
-import type { PublicGenre } from '../types/genre.ts';
-import type { PublicSeries } from '../types/series.ts';
-import type { AuthorSummary } from '../types/user.ts';
+import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
 import {
   json,
   ROLE_COOKIES,
