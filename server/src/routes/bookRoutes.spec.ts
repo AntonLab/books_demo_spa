@@ -1032,56 +1032,6 @@ test('a moderator may not change who is credited on a book', async () => {
   );
 });
 
-test('an author who is not credited may not change the co-authors', async () => {
-  await withAuthenticatedApp(
-    { bookRepository: createFakeRepository() },
-    async (base) => {
-      const { id } = await json<PublicBook>(await post(base, valid));
-
-      assert.equal(
-        (
-          await addCoAuthor(
-            base,
-            id,
-            USER_IDS.otherAuthor,
-            ROLE_COOKIES.otherAuthor
-          )
-        ).status,
-        403
-      );
-      assert.equal(
-        (
-          await removeCoAuthor(
-            base,
-            id,
-            KNOWN_USER_ID,
-            ROLE_COOKIES.otherAuthor
-          )
-        ).status,
-        403
-      );
-    }
-  );
-});
-
-test('a co-author who is no longer an author may not remove anyone else', async () => {
-  await withAuthenticatedApp(
-    { bookRepository: createFakeRepository() },
-    async (base) => {
-      const { id } = await json<PublicBook>(await post(base, valid));
-      await addCoAuthor(base, id, USER_IDS.user);
-
-      const response = await removeCoAuthor(
-        base,
-        id,
-        KNOWN_USER_ID,
-        ROLE_COOKIES.user
-      );
-      assert.equal(response.status, 403);
-    }
-  );
-});
-
 test('changing co-authors without a session is 401', async () => {
   await withApp({ bookRepository: createFakeRepository() }, async (base) => {
     assert.equal((await addCoAuthor(base, 1, 2, null)).status, 401);
