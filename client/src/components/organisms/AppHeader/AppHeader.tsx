@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { FC } from 'react';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
-import { useLogout, useSession } from '@/queries/auth';
+import { useSession } from '@/queries/auth';
 import { isModeratorRole } from 'shared';
 import { useGenresWithBooks } from '@/queries/genres';
 import { searchPath } from '@/types/bookSearch';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
-import { unsavedText } from '@/store/unsavedTextSlice';
+import { useSignOut } from '@/store/useUnsavedText';
 import { SearchBar } from '@/components/organisms/SearchBar/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
@@ -24,24 +24,10 @@ export const AppHeader: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const session = useSession();
-  const logout = useLogout();
+  const signOut = useSignOut();
   const user = session.data;
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.devicePreferences.theme);
-
-  const unsavedTextAccountId = useAppSelector(
-    (state) => state.unsavedText.accountId
-  );
-  const userId = user?.id;
-
-  // Mounted on every route, so it sees each sign-in. A different Account
-  // discards the previous one's Unsaved text; a lost session (null) is not a
-  // sign out and dispatches nothing, so the same Account gets its text back.
-  useEffect(() => {
-    if (userId !== undefined && userId !== unsavedTextAccountId) {
-      dispatch(unsavedText.accountChanged(userId));
-    }
-  }, [userId, unsavedTextAccountId, dispatch]);
 
   const genres = useGenresWithBooks();
   // Empty covers all three cases the submenu must not appear in: loading,
@@ -82,11 +68,7 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      // Only an explicit Log out discards Unsaved text, and only once the
-      // server has ended the session.
-      logout.mutate(undefined, {
-        onSuccess: () => dispatch(unsavedText.discardAll()),
-      });
+      signOut();
       return;
     }
     void navigate(key);
