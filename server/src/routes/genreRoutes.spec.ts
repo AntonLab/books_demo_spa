@@ -10,8 +10,8 @@ import {
   withAuthenticatedApp,
 } from './routeTestKit.testkit.ts';
 
-// Only `admin` and `superadmin` hold anything but `none` on writing genres
-// (R1), so `admin` is the default caller for every write here.
+// Only `admin` and `superadmin` hold anything but `none` on writing genres,
+// so `admin` is the default caller for every write here.
 const post = (
   base: string,
   body: unknown,
@@ -70,7 +70,7 @@ test('GET is open to a guest and lists every genre alphabetically', async () => 
         body.items.map((genre) => genre.name),
         ['gothic', 'Horror']
       );
-      // No paging envelope: A1 returns the list whole.
+      // No paging envelope: the list comes back whole.
       assert.equal('total' in body, false);
     }
   );

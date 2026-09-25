@@ -98,7 +98,7 @@ export interface BookRepository {
   // series exactly once; anything else is a StateConflictError that changes
   // nothing. False when the series is not there.
   reorderInSeries(seriesId: number, bookIds: number[]): Promise<boolean>;
-  // The Cover's bytes never ride along with any other read (S2) — these
+  // The Cover's bytes never ride along with any other read — these
   // three are the only place book_covers is touched. false/null mean "no
   // such Book", exactly as the other single-row methods report it —
   // removeCover included, so a caller can tell "no such Book" from "no Cover
@@ -324,7 +324,7 @@ function buildWhere(
     clauses.push({ seriesId: query.seriesId });
   }
 
-  // A5: combined with the other filters by AND. An id that names no Genre
+  // Combined with the other filters by AND. An id that names no Genre
   // matches nothing and yields an empty list, as an unknown `?tag=` does.
   if (query.genreId !== undefined) {
     clauses.push({ genreId: query.genreId });

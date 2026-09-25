@@ -47,7 +47,7 @@ export function createFakeSeriesRepository(
   });
 
   // Stands in for the genres row the real repository looks up before it
-  // writes, which answers a missing one with this same BadRequestError (A6).
+  // writes, which answers a missing one with this same BadRequestError.
   const assertGenre = (genreId: number | null | undefined): void => {
     if (genreId !== null && genreId !== undefined && !genres.has(genreId)) {
       throw missingGenre(genreId);

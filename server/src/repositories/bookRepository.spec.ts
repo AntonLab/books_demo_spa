@@ -1168,7 +1168,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(loadedSeries?.books?.length, 1);
   });
 
-  // --- Cover storage (S1-S4, T2). ---
+  // --- Cover storage. ---
 
   test('a cover round-trips through setCover/getCoverData, and a second upload replaces the first', async () => {
     // Published, not a fresh draft: this test is about the round-trip, not

@@ -23,12 +23,12 @@ export interface PublicBook {
   description: string;
   tags: string[];
   status: BookStatus;
-  // A7: the Book's Genre, embedded so a card can show it without a second
+  // The Book's Genre, embedded so a card can show it without a second
   // request, or null. A Book takes it from nowhere else — never from its
   // Series (CONTEXT.md, ADR-0008). `SeriesBookSummary` picks four fields and
   // is deliberately not one of them.
   genre: PublicGenre | null;
-  // A7: the URL the browser fetches, versioned by the Cover's own
+  // The URL the browser fetches, versioned by the Cover's own
   // updatedAt so a replace is never served stale. null when there is none.
   coverUrl: string | null;
   createdAt: Date;

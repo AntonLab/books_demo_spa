@@ -174,7 +174,7 @@ test('POST rejects a missing description with 400', async () => {
 // The repository-level mapping from a rejected FK to NotFoundError is still
 // covered directly in seriesRepository.spec.ts.
 
-// R2, as in bookRoutes.spec.ts: the caller is the `author` persona, which
+// As in bookRoutes.spec.ts: the caller is the `author` persona, which
 // holds `none` on every genres action — choosing a Genre rides on the series'
 // own create grant.
 test('POST files a series under a genre, and leaves it without one when genreId is absent', async () => {
@@ -194,7 +194,7 @@ test('POST files a series under a genre, and leaves it without one when genreId 
   );
 });
 
-// A6: choosing a Genre rides on the series' own create/update grant (R2), so
+// Choosing a Genre rides on the series' own create/update grant, so
 // nothing extra is checked — but an id that names no Genre is a 400. The
 // create path's body is asserted, not just its status: that is where it
 // differs from a zod ValidationError, which carries `details`.

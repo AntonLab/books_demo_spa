@@ -20,7 +20,7 @@ export interface GenreRepositoryContractWorld {
 // Case-insensitive uniqueness and the alphabetical order are in here rather
 // than in the MySQL spec alone, because the fake has to match them: MySQL gets
 // both from the column's utf8mb4_0900_ai_ci collation, and the fake has to
-// lower-case names by hand to agree (M1).
+// lower-case names by hand to agree.
 export function genreRepositoryContract(
   setUp: () => Promise<GenreRepositoryContractWorld>
 ): void {

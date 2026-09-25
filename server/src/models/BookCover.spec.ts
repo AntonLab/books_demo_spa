@@ -44,13 +44,13 @@ test('data is a MEDIUMBLOB, never null', () => {
   assert.match(createTableSql, /`data` MEDIUMBLOB NOT NULL/);
 });
 
-test('updatedAt carries millisecond precision; there is no createdAt or content-type column (S1)', () => {
+test('updatedAt carries millisecond precision; there is no createdAt or content-type column', () => {
   assert.match(createTableSql, /`updatedAt` DATETIME\(3\) NOT NULL/);
   assert.doesNotMatch(createTableSql, /createdAt/);
   assert.doesNotMatch(createTableSql, /contentType/i);
 });
 
-// The cascade is the one mechanism this table exists to deliver (S1/S3):
+// The cascade is the one mechanism this table exists to deliver:
 // deleting a Book must take its Cover with it, with no application code.
 test('bookId cascades to books.id — deleting a Book removes its Cover', () => {
   assert.match(

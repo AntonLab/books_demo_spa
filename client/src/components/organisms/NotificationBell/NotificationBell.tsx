@@ -152,9 +152,8 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
       onOpenChange={handleOpenChange}
     >
       <Badge count={unread} size="small">
-        {/* A text glyph, like LikeButton's: @ant-design/icons is not a
-            dependency here. The count is in the name as well as the badge,
-            which a screen reader does not announce. */}
+        {/* The count is in the name as well as the badge, which a screen
+            reader does not announce. */}
         <Button
           type="text"
           aria-label={

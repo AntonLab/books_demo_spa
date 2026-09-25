@@ -42,8 +42,6 @@ export function createBookRoutes(deps: RouteDeps): Router {
     controller.getById
   );
 
-  // requirePermission goes before validate on every write, so a refused
-  // request is never parsed or echoed back in a 400.
   router.post(
     '/',
     requirePermission('books', 'create'),
@@ -83,7 +81,7 @@ export function createBookRoutes(deps: RouteDeps): Router {
     controller.removeCoAuthor
   );
 
-  // A1/A2: the raw body parser is mounted on this PUT alone, never
+  // The raw body parser is mounted on this PUT alone, never
   // app-wide, and after requirePermission so a refused request's 2 MiB is
   // never read.
   router.put(
@@ -102,7 +100,7 @@ export function createBookRoutes(deps: RouteDeps): Router {
     validate({ params: idParamSchema }),
     controller.removeCover
   );
-  // A3: books x read, which a guest holds — the same public-read pattern as
+  // Books x read, which a guest holds — the same public-read pattern as
   // GET /:id.
   router.get(
     '/:id/cover',

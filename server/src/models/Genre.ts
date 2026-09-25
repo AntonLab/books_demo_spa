@@ -51,7 +51,7 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
         // Uniqueness belongs in the schema, never a findOne first — that is a
         // check-then-write race. The column inherits the table's
         // utf8mb4_0900_ai_ci collation, so this index refuses "fantasy" beside
-        // "Fantasy" (M1), and the repository maps its violation to a 409.
+        // "Fantasy", and the repository maps its violation to a 409.
         {
           name: 'genres_name',
           unique: true,

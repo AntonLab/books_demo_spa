@@ -65,8 +65,7 @@ const SortableRow: FC<{ item: SortableListItem }> = ({ item }) => {
     >
       <Flex align="center" gap={token.marginXS}>
         {/* The handle alone starts a drag, so the links and buttons in the row
-            keep working. A text glyph, like LikeButton's: @ant-design/icons is
-            not a dependency here. */}
+            keep working. */}
         <Button
           ref={setActivatorNodeRef}
           type="text"
