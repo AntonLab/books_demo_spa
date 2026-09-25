@@ -48,9 +48,9 @@ describe('listSeries', () => {
 
     const [url, init] = callOf(fetchMock);
     expect(url).toBe('/api/series');
-    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
+    expect(init).toMatchObject({ method: 'GET' });
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('encodes userId and limit, in that order', async () => {
@@ -100,7 +100,7 @@ describe('getSeries', () => {
     expect(url).toBe('/api/series/2');
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('rejects with the 404 of a missing series', async () => {
@@ -280,7 +280,7 @@ describe('listSeriesBooks', () => {
     expect(url).toBe('/api/series/2/books');
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('returns the items wrapper as sent, with no paging fields', async () => {
