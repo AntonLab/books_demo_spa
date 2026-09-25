@@ -130,9 +130,9 @@ describe('listBooks', () => {
     await listBooks();
 
     const [, init] = callOf(fetchMock);
-    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
+    expect(init).toMatchObject({ method: 'GET' });
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('returns the list envelope unchanged', async () => {
@@ -157,7 +157,7 @@ describe('getBook', () => {
     expect(url).toBe('/api/books/7');
     expect(init.method).toBe('GET');
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('returns the detail as the server sent it', async () => {

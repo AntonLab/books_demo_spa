@@ -31,9 +31,9 @@ describe('listNotifications', () => {
     const [url, init] = callOf(fetchMock);
     // No userId: whose notifications is the session's to decide.
     expect(url).toBe('/api/notifications?limit=20');
-    expect(init).toMatchObject({ method: 'GET', credentials: 'include' });
+    expect(init).toMatchObject({ method: 'GET' });
     expect(init.body).toBeUndefined();
-    expect(init.headers).toBeUndefined();
+    expect(init.headers).toEqual({});
   });
 
   it('returns the page with its unread count', async () => {

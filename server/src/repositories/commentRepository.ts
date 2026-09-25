@@ -10,7 +10,12 @@ import { Like } from '../models/Like.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { loadAvatarUrls } from './userRepository.ts';
-import type { CommentWithAuthor, PublicComment, Tombstone } from 'shared';
+import type {
+  CommentWithAuthor,
+  ListResponse,
+  PublicComment,
+  Tombstone,
+} from 'shared';
 import type {
   CreateCommentInput,
   ListCommentsQuery,
@@ -18,10 +23,10 @@ import type {
 } from '../types/comment.ts';
 import { readableBookInclude, type Viewer } from './visibility.ts';
 
-export interface CommentListResult {
-  items: CommentWithAuthor[];
-  total: number;
-}
+export type CommentListResult = Pick<
+  ListResponse<CommentWithAuthor>,
+  'items' | 'total'
+>;
 
 export interface CommentRepository {
   // actorId is separate from the input rather than folded into it, so the type
