@@ -45,19 +45,16 @@ export function listedBookWhere(
 // a book's own detail, and the chapters, comments and likes hanging off it.
 export async function readableBookWhere(viewer: Viewer): Promise<WhereOptions> {
   if (isModerator(viewer)) return {};
+  return readableBookWhereFor(await creditedBookIds(viewer));
+}
 
+// Split from readableBookWhere so readableChapterScope, which needs the
+// credited ids twice, looks them up once.
+function readableBookWhereFor(credited: number[]): WhereOptions {
   const published: WhereOptions = { status: { [Op.ne]: 'draft' } };
-  if (viewer === null) return published;
-
-  const credited = await BookAuthor.findAll({
-    where: { userId: viewer.id },
-    attributes: ['bookId'],
-  });
-  if (credited.length === 0) return published;
-
-  return {
-    [Op.or]: [published, { id: credited.map((credit) => credit.bookId) }],
-  };
+  return credited.length === 0
+    ? published
+    : { [Op.or]: [published, { id: credited }] };
 }
 
 // An inner join on a row's `book` association, carrying no columns of its own:
@@ -66,13 +63,11 @@ export async function readableBookWhere(viewer: Viewer): Promise<WhereOptions> {
 export async function readableBookInclude(
   viewer: Viewer
 ): Promise<IncludeOptions> {
-  return {
-    model: Book,
-    as: 'book',
-    attributes: [],
-    required: true,
-    where: await readableBookWhere(viewer),
-  };
+  return bookIncludeWhere(await readableBookWhere(viewer));
+}
+
+function bookIncludeWhere(where: WhereOptions): IncludeOptions {
+  return { model: Book, as: 'book', attributes: [], required: true, where };
 }
 
 // The same rule turned inside out: the ids of the Draft books a viewer may not
@@ -82,16 +77,7 @@ export async function readableBookInclude(
 export async function hiddenBookIds(viewer: Viewer): Promise<number[]> {
   if (isModerator(viewer)) return [];
 
-  const credited =
-    viewer === null
-      ? []
-      : (
-          await BookAuthor.findAll({
-            where: { userId: viewer.id },
-            attributes: ['bookId'],
-          })
-        ).map((credit) => credit.bookId);
-
+  const credited = await creditedBookIds(viewer);
   const drafts = await Book.findAll({
     where: {
       status: 'draft',
@@ -156,11 +142,13 @@ export function viewerOf(user: { id: number; role: Role } | undefined): Viewer {
 export async function readableChapterScope(
   viewer: Viewer
 ): Promise<{ where: WhereOptions; include: IncludeOptions }> {
-  const include = await readableBookInclude(viewer);
-  if (isModerator(viewer)) return { where: {}, include };
+  if (isModerator(viewer)) {
+    return { where: {}, include: bookIncludeWhere({}) };
+  }
 
-  const published: WhereOptions = { publishedAt: { [Op.lte]: new Date() } };
   const credited = await creditedBookIds(viewer);
+  const include = bookIncludeWhere(readableBookWhereFor(credited));
+  const published: WhereOptions = { publishedAt: { [Op.lte]: new Date() } };
   if (credited.length === 0) return { where: published, include };
 
   return {
