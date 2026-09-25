@@ -1,8 +1,7 @@
 import type { FC } from 'react';
 import { Segmented } from 'antd';
 import type { ColProps } from 'antd';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faList, faTableCellsLarge } from '@fortawesome/free-solid-svg-icons';
+import { AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { TILE_COLUMNS } from '@/components/organisms/CardList/CardList';
 import {
   devicePreferences,
@@ -35,12 +34,12 @@ export const ResultsLayoutSwitch: FC = () => {
       options={[
         {
           value: 'grid',
-          icon: <FontAwesomeIcon icon={faTableCellsLarge} aria-label="Grid" />,
+          icon: <AppstoreOutlined aria-label="Grid" />,
           tooltip: 'Grid',
         },
         {
           value: 'list',
-          icon: <FontAwesomeIcon icon={faList} aria-label="List" />,
+          icon: <UnorderedListOutlined aria-label="List" />,
           tooltip: 'List',
         },
       ]}

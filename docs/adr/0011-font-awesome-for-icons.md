@@ -1,5 +1,7 @@
 # Icons come from Font Awesome, not @ant-design/icons
 
+Superseded by ADR-0012.
+
 The client draws its icons with Font Awesome's SVG packages
 (`@fortawesome/react-fontawesome`, `@fortawesome/fontawesome-svg-core`,
 `@fortawesome/free-solid-svg-icons`), imported one icon at a time so only the
