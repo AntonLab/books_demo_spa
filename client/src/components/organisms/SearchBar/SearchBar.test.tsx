@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { SearchBar } from './SearchBar';
@@ -26,6 +26,11 @@ const LocationProbe = () => {
   );
 };
 
+// A search on Enter navigates a microtask later (so a pick in the same
+// keydown can cancel it); let that and its render finish before reading the
+// URL, which also makes a "did nothing" assertion mean it.
+const settle = () => act(async () => {});
+
 const renderBar = (route = '/') => {
   return renderWithProviders(
     <>
@@ -46,6 +51,7 @@ describe('SearchBar', () => {
       screen.getByLabelText('Search books'),
       'dragon riders{Enter}'
     );
+    await settle();
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/search?q=dragon%20riders'
@@ -59,6 +65,7 @@ describe('SearchBar', () => {
       screen.getByLabelText('Search books'),
       '  elf  {Enter}'
     );
+    await settle();
 
     expect(screen.getByTestId('location')).toHaveTextContent('/search?q=elf');
   });
@@ -67,6 +74,7 @@ describe('SearchBar', () => {
     renderBar();
 
     await userEvent.type(screen.getByLabelText('Search books'), '{Enter}');
+    await settle();
 
     // Exact match, not toHaveTextContent: '/search?q=' contains '/' as a
     // substring, so a substring assertion here would pass even with the
@@ -78,6 +86,7 @@ describe('SearchBar', () => {
     renderBar();
 
     await userEvent.type(screen.getByLabelText('Search books'), '   {Enter}');
+    await settle();
 
     expect(screen.getByTestId('location').textContent).toBe('/');
   });
@@ -226,6 +235,7 @@ describe('SearchBar suggestions', () => {
     await userEvent.type(screen.getByLabelText('Search books'), 'drag');
     await screen.findByTitle('Dragon Tale 1');
     await userEvent.keyboard('{Enter}');
+    await settle();
 
     expect(screen.getByTestId('location').textContent).toBe('/search?q=drag');
   });
