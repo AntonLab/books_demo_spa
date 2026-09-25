@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import type { PublicGenre } from 'shared';
 import type { AuthorSummary } from '@/types/api';
+import spacing from '@/theme/spacing.module.css';
 import styles from './Card.module.css';
 
 interface CardProps {
@@ -41,8 +42,10 @@ export const Card: FC<CardProps> = ({
   return (
     <AntCard
       size="small"
+      // In a list the grid's gutter spaces the cards; heading a page, the
+      // card keeps its own distance from the list beneath it.
       className={
-        tile ? styles.tile : href === undefined ? styles.pageHeading : undefined
+        tile ? styles.tile : href === undefined ? spacing.gapBelow : undefined
       }
     >
       {/* Flex, not Space: Space wraps each child in a div.ant-space-item
