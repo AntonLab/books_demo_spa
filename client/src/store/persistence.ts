@@ -32,12 +32,11 @@ const UNSAVED_TEXT_WRITE_INTERVAL_MS = 500;
 // Storage can be missing (a locked-down browser), full, or hold JSON that no
 // longer parses. Every access is guarded so the store carries on in memory
 // and the page never breaks.
-const read = (key: string): unknown => {
+const readRaw = (key: string): string | null => {
   try {
-    const raw = localStorage.getItem(key);
-    return raw === null ? undefined : (JSON.parse(raw) as unknown);
+    return localStorage.getItem(key);
   } catch {
-    return undefined;
+    return null;
   }
 };
 
@@ -55,6 +54,9 @@ const isReadingFontSize = (value: unknown): value is number =>
   value <= READING_FONT_SIZE.max &&
   (value - READING_FONT_SIZE.min) % READING_FONT_SIZE.step === 0;
 
+const oneOf = <T>(options: readonly T[], value: unknown, fallback: T): T =>
+  options.find((known) => known === value) ?? fallback;
+
 // Field by field, like the rest: one unknown value falls back alone.
 const toReadingPreferences = (value: unknown): ReadingPreferences => {
   const stored = (
@@ -62,18 +64,21 @@ const toReadingPreferences = (value: unknown): ReadingPreferences => {
   ) as Record<string, unknown>;
   const initial = initialReadingPreferences;
   return {
-    background:
-      READING_BACKGROUNDS.find((known) => known === stored.background) ??
-      initial.background,
-    font: READING_FONTS.find((known) => known === stored.font) ?? initial.font,
+    background: oneOf(
+      READING_BACKGROUNDS,
+      stored.background,
+      initial.background
+    ),
+    font: oneOf(READING_FONTS, stored.font, initial.font),
     fontSize: isReadingFontSize(stored.fontSize)
       ? stored.fontSize
       : initial.fontSize,
-    lineHeight:
-      READING_LINE_HEIGHTS.find((known) => known === stored.lineHeight) ??
-      initial.lineHeight,
-    width:
-      READING_WIDTHS.find((known) => known === stored.width) ?? initial.width,
+    lineHeight: oneOf(
+      READING_LINE_HEIGHTS,
+      stored.lineHeight,
+      initial.lineHeight
+    ),
+    width: oneOf(READING_WIDTHS, stored.width, initial.width),
   };
 };
 
@@ -89,9 +94,11 @@ const toDevicePreferences = (
   if (theme === undefined) return undefined;
   return {
     theme,
-    resultsLayout:
-      RESULTS_LAYOUTS.find((known) => known === stored.resultsLayout) ??
-      initialDevicePreferences.resultsLayout,
+    resultsLayout: oneOf(
+      RESULTS_LAYOUTS,
+      stored.resultsLayout,
+      initialDevicePreferences.resultsLayout
+    ),
     searchFormExpanded:
       typeof stored.searchFormExpanded === 'boolean'
         ? stored.searchFormExpanded
@@ -142,28 +149,11 @@ const validEntries = (
   return result;
 };
 
-export const loadPersistedState = (): Partial<RootState> => {
-  const state: Partial<RootState> = {};
-  const devicePreferences = toDevicePreferences(
-    read(STORAGE_KEYS.devicePreferences)
-  );
-  if (devicePreferences !== undefined) {
-    state.devicePreferences = devicePreferences;
-  }
-  const unsavedText = read(STORAGE_KEYS.unsavedText);
-  if (isUnsavedTextShape(unsavedText)) {
-    state.unsavedText = {
-      accountId: unsavedText.accountId,
-      entries: validEntries(unsavedText.entries),
-    };
-  }
-  return state;
-};
-
-// Parses another tab's raw storage value through the same guards above, for
-// the `storage` event listener in index.ts. `null` (the key was cleared) and
-// a value of the wrong shape are told apart: `null` return means "reset the
-// slice", `undefined` means "ignore, keep this tab's state".
+// Parses a raw storage value through the guards above: this tab's own at load,
+// and another tab's for the `storage` event listener in index.ts. `null` (the
+// key was cleared) and a value of the wrong shape are told apart: `null`
+// return means "reset the slice", `undefined` means "ignore, keep this tab's
+// state".
 export const parsePersisted = (
   key: string,
   raw: string | null
@@ -189,6 +179,15 @@ export const parsePersisted = (
   }
   return undefined;
 };
+
+// null and undefined both leave the slice to its initial state here.
+export const loadPersistedState = (): Partial<RootState> =>
+  Object.assign(
+    {},
+    ...Object.values(STORAGE_KEYS).map((key) =>
+      parsePersisted(key, readRaw(key))
+    )
+  ) as Partial<RootState>;
 
 // A whitespace-only entry lives in memory while its field is being typed in,
 // but is not worth a reload.
