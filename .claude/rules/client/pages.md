@@ -44,8 +44,9 @@ paths:
   shows "This genre no longer exists." and asks for no books. When the
   server serves a lower `current` than asked, the page `replace`s the URL. A
   400's zod issues land on their fields (`fieldErrorsOf`). The form is
-  collapsible, open by default, by the `searchFormExpanded` Device
-  preference. Results show as tiles or a list by `resultsLayout`
+  shown or hidden (never unmounted, so field errors still land) by the
+  `SearchFiltersToggle` button beside the layout switch, through the
+  `searchFormExpanded` Device preference, open by default. Results show as tiles or a list by `resultsLayout`
   (`ResultsLayoutSwitch`, also on `SeriesPage`). `MainPage`'s sections are
   always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
   their default columns.
