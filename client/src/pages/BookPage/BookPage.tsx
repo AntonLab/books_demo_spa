@@ -24,6 +24,7 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
+import { searchPath } from '@/types/bookSearch';
 import { bookCapabilities } from '@/types/capabilities';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
@@ -104,7 +105,7 @@ export const BookPage: FC = () => {
               <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
             )}
             {book.genre !== null && (
-              <Link to={`/search?genre=${book.genre.id}`}>
+              <Link to={searchPath({ genre: String(book.genre.id) })}>
                 {book.genre.name}
               </Link>
             )}

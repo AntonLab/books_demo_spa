@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { useBookSuggestions } from '@/queries/books';
 import { useSeriesSuggestions } from '@/queries/series';
-import { toSearchParams } from '@/types/bookSearch';
+import { searchPath } from '@/types/bookSearch';
 import {
   authorLabelOf,
   matchingAuthors,
@@ -63,12 +63,7 @@ export const SearchBar: FC = () => {
         (byAuthor.data?.items ?? []).flatMap((book) => book.authors),
         term
       ).map((author) => ({
-        value: `/search?${toSearchParams({
-          author: author.login,
-          authorId: author.id,
-          sort: 'popular',
-          page: 1,
-        }).toString()}`,
+        value: searchPath({ author: author.login, authorId: author.id }),
         label: authorLabelOf(author),
       }))
     ),
@@ -135,7 +130,7 @@ export const SearchBar: FC = () => {
 
     queueMicrotask(() => {
       if (!justPicked.current) {
-        void navigate(`/search?q=${encodeURIComponent(trimmed)}`);
+        void navigate(searchPath({ q: trimmed }));
       }
     });
   };

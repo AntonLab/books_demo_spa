@@ -95,7 +95,7 @@ describe('MainPage', () => {
 
     expect(
       await within(section('Popular')).findByRole('link', { name: 'Show more' })
-    ).toHaveAttribute('href', '/search?sort=popular');
+    ).toHaveAttribute('href', '/search');
     await within(section('New releases')).findByRole('link', { name: 'A' });
     expect(
       within(section('New releases')).queryByRole('link', {
