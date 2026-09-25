@@ -1,13 +1,15 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
+import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
@@ -23,6 +25,7 @@ const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedGenres = jest.mocked(genresApi);
+const mockedNotifications = jest.mocked(notificationsApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
@@ -266,6 +269,53 @@ describe('AppShell session bootstrap', () => {
     expect(
       await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('AppShell and Unsaved text', () => {
+  it('binds the Unsaved text to the Account signed in', async () => {
+    const signedIn: PublicUser = {
+      id: 1,
+      login: 'bob',
+      email: 'bob@example.com',
+      firstName: 'Bob',
+      lastName: 'Bobson',
+      status: 'active',
+      role: 'user',
+      avatarUrl: null,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    mockedAuth.me.mockResolvedValue(signedIn);
+    // The bell a signed-in header shows asks for these.
+    mockedNotifications.listNotifications.mockResolvedValue({
+      items: [],
+      total: 0,
+      unread: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { store } = renderWithProviders(<AppShell />, {
+      preloadedState: {
+        unsavedText: {
+          accountId: 2,
+          entries: {
+            'book:1:comment': {
+              text: 'Not yours',
+              savedAt: '2026-09-23T10:00:00.000Z',
+            },
+          },
+        },
+      },
+    });
+
+    await waitFor(() =>
+      expect(store.getState().unsavedText).toEqual({
+        accountId: 1,
+        entries: {},
+      })
+    );
   });
 });
 
