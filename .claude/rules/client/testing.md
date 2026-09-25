@@ -42,6 +42,8 @@ is load-bearing:
   `localStorage`, which an earlier test may have written. Pass `path` beside
   `route` for a page that reads params, or `useParams()` is empty and the page
   queries `NaN`.
+  `renderHookWithProviders(hook, options)` puts a hook in the same providers
+  and returns `renderHook`'s result plus `{ store, queryClient }`.
 - Its query client is **fresh per render** (a shared one leaks cache between
   tests), with `retry: false` and `staleTime`/`gcTime: Infinity` so seeded data
   is never refetched and no timer outlives the test.

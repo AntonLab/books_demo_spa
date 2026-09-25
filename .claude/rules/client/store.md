@@ -47,19 +47,26 @@ and that the server never sees: Unsaved text and Device preferences
 - **A landed Chapter save goes through `saved`, not `remove`.** Text typed
   while the save was in flight survives, rebased onto the version the save
   created.
-- **Entries follow the Account, not the session.** `AppHeader` dispatches
+- **Entries follow the Account, not the session.**
+  `useUnsavedTextAccountBinding`, called once in `AppShell`, dispatches
   `accountChanged(id)` when a signed-in id differs from `accountId`: the first
-  id is adopted with the entries, a different one discards them. Log out
-  dispatches `discardAll` on success. A lost session (expiry, Block, password
-  reset) dispatches nothing, so the same Account gets its text back; until
-  then the text stays readable in that browser's `localStorage` (accepted).
-- **Read entries through `ownEntries(state, session?.id)`**, never
-  `state.unsavedText.entries`. After a lost session a second Account can sign
-  in before `accountChanged` clears the first one's entries, and a form
-  seeded in that render would show them. A test of "no longer a Co-author"
-  drops the Account from the Book, not the session's id.
+  id is adopted with the entries, a different one discards them. Sign out goes
+  through `useSignOut`, which dispatches `discardAll` once the server has
+  ended the session (`queries/` never imports the store). A lost session
+  (expiry, Block, password reset) dispatches nothing, so the same Account gets
+  its text back; until then the text stays readable in that browser's
+  `localStorage` (accepted).
+- **Read and write entries through the hooks in `useUnsavedText.ts`**:
+  `useUnsavedText(key)` for one place, `useOwnUnsavedEntries()` for a view
+  over many (with `entriesOfBook`). Never read `state.unsavedText` in a
+  component. After a lost session a second Account can sign in before
+  `accountChanged` clears the first one's entries, and a form seeded in that
+  render would show them; the hooks' private `ownEntries` hides them. A test
+  of "no longer a Co-author" drops the Account from the Book, not the
+  session's id.
 - **Select narrowly.** A selector that builds a new array or object on each
-  call re-renders on every dispatch: select `entries` or one entry and derive
-  in the component.
+  call re-renders on every dispatch: `useUnsavedText` selects one entry and
+  `useOwnUnsavedEntries` selects the map, and components derive from what the
+  hooks return instead of selecting themselves.
 - The Publication time pickers are not part of an entry: a stale moment could
   publish a Chapter when nobody means it any more.

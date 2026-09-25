@@ -40,10 +40,10 @@ describe('cross-tab sync', () => {
       })
     );
 
-    // Replacing it here would make AppHeader's accountChanged effect wipe it
-    // back to Account 3 and write that back, which the other tab would then
-    // replace again — a loop between two Accounts that wipes Unsaved text
-    // every round.
+    // Replacing it here would make the Account binding's accountChanged wipe
+    // it back to Account 3 and write that back, which the other tab would
+    // then replace again — a loop between two Accounts that wipes Unsaved
+    // text every round.
     expect(store.getState().unsavedText).toEqual(before);
   });
 

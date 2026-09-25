@@ -1,12 +1,9 @@
 import type { FC } from 'react';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  entriesOfBook,
-  ownEntries,
-  unsavedText,
-} from '@/store/unsavedTextSlice';
+import { useAppDispatch } from '@/store/hooks';
+import { entriesOfBook, unsavedText } from '@/store/unsavedTextSlice';
+import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 
 interface BookUnsavedTextNoticesProps {
   bookId: number;
@@ -20,7 +17,7 @@ export const BookUnsavedTextNotices: FC<BookUnsavedTextNoticesProps> = ({
 }) => {
   const { data: session } = useSession();
   const dispatch = useAppDispatch();
-  const entries = useAppSelector((state) => ownEntries(state, session?.id));
+  const entries = useOwnUnsavedEntries();
 
   if (!session) return null;
 

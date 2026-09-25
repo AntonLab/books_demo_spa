@@ -1,16 +1,20 @@
-import { render } from '@testing-library/react';
+import { render, renderHook } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactElement, ReactNode } from 'react';
-import type { RenderOptions, RenderResult } from '@testing-library/react';
+import type {
+  RenderHookResult,
+  RenderOptions,
+  RenderResult,
+} from '@testing-library/react';
 import { ThemedConfigProvider } from '../components/organisms/ThemedConfigProvider/ThemedConfigProvider';
 import { createAppStore } from '../store';
 import type { AppStore, RootState } from '../store';
 import { createTestQueryClient } from './queryClient';
 
-interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
+interface ProviderSetup {
   preloadedState?: Partial<RootState>;
   store?: AppStore;
   queryClient?: QueryClient;
@@ -21,6 +25,8 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
   // exactly as before.
   path?: string;
 }
+
+type ProviderOptions = ProviderSetup & Omit<RenderOptions, 'wrapper'>;
 
 // Every component test needs a query client, a store, a router and the app's
 // tokens. ThemedConfigProvider is the one App mounts: without it a component
@@ -42,19 +48,13 @@ interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
 // `{}`: never from localStorage, which a previous test may have written. Both
 // are returned so a test can seed a session (`queryClient.setQueryData`),
 // read client state (`store.getState()`), or remount on the same store.
-export const renderWithProviders = (
-  ui: ReactElement,
-  options: ProviderOptions = {}
-): RenderResult & { store: AppStore; queryClient: QueryClient } => {
-  const {
-    preloadedState = {},
-    store = createAppStore(preloadedState),
-    queryClient = createTestQueryClient(),
-    route = '/',
-    path,
-    ...renderOptions
-  } = options;
-
+const setUpProviders = ({
+  preloadedState = {},
+  store = createAppStore(preloadedState),
+  queryClient = createTestQueryClient(),
+  route = '/',
+  path,
+}: ProviderSetup) => {
   const Wrapper = ({ children }: { children: ReactNode }) => {
     return (
       <QueryClientProvider client={queryClient}>
@@ -74,10 +74,39 @@ export const renderWithProviders = (
       </QueryClientProvider>
     );
   };
+  return { store, queryClient, Wrapper };
+};
 
-  return {
+export const renderWithProviders = (
+  ui: ReactElement,
+  options: ProviderOptions = {}
+): RenderResult & { store: AppStore; queryClient: QueryClient } => {
+  const { preloadedState, store, queryClient, route, path, ...renderOptions } =
+    options;
+  const providers = setUpProviders({
+    preloadedState,
     store,
     queryClient,
-    ...render(ui, { wrapper: Wrapper, ...renderOptions }),
+    route,
+    path,
+  });
+
+  return {
+    store: providers.store,
+    queryClient: providers.queryClient,
+    ...render(ui, { wrapper: providers.Wrapper, ...renderOptions }),
   };
+};
+
+// The same providers around a hook, for a hook that reads both the session
+// and the store.
+export const renderHookWithProviders = <Result,>(
+  hook: () => Result,
+  options: ProviderSetup = {}
+): RenderHookResult<Result, unknown> & {
+  store: AppStore;
+  queryClient: QueryClient;
+} => {
+  const { store, queryClient, Wrapper } = setUpProviders(options);
+  return { store, queryClient, ...renderHook(hook, { wrapper: Wrapper }) };
 };
