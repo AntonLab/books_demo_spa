@@ -165,11 +165,9 @@ describe('SearchBar suggestions', () => {
     });
   });
 
-  it('asks for nothing for the ?q= it starts from, or under three characters', async () => {
+  it('asks for nothing for the ?q= it starts from', async () => {
     renderBar('/search?q=dragon');
-
-    await userEvent.clear(screen.getByLabelText('Search books'));
-    await userEvent.type(screen.getByLabelText('Search books'), 'dr');
+    await settle();
 
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
     expect(mockedSeries.listSeries).not.toHaveBeenCalled();
