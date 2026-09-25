@@ -16,7 +16,6 @@ import { PAGE_SIZE_MAX } from 'shared';
 import { queryKeys } from './keys';
 
 const BOOKS_PAGE_SIZE = 20;
-export const SUGGESTIONS_SIZE = 8;
 
 // A ranking's first `pageSize` books, for the main page's sections; the search
 // page pages through `useBookSearch` instead.
@@ -46,22 +45,6 @@ export const useBooksInSeries = (seriesId: number) => {
   return useQuery({
     queryKey: queryKeys.books({ seriesId, pageSize: PAGE_SIZE_MAX }),
     queryFn: () => listBooks({ seriesId, pageSize: PAGE_SIZE_MAX }),
-  });
-};
-
-// The search form's Text and Author suggestions: the first few books the term
-// finds, one cache entry per term, as the Co-author picker does. A blank term
-// asks for nothing, since the server refuses one.
-// ponytail: a request per keystroke, debounce if the server feels it.
-export const useBookSuggestions = (field: 'q' | 'author', term: string) => {
-  const params: ListBooksParams = {
-    ...(field === 'q' ? { q: term } : { author: term }),
-    pageSize: SUGGESTIONS_SIZE,
-  };
-  return useQuery({
-    queryKey: queryKeys.books(params),
-    queryFn: () => listBooks(params),
-    enabled: term !== '',
   });
 };
 

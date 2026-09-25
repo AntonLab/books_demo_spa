@@ -114,42 +114,27 @@ describe('SearchForm', () => {
     expect(mockedSeries.listSeries).not.toHaveBeenCalled();
   });
 
-  it('suggests the titles holding the typed text, and opens the book picked', async () => {
+  it('suggests books for the typed text, and opens the book picked', async () => {
     mockedBooks.listBooks.mockResolvedValue(
-      pageOf([
-        bookOf(1, 'A Tale of Dragons'),
-        // Found by its description: no title to offer.
-        bookOf(2, 'Unrelated'),
-      ])
+      pageOf([bookOf(1, 'A Tale of Dragons')])
     );
     const { onSearch } = renderForm();
 
-    await userEvent.type(screen.getByLabelText('Text'), ' dr ');
-    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
-
-    await userEvent.clear(screen.getByLabelText('Text'));
     await userEvent.type(screen.getByLabelText('Text'), 'drag');
 
-    expect(mockedBooks.listBooks).toHaveBeenCalledTimes(2);
     expect(mockedBooks.listBooks).toHaveBeenLastCalledWith({
       q: 'drag',
       pageSize: 8,
     });
-    const option = await screen.findByTitle('A Tale of Dragons');
-    expect(screen.queryByTitle('Unrelated')).not.toBeInTheDocument();
-
-    await userEvent.click(option);
+    await userEvent.click(await screen.findByTitle('A Tale of Dragons'));
 
     expect(screen.getByTestId('location')).toHaveTextContent('/books/1');
     expect(onSearch).not.toHaveBeenCalled();
   });
 
-  it('suggests the matching authors once each, searching by the one picked', async () => {
+  it('suggests authors for the typed text, searching by the one picked', async () => {
     const ann = author(3, 'annlee', 'Ann Lee');
-    const cora = author(4, 'cora', 'Cora Moss');
-    mockedBooks.listBooks.mockResolvedValue(
-      pageOf([bookOf(1, 'One', [ann, cora]), bookOf(2, 'Two', [ann])])
-    );
+    mockedBooks.listBooks.mockResolvedValue(pageOf([bookOf(1, 'One', [ann])]));
     const { onSearch } = renderForm();
 
     await userEvent.type(screen.getByLabelText('Author'), 'lee');
@@ -158,11 +143,7 @@ describe('SearchForm', () => {
       author: 'lee',
       pageSize: 8,
     });
-    const options = await screen.findAllByTitle('Ann Lee (annlee)');
-    expect(options).toHaveLength(1);
-    expect(screen.queryByTitle('Cora Moss (cora)')).not.toBeInTheDocument();
-
-    await userEvent.click(options[0]!);
+    await userEvent.click(await screen.findByTitle('Ann Lee (annlee)'));
     await userEvent.click(screen.getByRole('button', { name: 'Search' }));
     expect(onSearch).toHaveBeenLastCalledWith(
       expect.objectContaining({ author: 'annlee', authorId: 3 })

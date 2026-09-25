@@ -3,15 +3,8 @@ import { useRef, useState } from 'react';
 import { AutoComplete, Input, Spin, theme } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
-import { useBookSuggestions } from '@/queries/books';
-import { useSeriesSuggestions } from '@/queries/series';
+import { authorLabelOf, useSuggestions } from '@/queries/suggestions';
 import { searchPath } from '@/types/bookSearch';
-import {
-  authorLabelOf,
-  matchingAuthors,
-  matchingTitles,
-  suggestionTermOf,
-} from '@/types/searchSuggestions';
 import styles from './SearchBar.module.css';
 
 // Fewer than the search form offers per field: three groups share one list.
@@ -32,10 +25,10 @@ export const SearchBar: FC = () => {
   const queryFromUrl = searchParams.get('q') ?? '';
   const [value, setValue] = useState(queryFromUrl);
   // Set only by typing, so a `?q=` arriving from the URL asks for nothing.
-  const [term, setTerm] = useState('');
-  const books = useBookSuggestions('q', term);
-  const byAuthor = useBookSuggestions('author', term);
-  const series = useSeriesSuggestions(term);
+  const [typed, setTyped] = useState('');
+  const books = useSuggestions('books', typed);
+  const authors = useSuggestions('authors', typed);
+  const series = useSuggestions('series', typed);
 
   // The URL is the source of truth; the input follows it, so a paste, a
   // reload and a back-button press all leave the bar showing the live query.
@@ -52,31 +45,28 @@ export const SearchBar: FC = () => {
   const options = [
     ...groupOf(
       'Books',
-      matchingTitles(books.data?.items ?? [], term).map((book) => ({
+      books.items.map((book) => ({
         value: `/books/${book.id}`,
         label: book.title,
       }))
     ),
     ...groupOf(
       'Authors',
-      matchingAuthors(
-        (byAuthor.data?.items ?? []).flatMap((book) => book.authors),
-        term
-      ).map((author) => ({
+      authors.items.map((author) => ({
         value: searchPath({ author: author.login, authorId: author.id }),
         label: authorLabelOf(author),
       }))
     ),
     ...groupOf(
       'Series',
-      matchingTitles(series.data?.items ?? [], term).map((entry) => ({
+      series.items.map((entry) => ({
         value: `/series/${entry.id}`,
         label: entry.title,
       }))
     ),
   ];
   const isFetching =
-    books.isFetching || byAuthor.isFetching || series.isFetching;
+    books.isFetching || authors.isFetching || series.isFetching;
 
   // Enter on an arrowed-to suggestion reaches Input.Search's onSearch first
   // and the pick second, in the same keydown. So a search waits out that
@@ -92,7 +82,7 @@ export const SearchBar: FC = () => {
       justPicked.current = false;
     });
     setValue('');
-    setTerm('');
+    setTyped('');
     void navigate(path);
   };
 
@@ -120,7 +110,7 @@ export const SearchBar: FC = () => {
     // passes the erased text through instead, this guard is what stops it
     // from being navigated to.
     if (info?.source === 'clear') {
-      setTerm('');
+      setTyped('');
       return;
     }
     const trimmed = text.trim();
@@ -157,7 +147,7 @@ export const SearchBar: FC = () => {
       // an author matched by first name.
       showSearch={{
         filterOption: false,
-        onSearch: (text) => setTerm(suggestionTermOf(text)),
+        onSearch: setTyped,
       }}
       // AutoComplete takes no `loading`; until a group lands the list is
       // empty, so its empty slot holds the spinner.
