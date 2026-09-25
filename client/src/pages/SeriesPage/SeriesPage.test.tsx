@@ -103,7 +103,7 @@ describe('SeriesPage', () => {
       pageSize: 100,
     });
     expect(
-      screen.getByRole('radiogroup', { name: 'Results layout' })
+      screen.getByRole('group', { name: 'Results layout' })
     ).toBeInTheDocument();
   });
 
