@@ -115,6 +115,15 @@ CI (`.github/workflows/`) runs seven required checks on every PR into `dev` or
 - **Project skills**: `npm run skills` restores them after a fresh clone or a
   lock change. See `.claude/rules/repo/skills.md`.
 
+### Context-saving agents
+
+- **`repo-auditor`** (Sonnet, read-only) takes any "check / audit / find all"
+  request, `/ponytail-audit` included, and returns numbered findings. Grilling
+  and the question of which findings to fix stay in the main session. The
+  picked findings go into a brief file for `sdd-implementer`.
+- **`gate-runner`** (Haiku) runs the quality gates or reads a CI run and
+  returns only the failures. Dispatch it instead of running the gates inline.
+
 ### Plan pipeline agents
 
 `.claude/agents/` holds five subagents carrying the superpowers plan pipeline's
