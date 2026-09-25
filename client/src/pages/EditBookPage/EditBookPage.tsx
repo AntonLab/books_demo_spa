@@ -21,6 +21,7 @@ import { bookCapabilities } from '@/types/capabilities';
 import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useMySeries } from '@/queries/series';
+import spacing from '@/theme/spacing.module.css';
 import styles from './EditBookPage.module.css';
 
 export const EditBookPage: FC = () => {
@@ -42,7 +43,7 @@ export const EditBookPage: FC = () => {
         <Alert
           type="error"
           title="Could not load this book."
-          className={styles.alert}
+          className={spacing.gapBelow}
         />
         {error instanceof ApiError && error.status === 404 && (
           <BookUnsavedTextNotices bookId={bookId} />
@@ -93,7 +94,7 @@ export const EditBookPage: FC = () => {
 
       <div className={styles.body}>
         {update.isSuccess && (
-          <Alert type="success" title="Saved." className={styles.alert} />
+          <Alert type="success" title="Saved." className={spacing.gapBelow} />
         )}
         <BookForm
           // Keyed by the last save, so the fields reset to what the server

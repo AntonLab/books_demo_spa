@@ -10,6 +10,7 @@ import { useSortedBooks } from '@/queries/books';
 import type { BookSort } from 'shared';
 import { BOOK_SORTS } from 'shared';
 import { BOOK_SORT_LABELS } from '@/types/book';
+import spacing from '@/theme/spacing.module.css';
 import styles from './MainPage.module.css';
 
 const SECTION_SIZE = 6;
@@ -37,7 +38,7 @@ const Section: FC<{ sort: BookSort }> = ({ sort }) => {
         justify="space-between"
         align="center"
         gap="middle"
-        className={styles.bar}
+        className={spacing.gapBelow}
       >
         <Typography.Title id={headingId} level={2} className={styles.heading}>
           {BOOK_SORT_LABELS[sort]}

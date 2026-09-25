@@ -2,10 +2,6 @@
   margin-top: var(--ant-margin-xl);
 }
 
-.bar {
-  margin-bottom: var(--ant-margin);
-}
-
 /* The bar spaces the heading from the books, so the heading's own margins
    would only push the link off its line. */
 .heading {

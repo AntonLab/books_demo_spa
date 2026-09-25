@@ -1,7 +1,3 @@
-.collapse {
-  margin-bottom: var(--ant-margin);
-}
-
 /* A DatePicker sizes to its content; in a grid cell it should fill it. */
 .picker {
   width: 100%;
