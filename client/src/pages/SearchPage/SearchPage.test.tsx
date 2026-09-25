@@ -272,7 +272,7 @@ describe('SearchPage', () => {
     // A tile leaves the description out; the list's card shows it.
     expect(screen.queryByText('A tale of dragons')).toBeNull();
 
-    await userEvent.click(screen.getByRole('radio', { name: 'List' }));
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
 
     expect(screen.getByText('A tale of dragons')).toBeInTheDocument();
     expect(store.getState().devicePreferences.resultsLayout).toBe('list');
