@@ -13,7 +13,8 @@ survive the swap save little. We now import antd's icons one at a time
 
 - `@ant-design/icons` is a direct dependency of `client`, pinned to the
   version antd requires; the two move together, like `@ant-design/cssinjs`
-  (ADR-0009).
+  (ADR-0009). `src/theme/antdCompanions.test.ts` fails when either pin falls
+  behind antd and npm installs a second copy.
 - An antd icon is not decorative by default: it renders `role="img"` with the
   icon's name as `aria-label`. On a button labelled by its own `aria-label`
   that name is overridden and harmless. Beside visible text it would join the
