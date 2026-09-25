@@ -1,6 +1,6 @@
 ---
 name: sdd-implementer
-description: Implements one task of a superpowers plan from a task brief file, tests it test-first, commits, and writes a report file. Dispatched only by superpowers:subagent-driven-development — the role rules are built in, so the dispatch carries just the task name, brief path, context, working directory and report path. Not for ad-hoc coding.
+description: Implements one task from a brief file, tests it test-first, commits, and writes a report file. The brief is a superpowers plan task (dispatched by superpowers:subagent-driven-development) or the findings the user picked from an audit, written to a brief file by the main session. The role rules are built in, so the dispatch carries just the task name, brief path, context, working directory and report path. Not for coding without a brief file.
 disallowedTools: Agent
 model: sonnet
 skills:
