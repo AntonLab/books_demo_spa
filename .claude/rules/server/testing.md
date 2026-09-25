@@ -20,8 +20,10 @@ Each answers a question the others cannot:
 - **Route specs** run `createApp` on in-memory fakes
   (`repositories/<name>Repository.fake.testkit.ts`) and assert the HTTP mapping
   and permission checks. A fake takes its seeds and spies as one options
-  object and never grows a domain rule. Session, reset and notification fakes
-  stay inline in their route specs. Shared harness:
+  object and never grows a domain rule: a rule copied into it is a second
+  implementation that can drift from the SQL one while every route spec stays
+  green, so Draft visibility and the like are proven on MySQL only. Session,
+  reset and notification fakes stay inline in their route specs. Shared harness:
   `routes/routeTestKit.testkit.ts`.
 - **Contracts** (`<name>Repository.contract.testkit.ts`) run twice, on MySQL
   from `<name>Repository.spec.ts` and on the fake from `.fake.spec.ts`. They
