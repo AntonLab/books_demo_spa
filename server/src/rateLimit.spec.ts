@@ -4,24 +4,24 @@ import { createRateLimiter, type RateLimiter } from './rateLimit.ts';
 
 const WINDOW_MS = 1_000;
 
-interface Clock {
-  now: number;
-}
-
-// Three hits a second, on a clock the test moves by hand. The sweep's
+// Three hits a second, with Date and the sweep's interval mocked from 0. The
 // interval is stopped when the test ends.
-function limiterOn(t: TestContext, clock: Clock): RateLimiter {
-  const limiter = createRateLimiter({
-    limit: 3,
-    windowMs: WINDOW_MS,
-    now: () => clock.now,
-  });
+function limiterOn(t: TestContext): RateLimiter {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'] });
+  const limiter = createRateLimiter({ limit: 3, windowMs: WINDOW_MS });
   t.after(() => limiter.stop());
   return limiter;
 }
 
+// `clock.now = ms` moves the mocked Date by hand, firing no timer.
+const clockOn = (t: TestContext) => ({
+  set now(ms: number) {
+    t.mock.timers.setTime(ms);
+  },
+});
+
 test('lets `limit` hits through in a window and refuses the next', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
 
   assert.deepEqual(
     [1, 2, 3, 4].map(() => limiter.hit('a').allowed),
@@ -30,8 +30,8 @@ test('lets `limit` hits through in a window and refuses the next', (t) => {
 });
 
 test('retryAfterMs is the time left in the window', (t) => {
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
+  const clock = clockOn(t);
 
   assert.equal(limiter.hit('a').retryAfterMs, WINDOW_MS);
   clock.now = 400;
@@ -39,8 +39,8 @@ test('retryAfterMs is the time left in the window', (t) => {
 });
 
 test('the window ends on time, and the key starts again with a full budget', (t) => {
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
+  const clock = clockOn(t);
   for (let hit = 0; hit < 4; hit += 1) {
     limiter.hit('a');
   }
@@ -55,7 +55,7 @@ test('the window ends on time, and the key starts again with a full budget', (t)
 });
 
 test('release decrements the key’s count, freeing the slot for another hit', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
   // Three of three spent: a fourth would be refused, so releasing one must
   // free exactly one slot back, not merely avoid refusing the very next hit.
   for (let hit = 0; hit < 3; hit += 1) {
@@ -69,7 +69,7 @@ test('release decrements the key’s count, freeing the slot for another hit', (
 });
 
 test('release never takes the count below zero', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
   limiter.hit('a');
 
   for (let extra = 0; extra < 5; extra += 1) {
@@ -85,7 +85,7 @@ test('release never takes the count below zero', (t) => {
 });
 
 test('release forgets the key once its count reaches zero, rather than leaving an empty window in the map', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
   limiter.hit('a');
 
   limiter.release('a');
@@ -94,8 +94,8 @@ test('release forgets the key once its count reaches zero, rather than leaving a
 });
 
 test('release does nothing when the key has no open window', (t) => {
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
+  const clock = clockOn(t);
 
   limiter.release('never-hit');
   assert.equal(limiter.size(), 0);
@@ -109,8 +109,8 @@ test('release does nothing when the key has no open window', (t) => {
 });
 
 test('release does not move the window’s end', (t) => {
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
+  const clock = clockOn(t);
   // Two hits, so the released count (1) stays above zero and the window
   // stays open — release deletes the key outright once it reaches zero,
   // which would make "the window's end" meaningless to ask about.
@@ -124,7 +124,7 @@ test('release does not move the window’s end', (t) => {
 });
 
 test('reset forgets one key and leaves the others alone', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
   for (let hit = 0; hit < 3; hit += 1) {
     limiter.hit('a');
     limiter.hit('b');
@@ -137,7 +137,7 @@ test('reset forgets one key and leaves the others alone', (t) => {
 });
 
 test('each key is counted apart', (t) => {
-  const limiter = limiterOn(t, { now: 0 });
+  const limiter = limiterOn(t);
   for (let hit = 0; hit < 3; hit += 1) {
     limiter.hit('a');
   }
@@ -147,30 +147,26 @@ test('each key is counted apart', (t) => {
 });
 
 test('the sweep drops windows whose keys are never touched again', (t) => {
-  t.mock.timers.enable({ apis: ['setInterval'] });
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
+  const clock = clockOn(t);
   limiter.hit('a');
   limiter.hit('b');
   clock.now = 500;
   limiter.hit('c');
   assert.equal(limiter.size(), 3);
 
-  clock.now = WINDOW_MS;
-  t.mock.timers.tick(WINDOW_MS);
+  // On to 1000, where the sweep's first interval fires.
+  t.mock.timers.tick(WINDOW_MS - 500);
 
   // a and b ended at 1000; c's window runs to 1500.
   assert.equal(limiter.size(), 1);
 });
 
 test('stop ends the sweep', (t) => {
-  t.mock.timers.enable({ apis: ['setInterval'] });
-  const clock = { now: 0 };
-  const limiter = limiterOn(t, clock);
+  const limiter = limiterOn(t);
   limiter.hit('a');
 
   limiter.stop();
-  clock.now = WINDOW_MS;
   t.mock.timers.tick(WINDOW_MS);
 
   assert.equal(limiter.size(), 1);

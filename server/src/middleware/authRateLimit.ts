@@ -28,18 +28,13 @@ export interface AuthRateLimits {
   stop(): void;
 }
 
-// `now` is injectable so a spec moves time by hand.
-export function createAuthRateLimits(now?: () => number): AuthRateLimits {
-  const loginByIpAndLogin = createRateLimiter({
-    ...AUTH_RATE_LIMITS.loginByIpAndLogin,
-    now,
-  });
-  const loginByIp = createRateLimiter({ ...AUTH_RATE_LIMITS.loginByIp, now });
-  const register = createRateLimiter({ ...AUTH_RATE_LIMITS.register, now });
-  const resetRequest = createRateLimiter({
-    ...AUTH_RATE_LIMITS.resetRequest,
-    now,
-  });
+export function createAuthRateLimits(): AuthRateLimits {
+  const loginByIpAndLogin = createRateLimiter(
+    AUTH_RATE_LIMITS.loginByIpAndLogin
+  );
+  const loginByIp = createRateLimiter(AUTH_RATE_LIMITS.loginByIp);
+  const register = createRateLimiter(AUTH_RATE_LIMITS.register);
+  const resetRequest = createRateLimiter(AUTH_RATE_LIMITS.resetRequest);
 
   return {
     loginByIpAndLogin,

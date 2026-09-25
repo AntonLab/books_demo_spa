@@ -15,10 +15,6 @@ interface Stoppable {
   stop(): void;
 }
 
-interface ShutdownTimer {
-  unref(): unknown;
-}
-
 export interface ShutdownDeps {
   server: ShutdownServer;
   sequelize: { close(): Promise<void> };
@@ -26,19 +22,11 @@ export interface ShutdownDeps {
   logger: Logger;
   // process.exit, for the forced and the failed paths only.
   exit: (code: number) => void;
-  // setTimeout, injectable so a spec fires the deadline itself.
-  setTimer?: (callback: () => void, ms: number) => ShutdownTimer;
-  timeoutMs?: number;
 }
 
 export type Shutdown = (reason: string) => Promise<void>;
 
 export function createShutdown(deps: ShutdownDeps): Shutdown {
-  const timeoutMs = deps.timeoutMs ?? SHUTDOWN_TIMEOUT_MS;
-  const setTimer =
-    deps.setTimer ??
-    ((callback: () => void, ms: number): ShutdownTimer =>
-      setTimeout(callback, ms));
   let running: Promise<void> | undefined;
 
   const run = async (reason: string): Promise<void> => {
@@ -46,13 +34,13 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
 
     // unref()ed: the deadline must never be what keeps the process alive
     // once everything else has closed.
-    setTimer(() => {
+    setTimeout(() => {
       deps.server.closeAllConnections();
       deps.logger.error(
-        `Shutdown did not finish within ${timeoutMs} ms; forcing exit`
+        `Shutdown did not finish within ${SHUTDOWN_TIMEOUT_MS} ms; forcing exit`
       );
       deps.exit(1);
-    }, timeoutMs).unref();
+    }, SHUTDOWN_TIMEOUT_MS).unref();
 
     try {
       for (const stoppable of deps.stoppables) {

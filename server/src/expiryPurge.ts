@@ -11,8 +11,6 @@ export interface ExpiryPurgeDeps {
   sessionRepository: Pick<SessionRepository, 'deleteExpired'>;
   passwordResetRepository: Pick<PasswordResetRepository, 'deleteExpiredBefore'>;
   logger: Logger;
-  // Date.now, injectable for the spec.
-  now?: () => number;
 }
 
 interface ExpiryPurge {
@@ -23,7 +21,7 @@ interface ExpiryPurge {
 // their own expiry. Never rejects — a failure is logged and the next pass
 // tries again, so a database hiccup cannot take the process down.
 export async function purgeExpiredRows(deps: ExpiryPurgeDeps): Promise<void> {
-  const now = deps.now?.() ?? Date.now();
+  const now = Date.now();
   try {
     const sessions = await deps.sessionRepository.deleteExpired(new Date(now));
     const resetTokens = await deps.passwordResetRepository.deleteExpiredBefore(
