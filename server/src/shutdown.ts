@@ -1,4 +1,4 @@
-import type { Logger } from './logger.ts';
+import { logger } from './logger.ts';
 
 // How long a shutdown may take before it is forced.
 export const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -19,7 +19,6 @@ export interface ShutdownDeps {
   server: ShutdownServer;
   sequelize: { close(): Promise<void> };
   stoppables: readonly Stoppable[];
-  logger: Logger;
   // process.exit, for the forced and the failed paths only.
   exit: (code: number) => void;
 }
@@ -30,13 +29,13 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
   let running: Promise<void> | undefined;
 
   const run = async (reason: string): Promise<void> => {
-    deps.logger.info(`Shutting down (${reason})`);
+    logger.info(`Shutting down (${reason})`);
 
     // unref()ed: the deadline must never be what keeps the process alive
     // once everything else has closed.
     setTimeout(() => {
       deps.server.closeAllConnections();
-      deps.logger.error(
+      logger.error(
         `Shutdown did not finish within ${SHUTDOWN_TIMEOUT_MS} ms; forcing exit`
       );
       deps.exit(1);
@@ -59,9 +58,9 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
       await deps.sequelize.close();
       // process.exitCode is left alone: a clean shutdown ends with 0 (or with
       // whatever a failed listen already set), once nothing holds the loop.
-      deps.logger.info('Shutdown complete');
+      logger.info('Shutdown complete');
     } catch (error) {
-      deps.logger.error(
+      logger.error(
         'Shutdown failed',
         error instanceof Error ? error.message : String(error)
       );

@@ -1,4 +1,4 @@
-import type { Logger } from './logger.ts';
+import { logger } from './logger.ts';
 import {
   RESET_TOKEN_RETENTION_MS,
   type PasswordResetRepository,
@@ -10,7 +10,6 @@ export const EXPIRY_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 export interface ExpiryPurgeDeps {
   sessionRepository: Pick<SessionRepository, 'deleteExpired'>;
   passwordResetRepository: Pick<PasswordResetRepository, 'deleteExpiredBefore'>;
-  logger: Logger;
 }
 
 interface ExpiryPurge {
@@ -28,10 +27,10 @@ export async function purgeExpiredRows(deps: ExpiryPurgeDeps): Promise<void> {
       new Date(now - RESET_TOKEN_RETENTION_MS)
     );
     if (sessions > 0 || resetTokens > 0) {
-      deps.logger.info('Purged expired rows', { sessions, resetTokens });
+      logger.info('Purged expired rows', { sessions, resetTokens });
     }
   } catch (error) {
-    deps.logger.error(
+    logger.error(
       'Expiry purge failed',
       error instanceof Error ? error.message : String(error)
     );
