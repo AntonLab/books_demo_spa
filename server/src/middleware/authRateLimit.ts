@@ -29,27 +29,17 @@ export interface AuthRateLimits {
 }
 
 export function createAuthRateLimits(): AuthRateLimits {
-  const loginByIpAndLogin = createRateLimiter(
-    AUTH_RATE_LIMITS.loginByIpAndLogin
-  );
-  const loginByIp = createRateLimiter(AUTH_RATE_LIMITS.loginByIp);
-  const register = createRateLimiter(AUTH_RATE_LIMITS.register);
-  const resetRequest = createRateLimiter(AUTH_RATE_LIMITS.resetRequest);
+  const limiters = {
+    loginByIpAndLogin: createRateLimiter(AUTH_RATE_LIMITS.loginByIpAndLogin),
+    loginByIp: createRateLimiter(AUTH_RATE_LIMITS.loginByIp),
+    register: createRateLimiter(AUTH_RATE_LIMITS.register),
+    resetRequest: createRateLimiter(AUTH_RATE_LIMITS.resetRequest),
+  };
 
   return {
-    loginByIpAndLogin,
-    loginByIp,
-    register,
-    resetRequest,
+    ...limiters,
     stop() {
-      for (const limiter of [
-        loginByIpAndLogin,
-        loginByIp,
-        register,
-        resetRequest,
-      ]) {
-        limiter.stop();
-      }
+      for (const limiter of Object.values(limiters)) limiter.stop();
     },
   };
 }
