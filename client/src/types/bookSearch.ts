@@ -137,6 +137,9 @@ export const searchPath = (search: Partial<BookSearch>): string => {
   return query === '' ? '/search' : `/search?${query}`;
 };
 
+// The rest maps the search to the form and the request, and is useSearchPage's
+// alone: every other caller goes through parseBookSearch, toSearchParams or
+// searchPath. Tested through that hook.
 // Every Search starts at page 1.
 export const searchOf = (values: BookSearchFormValues): BookSearch => {
   const search: BookSearch = { sort: values.sort, page: 1 };
