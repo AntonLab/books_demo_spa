@@ -27,7 +27,8 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   request.
 - **A disabled query reports `isPending: true` forever** (with
   `fetchStatus: 'idle'`). `useBookSearch` is disabled while the URL's Genre is
-  unresolved or gone, which is why `SearchPage` renders no `CardList` then.
+  unresolved or gone, which is why `useSearchPage` reports a status with no
+  `books` then.
 - `useGenresWithBooks` (`?nonEmpty=true`, under the `genres` prefix) feeds the
   header menu and the search form; book forms and `AdminGenresPage` keep
   `useGenres`. A book write invalidates `genres` too, since a status change

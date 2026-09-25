@@ -9,6 +9,7 @@ import {
 import { useSortedBooks } from '@/queries/books';
 import type { BookSort } from 'shared';
 import { BOOK_SORTS } from 'shared';
+import { searchPath } from '@/types/bookSearch';
 import { BOOK_SORT_LABELS } from '@/types/book';
 import spacing from '@/theme/spacing.module.css';
 import styles from './MainPage.module.css';
@@ -44,7 +45,7 @@ const Section: FC<{ sort: BookSort }> = ({ sort }) => {
           {BOOK_SORT_LABELS[sort]}
         </Typography.Title>
         {data !== undefined && data.total > SECTION_SIZE && (
-          <Link to={`/search?sort=${sort}`}>Show more</Link>
+          <Link to={searchPath({ sort })}>Show more</Link>
         )}
       </Flex>
       <CardList

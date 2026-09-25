@@ -18,10 +18,11 @@ that read like mistakes and are not.
   only drive hover through rc-menu's open delay.
 - The signed-out "Log in" menu carries `disabledOverflow` for its own reason: a
   menu sized by its single item collapses into "…" in any environment.
-- Genre items are keyed by their target path (`/search?genre=<id>`) so a click
-  navigates to its key like every other item, and `selectedKeys` compares
-  `pathname + search`. The submenu is left out while Genres load, on error and
-  when there are none.
+- Genre items are keyed by their target path (`searchPath`, so
+  `/search?genre=<id>`) so a click navigates to its key like every other item,
+  and `selectedKeys` compares `pathname + search`: `searchPath` must keep
+  writing exactly what the search page's URL holds. The submenu is left out
+  while Genres load, on error and when there are none.
 - There is no Register item: the login modal's "Create an account" is the way
   in.
 
