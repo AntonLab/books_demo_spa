@@ -18,16 +18,9 @@ import { FilterOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { useBookSuggestions } from '@/queries/books';
-import { useSeriesSuggestions } from '@/queries/series';
+import { authorLabelOf, useSuggestions } from '@/queries/suggestions';
 import type { AuthorSummary, PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
-import { authorLabelOf } from '@/queries/suggestions';
-import {
-  matchingAuthors,
-  matchingTitles,
-  suggestionTermOf,
-} from '@/types/searchSuggestions';
 import {
   BOOK_SORTS,
   RANGE_ORDER,
@@ -91,12 +84,12 @@ const before =
   (day: Dayjs): boolean =>
     limit != null && day.isBefore(limit, 'day');
 
-// The server already matched the term, so antd must not filter again: it
+// The server already matched the text, so antd must not filter again: it
 // would drop a login matched by first name. Fires on typing only, never on a
 // pick.
-const suggestOn = (onType: (term: string) => void) => ({
+const suggestOn = (onType: (text: string) => void) => ({
   filterOption: false as const,
-  onSearch: (value: string) => onType(suggestionTermOf(value)),
+  onSearch: onType,
 });
 
 // What a pick hands back beside the text it fills in.
@@ -113,8 +106,8 @@ const pendingOf = (isFetching: boolean) =>
 
 // Picking a book opens it, so its option's value is its id and never lands
 // in the field; two books sharing a title stay two options.
-const bookOptions = (books: PublicBook[], term: string) =>
-  matchingTitles(books, term).map((book) => ({
+const bookOptions = (books: PublicBook[]) =>
+  books.map((book) => ({
     value: String(book.id),
     label: book.title,
   }));
@@ -122,17 +115,17 @@ const bookOptions = (books: PublicBook[], term: string) =>
 // The value is the title the field shows, so it must be unique.
 // ponytail: series sharing a title offer only the first; label them apart
 // (by author) if that ever happens.
-const seriesOptions = (series: PublicSeries[], term: string): IdOption[] => {
+const seriesOptions = (series: PublicSeries[]): IdOption[] => {
   const seen = new Set<string>();
-  return matchingTitles(series, term)
+  return series
     .filter((entry) => !seen.has(entry.title) && seen.add(entry.title))
     .map((entry) => ({ value: entry.title, id: entry.id }));
 };
 
 // Each author is offered by login: the server matches `author` against
 // login, first or last name one at a time, so "First Last" would find nothing.
-const authorOptions = (authors: AuthorSummary[], term: string): IdOption[] =>
-  matchingAuthors(authors, term).map((author) => ({
+const authorOptions = (authors: AuthorSummary[]): IdOption[] =>
+  authors.map((author) => ({
     value: author.login,
     label: authorLabelOf(author),
     id: author.id,
@@ -154,12 +147,12 @@ export const SearchForm: FC<SearchFormProps> = ({
   const updatedTo = Form.useWatch('updatedTo', form);
   // Set only by typing, not by the values the URL fills in, so opening a
   // search asks for no suggestions.
-  const [textTerm, setTextTerm] = useState('');
-  const [authorTerm, setAuthorTerm] = useState('');
-  const [seriesTerm, setSeriesTerm] = useState('');
-  const texts = useBookSuggestions('q', textTerm);
-  const byAuthor = useBookSuggestions('author', authorTerm);
-  const series = useSeriesSuggestions(seriesTerm);
+  const [typedText, setTypedText] = useState('');
+  const [typedAuthor, setTypedAuthor] = useState('');
+  const [typedSeries, setTypedSeries] = useState('');
+  const books = useSuggestions('books', typedText);
+  const authors = useSuggestions('authors', typedAuthor);
+  const series = useSuggestions('series', typedSeries);
 
   useEffect(() => {
     form.setFields(fieldErrors);
@@ -180,10 +173,10 @@ export const SearchForm: FC<SearchFormProps> = ({
               <AutoComplete
                 placeholder="Title or description"
                 allowClear
-                onClear={() => setTextTerm('')}
-                showSearch={suggestOn(setTextTerm)}
-                notFoundContent={pendingOf(texts.isFetching)}
-                options={bookOptions(texts.data?.items ?? [], textTerm)}
+                onClear={() => setTypedText('')}
+                showSearch={suggestOn(setTypedText)}
+                notFoundContent={pendingOf(books.isFetching)}
+                options={bookOptions(books.items)}
                 onSelect={(bookId) => void navigate(`/books/${bookId}`)}
               />
             </Form.Item>
@@ -195,18 +188,15 @@ export const SearchForm: FC<SearchFormProps> = ({
                 allowClear
                 // A clear is not a keystroke, so the typing handler misses it.
                 onClear={() => {
-                  setAuthorTerm('');
+                  setTypedAuthor('');
                   form.setFieldValue('authorId', undefined);
                 }}
-                showSearch={suggestOn((term) => {
-                  setAuthorTerm(term);
+                showSearch={suggestOn((text) => {
+                  setTypedAuthor(text);
                   form.setFieldValue('authorId', undefined);
                 })}
-                notFoundContent={pendingOf(byAuthor.isFetching)}
-                options={authorOptions(
-                  (byAuthor.data?.items ?? []).flatMap((book) => book.authors),
-                  authorTerm
-                )}
+                notFoundContent={pendingOf(authors.isFetching)}
+                options={authorOptions(authors.items)}
                 onSelect={(_login, option) =>
                   form.setFieldValue('authorId', option.id)
                 }
@@ -220,15 +210,15 @@ export const SearchForm: FC<SearchFormProps> = ({
                 placeholder="Series title"
                 allowClear
                 onClear={() => {
-                  setSeriesTerm('');
+                  setTypedSeries('');
                   form.setFieldValue('seriesId', undefined);
                 }}
-                showSearch={suggestOn((term) => {
-                  setSeriesTerm(term);
+                showSearch={suggestOn((text) => {
+                  setTypedSeries(text);
                   form.setFieldValue('seriesId', undefined);
                 })}
                 notFoundContent={pendingOf(series.isFetching)}
-                options={seriesOptions(series.data?.items ?? [], seriesTerm)}
+                options={seriesOptions(series.items)}
                 onSelect={(_title, option) =>
                   form.setFieldValue('seriesId', option.id)
                 }
