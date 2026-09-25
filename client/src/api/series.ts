@@ -7,6 +7,8 @@ export interface ListSeriesParams {
   // One Genre's series, as on the book list.
   genreId?: number;
   limit?: number;
+  // Title or description; the server refuses a blank one.
+  q?: string;
 }
 
 // `?userId=` naming the caller lists the series they co-author: the book form's
@@ -19,6 +21,7 @@ export const listSeries = (
   if (params.genreId !== undefined)
     search.set('genreId', String(params.genreId));
   if (params.limit !== undefined) search.set('limit', String(params.limit));
+  if (params.q) search.set('q', params.q);
 
   const query = search.toString();
   return request<ListResponse<PublicSeries>>(

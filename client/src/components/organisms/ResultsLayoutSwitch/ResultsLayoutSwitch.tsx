@@ -1,5 +1,5 @@
-import type { FC } from 'react';
-import { Segmented } from 'antd';
+import type { FC, ReactNode } from 'react';
+import { Button, Space, Tooltip } from 'antd';
 import type { ColProps } from 'antd';
 import { AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { TILE_COLUMNS } from '@/components/organisms/CardList/CardList';
@@ -16,6 +16,11 @@ export const RESULTS_COLUMNS: Record<ResultsLayout, ColProps> = {
   list: { span: 24 },
 };
 
+const OPTIONS: { value: ResultsLayout; label: string; icon: ReactNode }[] = [
+  { value: 'grid', label: 'Grid', icon: <AppstoreOutlined /> },
+  { value: 'list', label: 'List', icon: <UnorderedListOutlined /> },
+];
+
 // A Device preference, so the choice holds on every page that lists results
 // on this device.
 export const ResultsLayoutSwitch: FC = () => {
@@ -25,24 +30,20 @@ export const ResultsLayoutSwitch: FC = () => {
   const dispatch = useAppDispatch();
 
   return (
-    <Segmented<ResultsLayout>
-      aria-label="Results layout"
-      value={layout}
-      onChange={(value) =>
-        dispatch(devicePreferences.resultsLayoutChanged(value))
-      }
-      options={[
-        {
-          value: 'grid',
-          icon: <AppstoreOutlined aria-label="Grid" />,
-          tooltip: 'Grid',
-        },
-        {
-          value: 'list',
-          icon: <UnorderedListOutlined aria-label="List" />,
-          tooltip: 'List',
-        },
-      ]}
-    />
+    <Space.Compact role="group" aria-label="Results layout">
+      {OPTIONS.map(({ value, label, icon }) => (
+        <Tooltip key={value} title={label}>
+          <Button
+            aria-label={label}
+            aria-pressed={layout === value}
+            type={layout === value ? 'primary' : 'default'}
+            icon={icon}
+            onClick={() =>
+              dispatch(devicePreferences.resultsLayoutChanged(value))
+            }
+          />
+        </Tooltip>
+      ))}
+    </Space.Compact>
   );
 };

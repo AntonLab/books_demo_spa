@@ -17,10 +17,17 @@ describe('ResultsLayoutSwitch', () => {
       },
     });
 
-    expect(screen.getByRole('radio', { name: 'List' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
 
-    await userEvent.click(screen.getByRole('radio', { name: 'Grid' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Grid' }));
 
     expect(store.getState().devicePreferences.resultsLayout).toBe('grid');
+    expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
   });
 });

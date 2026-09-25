@@ -252,7 +252,7 @@ describe('SearchPage', () => {
     expect(await screen.findByText('Too big')).toBeInTheDocument();
   });
 
-  it('counts the filters on the closed form', async () => {
+  it('hides the closed form, counting its filters, and opens it on Filters', async () => {
     renderPage('/search?q=dragon&status=complete', {
       devicePreferences: {
         theme: 'light',
@@ -262,7 +262,14 @@ describe('SearchPage', () => {
       },
     });
 
-    expect(await screen.findByText('Filters (2)')).toBeInTheDocument();
+    await screen.findByText('Filters (2)');
+    expect(
+      screen.queryByRole('button', { name: 'Search' })
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filters (2)' }));
+
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
   });
 
   it('shows tiles by default and switches to a list the device keeps', async () => {
@@ -272,7 +279,7 @@ describe('SearchPage', () => {
     // A tile leaves the description out; the list's card shows it.
     expect(screen.queryByText('A tale of dragons')).toBeNull();
 
-    await userEvent.click(screen.getByRole('radio', { name: 'List' }));
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
 
     expect(screen.getByText('A tale of dragons')).toBeInTheDocument();
     expect(store.getState().devicePreferences.resultsLayout).toBe('list');

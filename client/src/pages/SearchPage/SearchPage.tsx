@@ -7,7 +7,10 @@ import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
 } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
-import { SearchForm } from '@/components/organisms/SearchForm/SearchForm';
+import {
+  SearchFiltersToggle,
+  SearchForm,
+} from '@/components/organisms/SearchForm/SearchForm';
 import { useBookSearch } from '@/queries/books';
 import { useGenresWithBooks } from '@/queries/genres';
 import { useAppSelector } from '@/store/hooks';
@@ -24,6 +27,7 @@ import spacing from '@/theme/spacing.module.css';
 import styles from './SearchPage.module.css';
 
 const GENRE_GONE = 'This genre no longer exists.';
+const FORM_ID = 'search-filters';
 
 const countOf = (total: number): string =>
   `${total} ${total === 1 ? 'book' : 'books'}`;
@@ -37,6 +41,9 @@ export const SearchPage: FC = () => {
   const genres = useGenresWithBooks();
   const layout = useAppSelector(
     (state) => state.devicePreferences.resultsLayout
+  );
+  const filtersExpanded = useAppSelector(
+    (state) => state.devicePreferences.searchFormExpanded
   );
 
   // A `genre` counts only once the list the select offers holds it: a
@@ -71,17 +78,45 @@ export const SearchPage: FC = () => {
   return (
     <>
       <Typography.Title level={2}>Search results</Typography.Title>
-      <SearchForm
-        // antd reads initialValues once, so the form remounts whenever the
-        // URL, or the Genre it resolves to, changes.
-        key={`${searchParams.toString()}|${genre?.id ?? ''}`}
-        initialValues={formValuesOf(search, genre?.id)}
-        genres={genres.data?.items ?? []}
-        filterCount={filterCount(search)}
-        fieldErrors={fieldErrors}
-        onSearch={(values) => setSearchParams(toSearchParams(searchOf(values)))}
-        onReset={() => setSearchParams({})}
-      />
+      <Flex
+        justify="space-between"
+        align="center"
+        gap="middle"
+        wrap
+        className={spacing.gapBelow}
+      >
+        <Typography.Text>
+          {genreBlocked
+            ? null
+            : books.isPending
+              ? 'Searching…'
+              : books.isError
+                ? 'Search failed'
+                : countOf(books.data.total)}
+        </Typography.Text>
+        <Flex gap="small">
+          <SearchFiltersToggle
+            controls={FORM_ID}
+            filterCount={filterCount(search)}
+          />
+          {!genreBlocked && <ResultsLayoutSwitch />}
+        </Flex>
+      </Flex>
+      <div hidden={!filtersExpanded}>
+        <SearchForm
+          // antd reads initialValues once, so the form remounts whenever the
+          // URL, or the Genre it resolves to, changes.
+          key={`${searchParams.toString()}|${genre?.id ?? ''}`}
+          id={FORM_ID}
+          initialValues={formValuesOf(search, genre?.id)}
+          genres={genres.data?.items ?? []}
+          fieldErrors={fieldErrors}
+          onSearch={(values) =>
+            setSearchParams(toSearchParams(searchOf(values)))
+          }
+          onReset={() => setSearchParams({})}
+        />
+      </div>
 
       {genreBlocked ? (
         genres.isPending ? (
@@ -93,22 +128,6 @@ export const SearchPage: FC = () => {
         )
       ) : (
         <>
-          <Flex
-            justify="space-between"
-            align="center"
-            gap="middle"
-            wrap
-            className={spacing.gapBelow}
-          >
-            <Typography.Text>
-              {books.isPending
-                ? 'Searching…'
-                : books.isError
-                  ? 'Search failed'
-                  : countOf(books.data.total)}
-            </Typography.Text>
-            <ResultsLayoutSwitch />
-          </Flex>
           <CardList
             noun="books"
             items={books.data?.items ?? []}
