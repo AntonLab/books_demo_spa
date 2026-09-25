@@ -37,3 +37,13 @@ export type CommentWithAuthor = Wire<Shared.CommentWithAuthor>;
 export type PublicNotification = Wire<Shared.PublicNotification>;
 
 export type NotificationList = Wire<Shared.NotificationList>;
+
+export type PublicLike = Wire<Shared.PublicLike>;
+
+// No userId: the server takes the liker from the session cookie. `isLike`
+// separates a like from a dislike; this UI only ever sends true.
+export interface CreateLikePayload {
+  bookId?: number;
+  commentId?: number;
+  isLike: boolean;
+}

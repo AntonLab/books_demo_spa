@@ -19,8 +19,7 @@ updates:
     # named beside it support the new major.
     ignore:
       # TypeScript 7 is the native compiler, without the JavaScript API that
-      # typescript-eslint (typescript <6.1.0) and fork-ts-checker-webpack-plugin
-      # load.
+      # typescript-eslint (typescript <6.1.0) loads.
       - dependency-name: typescript
         versions: ['>=7']
       # ESLint 10 is past the range eslint-plugin-react and

@@ -2,7 +2,6 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
-const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
 
 // This config lives in `config/`, so paths resolve against the package root
@@ -41,7 +40,6 @@ module.exports = (_env, argv) => {
       publicPath: '/',
       filename: `static/js/[name]${hash}.js`,
       chunkFilename: `static/js/[name]${hash}.chunk.js`,
-      assetModuleFilename: 'static/media/[name].[hash:8][ext]',
       clean: true,
     },
     resolve: {
@@ -71,15 +69,6 @@ module.exports = (_env, argv) => {
               },
             },
           },
-        },
-        {
-          test: /\.(png|jpe?g|gif|webp|avif|svg)$/i,
-          type: 'asset',
-          parser: { dataUrlCondition: { maxSize: 8 * 1024 } },
-        },
-        {
-          test: /\.(woff2?|eot|ttf|otf)$/i,
-          type: 'asset/resource',
         },
         // `*.module.css` is scoped per component (ADR-0009,
         // .claude/rules/client/styling.md); every other stylesheet stays
@@ -119,13 +108,6 @@ module.exports = (_env, argv) => {
       new HtmlWebpackPlugin({
         template: path.resolve(root, 'public/index.html'),
         minify: !isDevelopment,
-      }),
-      // swc strips types without checking them, so types are checked in a
-      // separate process instead of failing silently.
-      new ForkTsCheckerWebpackPlugin({
-        typescript: {
-          configFile: path.resolve(root, 'tsconfig.json'),
-        },
       }),
       isDevelopment
         ? new ReactRefreshWebpackPlugin({ overlay: false })

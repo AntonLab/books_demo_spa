@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { CreateLikePayload, PublicLike } from '../types/like';
+import type { CreateLikePayload, PublicLike } from '../types/api';
 
 export const createLike = (payload: CreateLikePayload): Promise<PublicLike> => {
   return request<PublicLike>('/likes', { method: 'POST', body: payload });
