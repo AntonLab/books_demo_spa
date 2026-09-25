@@ -26,6 +26,7 @@ import {
   type PublicGenre,
   isModeratorRole,
 } from 'shared';
+import spacing from '@/theme/spacing.module.css';
 import styles from './AdminGenresPage.module.css';
 
 // The one refusal the fields explain themselves, rather than an Alert over the
@@ -86,7 +87,7 @@ const GenreManager: FC = () => {
         <Alert
           type="error"
           title={create.error.message}
-          className={styles.error}
+          className={spacing.gapBelow}
         />
       )}
 

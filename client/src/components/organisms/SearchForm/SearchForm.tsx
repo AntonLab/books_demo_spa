@@ -26,6 +26,7 @@ import type {
   SearchFieldError,
 } from '@/types/bookSearch';
 import type { PublicGenre } from 'shared';
+import spacing from '@/theme/spacing.module.css';
 import styles from './SearchForm.module.css';
 
 interface SearchFormProps {
@@ -84,7 +85,7 @@ export const SearchForm: FC<SearchFormProps> = ({
 
   return (
     <Collapse
-      className={styles.collapse}
+      className={spacing.gapBelow}
       activeKey={expanded ? ['filters'] : []}
       onChange={(keys) =>
         dispatch(devicePreferences.searchFormExpandedChanged(keys.length > 0))
