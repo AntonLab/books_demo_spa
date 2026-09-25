@@ -42,9 +42,11 @@ half. Nothing here lives in the permission table.
 
 ## Co-authors (ADR-0005)
 
-Every rule holds for books and for series. Each has its own controller; the
-repository rules are written once in `repositories/coAuthors.ts`, which each
-repository hands an adapter over its own credit table.
+Every rule holds for books and for series, and each is written once: the
+handlers in `controllers/creditHandlers.ts` (both controllers spread them in),
+who may act in `controllers/coAuthorGuard.ts`, and the repository rules in
+`repositories/coAuthors.ts`, which each repository hands an adapter over its
+own credit table.
 
 - **Adding** rides on `× update` and then requires the caller to be credited,
   which a Moderator never is: Moderators edit or delete any work but never
@@ -52,9 +54,11 @@ repository hands an adapter over its own credit table.
   missing account (404), one already credited (409, from the unique index, not
   a lookup).
 - **Removing** sits behind `requireAuth`, not `requirePermission`, so a
-  Co-author who switched to `user` (`none` on books) can still leave. Anyone
-  may remove themselves; removing someone else needs a scope of exactly `own`
-  and a credit, so `none` and `any` are both 403.
+  Co-author who switched to `user` (`none` on books) can still leave.
+  `assertMayRemoveCredit` holds the rule: anyone may remove themselves (no
+  lookup; the repository answers 404/409); removing someone else needs a scope
+  of exactly `own` (else 403 before any lookup, so `none` and `any` are both
+  refused) and a credit.
 - **A work always keeps one Co-author.** An uncredited account is 404 (checked
   first, so a stranger learns nothing), the last one is 409. The count and the
   delete run under `SELECT … FOR UPDATE` on the work row, or two Co-authors

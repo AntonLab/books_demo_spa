@@ -5,16 +5,11 @@ import {
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
-import { scopeFor } from '../permissions/permissionStore.ts';
-import {
-  assertCoAuthor,
-  assertMayChange,
-  type CoAuthorTarget,
-} from './coAuthorGuard.ts';
+import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import { creditHandlers } from './creditHandlers.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
-  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   UnsupportedMediaTypeError,
@@ -24,7 +19,6 @@ import type {
   ListBooksQuery,
   UpdateBookInput,
 } from '../types/book.ts';
-import type { AddCoAuthorInput } from '../types/params.ts';
 import type { ReorderSeriesBooksInput } from '../types/series.ts';
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
@@ -125,38 +119,12 @@ export function createBookController(repository: BookRepository) {
       res.status(204).end();
     },
 
-    addCoAuthor: async (req, res) => {
-      const { id } = validatedParams<{ id: number }>(req);
-      const { userId } = validatedBody<AddCoAuthorInput>(req);
-      await assertCoAuthor(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
-
-      const book = await repository.addCoAuthor(id, userId, actorOf(req));
-      if (!book) throw new NotFoundError('Book', id);
-      res.json(book);
-    },
-
-    // Mounted behind requireAuth alone, so the matrix is consulted here. Leaving
-    // is always allowed to a credited account, whatever its Role. Removing
-    // someone else takes a Co-author holding `own` on books: `none` is an
-    // account that is no longer an author, and `any` is a Moderator, who may
-    // edit or delete a book but never change who is credited on it.
-    removeCoAuthor: async (req, res) => {
-      if (!req.user) throw new UnauthorizedError();
-      const { id, userId } = validatedParams<{ id: number; userId: number }>(
-        req
-      );
-
-      if (userId !== req.user.id) {
-        if (scopeFor(req.user.role, 'books', 'update') !== 'own') {
-          throw new ForbiddenError('Only a co-author may remove a co-author');
-        }
-        await assertCoAuthor(req, bookTarget(id), MAY_ONLY_CHANGE_OWN);
-      }
-
-      const book = await repository.removeCoAuthor(id, userId, actorOf(req));
-      if (!book) throw new NotFoundError('Book', id);
-      res.json(book);
-    },
+    ...creditHandlers({
+      target: bookTarget,
+      module: 'books',
+      refusal: MAY_ONLY_CHANGE_OWN,
+      repository,
+    }),
 
     // The series editor's list, mounted behind `series × update`: it names the
     // Draft books filed in the series, which only the people who may reorder
