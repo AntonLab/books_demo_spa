@@ -49,8 +49,9 @@ interface SearchFormProps {
   onReset: () => void;
 }
 
-// One column on a phone, two on a tablet, four from `lg`.
-const FIELD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 6 };
+// One column on a phone, two on a tablet, three from `lg`, four from `xl`:
+// four at `lg` leave a date range's pickers too narrow for a whole day.
+const FIELD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8, xl: 6 };
 
 // The server trims before it counts, so the rule does too.
 const textRule: FormRule = {
@@ -283,46 +284,64 @@ export const SearchForm: FC<SearchFormProps> = ({
               />
             </Form.Item>
           </Col>
+          {/* One cell per range. Its pickers sit `small` (8px) apart, not
+              the Row's 16px gutter: at four columns that leaves a picker too
+              narrow for a whole YYYY-MM-DD. The inner items are
+              `noStyle`, so the outer one shows their errors under the pair,
+              and each picker carries its own name, since the label covers
+              both. */}
           <Col {...FIELD_COLUMNS}>
-            <Form.Item
-              name="releasedFrom"
-              label="Released from"
-              dependencies={['releasedTo']}
-              rules={[startsBefore('releasedTo')]}
-            >
-              <DatePicker
-                className={styles.picker}
-                disabledDate={after(releasedTo)}
-              />
+            <Form.Item label="Released">
+              <Flex gap="small">
+                <Form.Item
+                  name="releasedFrom"
+                  noStyle
+                  dependencies={['releasedTo']}
+                  rules={[startsBefore('releasedTo')]}
+                >
+                  <DatePicker
+                    aria-label="Released from"
+                    placeholder="From"
+                    className={styles.picker}
+                    disabledDate={after(releasedTo)}
+                  />
+                </Form.Item>
+                <Form.Item name="releasedTo" noStyle>
+                  <DatePicker
+                    aria-label="Released to"
+                    placeholder="To"
+                    className={styles.picker}
+                    disabledDate={before(releasedFrom)}
+                  />
+                </Form.Item>
+              </Flex>
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>
-            <Form.Item name="releasedTo" label="Released to">
-              <DatePicker
-                className={styles.picker}
-                disabledDate={before(releasedFrom)}
-              />
-            </Form.Item>
-          </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item
-              name="updatedFrom"
-              label="Updated from"
-              dependencies={['updatedTo']}
-              rules={[startsBefore('updatedTo')]}
-            >
-              <DatePicker
-                className={styles.picker}
-                disabledDate={after(updatedTo)}
-              />
-            </Form.Item>
-          </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item name="updatedTo" label="Updated to">
-              <DatePicker
-                className={styles.picker}
-                disabledDate={before(updatedFrom)}
-              />
+            <Form.Item label="Updated">
+              <Flex gap="small">
+                <Form.Item
+                  name="updatedFrom"
+                  noStyle
+                  dependencies={['updatedTo']}
+                  rules={[startsBefore('updatedTo')]}
+                >
+                  <DatePicker
+                    aria-label="Updated from"
+                    placeholder="From"
+                    className={styles.picker}
+                    disabledDate={after(updatedTo)}
+                  />
+                </Form.Item>
+                <Form.Item name="updatedTo" noStyle>
+                  <DatePicker
+                    aria-label="Updated to"
+                    placeholder="To"
+                    className={styles.picker}
+                    disabledDate={before(updatedFrom)}
+                  />
+                </Form.Item>
+              </Flex>
             </Form.Item>
           </Col>
         </Row>
