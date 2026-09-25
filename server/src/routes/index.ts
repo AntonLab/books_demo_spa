@@ -11,7 +11,6 @@ import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
-import { createUserRoleRoutes } from './userRoleRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
 export interface RouteDeps extends Repositories {
@@ -28,12 +27,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   // each one builds a requirePermission (authRoutes a requireAuth), which
   // needs the session and user repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
-  // The role routes mount first for readability — the narrower path reads
-  // first. The order is not load-bearing: `/:id` matches exactly one path
-  // segment, so it can never match `/:id/role`, and the two routers do not
-  // collide whichever is mounted first.
   router.use('/authors', createAuthorRoutes(deps));
-  router.use('/users', createUserRoleRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
   router.use('/books', createBookRoutes(deps));

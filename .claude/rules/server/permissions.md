@@ -6,7 +6,6 @@ paths:
   - 'server/src/models/Permission.ts'
   - 'server/src/controllers/userController.ts'
   - 'server/src/routes/userRoutes.ts'
-  - 'server/src/routes/userRoleRoutes.ts'
 ---
 
 # Roles and the permission matrix
