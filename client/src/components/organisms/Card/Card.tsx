@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import type { PublicGenre } from 'shared';
 import type { AuthorSummary } from '@/types/api';
+import { searchPath } from '@/types/bookSearch';
 import spacing from '@/theme/spacing.module.css';
 import styles from './Card.module.css';
 
@@ -114,7 +115,9 @@ export const Card: FC<CardProps> = ({
 
           {!tile && genre !== null && (
             <div className={styles.line}>
-              <Link to={`/search?genre=${genre.id}`}>{genre.name}</Link>
+              <Link to={searchPath({ genre: String(genre.id) })}>
+                {genre.name}
+              </Link>
             </div>
           )}
 

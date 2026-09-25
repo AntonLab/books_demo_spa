@@ -30,7 +30,7 @@ export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
 // The search page's one query: every filter, the page and its size, straight
 // from the URL. `enabled` is false while the URL's Genre is unresolved or
 // gone, so no book is asked for then; a disabled query reports isPending
-// forever, which is why SearchPage renders no CardList in that state.
+// forever, which is why useSearchPage hands the page no books in that state.
 export const useBookSearch = (params: ListBooksParams, enabled: boolean) => {
   return useQuery({
     queryKey: queryKeys.books(params),
