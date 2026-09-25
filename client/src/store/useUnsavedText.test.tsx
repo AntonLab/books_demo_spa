@@ -186,4 +186,31 @@ describe('useSignOut', () => {
 
     expect(store.getState().unsavedText).toEqual({ accountId: 1, entries });
   });
+
+  it('discards every entry even when the caller unmounts before sign out lands', async () => {
+    let land: () => void = () => {};
+    mockedAuth.logout.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          land = () => resolve();
+        })
+    );
+    const { result, store, unmount } = renderHookWithProviders(
+      () => useSignOut(),
+      { queryClient: withSession(account(1)), preloadedState: ownedBy(1) }
+    );
+
+    act(() => result.current());
+    await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await act(async () => land());
+
+    await waitFor(() =>
+      expect(store.getState().unsavedText).toEqual({
+        accountId: null,
+        entries: {},
+      })
+    );
+  });
 });

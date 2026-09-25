@@ -65,7 +65,8 @@ and that the server never sees: Unsaved text and Device preferences
   of "no longer a Co-author" drops the Account from the Book, not the
   session's id.
 - **Select narrowly.** A selector that builds a new array or object on each
-  call re-renders on every dispatch: select `entries` or one entry and derive
-  in the component.
+  call re-renders on every dispatch: `useUnsavedText` selects one entry and
+  `useOwnUnsavedEntries` selects the map, and components derive from what the
+  hooks return instead of selecting themselves.
 - The Publication time pickers are not part of an entry: a stale moment could
   publish a Chapter when nobody means it any more.
