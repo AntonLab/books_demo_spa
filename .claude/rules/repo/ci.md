@@ -24,7 +24,7 @@ merges into. Both run the same automation.
 - `dependabot.yml` — weekly npm and Actions updates, minor and patch grouped per
   ecosystem, majors one PR each, no labels (the labels are the triage roles).
   It ignores TypeScript 7 (a native compiler without the JavaScript API
-  typescript-eslint and fork-ts-checker-webpack-plugin load) and ESLint /
+  typescript-eslint loads) and ESLint /
   `@eslint/js` 10 (past what eslint-plugin-react and eslint-plugin-jsx-a11y
   support). Drop an entry once those catch up, then take the major by hand. It
   also holds `@types/node` to the `.nvmrc` major.
