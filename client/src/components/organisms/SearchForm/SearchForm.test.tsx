@@ -233,6 +233,21 @@ describe('SearchForm', () => {
     );
   });
 
+  it('clears a picked author, id and all', async () => {
+    const { onSearch } = renderForm({
+      initialValues: { author: 'annlee', authorId: 3, sort: 'popular' },
+    });
+    const authorField = screen.getByLabelText('Author').closest('.ant-select');
+
+    await userEvent.click(authorField!.querySelector('.ant-select-clear')!);
+
+    expect(screen.getByLabelText('Author')).toHaveValue('');
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+    const [values] = onSearch.mock.lastCall as [Record<string, unknown>];
+    expect(values.author ?? '').toBe('');
+    expect(values.authorId).toBeUndefined();
+  });
+
   it('offers the genres it is given', async () => {
     const { onSearch } = renderForm();
 
