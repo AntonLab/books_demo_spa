@@ -45,12 +45,12 @@ function fakes(
       },
     },
     logger,
-    now: () => NOW,
   };
   return { deps, lines, sessionMoments, resetCutoffs };
 }
 
-test('deletes the sessions expired by now and the reset tokens 30 days past their expiry', async () => {
+test('deletes the sessions expired by now and the reset tokens 30 days past their expiry', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const { deps, sessionMoments, resetCutoffs } = fakes();
 
   await purgeExpiredRows(deps);

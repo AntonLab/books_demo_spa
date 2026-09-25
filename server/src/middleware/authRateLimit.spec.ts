@@ -1,4 +1,4 @@
-import test from 'node:test';
+import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -16,10 +16,6 @@ const OTHER_CLIENT = '203.0.113.20';
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-interface Clock {
-  now: number;
-}
-
 interface Client {
   // POST /login; the stand-in handler answers with `status`.
   login(login: string, status: number, from?: string): Promise<Response>;
@@ -31,12 +27,19 @@ interface Client {
 // A stand-in for the auth routes: /login answers whatever status the body
 // asks for, so a test decides which attempts fail; /register answers 201.
 // One trusted proxy hop, so a test picks the client address through
-// X-Forwarded-For. The limits run on a clock the test moves by hand.
+// X-Forwarded-For. Date is mocked from 0, and `clock.now = ms` moves it by
+// hand; timers stay real, so the sockets and fetch run as usual.
 async function withLimitedApp(
-  fn: (client: Client, clock: Clock) => Promise<void>
+  t: TestContext,
+  fn: (client: Client, clock: { now: number }) => Promise<void>
 ): Promise<void> {
-  const clock: Clock = { now: 0 };
-  const limits = createAuthRateLimits(() => clock.now);
+  t.mock.timers.enable({ apis: ['Date'] });
+  const clock = {
+    set now(ms: number) {
+      t.mock.timers.setTime(ms);
+    },
+  };
+  const limits = createAuthRateLimits();
   let handled = 0;
 
   const app = express();
@@ -203,8 +206,8 @@ test('the budgets are 10 and 50 failed logins per 15 minutes, 5 registrations an
   });
 });
 
-test('the 11th failed login for one name from one address is refused before the handler runs', async () => {
-  await withLimitedApp(async (client) => {
+test('the 11th failed login for one name from one address is refused before the handler runs', async (t) => {
+  await withLimitedApp(t, async (client) => {
     await failTimes(client, 'bob', 10);
 
     const refused = await client.login('bob', 200);
@@ -214,8 +217,8 @@ test('the 11th failed login for one name from one address is refused before the 
   });
 });
 
-test('of the answers, only a 401 spends the login budget', async () => {
-  await withLimitedApp(async (client) => {
+test('of the answers, only a 401 spends the login budget', async (t) => {
+  await withLimitedApp(t, async (client) => {
     for (let attempt = 0; attempt < 15; attempt += 1) {
       assert.equal((await client.login('bob', 400)).status, 400);
       assert.equal((await client.login('bob', 403)).status, 403);
@@ -226,8 +229,8 @@ test('of the answers, only a 401 spends the login budget', async () => {
   });
 });
 
-test('a successful login clears that name’s budget', async () => {
-  await withLimitedApp(async (client) => {
+test('a successful login clears that name’s budget', async (t) => {
+  await withLimitedApp(t, async (client) => {
     await failTimes(client, 'bob', 9);
     assert.equal((await client.login('bob', 200)).status, 200);
 
@@ -236,8 +239,8 @@ test('a successful login clears that name’s budget', async () => {
   });
 });
 
-test('the 51st failure from one address is refused whatever the name, and a success does not clear it', async () => {
-  await withLimitedApp(async (client) => {
+test('the 51st failure from one address is refused whatever the name, and a success does not clear it', async (t) => {
+  await withLimitedApp(t, async (client) => {
     for (const name of ['a', 'b', 'c', 'd']) {
       await failTimes(client, name, 10);
     }
@@ -251,24 +254,24 @@ test('the 51st failure from one address is refused whatever the name, and a succ
   });
 });
 
-test('names are compared trimmed and lower-cased', async () => {
-  await withLimitedApp(async (client) => {
+test('names are compared trimmed and lower-cased', async (t) => {
+  await withLimitedApp(t, async (client) => {
     await failTimes(client, 'Bob', 10);
 
     assert.equal((await client.login('  bob ', 401)).status, 429);
   });
 });
 
-test('each address keeps its own budget', async () => {
-  await withLimitedApp(async (client) => {
+test('each address keeps its own budget', async (t) => {
+  await withLimitedApp(t, async (client) => {
     await failTimes(client, 'bob', 10);
 
     assert.equal((await client.login('bob', 401, OTHER_CLIENT)).status, 401);
   });
 });
 
-test('a refusal says how long to wait: Retry-After in whole seconds, rounded up, the message in minutes', async () => {
-  await withLimitedApp(async (client, clock) => {
+test('a refusal says how long to wait: Retry-After in whole seconds, rounded up, the message in minutes', async (t) => {
+  await withLimitedApp(t, async (client, clock) => {
     await failTimes(client, 'bob', 10);
 
     // 599,999 ms of the window are left.
@@ -277,8 +280,8 @@ test('a refusal says how long to wait: Retry-After in whole seconds, rounded up,
   });
 });
 
-test('the message never promises less than a minute, and one minute is singular', async () => {
-  await withLimitedApp(async (client, clock) => {
+test('the message never promises less than a minute, and one minute is singular', async (t) => {
+  await withLimitedApp(t, async (client, clock) => {
     await failTimes(client, 'bob', 10);
 
     // One second of the window is left.
@@ -287,8 +290,8 @@ test('the message never promises less than a minute, and one minute is singular'
   });
 });
 
-test('when both login budgets refuse, the refusal names the longer wait', async () => {
-  await withLimitedApp(async (client, clock) => {
+test('when both login budgets refuse, the refusal names the longer wait', async (t) => {
+  await withLimitedApp(t, async (client, clock) => {
     // The address's window opens at 0 and bob's at 10 minutes. Once the
     // address's window has closed, 50 fresh failures open a new one at 15
     // minutes, so the address's window now ends after bob's: bob has 10
@@ -307,8 +310,8 @@ test('when both login budgets refuse, the refusal names the longer wait', async 
   });
 });
 
-test('the budget returns when the window ends', async () => {
-  await withLimitedApp(async (client, clock) => {
+test('the budget returns when the window ends', async (t) => {
+  await withLimitedApp(t, async (client, clock) => {
     await failTimes(client, 'bob', 10);
 
     clock.now = FIFTEEN_MINUTES_MS - 1;
@@ -318,8 +321,8 @@ test('the budget returns when the window ends', async () => {
   });
 });
 
-test('every registration counts, and the sixth in an hour is refused', async () => {
-  await withLimitedApp(async (client, clock) => {
+test('every registration counts, and the sixth in an hour is refused', async (t) => {
+  await withLimitedApp(t, async (client, clock) => {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       assert.equal((await client.register()).status, 201);
     }
@@ -333,8 +336,8 @@ test('every registration counts, and the sixth in an hour is refused', async () 
   });
 });
 
-test('a non-401 outcome — malformed or successful — does not consume the per-IP budget', async () => {
-  await withLimitedApp(async (client) => {
+test('a non-401 outcome — malformed or successful — does not consume the per-IP budget', async (t) => {
+  await withLimitedApp(t, async (client) => {
     // 30 malformed attempts and 30 successful logins across different names
     // from the same address: 60 requests, more than the 50-per-IP budget,
     // none of them a failed login.
