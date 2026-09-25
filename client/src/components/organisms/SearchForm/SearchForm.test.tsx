@@ -2,7 +2,7 @@ import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
-import { SearchForm } from './SearchForm';
+import { SearchFiltersToggle, SearchForm } from './SearchForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const genres = [
@@ -10,32 +10,31 @@ const genres = [
   { id: 5, name: 'Hard SF' },
 ];
 
+const preferences = (expanded: boolean) => ({
+  devicePreferences: {
+    theme: 'light' as const,
+    resultsLayout: 'grid' as const,
+    searchFormExpanded: expanded,
+    reading: initialReadingPreferences,
+  },
+});
+
 const renderForm = (
-  overrides: Partial<Parameters<typeof SearchForm>[0]> = {},
-  expanded = true
+  overrides: Partial<Parameters<typeof SearchForm>[0]> = {}
 ) => {
   const onSearch = jest.fn();
   const onReset = jest.fn();
   const view = renderWithProviders(
     <SearchForm
+      id="filters"
       initialValues={{ sort: 'popular' }}
       genres={genres}
-      filterCount={0}
       fieldErrors={[]}
       onSearch={onSearch}
       onReset={onReset}
       {...overrides}
     />,
-    {
-      preloadedState: {
-        devicePreferences: {
-          theme: 'light',
-          resultsLayout: 'grid',
-          searchFormExpanded: expanded,
-          reading: initialReadingPreferences,
-        },
-      },
-    }
+    { preloadedState: preferences(true) }
   );
   return { ...view, onSearch, onReset };
 };
@@ -116,13 +115,29 @@ describe('SearchForm', () => {
 
     expect(await screen.findByText('Too big')).toBeInTheDocument();
   });
+});
 
-  it('counts the filters on its header while closed, and remembers being opened', async () => {
-    const { store } = renderForm({ filterCount: 3 }, false);
+describe('SearchFiltersToggle', () => {
+  it('counts the filters while closed, and remembers being opened and closed', async () => {
+    const { store } = renderWithProviders(
+      <SearchFiltersToggle controls="filters" filterCount={3} />,
+      { preloadedState: preferences(false) }
+    );
 
-    await userEvent.click(screen.getByText('Filters (3)'));
+    const toggle = screen.getByRole('button', { name: 'Filters (3)' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'filters');
+
+    await userEvent.click(toggle);
 
     expect(store.getState().devicePreferences.searchFormExpanded).toBe(true);
-    expect(screen.getByText('Filters')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
+
+    expect(store.getState().devicePreferences.searchFormExpanded).toBe(false);
   });
 });
