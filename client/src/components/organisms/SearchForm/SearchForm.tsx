@@ -206,6 +206,8 @@ export const SearchForm: FC<SearchFormProps> = ({
             <Form.Item name="q" label="Text" rules={[textRule]}>
               <AutoComplete
                 placeholder="Title or description"
+                allowClear
+                onClear={() => setTextTerm('')}
                 showSearch={suggestOn(setTextTerm)}
                 notFoundContent={pendingOf(texts.isFetching)}
                 options={bookOptions(texts.data?.items ?? [], textTerm)}
@@ -217,6 +219,12 @@ export const SearchForm: FC<SearchFormProps> = ({
             <Form.Item name="author" label="Author" rules={[textRule]}>
               <AutoComplete<string, IdOption>
                 placeholder="Login or name"
+                allowClear
+                // A clear is not a keystroke, so the typing handler misses it.
+                onClear={() => {
+                  setAuthorTerm('');
+                  form.setFieldValue('authorId', undefined);
+                }}
                 showSearch={suggestOn((term) => {
                   setAuthorTerm(term);
                   form.setFieldValue('authorId', undefined);
@@ -237,6 +245,11 @@ export const SearchForm: FC<SearchFormProps> = ({
             <Form.Item name="seriesTitle" label="Series" rules={[textRule]}>
               <AutoComplete<string, IdOption>
                 placeholder="Series title"
+                allowClear
+                onClear={() => {
+                  setSeriesTerm('');
+                  form.setFieldValue('seriesId', undefined);
+                }}
                 showSearch={suggestOn((term) => {
                   setSeriesTerm(term);
                   form.setFieldValue('seriesId', undefined);
