@@ -15,7 +15,7 @@ import { queryKeys } from './keys';
 import { createTestQueryClient } from '../test/queryClient';
 import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
-import type { PublicUser } from '../types/user';
+import type { PublicUser } from '../types/api';
 
 jest.mock('../api/auth');
 

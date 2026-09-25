@@ -11,7 +11,7 @@ import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import type { BookDetail } from '@/types/book';
 import type { RootState } from '@/store';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');

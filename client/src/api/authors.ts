@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { AuthorSummary } from '../types/user';
+import type { AuthorSummary } from '../types/api';
 
 // The Co-author picker's search: accounts holding the author Role, never with
 // an email. A blank term is not sent — the server rejects an empty `q` — and

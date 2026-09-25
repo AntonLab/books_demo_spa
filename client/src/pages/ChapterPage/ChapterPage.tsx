@@ -12,12 +12,11 @@ import {
 } from 'antd';
 import type { ThemeConfig } from 'antd';
 import { useNavigate, useParams } from 'react-router';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowLeft,
-  faArrowRight,
-  faListUl,
-} from '@fortawesome/free-solid-svg-icons';
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  UnorderedListOutlined,
+} from '@ant-design/icons';
 import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
 import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
 import { useBook } from '@/queries/books';
@@ -56,11 +55,8 @@ interface ChapterArrowProps {
 const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
   const navigate = useNavigate();
   const label = direction === 'previous' ? 'Previous chapter' : 'Next chapter';
-  const icon = (
-    <FontAwesomeIcon
-      icon={direction === 'previous' ? faArrowLeft : faArrowRight}
-    />
-  );
+  const icon =
+    direction === 'previous' ? <ArrowLeftOutlined /> : <ArrowRightOutlined />;
 
   if (target === undefined) {
     return <Button aria-label={label} icon={icon} size={size} disabled />;
@@ -115,7 +111,7 @@ export const ChapterPage: FC = () => {
         <ChapterArrow direction="previous" target={previous} />
         <Flex gap={token.marginXS}>
           <Button
-            icon={<FontAwesomeIcon icon={faListUl} />}
+            icon={<UnorderedListOutlined aria-hidden />}
             onClick={() => setContentsOpen(true)}
           >
             Contents

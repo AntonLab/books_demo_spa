@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import { Card } from '@/components/organisms/Card/Card';
-import type { PublicSeries } from '@/types/series';
+import type { PublicSeries } from '@/types/api';
 
 interface SeriesCardProps {
   series: PublicSeries;

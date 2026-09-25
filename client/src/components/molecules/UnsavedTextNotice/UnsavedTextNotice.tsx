@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Alert, Button, Flex, Input } from 'antd';
-import styles from './UnsavedTextNotice.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface UnsavedTextNoticeProps {
   title?: string;
@@ -33,7 +33,7 @@ export const UnsavedTextNotice: FC<UnsavedTextNoticeProps> = ({
   return (
     <Alert
       type="warning"
-      className={styles.notice}
+      className={spacing.gapBelow}
       title="Where this text was typed is gone. Copy it before you discard it."
       description={
         <Input.TextArea

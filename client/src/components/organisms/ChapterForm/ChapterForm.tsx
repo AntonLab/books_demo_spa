@@ -8,7 +8,7 @@ import {
 import type { PublishedAtPayload } from '@/api/chapters';
 import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';
-import styles from './ChapterForm.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 export interface ChapterFormValues {
   title: string;
@@ -101,7 +101,7 @@ export const ChapterForm: FC<ChapterFormProps> = ({
   return (
     <>
       {error !== null && (
-        <Alert type="error" title={error} className={styles.error} />
+        <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
       <Form<FieldValues>

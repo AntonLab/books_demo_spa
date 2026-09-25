@@ -4,7 +4,7 @@ import { Alert, Button, Form, Modal, Result } from 'antd';
 import { useNavigate } from 'react-router';
 import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
 import { useConfirmReset } from '@/queries/auth';
-import styles from './ResetConfirmModal.module.css';
+import spacing from '@/theme/spacing.module.css';
 
 interface ResetConfirmValues {
   password: string;
@@ -58,7 +58,11 @@ export const ResetConfirmModal: FC<Props> = ({ token }) => {
       ) : (
         <>
           {formError !== null && (
-            <Alert type="error" title={formError} className={styles.error} />
+            <Alert
+              type="error"
+              title={formError}
+              className={spacing.gapBelow}
+            />
           )}
 
           {/* void: handleFinish reports its own failure in the form, so nothing

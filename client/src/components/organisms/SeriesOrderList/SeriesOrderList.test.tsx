@@ -5,8 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
-import type { SeriesBookSummary } from '@/types/series';
-import type { PublicUser } from '@/types/user';
+import type { PublicUser, SeriesBookSummary } from '@/types/api';
 
 jest.mock('@/api/series');
 

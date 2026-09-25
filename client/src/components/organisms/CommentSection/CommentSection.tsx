@@ -18,7 +18,7 @@ import {
   unsavedText,
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
-import type { CommentWithAuthor } from '@/types/comment';
+import type { CommentWithAuthor } from '@/types/api';
 import styles from './CommentSection.module.css';
 
 interface CommentSectionProps {

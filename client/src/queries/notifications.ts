@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listNotifications, markNotificationsRead } from '../api/notifications';
-import type { NotificationList } from '../types/notification';
+import type { NotificationList } from '../types/api';
 import { queryKeys } from './keys';
 
 // How often an open tab asks again. A notification is written when someone

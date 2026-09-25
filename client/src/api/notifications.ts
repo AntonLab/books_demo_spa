@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { NotificationList } from '../types/notification';
+import type { NotificationList } from '../types/api';
 
 // The newest page is all the bell shows; older notifications stay stored.
 const NOTIFICATIONS_PAGE_SIZE = 20;

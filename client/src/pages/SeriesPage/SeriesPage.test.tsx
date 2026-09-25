@@ -9,8 +9,7 @@ import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
-import type { PublicSeries } from '@/types/series';
-import type { PublicUser } from '@/types/user';
+import type { PublicSeries, PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');

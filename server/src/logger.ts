@@ -1,11 +1,5 @@
 // The single sanctioned console boundary: every other module logs through this one.
 
-export interface Logger {
-  info(message: string, meta?: unknown): void;
-  warn(message: string, meta?: unknown): void;
-  error(message: string, meta?: unknown): void;
-}
-
 type Level = 'info' | 'warn' | 'error';
 
 const emit = (level: Level, message: string, meta?: unknown): void => {
@@ -19,8 +13,8 @@ const emit = (level: Level, message: string, meta?: unknown): void => {
   }
 };
 
-export const logger: Logger = {
-  info: (message, meta) => emit('info', message, meta),
-  warn: (message, meta) => emit('warn', message, meta),
-  error: (message, meta) => emit('error', message, meta),
+export const logger = {
+  info: (message: string, meta?: unknown) => emit('info', message, meta),
+  warn: (message: string, meta?: unknown) => emit('warn', message, meta),
+  error: (message: string, meta?: unknown) => emit('error', message, meta),
 };
