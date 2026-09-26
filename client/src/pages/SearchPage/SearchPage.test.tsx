@@ -1,5 +1,5 @@
 import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
@@ -70,6 +70,15 @@ const renderPage = (route: string, preloadedState?: Partial<RootState>) =>
 
 const location = () => screen.getByTestId('location').textContent;
 
+const collapsed: Partial<RootState> = {
+  devicePreferences: {
+    theme: 'light',
+    resultsLayout: 'grid',
+    searchFormExpanded: false,
+    reading: initialReadingPreferences,
+  },
+};
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
@@ -79,16 +88,39 @@ beforeEach(() => {
 });
 
 describe('SearchPage', () => {
-  it('shows the results and their count', async () => {
+  it('shows the results, their count in the title', async () => {
     renderPage('/search');
 
     expect(
-      screen.getByRole('heading', { name: 'Search results' })
-    ).toBeInTheDocument();
-    expect(
       await screen.findByRole('link', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
-    expect(screen.getByText('1 book')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Search results · 1 book' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the last count in the title while the next search runs', async () => {
+    serve({ total: 45 });
+    renderPage('/search?q=dragon');
+    await screen.findByRole('heading', { name: 'Search results · 45 books' });
+    mockedBooks.listBooks.mockImplementation(() => new Promise(() => {}));
+
+    await userEvent.click(screen.getByRole('radio', { name: 'New releases' }));
+
+    await waitFor(() => expect(location()).toBe('/search?q=dragon&sort=new'));
+    expect(
+      screen.getByRole('heading', { name: 'Search results · 45 books' })
+    ).toBeInTheDocument();
+  });
+
+  it('says it is searching until a first count is known', () => {
+    mockedBooks.listBooks.mockImplementation(() => new Promise(() => {}));
+
+    renderPage('/search');
+
+    return expect(
+      screen.findByRole('heading', { name: 'Search results · Searching…' })
+    ).resolves.toBeInTheDocument();
   });
 
   it('says so when nothing matches', async () => {
@@ -99,7 +131,9 @@ describe('SearchPage', () => {
     expect(
       await screen.findByText('No books match this search.')
     ).toBeInTheDocument();
-    expect(screen.getByText('0 books')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Search results · 0 books' })
+    ).toBeInTheDocument();
   });
 
   it('turns the page from the pagination', async () => {
@@ -126,16 +160,13 @@ describe('SearchPage', () => {
   });
 
   it('hides the closed form, counting its filters, and opens it on Filters', async () => {
-    renderPage('/search?q=dragon&status=complete', {
-      devicePreferences: {
-        theme: 'light',
-        resultsLayout: 'grid',
-        searchFormExpanded: false,
-        reading: initialReadingPreferences,
-      },
-    });
+    renderPage('/search?q=dragon&status=complete', collapsed);
 
     await screen.findByText('Filters (2)');
+    // A Sort order is no Search filter: it stays in view with the form shut.
+    expect(
+      screen.getByRole('radiogroup', { name: 'Sort by' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Search' })
     ).not.toBeInTheDocument();
@@ -155,6 +186,12 @@ describe('SearchPage', () => {
     expect(
       screen.queryByRole('button', { name: 'List' })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('radiogroup', { name: 'Sort by' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Search results' })
+    ).toBeInTheDocument();
   });
 
   it('reports a genre list that failed', async () => {
@@ -164,6 +201,71 @@ describe('SearchPage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not load the genres.'
+    );
+  });
+});
+
+describe('SearchPage Sort order', () => {
+  it('searches with the typed text under a picked Sort order, from page 1', async () => {
+    serve({ total: 45 });
+    renderPage('/search?q=dragon&page=2');
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+    expect(screen.getByRole('radio', { name: 'Popular' })).toBeChecked();
+
+    // Typed but never submitted with the Search button.
+    await userEvent.clear(screen.getByLabelText('Text'));
+    await userEvent.type(screen.getByLabelText('Text'), 'wyrm');
+    await userEvent.click(screen.getByRole('radio', { name: 'New releases' }));
+
+    await waitFor(() => expect(location()).toBe('/search?q=wyrm&sort=new'));
+    expect(screen.getByRole('radio', { name: 'New releases' })).toBeChecked();
+  });
+
+  it('keeps the Sort order and opens the form when a pick meets a broken rule', async () => {
+    const route = '/search?updatedFrom=2026-02-01&updatedTo=2026-01-01';
+    const { store } = renderPage(route, collapsed);
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+
+    await userEvent.click(screen.getByRole('radio', { name: 'New releases' }));
+
+    expect(
+      await screen.findByText('Must not be after the end date.')
+    ).toBeInTheDocument();
+    expect(store.getState().devicePreferences.searchFormExpanded).toBe(true);
+    expect(screen.getByRole('button', { name: 'Search' })).toBeVisible();
+    expect(location()).toBe(route);
+    expect(screen.getByRole('radio', { name: 'Popular' })).toBeChecked();
+  });
+
+  it('moves one Sort order per arrow key, keeping focus in the group', async () => {
+    renderPage('/search');
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+    const popular = screen.getByRole('radio', { name: 'Popular' });
+    popular.focus();
+
+    // Not `userEvent.keyboard`: it walks radios without a `name` as one
+    // group and moves the check itself, a second change no browser makes.
+    fireEvent.keyDown(popular, { key: 'ArrowRight' });
+
+    await waitFor(() => expect(location()).toBe('/search?sort=new'));
+    expect(
+      screen.getByRole('radiogroup', { name: 'Sort by' })
+    ).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it('keeps the Sort order on Search, and Reset clears it', async () => {
+    serve({ total: 45 });
+    renderPage('/search?q=dragon&sort=new&page=2');
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+
+    // Search drops the page, so a changed URL proves the submit happened.
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+    await waitFor(() => expect(location()).toBe('/search?q=dragon&sort=new'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await waitFor(() => expect(location()).toBe('/search'));
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: 'Popular' })).toBeChecked()
     );
   });
 });

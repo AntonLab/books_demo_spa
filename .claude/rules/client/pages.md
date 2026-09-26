@@ -54,7 +54,17 @@ paths:
   `results.status` and holds no search logic of its own. The form is
   shown or hidden (never unmounted, so field errors still land) by the
   `SearchFiltersToggle` button beside the layout switch, through the
-  `searchFormExpanded` Device preference, open by default. Results show as tiles or a list by `resultsLayout`
+  `searchFormExpanded` Device preference, open by default. The Sort order
+  is not a Search filter, so it is not in the form: `SortOrderSwitch` sits
+  at the toolbar's left, in view while the form is shut, once results are
+  `ready`. A pick submits the form's current values under the new sort
+  (`SearchForm`'s `ref` handle, `searchWith`), unsubmitted edits included,
+  from page 1; the form keeps `sort` as a hidden field so Search keeps it.
+  If the form fails its rules, nothing is applied, the switch keeps its
+  value (it is controlled by the URL) and the form is expanded and scrolled
+  to its first broken field (expanded synchronously first, or a hidden field
+  has nowhere to scroll to). The result count is in the title, which keeps the
+  last count while the next search runs ("Searching…" only before any). Results show as tiles or a list by `resultsLayout`
   (`ResultsLayoutSwitch`, also on `SeriesPage`). `MainPage`'s sections are
   always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
   their default columns.

@@ -1,4 +1,11 @@
-import { useEffect, useState, type FC } from 'react';
+import {
+  useEffect,
+  useImperativeHandle,
+  useState,
+  type FC,
+  type Ref,
+} from 'react';
+import { flushSync } from 'react-dom';
 import {
   AutoComplete,
   Button,
@@ -11,7 +18,7 @@ import {
   Select,
   Spin,
 } from 'antd';
-import type { ColProps, FormRule } from 'antd';
+import type { ColProps, FormProps, FormRule } from 'antd';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useNavigate } from 'react-router';
 import { FilterOutlined } from '@ant-design/icons';
@@ -22,12 +29,12 @@ import { authorLabelOf, useSuggestions } from '@/queries/suggestions';
 import type { AuthorSummary, PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import {
-  BOOK_SORTS,
   RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
+  type BookSort,
 } from 'shared';
-import { BOOK_SORT_LABELS, BOOK_STATUS_LABELS } from '@/types/book';
+import { BOOK_STATUS_LABELS } from '@/types/book';
 import type {
   BookSearchFormValues,
   SearchFieldError,
@@ -35,6 +42,17 @@ import type {
 import type { PublicGenre } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 import styles from './SearchForm.module.css';
+
+// The search page's Sort order sits outside the form but applies as a
+// Search does: with whatever the form holds now.
+export interface SearchFormHandle {
+  searchWith: (sort: BookSort) => void;
+}
+
+// What `validateFields` rejects with; antd exports it only this way.
+type FormFailure = Parameters<
+  NonNullable<FormProps<BookSearchFormValues>['onFinishFailed']>
+>[0];
 
 interface SearchFormProps {
   // Named by `SearchFiltersToggle`'s `aria-controls`.
@@ -46,6 +64,7 @@ interface SearchFormProps {
   fieldErrors: SearchFieldError[];
   onSearch: (values: BookSearchFormValues) => void;
   onReset: () => void;
+  ref?: Ref<SearchFormHandle>;
 }
 
 // One column on a phone, two on a tablet, three from `lg`, four from `xl`:
@@ -138,8 +157,10 @@ export const SearchForm: FC<SearchFormProps> = ({
   fieldErrors,
   onSearch,
   onReset,
+  ref,
 }) => {
   const [form] = Form.useForm<BookSearchFormValues>();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const releasedFrom = Form.useWatch('releasedFrom', form);
   const releasedTo = Form.useWatch('releasedTo', form);
@@ -157,6 +178,31 @@ export const SearchForm: FC<SearchFormProps> = ({
   useEffect(() => {
     form.setFields(fieldErrors);
   }, [form, fieldErrors]);
+
+  // A form that fails its rules applies no Sort order and opens at its first
+  // broken field, so the reader sees why even when it lies below the fold.
+  // The form's own `sort` is left alone, so nothing looks applied.
+  useImperativeHandle(
+    ref,
+    () => ({
+      searchWith: (sort) => {
+        // Both outcomes are handled here, and the pick awaits neither.
+        void form.validateFields().then(
+          (values) => onSearch({ ...values, sort }),
+          ({ errorFields }: FormFailure) => {
+            // A field inside a closed form has no place to scroll to, so
+            // the form must be open before the scroll measures.
+            flushSync(() =>
+              dispatch(devicePreferences.searchFormExpandedChanged(true))
+            );
+            const first = errorFields[0];
+            if (first) form.scrollToField(first.name, { block: 'center' });
+          }
+        );
+      },
+    }),
+    [form, onSearch, dispatch]
+  );
 
   return (
     <Card id={id} className={spacing.gapBelow}>
@@ -250,16 +296,6 @@ export const SearchForm: FC<SearchFormProps> = ({
               />
             </Form.Item>
           </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item name="sort" label="Sort by">
-              <Select
-                options={BOOK_SORTS.map((sort) => ({
-                  value: sort,
-                  label: BOOK_SORT_LABELS[sort],
-                }))}
-              />
-            </Form.Item>
-          </Col>
           {/* One cell per range. Its pickers sit `small` (8px) apart, not
               the Row's 16px gutter: at four columns that leaves a picker too
               narrow for a whole YYYY-MM-DD. The inner items are
@@ -321,6 +357,8 @@ export const SearchForm: FC<SearchFormProps> = ({
             </Form.Item>
           </Col>
         </Row>
+        {/* Picked in the page's toolbar; held here so Search keeps it. */}
+        <Form.Item name="sort" hidden noStyle />
         <Flex gap="small">
           <Button type="primary" htmlType="submit">
             Search

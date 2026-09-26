@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import type { PublicGenre } from 'shared';
+import type { BookSort, PublicGenre } from 'shared';
 import { useBookSearch } from '@/queries/books';
 import { useGenresWithBooks } from '@/queries/genres';
 import {
@@ -28,6 +28,8 @@ export type SearchResults =
 export interface SearchPageState {
   filterCount: number;
   genres: PublicGenre[];
+  // For the toolbar's Sort order, which sits outside the form.
+  sort: BookSort;
   form: {
     // antd reads initialValues once, so the form remounts whenever the URL,
     // or the Genre it resolves to, changes.
@@ -91,6 +93,7 @@ export const useSearchPage = (): SearchPageState => {
   return {
     filterCount: filterCount(search),
     genres: genres.data?.items ?? [],
+    sort: search.sort,
     form: {
       key: `${searchParams.toString()}|${genre?.id ?? ''}`,
       initialValues: formValuesOf(search, genre?.id),

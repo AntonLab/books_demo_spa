@@ -1,3 +1,10 @@
 .pagination {
   margin-top: var(--ant-margin-lg);
 }
+
+/* Filters and the layout switch hold the toolbar's right end whether or not
+   the Sort order is shown, and move to their own line, still right, when
+   the Sort order takes the whole first one. */
+.toolbarEnd {
+  margin-inline-start: auto;
+}
