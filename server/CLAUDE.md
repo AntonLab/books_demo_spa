@@ -71,16 +71,17 @@ Install from the repo root. Scripts run here or from the root with `-w server`.
 `.env.local` (git-ignored) supplies these; `src/db/config.ts` validates them
 with zod and refuses to start on a malformed value.
 
-| Variable                  | Default                   | Notes                                                                                                    |
-| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`             | Also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag.           |
-| `PORT`                    | `4000`                    |                                                                                                          |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                          |
-| `DB_NAME`                 | `books_demo_spa`          |                                                                                                          |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default, so the server never starts against an unintended database. An empty password is accepted.    |
-| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin: reset links and the CSRF trusted origin.                                              |
-| `TRUST_PROXY`             | `0`                       | Proxy hops trusted for `X-Forwarded-For`. The sign-in limits key on `req.ip`: set it behind a proxy.     |
-| `RESET_DELIVERY`          | `log`; none in production | `log` is the only sink. Production refuses to start without it, so link-logging never ships by accident. |
+| Variable                  | Default                   | Notes                                                                                                      |
+| ------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`             | Also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag.             |
+| `PORT`                    | `4000`                    |                                                                                                            |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                            |
+| `DB_NAME`                 | `books_demo_spa`          |                                                                                                            |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default, so the server never starts against an unintended database. An empty password is accepted.      |
+| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin: emailed links and the CSRF trusted origin.                                              |
+| `TRUST_PROXY`             | `0`                       | Proxy hops trusted for `X-Forwarded-For`. The sign-in limits key on `req.ip`: set it behind a proxy.       |
+| `MAIL_DELIVERY`           | `log`; none in production | `log` or `smtp`. Production refuses to start without it, so link-logging never ships by accident.          |
+| `SMTP_HOST` … `MAIL_FROM` | none; `SMTP_PORT` 587     | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`; all but the port required under smtp. |
 
 The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
 `SKIP_MYSQL` (see `testing.md`).

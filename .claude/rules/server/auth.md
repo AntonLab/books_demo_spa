@@ -59,8 +59,10 @@ paths:
   in a mailbox.
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
-- A real mailer adds a second `RESET_DELIVERY` value and the switch in
-  `index.ts` for it.
+- The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
+  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`. A
+  failed send fails the request with a 500 after the token is stored; the
+  account can ask again, and the new request supersedes the stored token.
 
 ## CSRF (`middleware/csrfProtection.ts`)
 

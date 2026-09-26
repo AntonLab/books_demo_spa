@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { ResetDelivery } from '../delivery/resetDelivery.ts';
+import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { Repositories } from '../repositories/sequelizeRepositories.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
@@ -15,7 +15,9 @@ import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
 export interface RouteDeps extends Repositories {
-  resetDelivery: ResetDelivery;
+  mailDelivery: MailDelivery;
+  // APP_BASE_URL: the client origin every emailed link is built on.
+  appBaseUrl: string;
   // The sign-in rate limits (middleware/authRateLimit.ts). Required, so no
   // app is ever built without them by accident; tests pass
   // unlimitedAuthRateLimits() from the route test kit.
