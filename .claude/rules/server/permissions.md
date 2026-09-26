@@ -21,8 +21,9 @@ paths:
   read is a row in the matrix, not a missing guard.
 - `PERMISSION_DEFINITION` lists grants only; `buildMatrixRows()` expands the
   rest to `none`, so a missing row is never an accidental grant.
-- `reports` is reserved for a moderation feature that does not exist; it grants
-  access to nothing today.
+- `reports` is reserved for a moderation feature that does not exist. The
+  matrix already grants admin and superadmin `any` on it, but no route checks
+  it, so it opens nothing today.
 - On `create`, `own` and `any` mean the same thing, since a new row is the
   caller's by construction. The create path still checks rows after the matrix:
   `assertMayAddToSeries` for a book filed into a series, and `assertMayChange`
