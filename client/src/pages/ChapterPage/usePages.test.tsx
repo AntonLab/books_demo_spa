@@ -198,6 +198,53 @@ describe('usePages', () => {
     expect(screen.getByText('Pages 1–2 of 3')).toBeInTheDocument();
   });
 
+  // Paragraph 3 runs from page 1 onto page 2, and paragraph 4 from page 2
+  // onto page 3, so the first thing visible on a page after the first is a
+  // paragraph that began on the page before.
+  const carryOverParagraphs = () => {
+    measure.countPages.mockReturnValue(5);
+    measure.childOnPage.mockImplementation((_strip, page) =>
+      page === 0 ? 0 : page + 2
+    );
+    measure.pageOfChild.mockImplementation((_strip, index) =>
+      index === 0 ? 0 : index - 3
+    );
+  };
+
+  const resizeTo = (pageHeight: number) => {
+    measure.measureGeometry.mockImplementation(() => ({
+      ...GEOMETRY,
+      pageHeight,
+    }));
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+  };
+
+  it('holds its page through repeated resizes', async () => {
+    carryOverParagraphs();
+    render(<Harness {...options()} />);
+    await forward();
+    await forward();
+
+    resizeTo(610);
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument();
+
+    resizeTo(620);
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument();
+  });
+
+  it('stays on its page when a resize changes no page size', async () => {
+    carryOverParagraphs();
+    render(<Harness {...options()} />);
+    await forward();
+    await forward();
+
+    resizeTo(GEOMETRY.pageHeight);
+
+    expect(screen.getByText('Page 3 of 5')).toBeInTheDocument();
+  });
+
   it('measures nothing in the Scroll layout', () => {
     render(<Harness {...options({ enabled: false })} />);
 

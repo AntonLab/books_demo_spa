@@ -71,6 +71,18 @@ describe('ReadingPreferences', () => {
     expect(onOpenChange).toHaveBeenLastCalledWith(true);
   });
 
+  it('tells its page the popover is gone when it unmounts open', async () => {
+    const onOpenChange = jest.fn();
+    const { unmount } = renderWithProviders(
+      <ReadingPreferences onOpenChange={onOpenChange} />
+    );
+    await open();
+
+    unmount();
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('resets every reading preference', async () => {
     const { store } = renderWith({
       background: 'black',
