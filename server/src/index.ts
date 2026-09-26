@@ -1,5 +1,5 @@
 import { createApp } from './app.ts';
-import { createLoggerResetDelivery } from './delivery/resetDelivery.ts';
+import { createMailDelivery } from './delivery/mailDelivery.ts';
 import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
@@ -58,7 +58,8 @@ async function main(): Promise<void> {
 
   const app = createApp({
     ...repositories,
-    resetDelivery: createLoggerResetDelivery(config.appBaseUrl),
+    mailDelivery: createMailDelivery(config.mail),
+    appBaseUrl: config.appBaseUrl,
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
     authRateLimits,

@@ -24,10 +24,19 @@ const envSchema = z.object({
   // the socket's peer. Only a whole, non-negative count is accepted: a hop
   // count is the form that cannot silently trust every address.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
-  // Where a password-reset link goes; `log`, the server log, is the only
-  // delivery. Development and test may leave it unset; production must set it
-  // (see parseConfig), because `log` writes live reset links into the log.
-  RESET_DELIVERY: z.literal('log').optional(),
+  // How mail leaves the server: `log` writes every message into the server
+  // log, `smtp` sends it through the SMTP_* settings below. Development and
+  // test may leave it unset, which logs; production must set it (see
+  // parseConfig), because `log` writes live reset links into the log.
+  MAIL_DELIVERY: z.enum(['log', 'smtp']).optional(),
+  // Read only under MAIL_DELIVERY=smtp, where every one of them but the port
+  // is required (mailConfigOf). 587 is the submission port; 465 is implicit
+  // TLS, which createSmtpMailDelivery switches on by itself.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: port.default(587),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASSWORD: z.string().min(1).optional(),
+  MAIL_FROM: z.email().optional(),
 });
 
 export interface DbConfig {
@@ -38,12 +47,60 @@ export interface DbConfig {
   password: string;
 }
 
+export interface SmtpMailConfig {
+  delivery: 'smtp';
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  from: string;
+}
+
+export type MailConfig = { delivery: 'log' } | SmtpMailConfig;
+
 export interface AppConfig {
   env: 'development' | 'test' | 'production';
   port: number;
   appBaseUrl: string;
   trustProxy: number;
+  mail: MailConfig;
   db: DbConfig;
+}
+
+type Env = z.infer<typeof envSchema>;
+
+// The SMTP settings are required together, and only once smtp is chosen, which
+// a flat zod object cannot say. Every missing one is named, so a deploy is
+// fixed in one round rather than one variable at a time.
+function mailConfigOf(env: Env): MailConfig {
+  if (env.MAIL_DELIVERY !== 'smtp') return { delivery: 'log' };
+
+  const {
+    SMTP_HOST: host,
+    SMTP_USER: user,
+    SMTP_PASSWORD: password,
+    MAIL_FROM: from,
+  } = env;
+  if (
+    host === undefined ||
+    user === undefined ||
+    password === undefined ||
+    from === undefined
+  ) {
+    const missing = Object.entries({
+      SMTP_HOST: host,
+      SMTP_USER: user,
+      SMTP_PASSWORD: password,
+      MAIL_FROM: from,
+    })
+      .filter(([, value]) => value === undefined)
+      .map(([name]) => name);
+    throw new Error(
+      `Invalid environment configuration — MAIL_DELIVERY: smtp needs ${missing.join(', ')}`
+    );
+  }
+
+  return { delivery: 'smtp', host, port: env.SMTP_PORT, user, password, from };
 }
 
 export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
@@ -57,9 +114,9 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
   }
 
   const env = result.data;
-  if (env.NODE_ENV === 'production' && env.RESET_DELIVERY === undefined) {
+  if (env.NODE_ENV === 'production' && env.MAIL_DELIVERY === undefined) {
     throw new Error(
-      'Invalid environment configuration — RESET_DELIVERY: production must set RESET_DELIVERY explicitly; `log` writes password-reset links to the server log'
+      'Invalid environment configuration — MAIL_DELIVERY: production must set MAIL_DELIVERY explicitly; `log` writes password-reset links and notification emails to the server log'
     );
   }
 
@@ -68,6 +125,7 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
     port: env.PORT,
     appBaseUrl: env.APP_BASE_URL,
     trustProxy: env.TRUST_PROXY,
+    mail: mailConfigOf(env),
     db: {
       host: env.DB_HOST,
       port: env.DB_PORT,

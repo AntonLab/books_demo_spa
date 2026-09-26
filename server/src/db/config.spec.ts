@@ -83,27 +83,78 @@ test('TRUST_PROXY refuses a negative, fractional or non-numeric value', () => {
   }
 });
 
-test('RESET_DELIVERY may be left unset in development and test', () => {
-  assert.doesNotThrow(() => parseConfig({ ...minimal }));
-  assert.doesNotThrow(() => parseConfig({ ...minimal, NODE_ENV: 'test' }));
+const SMTP = {
+  MAIL_DELIVERY: 'smtp',
+  SMTP_HOST: 'smtp.example.com',
+  SMTP_USER: 'mailer',
+  SMTP_PASSWORD: 'mailer-secret',
+  MAIL_FROM: 'noreply@example.com',
+};
+
+test('MAIL_DELIVERY may be left unset in development and test, and then logs', () => {
+  assert.deepEqual(parseConfig({ ...minimal }).mail, { delivery: 'log' });
+  assert.deepEqual(parseConfig({ ...minimal, NODE_ENV: 'test' }).mail, {
+    delivery: 'log',
+  });
 });
 
-test('production without RESET_DELIVERY is a config error that says what log does', () => {
+test('production without MAIL_DELIVERY is a config error that says what log does', () => {
   assert.throws(
     () => parseConfig({ ...minimal, NODE_ENV: 'production' }),
-    /production must set RESET_DELIVERY explicitly.*writes password-reset links to the server log/
+    /MAIL_DELIVERY: production must set MAIL_DELIVERY explicitly; `log` writes password-reset links and notification emails to the server log/
   );
 });
 
-test('production accepts RESET_DELIVERY=log once it is set explicitly', () => {
-  assert.doesNotThrow(() =>
-    parseConfig({ ...minimal, NODE_ENV: 'production', RESET_DELIVERY: 'log' })
+test('production accepts MAIL_DELIVERY=log once it is set explicitly', () => {
+  assert.deepEqual(
+    parseConfig({ ...minimal, NODE_ENV: 'production', MAIL_DELIVERY: 'log' })
+      .mail,
+    { delivery: 'log' }
   );
 });
 
-test('RESET_DELIVERY refuses a delivery that does not exist', () => {
+test('MAIL_DELIVERY refuses a delivery that does not exist', () => {
   assert.throws(
-    () => parseConfig({ ...minimal, RESET_DELIVERY: 'email' }),
-    /RESET_DELIVERY/
+    () => parseConfig({ ...minimal, MAIL_DELIVERY: 'email' }),
+    /MAIL_DELIVERY/
+  );
+});
+
+test('MAIL_DELIVERY=smtp carries the SMTP settings, on port 587 unless SMTP_PORT says otherwise', () => {
+  assert.deepEqual(parseConfig({ ...minimal, ...SMTP }).mail, {
+    delivery: 'smtp',
+    host: 'smtp.example.com',
+    port: 587,
+    user: 'mailer',
+    password: 'mailer-secret',
+    from: 'noreply@example.com',
+  });
+  const mail = parseConfig({ ...minimal, ...SMTP, SMTP_PORT: '465' }).mail;
+  assert.equal(mail.delivery === 'smtp' ? mail.port : null, 465);
+});
+
+test('MAIL_DELIVERY=smtp names every SMTP setting it is missing', () => {
+  assert.throws(
+    () =>
+      parseConfig({
+        ...minimal,
+        MAIL_DELIVERY: 'smtp',
+        SMTP_HOST: 'smtp.example.com',
+      }),
+    /MAIL_DELIVERY: smtp needs SMTP_USER, SMTP_PASSWORD, MAIL_FROM/
+  );
+});
+
+test('MAIL_FROM must be an email address', () => {
+  assert.throws(
+    () => parseConfig({ ...minimal, ...SMTP, MAIL_FROM: 'nobody' }),
+    /MAIL_FROM/
+  );
+});
+
+test('the SMTP settings are ignored while MAIL_DELIVERY is log', () => {
+  assert.deepEqual(
+    parseConfig({ ...minimal, ...SMTP, MAIL_DELIVERY: 'log' }).mail,
+    { delivery: 'log' }
   );
 });

@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
-import type { ResetDelivery } from '../delivery/resetDelivery.ts';
+import type { MailDelivery } from '../delivery/mailDelivery.ts';
+import { passwordResetMail } from '../delivery/passwordResetMail.ts';
 import { validatedBody } from '../middleware/validate.ts';
 import { hashPassword, verifyPassword } from '../password.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
@@ -29,7 +30,8 @@ export interface AuthControllerDeps {
   userRepository: UserRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
-  resetDelivery: ResetDelivery;
+  mailDelivery: MailDelivery;
+  appBaseUrl: string;
   // Injectable purely so a test can prove the unknown-login path still spends
   // an argon2 verify. A wall-clock assertion would be flaky under load, and an
   // ESM import binding cannot be spied on from outside; this makes the timing
@@ -170,7 +172,9 @@ export function createAuthController(deps: AuthControllerDeps) {
           hashToken(token),
           new Date(Date.now() + RESET_TTL_MS)
         );
-        await deps.resetDelivery.send(user.email, token);
+        await deps.mailDelivery.send(
+          passwordResetMail(deps.appBaseUrl, user.email, token)
+        );
       }
 
       // 202 whether or not the address exists. Branching the response here

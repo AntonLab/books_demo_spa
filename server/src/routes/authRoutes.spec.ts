@@ -10,6 +10,7 @@ import type {
   SessionRecord,
 } from '../repositories/sessionRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
+import type { MailMessage } from '../delivery/mailDelivery.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
 import type { PublicUser } from 'shared';
@@ -141,11 +142,17 @@ function authDeps() {
       userRepository: users,
       sessionRepository: sessions.repository,
       passwordResetRepository: resets.repository,
-      resetDelivery: {
-        async send(email: string, token: string) {
-          delivered.push({ email, token });
+      mailDelivery: {
+        async send(message: MailMessage) {
+          const link = message.text.match(/https?:\/\/\S+/)?.[0];
+          assert.ok(link, `no link in the mail to ${message.to}`);
+          delivered.push({
+            email: message.to,
+            token: new URL(link).searchParams.get('token') ?? '',
+          });
         },
       },
+      appBaseUrl: 'http://localhost:3000',
     },
     users,
     sessions,
