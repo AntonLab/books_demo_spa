@@ -5,6 +5,7 @@ import {
   READING_BACKGROUNDS,
   READING_FONT_SIZE,
   READING_FONTS,
+  READING_LAYOUTS,
   READING_LINE_HEIGHTS,
   READING_WIDTHS,
   RESULTS_LAYOUTS,
@@ -79,6 +80,7 @@ const toReadingPreferences = (value: unknown): ReadingPreferences => {
       initial.lineHeight
     ),
     width: oneOf(READING_WIDTHS, stored.width, initial.width),
+    layout: oneOf(READING_LAYOUTS, stored.layout, initial.layout),
   };
 };
 

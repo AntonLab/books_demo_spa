@@ -43,6 +43,7 @@ describe('ReadingPreferences', () => {
       fontSize: 18,
       lineHeight: 2,
       width: 'wide',
+      layout: 'scroll',
     });
   });
 
@@ -68,6 +69,7 @@ describe('ReadingPreferences', () => {
       fontSize: 24,
       lineHeight: 1.4,
       width: 'full',
+      layout: 'pages',
     });
     await open();
 

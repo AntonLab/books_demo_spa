@@ -29,6 +29,11 @@ export type ReadingLineHeight = (typeof READING_LINE_HEIGHTS)[number];
 export const READING_WIDTHS = ['narrow', 'medium', 'wide', 'full'] as const;
 export type ReadingWidth = (typeof READING_WIDTHS)[number];
 
+// Scroll is one continuous column; Pages lays the text out in screen-sized
+// pages turned sideways (CONTEXT.md, Reading layout).
+export const READING_LAYOUTS = ['scroll', 'pages'] as const;
+export type ReadingLayout = (typeof READING_LAYOUTS)[number];
+
 export const READING_FONT_SIZE = { min: 14, max: 28, step: 2 } as const;
 
 export interface ReadingPreferences {
@@ -37,6 +42,7 @@ export interface ReadingPreferences {
   fontSize: number;
   lineHeight: ReadingLineHeight;
   width: ReadingWidth;
+  layout: ReadingLayout;
 }
 
 export const initialReadingPreferences: ReadingPreferences = {
@@ -45,6 +51,7 @@ export const initialReadingPreferences: ReadingPreferences = {
   fontSize: 16,
   lineHeight: 1.6,
   width: 'medium',
+  layout: 'scroll',
 };
 
 export interface DevicePreferencesState {
