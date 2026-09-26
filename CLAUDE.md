@@ -125,7 +125,10 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   returns only the failures. Dispatch it instead of running the gates inline.
 - **`ui-checker`** (Sonnet, no edits) checks pages and flows in the browser
   through the Playwright MCP and returns pass/fail per item. Dispatch it after
-  a UI change instead of taking snapshots in the main session.
+  a UI change instead of taking snapshots in the main session, and never Read
+  a screenshot there.
+- **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
+  `general-purpose`: the latter ran on Sonnet and loaded the full context.
 - Every agent in `.claude/agents/` preloads `caveman`: its final message is
   caveman, while the files it writes stay normal prose. Needs the `caveman`
   plugin; a missing skill preloads nothing, silently.
@@ -167,7 +170,8 @@ frontmatter); re-sync them when those templates change.
   with `SendMessage`.
 - **Pass `model` on every dispatch:** `sdd-implementer` haiku when the brief
   holds the exact code for a mechanical change (a move, a rename), sonnet
-  otherwise; `sdd-task-reviewer` sonnet; `sdd-re-reviewer` haiku; `plan-writer`
+  otherwise; `sdd-task-reviewer` the implementer's model (haiku or sonnet);
+  `sdd-re-reviewer` haiku; `plan-writer`
   and `sdd-final-reviewer` opus.
 - **Never pause between tasks.** Stop only on `BLOCKED`, `NEEDS_CONTEXT` or the
   end of the plan. After `/compact`, re-read the plan's ledger under
