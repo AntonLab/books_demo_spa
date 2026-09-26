@@ -122,7 +122,7 @@ describe('ChapterPage', () => {
     expect(
       await screen.findByRole('link', { name: 'A Tale of Dragons' })
     ).toHaveAttribute('href', '/books/1');
-    expect(screen.getByRole('link', { name: 'Two' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '2. Two' })).toHaveAttribute(
       'aria-current',
       'page'
     );
