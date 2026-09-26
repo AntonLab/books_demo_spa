@@ -3,6 +3,7 @@ import { createRef } from 'react';
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
+import scrollIntoView from 'scroll-into-view-if-needed';
 import { useLocation } from 'react-router';
 import {
   SearchFiltersToggle,
@@ -17,6 +18,11 @@ import type { PublicSeries } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
+// What antd's `scrollToField` scrolls with; jsdom lays nothing out to scroll.
+jest.mock('scroll-into-view-if-needed', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedSeries = jest.mocked(seriesApi);
@@ -356,6 +362,28 @@ describe('SearchForm', () => {
     ).toBeInTheDocument();
     expect(onSearch).not.toHaveBeenCalled();
     expect(store.getState().devicePreferences.searchFormExpanded).toBe(true);
+  });
+
+  it('scrolls to the first broken field when a handed Sort order is refused', async () => {
+    const ref = createRef<SearchFormHandle>();
+    renderForm(
+      {
+        ref,
+        initialValues: {
+          updatedFrom: dayjs('2026-02-01'),
+          updatedTo: dayjs('2026-01-01'),
+          sort: 'popular',
+        },
+      },
+      false
+    );
+
+    act(() => ref.current!.searchWith('new'));
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    // antd scrolls to the picker's wrapper, which holds the field.
+    const [target] = jest.mocked(scrollIntoView).mock.calls[0]!;
+    expect(target).toContainElement(screen.getByLabelText('Updated from'));
   });
 
   it("shows the server's errors on their fields", async () => {
