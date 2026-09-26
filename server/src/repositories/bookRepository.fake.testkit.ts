@@ -31,6 +31,10 @@ export interface FakeBookRepositoryOptions {
   // What a book's detail reports about its likes, which live in another
   // repository: the count, and the id of a signed-in viewer's own like.
   likes?: { count: number; viewerLikeId: number | null };
+  // What a book's detail reports from its comments and chapters, which live in
+  // other repositories. Which comments and chapters count is the real
+  // repository's rule, proven on MySQL.
+  tallies?: { commentCount: number; wordCount: number };
   // Spies. `viewers` collects who each read was made as, `reorders` each
   // Series order handed over, `actors` who made each credit change or delete.
   viewers?: Viewer[];
@@ -53,6 +57,7 @@ export function createFakeBookRepository(
     series = new Map(),
     genres = new Map(),
     likes = { count: 0, viewerLikeId: null },
+    tallies = { commentCount: 0, wordCount: 0 },
     viewers = [],
     reorders = [],
     actors = [],
@@ -205,6 +210,8 @@ export function createFakeBookRepository(
         likeCount: likes.count,
         // Only a signed-in caller can have a like of their own to report.
         viewerLikeId: viewer === null ? null : likes.viewerLikeId,
+        commentCount: tallies.commentCount,
+        wordCount: tallies.wordCount,
       };
     },
 

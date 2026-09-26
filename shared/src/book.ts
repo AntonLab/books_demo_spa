@@ -55,6 +55,12 @@ export interface BookDetail extends PublicBook {
   // liked this book. The client needs no third state: with no session it hides
   // the button outright.
   viewerLikeId: number | null;
+  // Live Comments on the book, roots and replies; a Tombstone never counts.
+  commentCount: number;
+  // The words in the book's Published chapters. The same for every viewer: a
+  // Co-author's Draft and Scheduled chapters never count, so the figure is the
+  // one readers see.
+  wordCount: number;
 }
 
 // The Book statuses a search may ask for: a Draft book never appears in one.
