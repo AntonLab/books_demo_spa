@@ -1,7 +1,8 @@
-import type { FC } from 'react';
+import { useRef, type FC } from 'react';
 import { Alert, Empty, Flex, Pagination, Skeleton, Typography } from 'antd';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
+import { SortOrderSwitch } from '@/components/molecules/SortOrderSwitch/SortOrderSwitch';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
@@ -9,6 +10,7 @@ import {
 import {
   SearchFiltersToggle,
   SearchForm,
+  type SearchFormHandle,
 } from '@/components/organisms/SearchForm/SearchForm';
 import { useAppSelector } from '@/store/hooks';
 import spacing from '@/theme/spacing.module.css';
@@ -29,7 +31,8 @@ const countTextOf = (books: SearchBooks): string =>
       : countOf(books.data.total);
 
 export const SearchPage: FC = () => {
-  const { filterCount, genres, form, results } = useSearchPage();
+  const { filterCount, genres, sort, form, results } = useSearchPage();
+  const formRef = useRef<SearchFormHandle>(null);
   // React warns when `key` arrives inside a spread, so it goes on its own.
   const { key: formKey, ...formProps } = form;
   const layout = useAppSelector(
@@ -41,24 +44,31 @@ export const SearchPage: FC = () => {
 
   return (
     <>
-      <Typography.Title level={2}>Search results</Typography.Title>
-      <Flex
-        justify="space-between"
-        align="center"
-        gap="middle"
-        wrap
-        className={spacing.gapBelow}
-      >
-        <Typography.Text>
-          {results.status === 'ready' ? countTextOf(results.books) : null}
-        </Typography.Text>
-        <Flex gap="small">
+      <Typography.Title level={2}>
+        {results.status === 'ready'
+          ? `Search results · ${countTextOf(results.books)}`
+          : 'Search results'}
+      </Typography.Title>
+      <Flex align="center" gap="middle" wrap className={spacing.gapBelow}>
+        {results.status === 'ready' && (
+          <SortOrderSwitch
+            value={sort}
+            onChange={(next) => formRef.current?.searchWith(next)}
+          />
+        )}
+        <Flex gap="small" className={styles.toolbarEnd}>
           <SearchFiltersToggle controls={FORM_ID} filterCount={filterCount} />
           {results.status === 'ready' && <ResultsLayoutSwitch />}
         </Flex>
       </Flex>
       <div hidden={!filtersExpanded}>
-        <SearchForm key={formKey} {...formProps} id={FORM_ID} genres={genres} />
+        <SearchForm
+          key={formKey}
+          ref={formRef}
+          {...formProps}
+          id={FORM_ID}
+          genres={genres}
+        />
       </div>
 
       {results.status === 'ready' ? (
