@@ -23,10 +23,11 @@ The client dev server runs on `http://localhost:3000` and proxies `/api` to the 
 
 ## How to Check
 
-- Drive the page with the `mcp__playwright__browser_*` tools. Prefer `browser_snapshot` (the accessibility tree) over screenshots; take a screenshot only for layout, spacing or color claims, and save it to the scratchpad, never into the repo.
+- Drive the page with the `mcp__playwright__browser_*` tools. Prefer `browser_snapshot` (the accessibility tree) over screenshots; take a screenshot only for layout, spacing or color claims. Pass `browser_take_screenshot` a `filename` that is an absolute path in the scratchpad directory your environment names: a bare name lands in the repo's `.playwright-mcp/`.
 - After each step read `browser_console_messages` and the failed calls in `browser_network_requests`. A console error or a 4xx/5xx the check did not expect is a finding even when the page looks right.
 - Check each item as a user would: find it by its visible label or role, act on it, and confirm the outcome the dispatch expects.
 - Close the browser when done.
+- On PASS, delete what the Playwright MCP left in the repo: `rm -rf .playwright-mcp` from the repo root (console logs and page snapshots, git-ignored). On FAIL or BLOCKED leave it, so the controller can read the evidence.
 
 ## Report
 
