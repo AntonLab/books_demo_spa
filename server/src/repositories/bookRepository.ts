@@ -472,30 +472,26 @@ export function createSequelizeBookRepository(): BookRepository {
       });
       if (!book) return null;
 
-      // Two follow-up queries rather than a correlated subquery in the SELECT
-      // above: each is a single indexed lookup on likes, and keeping them apart
-      // leaves the include readable.
-      const likeCount = await Like.count({
-        where: { bookId: id, isLike: true },
-      });
-      const viewerLike =
-        viewerId === null
-          ? null
-          : await Like.findOne({
-              where: { bookId: id, userId: viewerId },
-              attributes: ['id'],
-            });
-
-      // Two more follow-up queries, for the same reason as the like ones.
-      // Published is judged on this process's clock, as readableChapterScope
-      // judges it, but the viewer never widens it: a Co-author's Draft and
-      // Scheduled chapters do not count. SUM over no row is NULL, hence ?? 0.
-      const [commentCount, wordCount] = await Promise.all([
-        Comment.count({ where: { bookId: id, tombstone: null } }),
-        Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
-          where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
-        }),
-      ]);
+      // Follow-up queries rather than correlated subqueries in the SELECT
+      // above, which keeps the include readable; none depends on another, so
+      // they run at once. The word count is judged Published on this
+      // process's clock, as readableChapterScope judges it, but the viewer
+      // never widens it: a Co-author's Draft and Scheduled chapters do not
+      // count. SUM over no row is NULL, hence ?? 0.
+      const [likeCount, viewerLike, commentCount, wordCount] =
+        await Promise.all([
+          Like.count({ where: { bookId: id, isLike: true } }),
+          viewerId === null
+            ? null
+            : Like.findOne({
+                where: { bookId: id, userId: viewerId },
+                attributes: ['id'],
+              }),
+          Comment.count({ where: { bookId: id, tombstone: null } }),
+          Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
+            where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
+          }),
+        ]);
 
       return {
         ...(await withAuthors(book)),
