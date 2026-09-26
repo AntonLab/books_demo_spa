@@ -57,6 +57,16 @@ export const BookStatistics: FC<BookStatisticsProps> = ({
       column={1}
       items={[
         {
+          key: 'release-time',
+          label: 'Release time',
+          children: fromChapters(dateOrDash(times[0])),
+        },
+        {
+          key: 'last-update',
+          label: 'Last update',
+          children: fromChapters(dateOrDash(times[times.length - 1])),
+        },
+        {
           key: 'chapters',
           label: 'Chapters',
           children: fromChapters(formatCount(chapters.length)),
@@ -67,16 +77,6 @@ export const BookStatistics: FC<BookStatisticsProps> = ({
           key: 'comments',
           label: 'Comments',
           children: formatCount(book.commentCount),
-        },
-        {
-          key: 'release-time',
-          label: 'Release time',
-          children: fromChapters(dateOrDash(times[0])),
-        },
-        {
-          key: 'last-update',
-          label: 'Last update',
-          children: fromChapters(dateOrDash(times[times.length - 1])),
         },
       ]}
     />

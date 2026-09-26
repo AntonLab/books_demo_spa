@@ -21,12 +21,12 @@ const baseProps = {
 };
 
 const LABELS = [
+  'Release time',
+  'Last update',
   'Chapters',
   'Words',
   'Likes',
   'Comments',
-  'Release time',
-  'Last update',
 ];
 
 // Each figure is one table cell holding its label and then its value; the
@@ -41,12 +41,12 @@ describe('BookStatistics', () => {
     renderWithProviders(<BookStatistics {...baseProps} />);
 
     expect(LABELS.map((label) => [label, valueOf(label)])).toEqual([
+      ['Release time', formatDate('2026-09-03T00:00:00.000Z')],
+      ['Last update', formatDate('2026-09-03T00:00:00.000Z')],
       ['Chapters', '1'],
       ['Words', '12,345'],
       ['Likes', '4'],
       ['Comments', '7'],
-      ['Release time', formatDate('2026-09-03T00:00:00.000Z')],
-      ['Last update', formatDate('2026-09-03T00:00:00.000Z')],
     ]);
     // Label order on the page, not only presence.
     expect(
