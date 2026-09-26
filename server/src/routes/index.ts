@@ -7,6 +7,7 @@ import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
+import { createFavoriteRoutes } from './favoriteRoutes.ts';
 import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
@@ -36,6 +37,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/genres', createGenreRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
+  router.use('/favorites', createFavoriteRoutes(deps));
   router.use('/notifications', createNotificationRoutes(deps));
   return router;
 }
