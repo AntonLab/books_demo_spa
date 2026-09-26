@@ -107,6 +107,9 @@ module.exports = (_env, argv) => {
     plugins: [
       new HtmlWebpackPlugin({
         template: path.resolve(root, 'public/index.html'),
+        // Emits the file into the build and injects its <link rel="icon">, so
+        // no asset rule or static folder is needed.
+        favicon: path.resolve(root, 'public/favicon.svg'),
         minify: !isDevelopment,
       }),
       isDevelopment
@@ -141,8 +144,9 @@ module.exports = (_env, argv) => {
       port: 3000,
       // Serve index.html for client-side routes instead of 404ing.
       historyApiFallback: true,
-      // public/index.html is injected by html-webpack-plugin; everything else
-      // is bundled from src/, so there is no static passthrough folder.
+      // html-webpack-plugin emits public/index.html and public/favicon.svg;
+      // everything else is bundled from src/, so there is no static
+      // passthrough folder.
       static: false,
       client: { overlay: { warnings: false } },
       // Forwards API calls to the Express server (server/src/index.ts, port
