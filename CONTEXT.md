@@ -179,10 +179,16 @@ _Avoid_: Draft (for text not yet sent)
 **Device preferences**:
 How the app looks and reads on one device, such as its theme, the layout of
 search results (grid or list), or how a Chapter reads: its background, font,
-font size, line height and text width. The server never sees
+font size, line height, text width and Reading layout. The server never sees
 them, so another device does not share them,
 and signing out keeps them.
 _Avoid_: Settings, Profile (both suggest something the Account keeps)
+
+**Reading layout**:
+How a Chapter's text is laid out for reading, a Device preference: **Scroll**
+(one continuous column) or **Pages** (screen-sized pages turned sideways, two
+side by side like an open book when the screen is wide enough).
+_Avoid_: Book mode, Reader mode (a Book is the work, not a way of reading it)
 
 ### Comments
 
