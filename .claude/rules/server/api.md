@@ -55,6 +55,10 @@ code alone does not explain.
   `BookDetail.favoriteCount` counts every holder, and is 0 while the book is a
   Draft whoever reads it; `viewerFavoriteId` names the viewer's own row even
   then.
+- `GET /api/series/:id` answers `SeriesDetail`: `PublicSeries` plus
+  `favoriteCount` (every holder; a Series has no status) and
+  `viewerFavoriteId`, from `seriesRepository.findDetailById`. `findById`
+  stays the plain record for everything else.
 
 ## Chapters
 
