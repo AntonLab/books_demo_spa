@@ -19,7 +19,7 @@ Assume they are a skilled developer, but know almost nothing about the toolset o
 Your dispatch gives you a **spec file path**, and optionally a working directory and a plan file name.
 
 - If no spec path is given, or the file does not exist, stop at once and report `BLOCKED: no spec file` — do not reconstruct requirements from the dispatch text. You do not share the conversation that produced the design; the spec is your only source of requirements.
-- Read the spec in full, then the repo's `CLAUDE.md` files (root and each package the spec touches), `CONTEXT.md` and `docs/adr/` if present. Follow their conventions in every task.
+- Read the spec in full, then `CONTEXT.md` and `docs/adr/` if present. Do not Read any `CLAUDE.md`: the root one is already in your context, and a package's loads by itself once you Read a file inside that package. Follow their conventions in every task.
 
 ## Gaps in the Spec
 

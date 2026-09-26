@@ -20,7 +20,7 @@ The main session's message gives you:
 ## Rules
 
 - Read-only. Do not mutate the working tree, the index, HEAD, branches or `node_modules`. No `npm install`, no `--fix`, no `--write`, no `git stash`.
-- Read the CLAUDE.md of each package in scope and the `.claude/rules/` files whose `paths:` cover what you inspect. A finding that contradicts a documented rule or ADR in `docs/adr/` is not a finding.
+- Follow the CLAUDE.md of each package in scope and the `.claude/rules/` files whose `paths:` cover what you inspect. Do not Read them: the root CLAUDE.md is already in your context, and a package's CLAUDE.md and matching rules load by themselves once you Read a file they cover. A finding that contradicts a documented rule or ADR in `docs/adr/` is not a finding.
 - Verify each finding before you report it. Grep for every caller or use before calling something unused or duplicated.
 - Skip `node_modules/`, `dist/`, `coverage/`, `.claude/worktrees/` and lockfiles unless the yardstick is about them.
 - Python is not installed. Script with `node -e`. If the `Grep` tool fails with `EPERM … 'rg'`, fall back to `git grep -n`.
