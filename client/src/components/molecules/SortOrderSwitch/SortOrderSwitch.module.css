@@ -3,3 +3,20 @@
 .phone {
   width: 100%;
 }
+
+/* Even at full width, 360px cannot hold "Recently updated" on one line, and
+   antd clips each label with an ellipsis. Labels wrap instead, and every item
+   fills the tallest one's height so the single-line labels stay centered. */
+.phone :global(.ant-segmented-item) {
+  display: flex;
+}
+
+.phone :global(.ant-segmented-item-label) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  line-height: var(--ant-line-height);
+  text-align: center;
+  white-space: normal;
+}
