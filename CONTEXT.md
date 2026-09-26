@@ -256,3 +256,15 @@ The Publication time of a Book's latest Published Chapter. Editing a Book's
 details or an existing Chapter does not move it, and neither does a Scheduled
 chapter until its Publication time passes.
 _Avoid_: Updated at (for a Book)
+
+**Search filter**:
+A condition that narrows which Books a search finds, such as its text, an
+author, a Series, a Genre, a Book status, or a range of Release times or Last
+updates. A search's Search filters all apply at once.
+_Avoid_: Sort (for a condition that narrows)
+
+**Sort order**:
+The order a search's Books are listed in: by Popularity, as New releases, or
+by Last update. It never changes which Books are found, only their order, so
+it is not a Search filter.
+_Avoid_: Filter, ranking
