@@ -1,6 +1,7 @@
 import { col, fn, Op, where as sequelizeWhere } from 'sequelize';
 import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
+import { Favorite } from '../models/Favorite.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
@@ -14,7 +15,7 @@ import {
 } from './coAuthors.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { ListResponse, PublicSeries } from 'shared';
+import type { ListResponse, PublicSeries, SeriesDetail } from 'shared';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -39,6 +40,9 @@ export interface SeriesRepository {
   // unless the viewer co-authors it or is a Moderator.
   list(query: ListSeriesQuery, viewer: Viewer): Promise<SeriesListResult>;
   findById(id: number, viewer: Viewer): Promise<PublicSeries | null>;
+  // What GET /api/series/:id serves: findById plus the Favorite state. null
+  // where findById is.
+  findDetailById(id: number, viewer: Viewer): Promise<SeriesDetail | null>;
   update(id: number, input: UpdateSeriesInput): Promise<PublicSeries | null>;
   // Like a book's, the writes that change who is credited or end the series
   // take the actor and tell the other Co-authors in the same transaction.
@@ -224,6 +228,31 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         where: { [Op.and]: [{ id }, await visibleSeriesWhere(viewer)] },
       });
       return series ? withAuthors(series) : null;
+    },
+
+    async findDetailById(id, viewer) {
+      const series = await Series.findOne({
+        where: { [Op.and]: [{ id }, await visibleSeriesWhere(viewer)] },
+      });
+      if (!series) return null;
+
+      const viewerId = viewer?.id ?? null;
+      const [withCredits, favoriteCount, viewerFavorite] = await Promise.all([
+        withAuthors(series),
+        Favorite.count({ where: { seriesId: id } }),
+        viewerId === null
+          ? null
+          : Favorite.findOne({
+              where: { seriesId: id, userId: viewerId },
+              attributes: ['id'],
+            }),
+      ]);
+
+      return {
+        ...withCredits,
+        favoriteCount,
+        viewerFavoriteId: viewerFavorite?.id ?? null,
+      };
     },
 
     async update(id, input) {

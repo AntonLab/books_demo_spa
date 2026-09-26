@@ -48,7 +48,7 @@ export function createSeriesController(repository: SeriesRepository) {
 
     getById: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      const series = await repository.findById(id, viewerOf(req.user));
+      const series = await repository.findDetailById(id, viewerOf(req.user));
       if (!series) throw new NotFoundError('Series', id);
       res.json(series);
     },

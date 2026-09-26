@@ -13,6 +13,7 @@ import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
+import { Favorite } from '../models/Favorite.ts';
 import { Genre } from '../models/Genre.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
@@ -697,6 +698,86 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       assert.deepEqual(await titles(viewer), ['Empty', 'Drafted', 'Out']);
       assert.equal((await repository.findById(empty.id, viewer))?.id, empty.id);
     }
+  });
+
+  describe('detail', () => {
+    let fanCount = 0;
+    const aFan = async () => {
+      fanCount += 1;
+      return User.create({
+        login: `SeriesFan${fanCount}`,
+        email: `series-fan-${fanCount}@example.com`,
+        password: 'hunter2hunter2',
+        firstName: 'Series',
+        lastName: `Fan${fanCount}`,
+      });
+    };
+
+    const aPublishedSeries = async (title: string) => {
+      const series = await repository.create({
+        userId: ownerId,
+        title,
+        description: title,
+        tags: [],
+      });
+      await createCreditedBook(
+        {
+          title: `${title} Book`,
+          description: 'x',
+          tags: [],
+          seriesId: series.id,
+        },
+        [ownerId]
+      );
+      return series;
+    };
+
+    test("favoriteCount counts every holder, and viewerFavoriteId names the viewer's own", async () => {
+      const series = await aPublishedSeries('Treasured Saga');
+      const elsewhere = await aPublishedSeries('Other Saga');
+      const fan = await aFan();
+      const otherFan = await aFan();
+      const own = await Favorite.create({
+        userId: fan.id,
+        seriesId: series.id,
+      });
+      await Favorite.create({ userId: otherFan.id, seriesId: series.id });
+      await Favorite.create({ userId: fan.id, seriesId: elsewhere.id });
+
+      const asFan = await repository.findDetailById(series.id, {
+        id: fan.id,
+        role: 'user',
+      });
+      const asGuest = await repository.findDetailById(series.id, null);
+
+      assert.deepEqual(
+        [asFan?.favoriteCount, asFan?.viewerFavoriteId],
+        [2, own.id]
+      );
+      assert.deepEqual(
+        [asGuest?.favoriteCount, asGuest?.viewerFavoriteId],
+        [2, null]
+      );
+      assert.deepEqual(
+        asGuest?.authors.map((author) => author.id),
+        [ownerId]
+      );
+    });
+
+    test('a series the viewer may not see has no detail, as findById has no record', async () => {
+      const hidden = await repository.create({
+        userId: ownerId,
+        title: 'Nothing Out',
+        description: 'x',
+        tags: [],
+      });
+
+      assert.equal(await repository.findDetailById(hidden.id, null), null);
+      assert.equal(
+        (await repository.findDetailById(hidden.id, asOwner()))?.id,
+        hidden.id
+      );
+    });
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
