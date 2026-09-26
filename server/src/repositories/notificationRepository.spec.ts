@@ -7,6 +7,7 @@ import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
+import { NotFoundError } from '../types/errors.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { Chapter } from '../models/Chapter.ts';
@@ -388,6 +389,40 @@ describe('notifications against real MySQL', { skip }, () => {
     assert.equal(
       (await notifications.list(cleo.id, { limit: 20, offset: 0 })).unread,
       1
+    );
+  });
+
+  test('a new account has email notifications on', async () => {
+    assert.deepEqual(await notifications.getSettings(ann.id), {
+      emailNotifications: true,
+    });
+  });
+
+  test('the email switch round-trips and touches only its own account', async () => {
+    assert.deepEqual(
+      await notifications.updateSettings(ann.id, { emailNotifications: false }),
+      { emailNotifications: false }
+    );
+
+    assert.deepEqual(await notifications.getSettings(ann.id), {
+      emailNotifications: false,
+    });
+    assert.deepEqual(await notifications.getSettings(ben.id), {
+      emailNotifications: true,
+    });
+  });
+
+  test('the email switch of a missing account is a NotFoundError naming User', async () => {
+    const missing = ann.id + 10_000;
+
+    await assert.rejects(notifications.getSettings(missing), (error) => {
+      assert.ok(error instanceof NotFoundError);
+      assert.match(error.message, /User/);
+      return true;
+    });
+    await assert.rejects(
+      notifications.updateSettings(missing, { emailNotifications: false }),
+      NotFoundError
     );
   });
 });

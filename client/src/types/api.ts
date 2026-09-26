@@ -38,6 +38,8 @@ export type PublicNotification = Wire<Shared.PublicNotification>;
 
 export type NotificationList = Wire<Shared.NotificationList>;
 
+export type NotificationSettings = Shared.NotificationSettings;
+
 export type PublicLike = Wire<Shared.PublicLike>;
 
 // No userId: the server takes the liker from the session cookie. `isLike`

@@ -5,6 +5,7 @@ import { validate } from '../middleware/validate.ts';
 import {
   listNotificationsQuerySchema,
   markNotificationsReadSchema,
+  updateNotificationSettingsSchema,
 } from '../types/notification.ts';
 import type { RouteDeps } from './index.ts';
 
@@ -27,6 +28,13 @@ export function createNotificationRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ body: markNotificationsReadSchema }),
     controller.markRead
+  );
+  router.get('/settings', requireAuth, controller.settings);
+  router.patch(
+    '/settings',
+    requireAuth,
+    validate({ body: updateNotificationSettingsSchema }),
+    controller.updateSettings
   );
 
   return router;
