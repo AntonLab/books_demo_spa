@@ -222,10 +222,38 @@ _Avoid_: Deleted comment (that one its Owner made)
 ### Notifications
 
 **Notification**:
-An in-app notice telling a Co-author that someone else changed who is credited
-on a shared Book or Series, or deleted it. It keeps the work's title and the
-actor's name as they were at the time, so it outlives both.
-_Avoid_: Notice, alert, message
+An in-app notice to one Account. It tells a Co-author that someone else changed
+who is credited on a shared Book or Series, or deleted it; or it tells an
+Account that something it holds as a Favorite has a New chapter or a New book.
+It keeps the work's title and the actor's name as they were at the time, so it
+outlives both. New chapters of one Book gather into one unread Notification
+until the Account reads it.
+_Avoid_: Notice, alert, message, push
+
+**New chapter**:
+A Chapter of a Published Book whose Publication time has just passed. It is
+announced to the Accounts that hold that Book as a Favorite, except the Book's
+Co-authors.
+
+**New book**:
+A Book in a Series whose Release time has just passed. It is announced to the
+Accounts that hold that Series as a Favorite, except the Book's Co-authors.
+_Avoid_: New release (that is a Sort order)
+
+**Online**:
+An Account that has the app open on at least one device at the moment of an
+event. An Online Account is shown a New chapter or New book at once; one that
+is not Online is sent an email as well. Either way the Notification is kept.
+
+### Favorites
+
+**Favorite**:
+A Book or Series an Account marks to follow it: it keeps the work on the
+Account's list and brings Notifications of its New chapters (for a Book) or New
+books (for a Series). Private to the Account; it is not approval and does not
+count toward Popularity. A Favorite on a Book that is no longer Published is
+kept but not shown or counted until the Book is Published again.
+_Avoid_: Follow, subscription, bookmark, Like (for a Favorite)
 
 ### Likes
 
