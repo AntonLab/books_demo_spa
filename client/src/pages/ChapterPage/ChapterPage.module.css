@@ -25,3 +25,47 @@
   font-size: inherit;
   line-height: inherit;
 }
+
+/* Pages. The probe is an empty block carrying the reading width's class, so
+   usePages measures one page's width from it; the window shows one page or a
+   spread; the strip is the whole chapter in columns one page wide, running
+   off to the right, and slides under the window. Sizes, column count and the
+   shift are measured at runtime and set inline. */
+.probe {
+  height: 0;
+}
+
+/* `clip`, not `hidden`: a `hidden` box is still a scroll container, so
+   find-in-page could scroll it and misalign every page after. */
+.window {
+  margin-inline: auto;
+  overflow: clip;
+}
+
+.strip {
+  height: 100%;
+  column-fill: auto;
+}
+
+/* Only a turn slides: opening a chapter and a relayout jump. */
+.turning {
+  transition: transform var(--ant-motion-duration-mid)
+    var(--ant-motion-ease-in-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turning {
+    transition: none;
+  }
+}
+
+/* Book typography. The indent is in `em` so it follows the reader's font
+   size; `hyphens: auto` relies on `<html lang="en">`. */
+.paragraph {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: justify;
+  text-indent: 1.5em;
+  hyphens: auto;
+}
