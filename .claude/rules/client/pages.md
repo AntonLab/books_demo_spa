@@ -61,8 +61,9 @@ paths:
   (`SearchForm`'s `ref` handle, `searchWith`), unsubmitted edits included,
   from page 1; the form keeps `sort` as a hidden field so Search keeps it.
   If the form fails its rules, nothing is applied, the switch keeps its
-  value (it is controlled by the URL) and the form is expanded so the errors
-  show. The result count is in the title. Results show as tiles or a list by `resultsLayout`
+  value (it is controlled by the URL) and the form is expanded and scrolled
+  to its first broken field (expanded synchronously first, or a hidden field
+  has nowhere to scroll to). The result count is in the title. Results show as tiles or a list by `resultsLayout`
   (`ResultsLayoutSwitch`, also on `SeriesPage`). `MainPage`'s sections are
   always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
   their default columns.

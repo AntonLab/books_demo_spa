@@ -5,6 +5,7 @@ import {
   type FC,
   type Ref,
 } from 'react';
+import { flushSync } from 'react-dom';
 import {
   AutoComplete,
   Button,
@@ -17,7 +18,7 @@ import {
   Select,
   Spin,
 } from 'antd';
-import type { ColProps, FormRule } from 'antd';
+import type { ColProps, FormProps, FormRule } from 'antd';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useNavigate } from 'react-router';
 import { FilterOutlined } from '@ant-design/icons';
@@ -47,6 +48,11 @@ import styles from './SearchForm.module.css';
 export interface SearchFormHandle {
   searchWith: (sort: BookSort) => void;
 }
+
+// What `validateFields` rejects with; antd exports it only this way.
+type FormFailure = Parameters<
+  NonNullable<FormProps<BookSearchFormValues>['onFinishFailed']>
+>[0];
 
 interface SearchFormProps {
   // Named by `SearchFiltersToggle`'s `aria-controls`.
@@ -173,9 +179,9 @@ export const SearchForm: FC<SearchFormProps> = ({
     form.setFields(fieldErrors);
   }, [form, fieldErrors]);
 
-  // A form that fails its rules applies no Sort order and opens, so the
-  // reader sees why. The form's own `sort` is left alone, so nothing looks
-  // applied.
+  // A form that fails its rules applies no Sort order and opens at its first
+  // broken field, so the reader sees why even when it lies below the fold.
+  // The form's own `sort` is left alone, so nothing looks applied.
   useImperativeHandle(
     ref,
     () => ({
@@ -183,7 +189,15 @@ export const SearchForm: FC<SearchFormProps> = ({
         // Both outcomes are handled here, and the pick awaits neither.
         void form.validateFields().then(
           (values) => onSearch({ ...values, sort }),
-          () => dispatch(devicePreferences.searchFormExpandedChanged(true))
+          ({ errorFields }: FormFailure) => {
+            // A field inside a closed form has no place to scroll to, so
+            // the form must be open before the scroll measures.
+            flushSync(() =>
+              dispatch(devicePreferences.searchFormExpandedChanged(true))
+            );
+            const first = errorFields[0];
+            if (first) form.scrollToField(first.name, { block: 'center' });
+          }
         );
       },
     }),
