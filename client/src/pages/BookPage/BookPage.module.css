@@ -15,6 +15,6 @@
   margin-top: var(--ant-margin-xs);
 }
 
-.description {
-  margin-top: var(--ant-margin-sm);
+.tabs {
+  margin-top: var(--ant-margin);
 }
