@@ -165,6 +165,16 @@ describe('useSearchPage reading the URL', () => {
     await whenLoaded(filtered.page);
     expect(filtered.page().filterCount).toBe(4);
   });
+
+  it('reports the Sort order, popular for an unknown one', async () => {
+    const known = renderSearchPage('/search?sort=updated');
+    await whenLoaded(known.page);
+    expect(known.page().sort).toBe('updated');
+
+    const unknown = renderSearchPage('/search?sort=bogus');
+    await whenLoaded(unknown.page);
+    expect(unknown.page().sort).toBe('popular');
+  });
 });
 
 describe('useSearchPage resolving the genre', () => {

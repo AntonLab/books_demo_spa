@@ -1,9 +1,15 @@
 import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
-import { act, screen } from '@testing-library/react';
+import { createRef } from 'react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
+import scrollIntoView from 'scroll-into-view-if-needed';
 import { useLocation } from 'react-router';
-import { SearchFiltersToggle, SearchForm } from './SearchForm';
+import {
+  SearchFiltersToggle,
+  SearchForm,
+  type SearchFormHandle,
+} from './SearchForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
@@ -12,6 +18,11 @@ import type { PublicSeries } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
+// What antd's `scrollToField` scrolls with; jsdom lays nothing out to scroll.
+jest.mock('scroll-into-view-if-needed', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}));
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedSeries = jest.mocked(seriesApi);
@@ -57,7 +68,8 @@ const preferences = (expanded: boolean) => ({
 });
 
 const renderForm = (
-  overrides: Partial<Parameters<typeof SearchForm>[0]> = {}
+  overrides: Partial<Parameters<typeof SearchForm>[0]> = {},
+  expanded = true
 ) => {
   const onSearch = jest.fn();
   const onReset = jest.fn();
@@ -74,7 +86,7 @@ const renderForm = (
       />
       <LocationProbe />
     </>,
-    { preloadedState: preferences(true) }
+    { preloadedState: preferences(expanded) }
   );
   return { ...view, onSearch, onReset };
 };
@@ -297,6 +309,81 @@ describe('SearchForm', () => {
       await screen.findByText('At most 200 characters.')
     ).toBeInTheDocument();
     expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('has no Sort order field of its own', () => {
+    renderForm();
+
+    expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
+  });
+
+  it('searches with what it holds now, typed or picked, under a Sort order it is handed', async () => {
+    mockedBooks.listBooks.mockResolvedValue(pageOf([]));
+    const ref = createRef<SearchFormHandle>();
+    const { onSearch } = renderForm({
+      ref,
+      initialValues: { author: 'annlee', authorId: 3, sort: 'popular' },
+    });
+
+    // Typed but never submitted with the Search button.
+    await userEvent.type(screen.getByLabelText('Text'), 'dragon');
+    act(() => ref.current!.searchWith('new'));
+
+    await waitFor(() =>
+      expect(onSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: 'dragon',
+          author: 'annlee',
+          authorId: 3,
+          sort: 'new',
+        })
+      )
+    );
+  });
+
+  it('searches nothing and opens itself when a handed Sort order meets a broken rule', async () => {
+    const ref = createRef<SearchFormHandle>();
+    const { onSearch, store } = renderForm(
+      {
+        ref,
+        initialValues: {
+          updatedFrom: dayjs('2026-02-01'),
+          updatedTo: dayjs('2026-01-01'),
+          sort: 'popular',
+        },
+      },
+      false
+    );
+
+    act(() => ref.current!.searchWith('new'));
+
+    expect(
+      await screen.findByText('Must not be after the end date.')
+    ).toBeInTheDocument();
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(store.getState().devicePreferences.searchFormExpanded).toBe(true);
+  });
+
+  it('scrolls to the first broken field when a handed Sort order is refused', async () => {
+    const ref = createRef<SearchFormHandle>();
+    renderForm(
+      {
+        ref,
+        initialValues: {
+          updatedFrom: dayjs('2026-02-01'),
+          updatedTo: dayjs('2026-01-01'),
+          sort: 'popular',
+        },
+      },
+      false
+    );
+
+    act(() => ref.current!.searchWith('new'));
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    // antd scrolls to the picker's wrapper, which holds the field.
+    const [target] = jest.mocked(scrollIntoView).mock.calls[0]!;
+    expect(target).toContainElement(screen.getByLabelText('Updated from'));
   });
 
   it("shows the server's errors on their fields", async () => {
