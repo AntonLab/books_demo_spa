@@ -1,8 +1,11 @@
 {
   "mcpServers": {
     "playwright": {
-      "command": "cmd",
-      "args": ["/c", "npx", "@playwright/mcp@latest"]
+      "command": "node",
+      "args": [
+        "-e",
+        "require('node:child_process').spawn('npx @playwright/mcp@latest', { stdio: 'inherit', shell: true }).on('exit', (code) => process.exit(code ?? 1))"
+      ]
     }
   }
 }
