@@ -94,7 +94,9 @@ code alone does not explain.
   paging meaningful. Deletion is soft (see `access.md`).
 - `/api/notifications` sits behind `requireAuth`, not the matrix; whose
   notifications they are comes from the session only. No delete, no retention
-  limit.
+  limit. `GET`/`PATCH /api/notifications/settings` carry the Account's email
+  switch (`users.emailNotifications`, default on); it is kept out of
+  `PublicUser` because Admins read other Accounts' `PublicUser`.
 
 ## Genres (ADR-0008)
 

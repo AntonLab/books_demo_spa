@@ -4,11 +4,13 @@ import { User } from '../models/User.ts';
 import type {
   ActorKind,
   NotificationKind,
+  NotificationSettings,
   PublicNotification,
   WorkType,
 } from 'shared';
 import type { ListNotificationsQuery } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
+import { NotFoundError } from '../types/errors.ts';
 
 interface NotificationListResult {
   items: PublicNotification[];
@@ -26,6 +28,11 @@ export interface NotificationRepository {
   // Marks those of `ids` that are the account's own, and answers with how
   // many of its notifications are still unread.
   markRead(userId: number, ids: number[]): Promise<number>;
+  getSettings(userId: number): Promise<NotificationSettings>;
+  updateSettings(
+    userId: number,
+    settings: NotificationSettings
+  ): Promise<NotificationSettings>;
 }
 
 // Whoever made a change that raises notifications.
@@ -124,6 +131,29 @@ export function createSequelizeNotificationRepository(): NotificationRepository 
         { where: { userId, id: ids, isRead: false } }
       );
       return Notification.count({ where: { userId, isRead: false } });
+    },
+
+    async getSettings(userId) {
+      const user = await User.findByPk(userId, {
+        attributes: ['emailNotifications'],
+      });
+      if (!user) throw new NotFoundError('User', userId);
+      return { emailNotifications: user.emailNotifications };
+    },
+
+    async updateSettings(userId, settings) {
+      const [updated] = await User.update(
+        { emailNotifications: settings.emailNotifications },
+        { where: { id: userId } }
+      );
+      // MySQL counts changed rows, not matched ones, so a write of the value
+      // already stored reports 0; only a missing account is an error.
+      if (
+        updated === 0 &&
+        !(await User.findByPk(userId, { attributes: ['id'] }))
+      )
+        throw new NotFoundError('User', userId);
+      return { emailNotifications: settings.emailNotifications };
     },
   };
 }

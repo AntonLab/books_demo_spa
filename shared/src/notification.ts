@@ -44,3 +44,10 @@ export interface PublicNotification {
 export interface NotificationList extends ListResponse<PublicNotification> {
   unread: number;
 }
+
+// The Account's own switch for Favorite announcement emails, read and written
+// at /api/notifications/settings. It never appears in PublicUser, which other
+// Accounts' Admins read.
+export interface NotificationSettings {
+  emailNotifications: boolean;
+}
