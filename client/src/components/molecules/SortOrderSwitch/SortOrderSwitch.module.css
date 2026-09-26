@@ -1,0 +1,5 @@
+/* At phone width the Sort order takes its own line, at the toolbar's full
+   width, so its three labels are not squeezed beside the Filters button. */
+.phone {
+  width: 100%;
+}
