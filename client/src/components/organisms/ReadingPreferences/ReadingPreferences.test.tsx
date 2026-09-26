@@ -43,6 +43,7 @@ describe('ReadingPreferences', () => {
       fontSize: 18,
       lineHeight: 2,
       width: 'wide',
+      layout: 'scroll',
     });
   });
 
@@ -61,6 +62,27 @@ describe('ReadingPreferences', () => {
     expect(screen.getByRole('button', { name: 'Larger text' })).toBeDisabled();
   });
 
+  it('tells its page when the popover opens', async () => {
+    const onOpenChange = jest.fn();
+    renderWithProviders(<ReadingPreferences onOpenChange={onOpenChange} />);
+
+    await open();
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it('tells its page the popover is gone when it unmounts open', async () => {
+    const onOpenChange = jest.fn();
+    const { unmount } = renderWithProviders(
+      <ReadingPreferences onOpenChange={onOpenChange} />
+    );
+    await open();
+
+    unmount();
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
   it('resets every reading preference', async () => {
     const { store } = renderWith({
       background: 'black',
@@ -68,6 +90,7 @@ describe('ReadingPreferences', () => {
       fontSize: 24,
       lineHeight: 1.4,
       width: 'full',
+      layout: 'pages',
     });
     await open();
 

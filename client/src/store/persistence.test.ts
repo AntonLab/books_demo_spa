@@ -130,6 +130,29 @@ describe('persistence', () => {
     });
   });
 
+  it('reads reading preferences stored before the layout existed as scroll', () => {
+    const raw = JSON.stringify({
+      theme: 'light',
+      reading: { background: 'sepia' },
+    });
+
+    expect(
+      parsePersisted(STORAGE_KEYS.devicePreferences, raw)?.devicePreferences
+        ?.reading.layout
+    ).toBe('scroll');
+  });
+
+  it('keeps a stored pages layout and drops an unknown one', () => {
+    const read = (layout: string) =>
+      parsePersisted(
+        STORAGE_KEYS.devicePreferences,
+        JSON.stringify({ theme: 'light', reading: { layout } })
+      )?.devicePreferences?.reading.layout;
+
+    expect(read('pages')).toBe('pages');
+    expect(read('book')).toBe('scroll');
+  });
+
   it('reads back what it wrote under the v1 key', () => {
     createAppStore().dispatch(devicePreferences.themeToggled());
 

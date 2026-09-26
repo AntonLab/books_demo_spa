@@ -17,6 +17,7 @@ describe('devicePreferencesSlice', () => {
         fontSize: 16,
         lineHeight: 1.6,
         width: 'medium',
+        layout: 'scroll',
       },
     });
   });
@@ -69,6 +70,15 @@ describe('devicePreferencesSlice', () => {
     ).toEqual({ ...initialReadingPreferences, font: 'serif' });
   });
 
+  it('switches the reading layout, keeping the other reading preferences', () => {
+    expect(
+      devicePreferencesReducer(
+        initialDevicePreferences,
+        devicePreferences.readingChanged({ layout: 'pages' })
+      ).reading
+    ).toEqual({ ...initialReadingPreferences, layout: 'pages' });
+  });
+
   it('resets the reading preferences alone', () => {
     const changed = {
       ...initialDevicePreferences,
@@ -79,6 +89,7 @@ describe('devicePreferencesSlice', () => {
         fontSize: 22,
         lineHeight: 2 as const,
         width: 'full' as const,
+        layout: 'pages' as const,
       },
     };
 
