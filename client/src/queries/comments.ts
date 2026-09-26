@@ -15,8 +15,10 @@ export const useComments = (bookId: number) => {
   });
 };
 
-// All three mutations invalidate the same key and nothing else: a comment
-// change cannot affect the book, the chapters, or another book's thread.
+// All three mutations invalidate the thread and the book's detail, whose
+// commentCount BookPage's Statistics tab shows. An edit moves no count, but one
+// extra detail refetch is cheaper than a second mutation shape. A comment
+// change cannot affect the chapters or another book's thread.
 const useCommentMutation = <TVariables>(
   bookId: number,
   mutationFn: (variables: TVariables) => Promise<unknown>
@@ -29,7 +31,12 @@ const useCommentMutation = <TVariables>(
     // would hand it a stray parameter it never asked for.
     mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.comments(bookId) }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.comments(bookId),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.book(bookId) }),
+      ]),
   });
 };
 
