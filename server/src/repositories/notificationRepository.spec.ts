@@ -341,7 +341,8 @@ describe('notifications against real MySQL', { skip }, () => {
       title: 'As It Was',
     });
     // Ann's account is gone; her name, as it was, is not.
-    assert.deepEqual(added?.actor, { kind: 'co_author', name: 'Ann Writer' });
+    assert.ok(added?.kind === 'co_author_added');
+    assert.deepEqual(added.actor, { kind: 'co_author', name: 'Ann Writer' });
   });
 
   test('an account lists only its own notifications, newest first, with its unread count', async () => {

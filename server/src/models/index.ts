@@ -329,6 +329,16 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   Notification.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
+  // A New chapter's link to the Chapter a click opens: nulled, not cascaded,
+  // when the Chapter is deleted, like the work links above.
+  Chapter.hasMany(Notification, {
+    as: 'notifications',
+    foreignKey: { name: 'chapterId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Notification.belongsTo(Chapter, { as: 'chapter', foreignKey: 'chapterId' });
 }
 
 export function initModels(sequelize: Sequelize): void {
