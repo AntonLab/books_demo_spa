@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { FC } from 'react';
-import { Drawer, Flex, theme } from 'antd';
+import { Divider, Drawer, Flex, theme } from 'antd';
 import { Link } from 'react-router';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import type { BookDetail } from '@/types/book';
@@ -42,10 +42,11 @@ export const ChapterContents: FC<ChapterContentsProps> = ({
         {book && <BookCard book={book} />}
         <nav aria-label="Chapters">
           <ol className={styles.list}>
-            {chapters.map((chapter) => {
+            {chapters.map((chapter, index) => {
               const isCurrent = chapter.id === currentId;
               return (
                 <li key={chapter.id}>
+                  {index > 0 && <Divider size="small" />}
                   <Link
                     ref={isCurrent ? current : undefined}
                     to={`/books/${chapter.bookId}/chapters/${chapter.id}`}
@@ -53,7 +54,7 @@ export const ChapterContents: FC<ChapterContentsProps> = ({
                     className={`${styles.item} ${isCurrent ? styles.current : ''}`}
                     onClick={onClose}
                   >
-                    {chapter.title}
+                    {index + 1}. {chapter.title}
                   </Link>
                 </li>
               );
