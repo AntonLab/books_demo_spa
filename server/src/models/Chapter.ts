@@ -12,11 +12,15 @@ import type { Book } from './Book.ts';
 import type { ChapterSummary, PublicChapter } from 'shared';
 
 // The one place a chapter's words are counted: the text setter below calls it,
-// so the repository and the seed cannot disagree. A trimmed-empty text is 0,
-// where ''.split(/\s+/) would answer 1.
+// so the repository and the seed cannot disagree. A word is a run of
+// non-whitespace. Counted by stepping the regex, not with split() or match():
+// a chapter may hold a million characters, and both build an array of every
+// word only to read its length.
 export function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed === '' ? 0 : trimmed.split(/\s+/).length;
+  const word = /\S+/g;
+  let count = 0;
+  while (word.exec(text) !== null) count += 1;
+  return count;
 }
 
 export class Chapter extends Model<
