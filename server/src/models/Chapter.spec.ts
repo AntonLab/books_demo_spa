@@ -189,3 +189,8 @@ test('wordCount stays out of both chapter responses', () => {
   assert.ok(!('wordCount' in toPublicChapter(chapter)));
   assert.ok(!('wordCount' in toChapterSummary(chapter)));
 });
+
+test('announcedAt is a nullable, millisecond-precise moment — null is not yet announced', () => {
+  assert.match(createTableSql, /`announcedAt` DATETIME\(3\)(?! NOT NULL)/);
+  assert.doesNotMatch(createTableSql, /`announcedAt` DATETIME\(3\) NOT NULL/);
+});

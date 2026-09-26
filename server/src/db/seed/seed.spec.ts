@@ -398,4 +398,50 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
       []
     );
   });
+
+  // Otherwise the first announcement pass after a seed would mail every
+  // Favorite holder about the whole catalogue (ADR-0013).
+  test('marks every Published chapter and book announced, and leaves Scheduled chapters for the pass', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT c.id FROM chapters c
+         JOIN books b ON b.id = c.bookId
+         WHERE b.status <> 'draft' AND c.publishedAt <= NOW(3)
+           AND c.announcedAt IS NULL`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT b.id FROM books b
+         WHERE b.status <> 'draft' AND b.announcedAt IS NULL
+           AND EXISTS (SELECT 1 FROM chapters c
+                       WHERE c.bookId = b.id AND c.publishedAt <= NOW(3))`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT c.id FROM chapters c
+         WHERE (c.publishedAt IS NULL OR c.publishedAt > NOW(3))
+           AND c.announcedAt IS NOT NULL`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT b.id FROM books b
+         WHERE b.status = 'draft' AND b.announcedAt IS NOT NULL`
+      ),
+      []
+    );
+    const [scheduled] = await sequelize.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM chapters WHERE publishedAt > NOW(3)`,
+      { type: QueryTypes.SELECT }
+    );
+    assert.ok(
+      Number(scheduled?.count) > 0,
+      'the seed writes Scheduled chapters for the pass to announce'
+    );
+  });
 });

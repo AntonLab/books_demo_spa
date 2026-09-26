@@ -205,11 +205,20 @@ async function writeContent(
     title: string;
     text: string;
     publishedAt: Date | null;
+    announcedAt: Date | null;
     position: number;
     createdAt: Date;
     updatedAt: Date;
   }[] = [];
   let seriesCount = 0;
+
+  // Everything already out when the seed runs counts as announced, or the
+  // first announcement pass would tell every Favorite holder about the whole
+  // catalogue (ADR-0013). Scheduled chapters stay unannounced: the pass
+  // announces them when their time comes, as it would for a real author's.
+  const seededAt = new Date();
+  const isOut = (moment: Date | null): moment is Date =>
+    moment !== null && moment <= seededAt;
 
   for (const author of plan.authors) {
     // Every Book and Series drawn from this author's bank is filed under the
@@ -253,6 +262,11 @@ async function writeContent(
           // Attached after the parse, like the Co-authors: createBookSchema
           // has no status, because every book the API creates is a draft.
           status: book.status,
+          announcedAt:
+            book.status !== 'draft' &&
+            book.chapters.some((chapter) => isOut(chapter.publishedAt))
+              ? seededAt
+              : null,
           seriesPosition: seriesPositionOf(book.seriesIndex, filedSoFar),
           createdAt: book.createdAt,
           updatedAt: book.createdAt,
@@ -283,6 +297,12 @@ async function writeContent(
           // Attached after the parse, like a book's status: the schema's
           // publishedAt is 'now' or a future moment, and the seed backdates.
           publishedAt: chapter.publishedAt,
+          // A Draft book's chapters stay unannounced too, so publishing the
+          // book later announces it as a New book, as it would via the API.
+          announcedAt:
+            book.status !== 'draft' && isOut(chapter.publishedAt)
+              ? seededAt
+              : null,
           // The Reading order is the order the plan wrote them in, 1-based
           // like the positions chapterRepository appends.
           position: index + 1,

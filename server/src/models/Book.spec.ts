@@ -171,3 +171,8 @@ test('toPublicBook reports a book with no Genre as genre: null, never undefined'
   assert.equal(output.genre, null);
   assert.ok('genre' in output);
 });
+
+test('announcedAt is a nullable, millisecond-precise moment — null is not yet announced to its Series', () => {
+  assert.match(createTableSql, /`announcedAt` DATETIME\(3\)(?! NOT NULL)/);
+  assert.doesNotMatch(createTableSql, /`announcedAt` DATETIME\(3\) NOT NULL/);
+});
