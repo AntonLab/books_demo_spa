@@ -62,6 +62,15 @@ describe('ReadingPreferences', () => {
     expect(screen.getByRole('button', { name: 'Larger text' })).toBeDisabled();
   });
 
+  it('tells its page when the popover opens', async () => {
+    const onOpenChange = jest.fn();
+    renderWithProviders(<ReadingPreferences onOpenChange={onOpenChange} />);
+
+    await open();
+
+    expect(onOpenChange).toHaveBeenLastCalledWith(true);
+  });
+
   it('resets every reading preference', async () => {
     const { store } = renderWith({
       background: 'black',

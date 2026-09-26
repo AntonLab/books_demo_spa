@@ -94,9 +94,23 @@ paths:
 - `ChapterPage` applies the reading Device preferences: background and font
   through a nested `ConfigProvider` (a class overriding `--ant-*` never
   reaches antd's components, which redeclare them), size and line height
-  inline on the text column, whose `ch` width is measured at that size. Its
-  arrows are antd `Button`s with `href`, routed in-app on a plain click, and
-  stay disabled rather than vanish at either end.
+  inline on the text column, whose `ch` width is measured at that size. In
+  Scroll its arrows are antd `Button`s with `href`, routed in-app on a plain
+  click, and stay disabled rather than vanish at either end.
+- The Pages Reading layout lives beside the page: rules in `pagination.ts`,
+  every layout read in `measurePages.ts` (mocked in Jest; jsdom lays nothing
+  out, so check pages, spreads and the slide in a browser), state in
+  `usePages.ts`. The strip is CSS multi-column with a fixed height, so its
+  overflow columns are the pages. A relayout re-measures, then shows the page
+  where the paragraph that was on top begins; the effect recording that
+  paragraph must stay after the one that reads it. The page stays mounted
+  between chapters, so `usePages` resets its view during render when the
+  chapter id changes. "Open on the last page" is `location.state`, replaced
+  with `null` once read, or a reload would reopen there. In Pages the arrows
+  are plain buttons whose label changes, so focus survives the hand-off to a
+  chapter. The window clips with `overflow: clip`: a `hidden` box can be
+  scrolled by find-in-page. Destructure `usePages`'s result: `react-hooks/refs`
+  reads any property of an object holding refs as a ref read during render.
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
   and opens the confirm modal over it. The path and key are a contract with
   `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.

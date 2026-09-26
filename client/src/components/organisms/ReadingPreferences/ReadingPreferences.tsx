@@ -51,9 +51,17 @@ const Field: FC<{ label: string; children: ReactNode }> = ({
   );
 };
 
+interface ReadingPreferencesProps {
+  // The reader's page turns pages on the arrow keys, which the popover's own
+  // controls need while it is open.
+  onOpenChange?: (open: boolean) => void;
+}
+
 // How a Chapter reads on this device: a Device preference, so it holds for
 // every Book. Each change applies at once, behind the open popover.
-export const ReadingPreferences: FC = () => {
+export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
+  onOpenChange,
+}) => {
   const { token } = theme.useToken();
   const reading = useAppSelector((state) => state.devicePreferences.reading);
   const dispatch = useAppDispatch();
@@ -119,7 +127,12 @@ export const ReadingPreferences: FC = () => {
   );
 
   return (
-    <Popover content={form} trigger="click" placement="bottomRight">
+    <Popover
+      content={form}
+      trigger="click"
+      placement="bottomRight"
+      onOpenChange={onOpenChange}
+    >
       <Button aria-label="Reading preferences" icon={<SettingOutlined />} />
     </Popover>
   );

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import type { FC, ReactNode } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
+import type { FC, MouseEvent, ReactNode } from 'react';
 import {
   Alert,
   Button,
@@ -31,6 +31,8 @@ import { READING_PALETTES, READING_SERIF_FONT } from '@/theme/tokens';
 import { publishedChapters, type ChapterSummary } from '@/types/chapter';
 import {
   arrowLabel,
+  directionForClick,
+  directionForKey,
   OPEN_ON_LAST_PAGE,
   opensOnLastPage,
   pageIndicator,
@@ -113,6 +115,7 @@ export const ChapterPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [contentsOpen, setContentsOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const pagesOn = reading.layout === 'pages';
   const openOnLastPage = opensOnLastPage(location.state);
 
@@ -176,6 +179,32 @@ export const ChapterPage: FC = () => {
     );
   };
 
+  // The drawer and the popover need the arrow keys for themselves, and a
+  // chapter still loading has no pages to turn.
+  const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (contentsOpen || preferencesOpen || chapter === undefined) return;
+    const direction = directionForKey(event);
+    if (direction === undefined) return;
+    event.preventDefault();
+    go(direction);
+  });
+
+  // Scroll leaves every key to the browser.
+  useEffect(() => {
+    if (!pagesOn) return;
+    const listener = (event: KeyboardEvent) => onKeyDown(event);
+    document.addEventListener('keydown', listener);
+    return () => document.removeEventListener('keydown', listener);
+  }, [pagesOn]);
+
+  const onTextClick = (event: MouseEvent<HTMLDivElement>) => {
+    // A drag that selects text ends in a click too.
+    if (window.getSelection()?.isCollapsed === false) return;
+    const { left, width } = event.currentTarget.getBoundingClientRect();
+    const direction = directionForClick(event.clientX, left, width);
+    if (direction !== undefined) go(direction);
+  };
+
   if (isError) {
     return <Alert type="error" title="Could not load this chapter." />;
   }
@@ -227,7 +256,7 @@ export const ChapterPage: FC = () => {
               }
             />
           </Tooltip>
-          <ReadingPreferences />
+          <ReadingPreferences onOpenChange={setPreferencesOpen} />
         </Flex>
         {arrow('next')}
       </Flex>
@@ -247,7 +276,14 @@ export const ChapterPage: FC = () => {
               />
               {/* Off-page text is clipped, never aria-hidden: a screen reader
                   still reads the whole chapter. */}
-              <div className={styles.window} style={windowStyle}>
+              {/* The keys do the same from the document listener, so the
+                  click needs no key handler or role of its own. */}
+              <div
+                role="presentation"
+                className={styles.window}
+                style={windowStyle}
+                onClick={onTextClick}
+              >
                 <div
                   ref={stripRef}
                   className={`${styles.strip} ${animate ? styles.turning : ''}`}
