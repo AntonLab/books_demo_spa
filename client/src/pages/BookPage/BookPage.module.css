@@ -18,3 +18,11 @@
 .tabs {
   margin-top: var(--ant-margin);
 }
+
+/* The panel, not the whole Tabs, so the tab bar stays in view while a long
+   description or chapter list scrolls. Fixed rather than capped, so switching
+   tabs never moves the comments below. */
+.tabsBody {
+  height: var(--ant-app-book-tabs-height);
+  overflow-y: auto;
+}
