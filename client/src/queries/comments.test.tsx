@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
   useCreateComment,
@@ -94,5 +94,25 @@ describe('comment writes', () => {
       'Loved it, truly'
     );
     expectThreadAndBookInvalidated();
+  });
+
+  // CommentSection clears its form once the write settles, so a slow book
+  // refetch must not hold it back; only the thread's refetch is awaited.
+  it('settles without waiting for the book’s figures to come back', async () => {
+    const { wrapper } = setUp();
+    const { result } = renderHook(
+      () => {
+        useQuery({
+          queryKey: ['books', 1],
+          queryFn: () => new Promise<never>(() => {}),
+        });
+        return useCreateComment(1);
+      },
+      { wrapper }
+    );
+
+    result.current.mutate({ bookId: 1, parentId: null, text: 'Loved it' });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });
