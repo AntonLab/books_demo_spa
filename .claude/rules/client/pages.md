@@ -102,13 +102,18 @@ paths:
   out, so check pages, spreads and the slide in a browser), state in
   `usePages.ts`. The strip is CSS multi-column with a fixed height, so its
   overflow columns are the pages. A relayout re-measures, then shows the page
-  where the paragraph that was on top begins; the effect recording that
-  paragraph must stay after the one that reads it. The page stays mounted
+  where the paragraph that was on top begins. That paragraph is recorded only
+  on an open or a turn, never after a relayout (it would then be the one
+  carried over from the page before, and every resize would step back a
+  page), and a resize that changes no page size keeps the old geometry. The
+  page stays mounted
   between chapters, so `usePages` resets its view during render when the
   chapter id changes. "Open on the last page" is `location.state`, replaced
   with `null` once read, or a reload would reopen there. In Pages the arrows
-  are plain buttons whose label changes, so focus survives the hand-off to a
-  chapter. The window clips with `overflow: clip`: a `hidden` box can be
+  are plain buttons whose label changes, so focus stays on one as it turns
+  pages; a hand-off to a chapter not yet cached shows the skeleton, which
+  drops focus. `ReadingPreferences` reports closed on unmount, or the page's
+  keys stay off after that skeleton. The window clips with `overflow: clip`: a `hidden` box can be
   scrolled by find-in-page. Destructure `usePages`'s result: `react-hooks/refs`
   reads any property of an object holding refs as a ref read during render.
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL

@@ -56,6 +56,12 @@ const openedView = (chapterId: number, openOnLastPage: boolean): View => ({
   animate: false,
 });
 
+const sameGeometry = (a: Geometry, b: Geometry) =>
+  a.pageWidth === b.pageWidth &&
+  a.pageHeight === b.pageHeight &&
+  a.perView === b.perView &&
+  a.gap === b.gap;
+
 export const usePages = ({
   enabled,
   chapterId,
@@ -66,8 +72,8 @@ export const usePages = ({
   const { token } = theme.useToken();
   const probeRef = useRef<HTMLDivElement>(null);
   const stripRef = useRef<HTMLDivElement>(null);
-  // The strip child at the top of the page shown, recorded after each settle
-  // so a relayout can find it again.
+  // The strip child at the top of the page shown, recorded on each open and
+  // turn so a relayout can find it again.
   const anchorRef = useRef(0);
   const [geometry, setGeometry] = useState<Geometry>();
   const [view, setView] = useState(() => openedView(chapterId, openOnLastPage));
@@ -87,14 +93,22 @@ export const usePages = ({
 
   // `text` and `font` are not read here, but either one reflows the strip,
   // and a fresh geometry object is what makes phase B count the pages again.
+  // A resize reflows nothing unless a page size changed, and a settle there
+  // would step back to where the carried-over paragraph begins.
   useLayoutEffect(() => {
     const probe = probeRef.current;
     if (!enabled || !probe) return;
     const measure = () =>
-      setGeometry(measureGeometry(probe, width, { gap, reserve, minHeight }));
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+      measureGeometry(probe, width, { gap, reserve, minHeight });
+    const remeasure = () => {
+      const next = measure();
+      setGeometry((current) =>
+        current !== undefined && sameGeometry(current, next) ? current : next
+      );
+    };
+    setGeometry(measure());
+    window.addEventListener('resize', remeasure);
+    return () => window.removeEventListener('resize', remeasure);
   }, [
     enabled,
     text,
@@ -117,26 +131,19 @@ export const usePages = ({
         : view.openAt === 'first'
           ? 0
           : pageOfChild(strip, anchorRef.current, measured);
-    setView({
-      ...view,
-      openAt: 'anchor',
-      pageCount,
-      start: clampView(page, pageCount, measured.perView),
-      animate: false,
-    });
+    const start = clampView(page, pageCount, measured.perView);
+    // An anchor settle keeps its anchor: recorded again, it would be the
+    // paragraph carried over onto this page, and each relayout would step
+    // one page further back.
+    if (view.openAt !== 'anchor') {
+      anchorRef.current = childOnPage(strip, start, measured);
+    }
+    setView({ ...view, openAt: 'anchor', pageCount, start, animate: false });
   });
 
   useLayoutEffect(() => {
     if (geometry) settle(geometry);
   }, [geometry]);
-
-  // After phase B on purpose: in the commit that brings a new geometry,
-  // phase B must still read the anchor recorded under the old one.
-  useLayoutEffect(() => {
-    const strip = stripRef.current;
-    if (!geometry || !strip) return;
-    anchorRef.current = childOnPage(strip, view.start, geometry);
-  }, [geometry, view.start]);
 
   const perView = geometry?.perView ?? 1;
   const offset = geometry
@@ -161,15 +168,17 @@ export const usePages = ({
     },
     hasPage: (direction) =>
       hasPage(view.start, direction, view.pageCount, perView),
-    turn: (direction) =>
-      setView((current) => ({
-        ...current,
-        animate: true,
-        start: clampView(
-          current.start + (direction === 'next' ? perView : -perView),
-          current.pageCount,
-          perView
-        ),
-      })),
+    turn: (direction) => {
+      const start = clampView(
+        view.start + (direction === 'next' ? perView : -perView),
+        view.pageCount,
+        perView
+      );
+      const strip = stripRef.current;
+      if (geometry && strip) {
+        anchorRef.current = childOnPage(strip, start, geometry);
+      }
+      setView({ ...view, animate: true, start });
+    },
   };
 };

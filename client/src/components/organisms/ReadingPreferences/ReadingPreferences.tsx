@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Button, Flex, Popover, Segmented, theme, Typography } from 'antd';
 import {
@@ -65,6 +66,16 @@ export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
   const { token } = theme.useToken();
   const reading = useAppSelector((state) => state.devicePreferences.reading);
   const dispatch = useAppDispatch();
+  const [open, setOpen] = useState(false);
+
+  // Unmounted while open (a chapter loading swaps the page for a skeleton),
+  // the popover never reports closing, and its page would keep the keys off.
+  useEffect(() => {
+    if (!open) return;
+    onOpenChange?.(true);
+    return () => onOpenChange?.(false);
+  }, [open, onOpenChange]);
+
   const change = (patch: Partial<Reading>) =>
     dispatch(devicePreferences.readingChanged(patch));
   const { min, max, step } = READING_FONT_SIZE;
@@ -131,7 +142,8 @@ export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
       content={form}
       trigger="click"
       placement="bottomRight"
-      onOpenChange={onOpenChange}
+      open={open}
+      onOpenChange={setOpen}
     >
       <Button aria-label="Reading preferences" icon={<SettingOutlined />} />
     </Popover>
