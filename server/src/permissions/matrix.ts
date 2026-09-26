@@ -43,6 +43,10 @@ const USER_GRANTS: RoleGrants = {
   // update is what turns a like into a dislike; without it likeRoutes' PATCH
   // would be reachable by superadmin alone.
   likes: { read: 'any', create: 'own', update: 'own', delete: 'own' },
+  // A Favorite is private: added and removed by its Account only, never read
+  // or edited through the matrix. The lists are requireAuth routes that read
+  // the session's own rows (routes/favoriteRoutes.ts).
+  favorites: { create: 'own', delete: 'own' },
 };
 
 const AUTHOR_GRANTS: RoleGrants = {
@@ -75,10 +79,15 @@ const ADMIN_GRANTS: RoleGrants = {
   reports: { read: 'any', create: 'any', update: 'any', delete: 'any' },
 };
 
-// `any` on everything, with the two carve-outs admin has too: no creating
-// content (admins moderate; they do not author) and no rewriting another
-// account's comments or likes (moderators remove; they do not rewrite).
+// `any` on everything, with the carve-outs admin has too: no creating content
+// (admins moderate; they do not author), no rewriting another account's
+// comments or likes (moderators remove; they do not rewrite), and Favorites
+// exactly as everyone else has them — they are private, so there is nothing
+// for a Moderator to reach.
 function superadminScope(module: Module, action: Action): PermissionScope {
+  if (module === 'favorites') {
+    return action === 'create' || action === 'delete' ? 'own' : 'none';
+  }
   if (
     action === 'create' &&
     (module === 'books' || module === 'series' || module === 'chapters')
