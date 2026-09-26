@@ -41,7 +41,9 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   in or out of any list, so it invalidates the whole `books` prefix; filing a
   book also changes a series; a Genre rename changes the `genre` embedded in
   every book and series; an Avatar change touches every embedded `PublicUser`
-  or `AuthorSummary`.
+  or `AuthorSummary`. A Comment write and a chapter create, save or delete
+  also invalidate `queryKeys.book(bookId)`: the detail carries `commentCount`
+  and `wordCount` for `BookPage`'s Statistics tab. A chapter reorder does not.
 - `useToggleLike` handles both directions from the `viewerLikeId` the caller
   holds (`null` likes, a number deletes that row) and takes the key to
   invalidate, since a book like and a comment like refresh different things.
