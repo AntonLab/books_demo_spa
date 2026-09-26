@@ -36,6 +36,7 @@ const KNOWN_SERIES_ID = 7;
 // able to file a book under.
 const OTHER_AUTHOR_SERIES_ID = 8;
 const VIEWER_LIKE_ID = 99;
+const VIEWER_FAVORITE_ID = 77;
 const UNOWNED_USER_ID = 999997;
 
 // Credited to otherAuthor first and the `author` persona second, so filing a
@@ -112,6 +113,7 @@ const createFakeRepository = (
     series: SERIES,
     genres: GENRES,
     likes: { count: 4, viewerLikeId: VIEWER_LIKE_ID },
+    favorites: { count: 3, viewerFavoriteId: VIEWER_FAVORITE_ID },
     tallies: { commentCount: 6, wordCount: 1200 },
     ...spies,
   });
@@ -529,6 +531,8 @@ test('GET by id embeds the co-authors and series, and never an email', async () 
       assert.equal(body.commentCount, 6);
       assert.equal(body.wordCount, 1200);
       assert.equal(body.viewerLikeId, null);
+      assert.equal(body.favoriteCount, 3);
+      assert.equal(body.viewerFavoriteId, null);
     }
   );
 });
@@ -545,6 +549,7 @@ test('GET by id reports the viewer own like when signed in', async () => {
 
       const body = await json<BookDetail>(response);
       assert.equal(body.viewerLikeId, VIEWER_LIKE_ID);
+      assert.equal(body.viewerFavoriteId, VIEWER_FAVORITE_ID);
     }
   );
 });

@@ -61,6 +61,13 @@ export interface BookDetail extends PublicBook {
   // Co-author's Draft and Scheduled chapters never count, so the figure is the
   // one readers see.
   wordCount: number;
+  // Accounts holding this book as a Favorite. 0 while the book is a Draft,
+  // whoever reads it: a Draft book's Favorites are kept but not counted.
+  favoriteCount: number;
+  // The id of the viewer's own Favorite, for DELETE /api/favorites/:id; null
+  // for a Guest and for an account without one. Reported on a Draft too, so
+  // the button a Co-author sees matches the row that exists.
+  viewerFavoriteId: number | null;
 }
 
 // The Book statuses a search may ask for: a Draft book never appears in one.

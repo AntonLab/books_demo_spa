@@ -13,6 +13,7 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
+import { Favorite } from '../models/Favorite.ts';
 import { Genre } from '../models/Genre.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
@@ -863,6 +864,73 @@ describe('bookRepository against real MySQL', { skip }, () => {
       });
 
       assert.equal(detail?.wordCount, 0);
+    });
+
+    let fanCount = 0;
+    const aFan = async () => {
+      fanCount += 1;
+      return User.create({
+        login: `BookFan${fanCount}`,
+        email: `book-fan-${fanCount}@example.com`,
+        password: 'hunter2hunter2',
+        firstName: 'Book',
+        lastName: `Fan${fanCount}`,
+      });
+    };
+
+    test("favoriteCount counts every holder, and viewerFavoriteId names the viewer's own", async () => {
+      const book = await publishedBook('Treasured');
+      const elsewhere = await publishedBook('Elsewhere');
+      const fan = await aFan();
+      const otherFan = await aFan();
+      const own = await Favorite.create({ userId: fan.id, bookId: book.id });
+      await Favorite.create({ userId: otherFan.id, bookId: book.id });
+      await Favorite.create({ userId: fan.id, bookId: elsewhere.id });
+
+      const asFan = await repository.findDetailById(book.id, {
+        id: fan.id,
+        role: 'user',
+      });
+      const asGuest = await repository.findDetailById(book.id, null);
+      const asCoAuthor = await repository.findDetailById(book.id, asOwner());
+
+      assert.deepEqual(
+        [asFan?.favoriteCount, asFan?.viewerFavoriteId],
+        [2, own.id]
+      );
+      assert.deepEqual(
+        [asGuest?.favoriteCount, asGuest?.viewerFavoriteId],
+        [2, null]
+      );
+      assert.equal(asCoAuthor?.viewerFavoriteId, null);
+    });
+
+    test('a Draft book counts no favorites, yet names the viewer own, and republishing counts them again', async () => {
+      const book = await publishedBook('Withdrawn');
+      const fan = await aFan();
+      await Favorite.create({ userId: fan.id, bookId: book.id });
+      const own = await Favorite.create({ userId: ownerId, bookId: book.id });
+
+      await repository.update(book.id, { status: 'draft' });
+      const asCoAuthor = await repository.findDetailById(book.id, asOwner());
+      const asModerator = await repository.findDetailById(book.id, {
+        id: fan.id,
+        role: 'admin',
+      });
+
+      assert.deepEqual(
+        [asCoAuthor?.favoriteCount, asCoAuthor?.viewerFavoriteId],
+        [0, own.id]
+      );
+      assert.equal(asModerator?.favoriteCount, 0);
+      assert.equal(await Favorite.count({ where: { bookId: book.id } }), 2);
+
+      await repository.update(book.id, { status: 'complete' });
+
+      assert.equal(
+        (await repository.findDetailById(book.id, null))?.favoriteCount,
+        2
+      );
     });
   });
 
