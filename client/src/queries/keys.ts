@@ -29,4 +29,6 @@ export const queryKeys = {
   seriesBooks: (id: number) => ['series', id, 'books'] as const,
   authors: (q: string) => ['authors', { q }] as const,
   notifications: (userId: number) => ['notifications', userId] as const,
+  // The prefix over every Account's notifications.
+  allNotifications: ['notifications'] as const,
 };
