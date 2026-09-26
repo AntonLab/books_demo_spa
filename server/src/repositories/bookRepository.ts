@@ -3,6 +3,8 @@ import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
+import { Chapter } from '../models/Chapter.ts';
+import { Comment } from '../models/Comment.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
@@ -57,8 +59,8 @@ export interface BookRepository {
   list(query: ListBooksQuery, viewer: Viewer): Promise<BookListResult>;
   findById(id: number): Promise<PublicBook | null>;
   // Separate from findById rather than replacing it: the detail read costs a
-  // series join and two like queries, and the write paths that only need to
-  // know a row exists should not pay for them.
+  // series join, two like queries and two tallies, and the write paths that
+  // only need to know a row exists should not pay for them.
   //
   // null, too, for a Draft book the viewer may not read: the caller reports it
   // exactly as a missing book, so a refusal does not reveal the draft exists.
@@ -470,19 +472,26 @@ export function createSequelizeBookRepository(): BookRepository {
       });
       if (!book) return null;
 
-      // Two follow-up queries rather than a correlated subquery in the SELECT
-      // above: each is a single indexed lookup on likes, and keeping them apart
-      // leaves the include readable.
-      const likeCount = await Like.count({
-        where: { bookId: id, isLike: true },
-      });
-      const viewerLike =
-        viewerId === null
-          ? null
-          : await Like.findOne({
-              where: { bookId: id, userId: viewerId },
-              attributes: ['id'],
-            });
+      // Follow-up queries rather than correlated subqueries in the SELECT
+      // above, which keeps the include readable; none depends on another, so
+      // they run at once. The word count is judged Published on this
+      // process's clock, as readableChapterScope judges it, but the viewer
+      // never widens it: a Co-author's Draft and Scheduled chapters do not
+      // count. SUM over no row is NULL, hence ?? 0.
+      const [likeCount, viewerLike, commentCount, wordCount] =
+        await Promise.all([
+          Like.count({ where: { bookId: id, isLike: true } }),
+          viewerId === null
+            ? null
+            : Like.findOne({
+                where: { bookId: id, userId: viewerId },
+                attributes: ['id'],
+              }),
+          Comment.count({ where: { bookId: id, tombstone: null } }),
+          Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
+            where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
+          }),
+        ]);
 
       return {
         ...(await withAuthors(book)),
@@ -491,6 +500,8 @@ export function createSequelizeBookRepository(): BookRepository {
           : null,
         likeCount,
         viewerLikeId: viewerLike?.id ?? null,
+        commentCount,
+        wordCount: wordCount ?? 0,
       };
     },
 

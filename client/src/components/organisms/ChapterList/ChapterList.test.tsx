@@ -80,3 +80,44 @@ describe('ChapterList dates and states', () => {
     );
   });
 });
+
+describe('ChapterList numbering', () => {
+  // The number sits beside the link, not in it: the link's name stays the
+  // title, so the row reads "2. Chapter One".
+  const rows = () =>
+    screen.getAllByRole('link').map((link) => link.parentElement?.textContent);
+
+  it('numbers each chapter by its place in the list, from 1', () => {
+    renderWithProviders(
+      <ChapterList
+        {...baseProps}
+        items={[
+          { ...chapter, id: 12, title: 'Written last, read first' },
+          chapter,
+          { ...chapter, id: 15, title: 'The End' },
+        ]}
+      />
+    );
+
+    expect(rows()).toEqual([
+      '1. Written last, read first',
+      '2. Chapter One',
+      '3. The End',
+    ]);
+  });
+
+  it('keeps a number the title carries of its own', () => {
+    // The place wins: a title numbered by its author is shown as written.
+    renderWithProviders(
+      <ChapterList
+        {...baseProps}
+        items={[{ ...chapter, title: 'Chapter 3: The Gate' }]}
+      />
+    );
+
+    expect(rows()).toEqual(['1. Chapter 3: The Gate']);
+    expect(
+      screen.getByRole('link', { name: 'Chapter 3: The Gate' })
+    ).toHaveAttribute('href', '/books/1/chapters/9');
+  });
+});

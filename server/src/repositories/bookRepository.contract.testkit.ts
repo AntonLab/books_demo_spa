@@ -247,6 +247,22 @@ export function bookRepositoryContract(
     );
   });
 
+  // Zero, not null, on both sides: the real repository's SUM over no chapter
+  // is NULL, and a client adding it up would print "null".
+  test('contract: a new book detail counts no comments and no words', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    const created = await aBook(repository, authorId);
+
+    const detail = await repository.findDetailById(created.id, {
+      id: authorId,
+      role: 'author',
+    });
+
+    assert.equal(detail?.commentCount, 0);
+    assert.equal(detail?.wordCount, 0);
+  });
+
   test('contract: a removed book is gone, credits and all', async () => {
     const { repository, anAuthor } = await setUp();
     const authorId = await anAuthor();
