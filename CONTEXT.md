@@ -90,6 +90,11 @@ A work credited to one or more Co-authors, read as a sequence of Chapters in
 its Reading order and optionally grouped into a Series.
 _Avoid_: Title, work
 
+**Description**:
+The text a Book's or Series' Co-authors write to tell readers what it is
+about. It may be empty.
+_Avoid_: Annotation, summary, blurb
+
 **Cover**:
 The one optional picture that stands for a Book. A Book without one is shown
 with a placeholder bearing its title.
@@ -121,6 +126,9 @@ _Avoid_: Part, section, episode
 **Reading order**:
 The explicit position of each Chapter within its Book, independent of when a
 Chapter was created or published.
+A reader sees a Chapter numbered by its place among the Book's Published
+chapters, so the number is derived, not kept, and can change when a Chapter is
+published, withdrawn or moved.
 _Avoid_: Chapter number (a title may carry one; the order does not depend on it)
 
 **Publication time**:
@@ -248,3 +256,15 @@ The Publication time of a Book's latest Published Chapter. Editing a Book's
 details or an existing Chapter does not move it, and neither does a Scheduled
 chapter until its Publication time passes.
 _Avoid_: Updated at (for a Book)
+
+**Search filter**:
+A condition that narrows which Books a search finds, such as its text, an
+author, a Series, a Genre, a Book status, or a range of Release times or Last
+updates. A search's Search filters all apply at once.
+_Avoid_: Sort (for a condition that narrows)
+
+**Sort order**:
+The order a search's Books are listed in: by Popularity, as New releases, or
+by Last update. It never changes which Books are found, only their order, so
+it is not a Search filter.
+_Avoid_: Filter, ranking
