@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChapterPage } from './ChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -423,5 +423,159 @@ describe('ChapterPage in pages', () => {
     ).toHaveAttribute('href', '/books/1/chapters/11');
     expect(screen.queryByText(/^Page /)).not.toBeInTheDocument();
     expect(measure.measureGeometry).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChapterPage pages from the keyboard', () => {
+  it('turns forward on the right arrow, Page Down and Space, back on the left arrow and Page Up', async () => {
+    measure.countPages.mockReturnValue(5);
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 5');
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument();
+    await userEvent.keyboard('{PageDown}');
+    expect(screen.getByText('Page 3 of 5')).toBeInTheDocument();
+    await userEvent.keyboard(' ');
+    expect(screen.getByText('Page 4 of 5')).toBeInTheDocument();
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(screen.getByText('Page 3 of 5')).toBeInTheDocument();
+    await userEvent.keyboard('{PageUp}');
+    expect(screen.getByText('Page 2 of 5')).toBeInTheDocument();
+  });
+
+  it('hands off to the next chapter from the last page', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
+
+    expect(
+      await screen.findByRole('heading', { name: 'Three' })
+    ).toBeInTheDocument();
+  });
+
+  it('ignores a key with a modifier held', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+
+    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowLeft}{/Alt}');
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Two' })).toBeInTheDocument();
+  });
+
+  it('leaves the keys to a field being typed in', async () => {
+    renderWithProviders(
+      <>
+        <input aria-label="Search" />
+        <ChapterPage />
+      </>,
+      {
+        route: '/books/1/chapters/10',
+        path: '/books/:bookId/chapters/:chapterId',
+        preloadedState: inPages,
+      }
+    );
+    await screen.findByText('Page 1 of 3');
+    const search = screen.getByRole('textbox', { name: 'Search' });
+
+    await userEvent.click(search);
+    await userEvent.keyboard('a b{ArrowLeft}{ArrowRight}{PageDown}');
+
+    expect(search).toHaveValue('a b');
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
+  it('turns once when Space presses a focused arrow', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+    arrows('Next page')[0]!.focus();
+
+    await userEvent.keyboard(' ');
+
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+  });
+
+  it('turns nothing while the contents are open', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+    await userEvent.click(screen.getByRole('button', { name: 'Contents' }));
+    await screen.findByRole('navigation', { name: 'Chapters' });
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
+  it('turns nothing while the reading preferences are open', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Reading preferences' })
+    );
+    await screen.findByText('Background');
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
+  it('leaves the keys alone in scroll', async () => {
+    renderAt(10);
+    await screen.findByRole('heading', { name: 'Two' });
+
+    await userEvent.keyboard('{ArrowRight}{PageDown} ');
+
+    expect(screen.getByRole('heading', { name: 'Two' })).toBeInTheDocument();
+    expect(screen.queryByText(/^Page /)).not.toBeInTheDocument();
+  });
+});
+
+describe('ChapterPage pages from a click on the text', () => {
+  // jsdom lays nothing out, so the window is given a 900px-wide box.
+  const renderWithWindow = async () => {
+    renderPagesAt(10);
+    const heading = await screen.findByRole('heading', { name: 'Two' });
+    const pageWindow = heading.parentElement!.parentElement!;
+    jest.spyOn(pageWindow, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 900,
+    } as DOMRect);
+    return heading;
+  };
+
+  afterEach(() => {
+    window.getSelection()?.removeAllRanges();
+  });
+
+  it('turns forward on the right third and back on the left third', async () => {
+    const heading = await renderWithWindow();
+
+    fireEvent.click(heading, { clientX: 850 });
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+
+    fireEvent.click(heading, { clientX: 50 });
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
+  it('does nothing on the middle third', async () => {
+    const heading = await renderWithWindow();
+
+    fireEvent.click(heading, { clientX: 450 });
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+
+  it('does not turn at the end of a text selection', async () => {
+    const heading = await renderWithWindow();
+    const range = document.createRange();
+    range.selectNodeContents(screen.getByText('It was a dark night.'));
+    window.getSelection()?.addRange(range);
+
+    fireEvent.click(heading, { clientX: 850 });
+
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
   });
 });
