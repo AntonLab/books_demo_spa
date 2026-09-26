@@ -35,6 +35,9 @@ export type CommentWithAuthor = Wire<Shared.CommentWithAuthor>;
 // to it. `actor.name` is set for a Co-author only; a Moderator and a deleted
 // account are never named.
 export type PublicNotification = Wire<Shared.PublicNotification>;
+export type CreditNotification = Wire<Shared.CreditNotification>;
+export type NewChapterNotification = Wire<Shared.NewChapterNotification>;
+export type NewBookNotification = Wire<Shared.NewBookNotification>;
 
 export type NotificationList = Wire<Shared.NotificationList>;
 

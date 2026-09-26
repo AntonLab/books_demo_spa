@@ -3,7 +3,7 @@ import { Notification, toPublicNotification } from '../models/Notification.ts';
 import { User } from '../models/User.ts';
 import type {
   ActorKind,
-  NotificationKind,
+  CreditNotificationKind,
   NotificationSettings,
   PublicNotification,
   WorkType,
@@ -44,7 +44,7 @@ export interface Actor {
 // One event and everyone it is told to.
 interface NotificationEvent {
   recipientIds: number[];
-  kind: NotificationKind;
+  kind: CreditNotificationKind;
   work: { type: WorkType; id: number | null; title: string };
   actorKind: ActorKind;
   actorName: string | null;

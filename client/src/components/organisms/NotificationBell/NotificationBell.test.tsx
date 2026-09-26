@@ -4,21 +4,51 @@ import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
-import type { PublicNotification } from '@/types/api';
+import type {
+  CreditNotification,
+  NewBookNotification,
+  NewChapterNotification,
+  PublicNotification,
+} from '@/types/api';
 
 jest.mock('@/api/notifications');
 
 const mockedNotifications = jest.mocked(notificationsApi);
 
 const notification = (
-  overrides: Partial<PublicNotification>
-): PublicNotification => ({
+  overrides: Partial<CreditNotification>
+): CreditNotification => ({
   id: 1,
   kind: 'co_author_added',
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   actor: { kind: 'co_author', name: 'Margaret Hale' },
   isRead: false,
   createdAt: '2026-09-12T10:00:00.000Z',
+  ...overrides,
+});
+
+const newChapter = (
+  overrides: Partial<NewChapterNotification>
+): NewChapterNotification => ({
+  id: 11,
+  kind: 'new_chapter',
+  work: { type: 'book', id: 7, title: 'The Glass Harbour' },
+  chapter: { id: 70, title: 'The Tide Bell' },
+  chapterCount: 1,
+  isRead: false,
+  createdAt: '2026-09-26T10:00:00.000Z',
+  ...overrides,
+});
+
+const newBook = (
+  overrides: Partial<NewBookNotification>
+): NewBookNotification => ({
+  id: 21,
+  kind: 'new_book',
+  work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
+  series: { id: 4, title: 'The Nightbus Files' },
+  isRead: false,
+  createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
 
@@ -214,6 +244,71 @@ describe('NotificationBell', () => {
     expect(
       await screen.findByText('No notifications yet.')
     ).toBeInTheDocument();
+  });
+
+  it('words New chapter and New book notifications and links to what is new', async () => {
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([
+        newChapter({}),
+        newChapter({
+          id: 12,
+          work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+          chapter: { id: 80, title: 'Low Water' },
+          chapterCount: 3,
+        }),
+        newChapter({
+          id: 13,
+          work: { type: 'book', id: 5, title: 'Iron Orchard' },
+          chapter: { id: null, title: 'Withdrawn' },
+        }),
+        newChapter({
+          id: 14,
+          work: { type: 'book', id: null, title: 'Gone Book' },
+          chapter: { id: null, title: 'Gone Chapter' },
+        }),
+        newBook({}),
+      ])
+    );
+    renderWithProviders(<NotificationBell userId={3} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Notifications/ })
+    );
+
+    expect(
+      await screen.findByText('The Tide Bell', { exact: false })
+    ).toBeInTheDocument();
+    expect(
+      sentence('New chapter in the book “The Glass Harbour”: “The Tide Bell”.')
+    ).toBeInTheDocument();
+    expect(
+      sentence(
+        '3 new chapters in the book “Salt and Candlelight”, starting with “Low Water”.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      sentence(
+        'New book in the series “The Nightbus Files”: “The Nightbus Returns”.'
+      )
+    ).toBeInTheDocument();
+
+    // A New chapter opens the first new Chapter; a New book opens the Book.
+    expect(
+      screen.getByRole('link', { name: '“The Tide Bell”' })
+    ).toHaveAttribute('href', '/books/7/chapters/70');
+    expect(screen.getByRole('link', { name: '“Low Water”' })).toHaveAttribute(
+      'href',
+      '/books/8/chapters/80'
+    );
+    expect(
+      screen.getByRole('link', { name: '“The Nightbus Returns”' })
+    ).toHaveAttribute('href', '/books/9');
+    // A deleted Chapter falls back to its Book; a deleted Book links nowhere.
+    expect(screen.getByRole('link', { name: '“Withdrawn”' })).toHaveAttribute(
+      'href',
+      '/books/5'
+    );
+    expect(screen.queryByRole('link', { name: '“Gone Chapter”' })).toBeNull();
   });
 
   it('dates each notification with the app date-time helper', async () => {

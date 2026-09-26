@@ -81,6 +81,12 @@ own credit table.
 
 - Written by `notify` inside the transaction of the change, so a failed change
   raises nothing. The actor is never a recipient.
+- `new_chapter` and `new_book` are raised by the announcement pass
+  (`announcements/`), never by `notify`: they carry no actor (`actorKind`
+  null), a New chapter links its first unread Chapter (`chapterId`, `SET
+NULL`) with a `chapterCount`, and a New book sets both `bookId` and its
+  Series' `seriesId`. Their recipients are Favorite holders minus the Book's
+  Co-authors.
 - Added tells the account added; removed tells the account removed; leaving
   tells every remaining Co-author; deleting a work tells every other Co-author
   (the deleter is named only if credited — otherwise a Moderator, unnamed);
