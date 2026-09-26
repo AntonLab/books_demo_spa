@@ -90,6 +90,11 @@ A work credited to one or more Co-authors, read as a sequence of Chapters in
 its Reading order and optionally grouped into a Series.
 _Avoid_: Title, work
 
+**Description**:
+The text a Book's or Series' Co-authors write to tell readers what it is
+about. It may be empty.
+_Avoid_: Annotation, summary, blurb
+
 **Cover**:
 The one optional picture that stands for a Book. A Book without one is shown
 with a placeholder bearing its title.
@@ -121,6 +126,9 @@ _Avoid_: Part, section, episode
 **Reading order**:
 The explicit position of each Chapter within its Book, independent of when a
 Chapter was created or published.
+A reader sees a Chapter numbered by its place among the Book's Published
+chapters, so the number is derived, not kept, and can change when a Chapter is
+published, withdrawn or moved.
 _Avoid_: Chapter number (a title may carry one; the order does not depend on it)
 
 **Publication time**:
