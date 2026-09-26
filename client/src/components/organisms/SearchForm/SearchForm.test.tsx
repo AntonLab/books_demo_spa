@@ -1,9 +1,14 @@
 import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
-import { act, screen } from '@testing-library/react';
+import { createRef } from 'react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import { useLocation } from 'react-router';
-import { SearchFiltersToggle, SearchForm } from './SearchForm';
+import {
+  SearchFiltersToggle,
+  SearchForm,
+  type SearchFormHandle,
+} from './SearchForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
@@ -57,7 +62,8 @@ const preferences = (expanded: boolean) => ({
 });
 
 const renderForm = (
-  overrides: Partial<Parameters<typeof SearchForm>[0]> = {}
+  overrides: Partial<Parameters<typeof SearchForm>[0]> = {},
+  expanded = true
 ) => {
   const onSearch = jest.fn();
   const onReset = jest.fn();
@@ -74,7 +80,7 @@ const renderForm = (
       />
       <LocationProbe />
     </>,
-    { preloadedState: preferences(true) }
+    { preloadedState: preferences(expanded) }
   );
   return { ...view, onSearch, onReset };
 };
@@ -297,6 +303,59 @@ describe('SearchForm', () => {
       await screen.findByText('At most 200 characters.')
     ).toBeInTheDocument();
     expect(onSearch).not.toHaveBeenCalled();
+  });
+
+  it('has no Sort order field of its own', () => {
+    renderForm();
+
+    expect(screen.queryByLabelText('Sort by')).not.toBeInTheDocument();
+  });
+
+  it('searches with what it holds now, typed or picked, under a Sort order it is handed', async () => {
+    mockedBooks.listBooks.mockResolvedValue(pageOf([]));
+    const ref = createRef<SearchFormHandle>();
+    const { onSearch } = renderForm({
+      ref,
+      initialValues: { author: 'annlee', authorId: 3, sort: 'popular' },
+    });
+
+    // Typed but never submitted with the Search button.
+    await userEvent.type(screen.getByLabelText('Text'), 'dragon');
+    act(() => ref.current!.searchWith('new'));
+
+    await waitFor(() =>
+      expect(onSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          q: 'dragon',
+          author: 'annlee',
+          authorId: 3,
+          sort: 'new',
+        })
+      )
+    );
+  });
+
+  it('searches nothing and opens itself when a handed Sort order meets a broken rule', async () => {
+    const ref = createRef<SearchFormHandle>();
+    const { onSearch, store } = renderForm(
+      {
+        ref,
+        initialValues: {
+          updatedFrom: dayjs('2026-02-01'),
+          updatedTo: dayjs('2026-01-01'),
+          sort: 'popular',
+        },
+      },
+      false
+    );
+
+    act(() => ref.current!.searchWith('new'));
+
+    expect(
+      await screen.findByText('Must not be after the end date.')
+    ).toBeInTheDocument();
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(store.getState().devicePreferences.searchFormExpanded).toBe(true);
   });
 
   it("shows the server's errors on their fields", async () => {
