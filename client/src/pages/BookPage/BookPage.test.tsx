@@ -359,10 +359,11 @@ describe('BookPage tabs', () => {
   // queries skip.
   const openPanel = () => within(screen.getByRole('tabpanel'));
 
-  // antd's non-bordered Descriptions puts each value in the span right after
-  // its label.
+  // Each figure is one table cell holding its label and then its value.
   const statistic = (label: string) =>
-    openPanel().getByText(label).nextElementSibling?.textContent;
+    openPanel()
+      .getByRole('cell', { name: new RegExp(`^${label}`) })
+      .textContent?.slice(label.length);
 
   const openTab = async (name: string) => {
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
