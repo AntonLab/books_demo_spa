@@ -37,6 +37,10 @@ Four" reads as a test run, not a demo.
 - **Dates anchor to the run**: the newest chapter is always 2-5 days old, the
   cadence scales to `PUBLICATION_WINDOW_DAYS`, `createdAt` is passed
   explicitly, and `{ silent: true }` keeps a backdated `updatedAt`.
+- **Everything already out is announced** (`announcedAt` = the run's start) on
+  books and chapters, or the first announcement pass would mail every Favorite
+  holder about the catalogue. Scheduled chapters and Draft books stay
+  unannounced, so the pass announces them when their time comes.
 - The data never shows what the API would refuse: no like on one's own book or
   comment, none on a tombstone or Draft book, no Favorite on a Draft book or on
   a series with no non-draft book, no activity before an account's
