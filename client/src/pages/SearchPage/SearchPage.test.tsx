@@ -99,6 +99,30 @@ describe('SearchPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the last count in the title while the next search runs', async () => {
+    serve({ total: 45 });
+    renderPage('/search?q=dragon');
+    await screen.findByRole('heading', { name: 'Search results · 45 books' });
+    mockedBooks.listBooks.mockImplementation(() => new Promise(() => {}));
+
+    await userEvent.click(screen.getByRole('radio', { name: 'New releases' }));
+
+    await waitFor(() => expect(location()).toBe('/search?q=dragon&sort=new'));
+    expect(
+      screen.getByRole('heading', { name: 'Search results · 45 books' })
+    ).toBeInTheDocument();
+  });
+
+  it('says it is searching until a first count is known', () => {
+    mockedBooks.listBooks.mockImplementation(() => new Promise(() => {}));
+
+    renderPage('/search');
+
+    return expect(
+      screen.findByRole('heading', { name: 'Search results · Searching…' })
+    ).resolves.toBeInTheDocument();
+  });
+
   it('says so when nothing matches', async () => {
     serve({ items: [], total: 0 });
 
