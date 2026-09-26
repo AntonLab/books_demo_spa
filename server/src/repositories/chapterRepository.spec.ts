@@ -210,6 +210,38 @@ describe('chapterRepository against real MySQL', { skip }, () => {
     assert.equal(updated?.text, 'The body');
   });
 
+  test('the word count follows the text on create and on a save that carries text, and only then', async () => {
+    const wordCountOf = async (id: number) =>
+      (await Chapter.findByPk(id))?.wordCount;
+    const created = await createPublished({
+      bookId,
+      title: 'Counted',
+      text: '  It was   a dark\nnight.  ',
+    });
+    assert.equal(await wordCountOf(created.id), 5);
+
+    // A save without text — a rename, a return to Draft — leaves it alone.
+    const renamed = await repository.update(created.id, {
+      title: 'Renamed',
+      publishedAt: null,
+      expectedUpdatedAt: created.updatedAt.toISOString(),
+    });
+    assert.equal(await wordCountOf(created.id), 5);
+
+    const rewritten = await repository.update(created.id, {
+      text: 'Shorter now.',
+      expectedUpdatedAt: renamed!.updatedAt.toISOString(),
+    });
+    assert.equal(await wordCountOf(created.id), 2);
+
+    // Whitespace passes the schema's min(1) but holds no word.
+    await repository.update(created.id, {
+      text: ' \n\t ',
+      expectedUpdatedAt: rewritten!.updatedAt.toISOString(),
+    });
+    assert.equal(await wordCountOf(created.id), 0);
+  });
+
   test('update and remove report a missing chapter rather than throwing', async () => {
     assert.equal(
       await repository.update(999_999, {
