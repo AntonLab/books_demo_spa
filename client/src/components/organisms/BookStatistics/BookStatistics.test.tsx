@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { BookStatistics } from './BookStatistics';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDate } from '@/format/date';
@@ -20,25 +20,27 @@ const baseProps = {
   isError: false,
 };
 
-// antd's non-bordered Descriptions renders each item as a label span followed
-// by its content span.
+const LABELS = [
+  'Chapters',
+  'Words',
+  'Likes',
+  'Comments',
+  'Release time',
+  'Last update',
+];
+
+// Each figure is one table cell holding its label and then its value; the
+// cell's text is read, not the markup inside it, which antd is free to change.
+const cellOf = (label: string) =>
+  screen.getByRole('cell', { name: new RegExp(`^${label}`) });
 const valueOf = (label: string) =>
-  screen.getByText(label).nextElementSibling?.textContent;
+  cellOf(label).textContent?.slice(label.length);
 
 describe('BookStatistics', () => {
   it('lists the six figures in order', () => {
     renderWithProviders(<BookStatistics {...baseProps} />);
 
-    expect(
-      [
-        'Chapters',
-        'Words',
-        'Likes',
-        'Comments',
-        'Release time',
-        'Last update',
-      ].map((label) => [label, valueOf(label)])
-    ).toEqual([
+    expect(LABELS.map((label) => [label, valueOf(label)])).toEqual([
       ['Chapters', '1'],
       ['Words', '12,345'],
       ['Likes', '4'],
@@ -47,18 +49,13 @@ describe('BookStatistics', () => {
       ['Last update', formatDate('2026-09-03T00:00:00.000Z')],
     ]);
     // Label order on the page, not only presence.
-    const labels = Array.from(
-      document.querySelectorAll('.ant-descriptions-item-label'),
-      (label) => label.textContent
-    );
-    expect(labels).toEqual([
-      'Chapters',
-      'Words',
-      'Likes',
-      'Comments',
-      'Release time',
-      'Last update',
-    ]);
+    expect(
+      screen
+        .getAllByRole('cell')
+        .map((cell) =>
+          LABELS.find((label) => cell.textContent?.startsWith(label))
+        )
+    ).toEqual(LABELS);
   });
 
   it('dates the release and the last update by Publication time, not by Reading order', () => {
@@ -104,10 +101,12 @@ describe('BookStatistics', () => {
       <BookStatistics {...baseProps} chapters={[]} isPending />
     );
 
-    // Not "0" and not "—": neither is known yet.
-    expect(valueOf('Chapters')).toBe('');
-    expect(valueOf('Release time')).toBe('');
-    expect(valueOf('Last update')).toBe('');
+    // Not "0" and not "—": neither is known yet, and each says it is loading.
+    for (const label of ['Chapters', 'Release time', 'Last update']) {
+      expect(
+        within(cellOf(label)).getByRole('status', { name: 'Loading' })
+      ).toHaveAttribute('aria-busy', 'true');
+    }
     // The book's own figures have loaded.
     expect(valueOf('Words')).toBe('12,345');
     expect(valueOf('Likes')).toBe('4');

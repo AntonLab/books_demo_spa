@@ -30,7 +30,14 @@ export const BookStatistics: FC<BookStatisticsProps> = ({
     if (isError) {
       return <Typography.Text type="danger">Could not load</Typography.Text>;
     }
-    if (isPending) return <Skeleton.Input active size="small" />;
+    // Skeleton renders bare markup that tells a screen reader nothing.
+    if (isPending) {
+      return (
+        <span role="status" aria-busy="true" aria-label="Loading">
+          <Skeleton.Input active size="small" />
+        </span>
+      );
+    }
     return value;
   };
 
