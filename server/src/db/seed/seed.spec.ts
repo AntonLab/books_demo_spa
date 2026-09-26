@@ -17,6 +17,7 @@ import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
+import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -35,10 +36,11 @@ const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
-// The ten tables the seed deletes from under --force. Listed again here
+// The eleven tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  Favorite,
   Like,
   Comment,
   Chapter,
@@ -257,6 +259,48 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
         `SELECT l.id FROM likes l
          JOIN users u ON u.id = l.userId
          WHERE l.createdAt < u.createdAt`
+      ),
+      []
+    );
+  });
+
+  // Written through the models, past favoriteRepository's visibility check,
+  // so nothing but this stops the seed favoriting what a reader cannot see.
+  test('gives every reader favorites, and none the API would refuse', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT u.login FROM users u
+         LEFT JOIN favorites f ON f.userId = u.id
+         WHERE u.role = 'user'
+         GROUP BY u.id, u.login
+         HAVING COUNT(f.id) = 0`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         JOIN users u ON u.id = f.userId
+         WHERE u.role <> 'user' OR f.createdAt < u.createdAt`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         JOIN books b ON b.id = f.bookId
+         WHERE b.status = 'draft'`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         WHERE f.seriesId IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM books b
+             WHERE b.seriesId = f.seriesId AND b.status <> 'draft'
+           )`
       ),
       []
     );

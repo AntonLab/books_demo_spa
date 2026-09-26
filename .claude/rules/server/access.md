@@ -39,6 +39,14 @@ half. Nothing here lives in the permission table.
   check-then-write there. Safe because a comment's owner never changes, and a
   credit landing between check and insert leaves at worst one early like.
   Uniqueness stays with the indexes.
+- **Favorites are private.** Every read and the delete are scoped by the
+  session's account in `favoriteRepository`, not compared in the controller,
+  so another account's Favorite answers the same 404 as a missing one. Adding
+  one needs the work to be readable (`readableBookWhere` /
+  `visibleSeriesWhere`): a hidden Draft is 404 like a missing id. A book
+  returned to Draft keeps its Favorite rows but leaves the list and counts
+  zero on `BookDetail.favoriteCount`; its own Co-authors and Moderators still
+  see `viewerFavoriteId`.
 
 ## Co-authors (ADR-0005)
 

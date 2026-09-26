@@ -17,9 +17,9 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the ten content
-// tables before inserting. Without --force it reports what it found and exits
-// without writing.
+// Destructive by design: with --force it deletes every row in the eleven
+// content tables before inserting. Without --force it reports what it found
+// and exits without writing.
 
 import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger } from '../../logger.ts';
@@ -28,6 +28,7 @@ import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
+import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -37,6 +38,7 @@ import { User } from '../../models/User.ts';
 import { createBookSchema } from '../../types/book.ts';
 import { createChapterSchema } from '../../types/chapter.ts';
 import { createCommentSchema } from '../../types/comment.ts';
+import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
 import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
@@ -80,6 +82,7 @@ const INSERT_BATCH = 200;
 // syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  Favorite,
   Like,
   Comment,
   Chapter,
@@ -494,6 +497,39 @@ async function writeThreads(
   return { comments: plan.comments.length, likes: likeRows.length };
 }
 
+async function writeFavorites(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  seriesIds: Map<PlannedSeries, number>,
+  transaction: Transaction
+): Promise<number> {
+  const idOf = <T extends { title: string }>(
+    ids: Map<T, number>,
+    work: T
+  ): number => {
+    const id = ids.get(work);
+    if (id === undefined) {
+      throw new Error(`No row was created for "${work.title}"`);
+    }
+    return id;
+  };
+
+  const rows = plan.favorites.map((favorite) => ({
+    ...createFavoriteSchema.parse({
+      bookId: favorite.book === null ? null : idOf(bookIds, favorite.book),
+      seriesId:
+        favorite.series === null ? null : idOf(seriesIds, favorite.series),
+    }),
+    userId: itemAt(accountIds, favorite.accountIndex, 'account id'),
+    createdAt: favorite.createdAt,
+  }));
+
+  // About 25 rows: far below INSERT_BATCH, so one insert.
+  await Favorite.bulkCreate(rows, { transaction });
+  return rows.length;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Entry point                                                                */
 /* -------------------------------------------------------------------------- */
@@ -553,6 +589,13 @@ async function main(): Promise<void> {
         content.bookIds,
         transaction
       );
+      const favorites = await writeFavorites(
+        plan,
+        accountIds,
+        content.bookIds,
+        content.seriesIds,
+        transaction
+      );
       const notifications = await writeNotifications(
         plan,
         accountIds,
@@ -568,6 +611,7 @@ async function main(): Promise<void> {
         books: content.bookIds.size,
         chapters: content.chapters,
         ...threads,
+        favorites,
         notifications,
       };
     });

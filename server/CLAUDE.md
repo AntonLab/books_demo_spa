@@ -55,8 +55,9 @@ Install from the repo root. Scripts run here or from the root with `-w server`.
   `*.spec.ts`, `*.testkit.ts` and `src/db/seed/`. `dist/` still imports `shared`
   as `.ts`, so running it needs the workspace link and a type-stripping Node
   (ADR-0006).
-- `npm run seed -- --force` — **deletes every row in the ten content tables**,
-  Covers and Avatars with them; without `--force` it only reports row counts.
+- `npm run seed -- --force` — **deletes every row in the eleven content
+  tables**, Covers and Avatars with them; without `--force` it only reports
+  row counts.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`.
   Keep `--env-file-if-exists`: without it the MySQL suites skip silently.
   `posttest` drops the test schemas, and npm runs it only after a green run —
