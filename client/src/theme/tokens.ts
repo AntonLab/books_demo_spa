@@ -22,6 +22,10 @@ declare module 'antd/es/theme/interface' {
     appNotificationPanelWidth: number;
     /** Width of a BookCover frame; its height is 1.5x this (a 2:3 ratio). */
     appBookCoverWidth: number;
+    /** Height of BookPage's tab panel, sized to Statistics; longer ones scroll. */
+    appBookTabsHeight: number;
+    /** Tallest the replied-to Comment grows in the composer before it scrolls. */
+    appCommentQuoteMaxHeight: number;
     /** Width of the page's content column (header and route): a CSS length. */
     appPageWidth: string;
     /** Widest a Chapter's text column grows at each reading width: CSS lengths. */
@@ -50,6 +54,8 @@ export const appTheme: ThemeConfig = {
     appSearchBarMaxWidth: 400,
     appNotificationPanelWidth: 360,
     appBookCoverWidth: 96,
+    appBookTabsHeight: 218,
+    appCommentQuoteMaxHeight: 160,
     // A share of the window, kept between a floor and a ceiling. The `%`
     // resolves where the variable is used, against the Layout's full width.
     appPageWidth: 'clamp(1024px, 75%, 1440px)',
