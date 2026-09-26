@@ -12,11 +12,14 @@ const TOMBSTONE_LABELS: Record<Tombstone, string> = {
   removed: '[removed by moderator]',
 };
 
+const COLLAPSED_ROWS = 3;
+
 interface CommentProps {
   comment: CommentWithAuthor;
-  // False on a reply: the UI renders two levels, so a reply carries no Reply
-  // button. The server stores arbitrary depth regardless — only this caps it.
   canReply: boolean;
+  // Clamps the text to a few lines behind "Show more"; off where the whole
+  // text must show, as above the reply composer.
+  clamp?: boolean;
   isOwn: boolean;
   canLike: boolean;
   onReply: (id: number) => void;
@@ -31,6 +34,7 @@ interface CommentProps {
 export const Comment: FC<CommentProps> = ({
   comment,
   canReply,
+  clamp = true,
   isOwn,
   canLike,
   onReply,
@@ -74,7 +78,16 @@ export const Comment: FC<CommentProps> = ({
         </Typography.Text>
       </Space>
 
-      <Typography.Paragraph className={styles.text}>
+      <Typography.Paragraph
+        className={styles.text}
+        ellipsis={
+          clamp && {
+            rows: COLLAPSED_ROWS,
+            expandable: 'collapsible',
+            symbol: (expanded) => (expanded ? 'Show less' : 'Show more'),
+          }
+        }
+      >
         {comment.text}
       </Typography.Paragraph>
 

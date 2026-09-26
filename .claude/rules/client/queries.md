@@ -19,7 +19,9 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
 - **The session follows every tab** (`watchSession`, wired to the app's
   client only): a `setQueryData` on the session is announced on the
   `books.session` BroadcastChannel and the other tabs refetch `/auth/me`; a
-  changed Account id invalidates every other query. So only a mutation's own
+  changed Account id invalidates every other query, except the notifications,
+  which it removes: the bell is still mounted then, and a refetch would ask
+  as the next Account (a 401 on Sign out). So only a mutation's own
   answer may `setQueryData` the session, never a guess. `useSession` also
   refetches on every focus (`'always'`), and a 401 on any query or mutation
   while an Account is shown refetches it too (a Lost session): never a

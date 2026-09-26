@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommentSection } from './CommentSection';
 import { ApiError } from '@/api/client';
@@ -75,6 +75,9 @@ const renderSignedIn = (preloadedState?: Partial<RootState>) => {
   });
 };
 
+const addComment = () =>
+  userEvent.click(screen.getByRole('button', { name: 'Add comment' }));
+
 const savedAt = '2026-09-23T10:00:00.000Z';
 const withEntries = (
   entries: Record<string, { text: string; savedAt: string }>
@@ -121,13 +124,13 @@ describe('CommentSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('prompts an anonymous visitor to sign in instead of showing a composer', async () => {
+  it('prompts an anonymous visitor to sign in instead of offering a composer', async () => {
     renderWithProviders(<CommentSection bookId={1} />);
 
     expect(
       await screen.findByText('Sign in to join the discussion.')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add comment' })).toBeNull();
   });
 
   it('is read-only when closed, even for a signed-in visitor', async () => {
@@ -139,19 +142,56 @@ describe('CommentSection', () => {
     expect(
       screen.getByText('Comments are closed while this book is a draft.')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add comment' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
     expect(screen.queryByRole('button', { name: /like/i })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
 
-  it('offers Reply only on the top-level comment', async () => {
+  it('offers Reply on the top-level comment and on its reply', async () => {
     renderSignedIn();
 
     await screen.findByText('A fine book');
 
-    // Two levels deep: the reply itself carries no Reply button.
-    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Reply' })).toHaveLength(2);
+  });
+
+  it('files a reply to a reply under their root', async () => {
+    mockedComments.createComment.mockResolvedValue({ ...reply, id: 7 });
+
+    renderSignedIn();
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]!);
+    const dialog = screen.getByRole('dialog', { name: 'Reply to Oth Er' });
+    expect(within(dialog).getByText('Agreed')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Me too');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Post' }));
+
+    // Two levels only: the new reply joins the thread, not the reply.
+    expect(mockedComments.createComment).toHaveBeenCalledWith({
+      bookId: 1,
+      parentId: 5,
+      text: 'Me too',
+    });
+  });
+
+  it('offers no Reply on a reply whose root is a Tombstone', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        { ...root, text: '', tombstone: 'deleted', userId: null, author: null },
+        reply,
+      ],
+      total: 2,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderSignedIn();
+    await screen.findByText('Agreed');
+
+    // The server refuses a reply under a Tombstone.
+    expect(screen.queryByRole('button', { name: 'Reply' })).toBeNull();
   });
 
   it('posts a top-level comment', async () => {
@@ -160,6 +200,10 @@ describe('CommentSection', () => {
     renderSignedIn();
     await screen.findByText('A fine book');
 
+    await addComment();
+    expect(
+      screen.getByRole('dialog', { name: 'New comment' })
+    ).toBeInTheDocument();
     await userEvent.type(screen.getByRole('textbox'), 'New');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
@@ -170,13 +214,36 @@ describe('CommentSection', () => {
     });
   });
 
+  it('offers no Post for blank text', async () => {
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), '   ');
+
+    expect(screen.getByRole('button', { name: 'Post' })).toBeDisabled();
+  });
+
+  it('shows the comment being replied to above the field', async () => {
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
+
+    const dialog = screen.getByRole('dialog', { name: 'Reply to Read Er' });
+    expect(within(dialog).getByText('A fine book')).toBeInTheDocument();
+    // Read-only: the quoted comment carries none of its controls.
+    expect(within(dialog).queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Reply' })).toBeNull();
+  });
+
   it('posts a reply against the comment being replied to', async () => {
     mockedComments.createComment.mockResolvedValue({ ...root, id: 7 });
 
     renderSignedIn();
     await screen.findByText('A fine book');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Reply' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
     await userEvent.type(screen.getByRole('textbox'), 'Mine too');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
@@ -193,8 +260,11 @@ describe('CommentSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByRole('textbox')).toHaveValue('A fine book');
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Edit comment' });
+    expect(within(dialog).getByRole('textbox')).toHaveValue('A fine book');
+    expect(
+      within(dialog).getByRole('button', { name: 'Save' })
+    ).toBeInTheDocument();
   });
 
   it('patches the comment being edited', async () => {
@@ -402,6 +472,7 @@ describe('CommentSection Unsaved text', () => {
   it('restores the root composer after a remount', async () => {
     const { store, queryClient, unmount } = renderSignedIn();
     await screen.findByText('A fine book');
+    await addComment();
     await userEvent.type(
       screen.getByRole('textbox', { name: 'Write a comment' }),
       'Half a thought'
@@ -411,6 +482,7 @@ describe('CommentSection Unsaved text', () => {
     renderWithProviders(<CommentSection bookId={1} />, { store, queryClient });
 
     await screen.findByText('A fine book');
+    await addComment();
     expect(
       screen.getByRole('textbox', { name: 'Write a comment' })
     ).toHaveValue('Half a thought');
@@ -457,14 +529,14 @@ describe('CommentSection Unsaved text', () => {
     const { store } = renderSignedIn();
     await screen.findByText('A fine book');
 
+    await addComment();
     await userEvent.type(screen.getByRole('textbox'), 'Keep me');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
-    await waitFor(() =>
-      expect(mockedComments.createComment).toHaveBeenCalled()
-    );
-    // Let the rejection settle, so a wrongly wired onSuccess would have run.
-    await act(async () => {});
 
+    // The modal stays open over the failure.
+    expect(
+      await screen.findByText('Could not post the comment.')
+    ).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveValue('Keep me');
     expect(store.getState().unsavedText.entries['book:1:comment']?.text).toBe(
       'Keep me'
@@ -476,11 +548,58 @@ describe('CommentSection Unsaved text', () => {
     const { store } = renderSignedIn();
     await screen.findByText('A fine book');
 
+    await addComment();
     await userEvent.type(screen.getByRole('textbox'), 'New');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-    await waitFor(() => expect(screen.getByRole('textbox')).toHaveValue(''));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('keeps the text when the modal is cancelled', async () => {
+    const { store } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'Later');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(store.getState().unsavedText.entries['book:1:comment']?.text).toBe(
+      'Later'
+    );
+    await addComment();
+    expect(screen.getByRole('textbox')).toHaveValue('Later');
+  });
+
+  it('closes a reply whose comment becomes a Tombstone and offers its text', async () => {
+    const { queryClient } = renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
+    await userEvent.type(screen.getByRole('textbox'), 'Too late');
+    act(() => {
+      queryClient.setQueryData(queryKeys.comments(1), {
+        items: [
+          {
+            ...root,
+            text: '',
+            tombstone: 'deleted',
+            userId: null,
+            author: null,
+          },
+          reply,
+        ],
+        total: 2,
+        limit: 100,
+        offset: 0,
+      });
+    });
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('textbox', { name: 'Unsaved text' })).toHaveValue(
+      'Too late'
+    );
   });
 
   it('offers the text of a reply whose comment became a Tombstone', async () => {
@@ -517,6 +636,7 @@ describe('CommentSection Unsaved text', () => {
     const { store, unmount } = renderSignedIn();
     await screen.findByText('A fine book');
 
+    await addComment();
     await userEvent.type(screen.getByRole('textbox'), 'New');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
     await waitFor(() =>

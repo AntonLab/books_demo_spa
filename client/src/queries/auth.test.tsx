@@ -263,6 +263,22 @@ describe('watchSession', () => {
     expect(client.getQueryState(queryKeys.session)?.isInvalidated).toBe(false);
   });
 
+  it("drops the last Account's notifications rather than refetching them", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.notifications(user.id), {
+      items: [],
+      unread: 0,
+    });
+
+    client.setQueryData(queryKeys.session, null);
+
+    expect(client.getQueryState(queryKeys.notifications(user.id))).toBe(
+      undefined
+    );
+  });
+
   describe('a failed request', () => {
     const failQuery = (client: QueryClient, error: ApiError) =>
       client
