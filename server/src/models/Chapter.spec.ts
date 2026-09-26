@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
 import { Book } from './Book.ts';
 import { initModels } from './index.ts';
-import { Chapter, toChapterSummary, toPublicChapter } from './Chapter.ts';
+import {
+  Chapter,
+  countWords,
+  toChapterSummary,
+  toPublicChapter,
+} from './Chapter.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
 // reached through a narrow structural cast rather than `any`.
@@ -73,6 +78,10 @@ test('position is a required unsigned integer — every chapter has a place in i
   assert.match(createTableSql, /`position` INTEGER UNSIGNED NOT NULL/);
 });
 
+test('wordCount is a required unsigned integer, stored beside the text it counts', () => {
+  assert.match(createTableSql, /`wordCount` INTEGER UNSIGNED NOT NULL/);
+});
+
 test('the table is InnoDB with the utf8mb4 default collation', () => {
   assert.match(
     createTableSql,
@@ -133,4 +142,50 @@ test('toChapterSummary drops the body but keeps the title', () => {
   assert.equal(summary.title, 'Chapter One');
   assert.ok(!('text' in summary));
   assert.ok(!('position' in summary));
+});
+
+test('countWords counts the runs of non-whitespace in a text', () => {
+  assert.equal(countWords('It was a dark night.'), 5);
+  assert.equal(countWords('one'), 1);
+  // Runs of spaces, tabs and newlines, and blanks at either end, are one gap.
+  assert.equal(countWords('  one   two\n\nthree\tfour  '), 4);
+  // A no-break space separates words too: JavaScript's \s includes it.
+  assert.equal(countWords('one two'), 2);
+});
+
+test('countWords is 0 for a text that is empty after trimming', () => {
+  // The schema's min(1) lets a whitespace-only body through, and
+  // ''.split(/\s+/) would otherwise answer 1.
+  assert.equal(countWords(''), 0);
+  assert.equal(countWords('   \n\t  '), 0);
+});
+
+test('building a chapter counts its words, and setting new text recounts them', () => {
+  const chapter = Chapter.build({
+    id: 1,
+    bookId: 2,
+    title: 'Chapter One',
+    text: 'It was a dark night.',
+    position: 3,
+  });
+  assert.equal(chapter.wordCount, 5);
+
+  chapter.set('text', 'Shorter now.');
+
+  // That the save also writes it is proven on MySQL, in
+  // chapterRepository.spec.ts.
+  assert.equal(chapter.wordCount, 2);
+});
+
+test('wordCount stays out of both chapter responses', () => {
+  const chapter = Chapter.build({
+    id: 1,
+    bookId: 2,
+    title: 'Chapter One',
+    text: 'It was a dark night.',
+    position: 3,
+  });
+
+  assert.ok(!('wordCount' in toPublicChapter(chapter)));
+  assert.ok(!('wordCount' in toChapterSummary(chapter)));
 });

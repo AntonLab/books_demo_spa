@@ -37,6 +37,11 @@ paths:
   utf8mb4. `CHAPTER_TEXT_MAX_LENGTH` (1,000,000) fits even at 4 bytes each.
 - `chapterRepository.list` omits `text` and returns `ChapterSummary`; the
   omission sits in the type so no call site puts it back.
+- `chapters.wordCount` is `countWords(text)`, written by a setter on `text` in
+  `Chapter.ts`, not by a hook: `bulkCreate` (the seed) runs setters but skips
+  per-instance hooks, and `instance.update` saves the side effect. So every
+  write that assigns `text` recounts, and one that does not leaves it. It is
+  summed into `BookDetail.wordCount` and never sent per chapter.
 - Credits are ordered by surrogate `id`, not `createdAt`: whole-second
   `DATETIME` ties two credits added in one second.
 - `book_covers` / `user_avatars` keep `updatedAt` and drop `createdAt` (replaced
