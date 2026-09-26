@@ -74,7 +74,9 @@ no MSW.
   tells a Cover from several Avatars.
 - **An antd `Menu` item cannot be activated by keyboard in a test**: its handler
   checks `event.which === 13`, which user-event never sets. Click it instead.
-- A route test awaits `findByRole`, which also waits out the lazy chunk.
+- **`App.test.tsx` imports every lazy page in `beforeAll`.** A page's first
+  import can outlast `findBy*`'s 1 s in a loaded run, so the route tests
+  failed at random. A page added to `App.tsx` joins `LAZY_PAGES`.
 - **`navigator.clipboard` exists only after `userEvent.setup()`**, which
   installs user-event's stub; a direct `userEvent.click` installs none and
   jsdom has no clipboard. Read what was copied with

@@ -29,6 +29,34 @@ const mockedNotifications = jest.mocked(notificationsApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
+// Every page App.tsx loads lazily. A page's first import transforms and
+// evaluates its whole module graph, which in a loaded parallel run outlasts
+// findBy*'s 1 s; loading them here leaves each route test waiting only for
+// its render, as a browser does once the chunk is cached.
+const LAZY_PAGES = [
+  'AdminGenresPage',
+  'BookPage',
+  'ChapterPage',
+  'EditBookPage',
+  'EditChapterPage',
+  'EditSeriesPage',
+  'MainPage',
+  'MyBooksPage',
+  'NewBookPage',
+  'NewChapterPage',
+  'NewSeriesPage',
+  'NotFoundPage',
+  'ProfilePage',
+  'SearchPage',
+  'SeriesPage',
+];
+
+beforeAll(
+  () =>
+    Promise.all(LAZY_PAGES.map((page) => import(`@/pages/${page}/${page}`))),
+  30_000
+);
+
 beforeEach(() => {
   jest.resetAllMocks();
   // Anonymous visitor unless a test says otherwise.
