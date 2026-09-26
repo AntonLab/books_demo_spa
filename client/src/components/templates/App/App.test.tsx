@@ -93,6 +93,8 @@ beforeEach(() => {
     likeCount: 0,
     commentCount: 0,
     wordCount: 0,
+    favoriteCount: 0,
+    viewerFavoriteId: null,
     viewerLikeId: null,
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);

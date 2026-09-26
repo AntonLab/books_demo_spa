@@ -52,6 +52,9 @@ code alone does not explain.
   Co-author's or Moderator's Draft and Scheduled chapters do not count. Both
   are follow-up queries in `findDetailById`, beside `Like.count`; list rows
   carry neither, and no chapter response carries its own count.
+  `BookDetail.favoriteCount` counts every holder, and is 0 while the book is a
+  Draft whoever reads it; `viewerFavoriteId` names the viewer's own row even
+  then.
 
 ## Chapters
 

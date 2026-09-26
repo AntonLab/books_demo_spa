@@ -5,6 +5,7 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
+import { Favorite } from '../models/Favorite.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
@@ -479,20 +480,36 @@ export function createSequelizeBookRepository(): BookRepository {
       // process's clock, as readableChapterScope judges it, but the viewer
       // never widens it: a Co-author's Draft and Scheduled chapters do not
       // count. SUM over no row is NULL, hence ?? 0.
-      const [likeCount, viewerLike, commentCount, wordCount] =
-        await Promise.all([
-          Like.count({ where: { bookId: id, isLike: true } }),
-          viewerId === null
-            ? null
-            : Like.findOne({
-                where: { bookId: id, userId: viewerId },
-                attributes: ['id'],
-              }),
-          Comment.count({ where: { bookId: id, tombstone: null } }),
-          Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
-            where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
-          }),
-        ]);
+      // A Draft book's Favorites are kept but not counted (CONTEXT.md,
+      // Favorite), whoever reads the detail. The viewer's own row is still
+      // named, so the button matches what exists.
+      const [
+        likeCount,
+        viewerLike,
+        commentCount,
+        wordCount,
+        favoriteCount,
+        viewerFavorite,
+      ] = await Promise.all([
+        Like.count({ where: { bookId: id, isLike: true } }),
+        viewerId === null
+          ? null
+          : Like.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['id'],
+            }),
+        Comment.count({ where: { bookId: id, tombstone: null } }),
+        Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
+          where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
+        }),
+        book.status === 'draft' ? 0 : Favorite.count({ where: { bookId: id } }),
+        viewerId === null
+          ? null
+          : Favorite.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['id'],
+            }),
+      ]);
 
       return {
         ...(await withAuthors(book)),
@@ -503,6 +520,8 @@ export function createSequelizeBookRepository(): BookRepository {
         viewerLikeId: viewerLike?.id ?? null,
         commentCount,
         wordCount: wordCount ?? 0,
+        favoriteCount,
+        viewerFavoriteId: viewerFavorite?.id ?? null,
       };
     },
 
