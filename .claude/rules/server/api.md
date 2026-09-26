@@ -46,6 +46,12 @@ code alone does not explain.
   book with no Published chapter. "Published" compares with the process clock,
   as `readableChapterScope` does, so a Scheduled chapter counts once its time
   passes.
+- `BookDetail.commentCount` counts live Comments, roots and replies, never a
+  Tombstone. `BookDetail.wordCount` sums `chapters.wordCount` over Published
+  chapters on the process clock, and the viewer never widens that: a
+  Co-author's or Moderator's Draft and Scheduled chapters do not count. Both
+  are follow-up queries in `findDetailById`, beside `Like.count`; list rows
+  carry neither, and no chapter response carries its own count.
 
 ## Chapters
 

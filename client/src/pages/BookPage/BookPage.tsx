@@ -2,9 +2,11 @@ import type { FC } from 'react';
 import {
   Alert,
   Divider,
+  Empty,
   Flex,
   Skeleton,
   Space,
+  Tabs,
   Tag,
   theme,
   Typography,
@@ -14,6 +16,7 @@ import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
 import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
 import { CommentSection } from '@/components/organisms/CommentSection/CommentSection';
@@ -60,6 +63,10 @@ export const BookPage: FC = () => {
   // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
   const { isCoAuthor, mayLike } = bookCapabilities(book, session);
+  // The public list: only what is out, even for a Co-author, who manages the
+  // rest from the edit page. The Chapters and Statistics tabs share it, so
+  // they cannot disagree about what is out.
+  const published = publishedChapters(chapters.data?.items ?? []);
 
   return (
     <article>
@@ -130,23 +137,49 @@ export const BookPage: FC = () => {
               ))}
             </div>
           )}
-
-          <Typography.Paragraph className={styles.description}>
-            {book.description}
-          </Typography.Paragraph>
         </div>
       </Flex>
 
-      <Divider />
-
-      <Typography.Title level={3}>Chapters</Typography.Title>
-      <ChapterList
-        bookId={bookId}
-        // The public list: only what is out, even for a Co-author, who
-        // manages the rest from the edit page.
-        items={publishedChapters(chapters.data?.items ?? [])}
-        isPending={chapters.isPending}
-        isError={chapters.isError}
+      {/* Uncontrolled: the open tab is this page's own state (ADR-0010) and
+          never reaches the URL, so a reload opens Description. */}
+      <Tabs
+        className={styles.tabs}
+        items={[
+          {
+            key: 'description',
+            label: 'Description',
+            children:
+              book.description.trim() === '' ? (
+                <Empty description="No description yet." />
+              ) : (
+                <Typography.Paragraph>{book.description}</Typography.Paragraph>
+              ),
+          },
+          {
+            key: 'chapters',
+            label: 'Chapters',
+            children: (
+              <ChapterList
+                bookId={bookId}
+                items={published}
+                isPending={chapters.isPending}
+                isError={chapters.isError}
+              />
+            ),
+          },
+          {
+            key: 'statistics',
+            label: 'Statistics',
+            children: (
+              <BookStatistics
+                book={book}
+                chapters={published}
+                isPending={chapters.isPending}
+                isError={chapters.isError}
+              />
+            ),
+          },
+        ]}
       />
 
       <Divider />

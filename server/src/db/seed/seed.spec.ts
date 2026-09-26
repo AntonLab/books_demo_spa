@@ -15,7 +15,7 @@ import { createCreditedBook } from '../../models/creditedBook.testkit.ts';
 import { initModels } from '../../models/index.ts';
 import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
-import { Chapter } from '../../models/Chapter.ts';
+import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Genre } from '../../models/Genre.ts';
 import { Like } from '../../models/Like.ts';
@@ -331,6 +331,26 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
          WHERE g.name IN ('Horror', 'Romance')
            AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
       ),
+      []
+    );
+  });
+
+  // The seed writes chapters with bulkCreate, which skips per-instance hooks:
+  // this fails first if the count ever moves from the text setter to a hook.
+  test('stores a word count in step with every chapter text', async () => {
+    const chapters = await Chapter.findAll({
+      attributes: ['id', 'text', 'wordCount'],
+    });
+
+    assert.ok(chapters.length > 0);
+    assert.deepEqual(
+      chapters
+        .filter(
+          (chapter) =>
+            chapter.wordCount === 0 ||
+            chapter.wordCount !== countWords(chapter.text)
+        )
+        .map((chapter) => chapter.id),
       []
     );
   });

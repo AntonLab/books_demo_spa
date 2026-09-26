@@ -11,6 +11,18 @@ import {
 import type { Book } from './Book.ts';
 import type { ChapterSummary, PublicChapter } from 'shared';
 
+// The one place a chapter's words are counted: the text setter below calls it,
+// so the repository and the seed cannot disagree. A word is a run of
+// non-whitespace. Counted by stepping the regex, not with split() or match():
+// a chapter may hold a million characters, and both build an array of every
+// word only to read its length.
+export function countWords(text: string): number {
+  const word = /\S+/g;
+  let count = 0;
+  while (word.exec(text) !== null) count += 1;
+  return count;
+}
+
 export class Chapter extends Model<
   InferAttributes<Chapter>,
   InferCreationAttributes<Chapter>
@@ -28,6 +40,9 @@ export class Chapter extends Model<
   // The chapter's place in its book's Reading order (CONTEXT.md), 1-based and
   // gapped after a delete. It orders every list and is never sent to a client.
   declare position: number;
+  // countWords(text), written by the text setter in initChapterModel whenever
+  // text is assigned. Summed into BookDetail.wordCount; never sent per chapter.
+  declare wordCount: CreationOptional<number>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -61,6 +76,14 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       text: {
         type: DataTypes.TEXT('medium'),
         allowNull: false,
+        // A setter rather than a hook: bulkCreate (the seed) runs setters as it
+        // builds each row but skips per-instance hooks, and instance.update
+        // writes a setter's side effect as a changed field. Rows read back
+        // from MySQL are built raw, so a read never recounts.
+        set(this: Chapter, value: string) {
+          this.setDataValue('text', value);
+          this.setDataValue('wordCount', countWords(value));
+        },
       },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
@@ -70,6 +93,9 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       // No default: chapterRepository.create appends, and a row inserted any
       // other way should fail loudly rather than land at an arbitrary place.
       position: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      // No default: the text setter always supplies it, and a row inserted any
+      // other way should fail loudly rather than claim zero words.
+      wordCount: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       createdAt: { type: DataTypes.DATE, allowNull: false },
       // Millisecond precision rather than the whole seconds every other table
       // keeps: a save carries the updatedAt it last saw (chapterRepository

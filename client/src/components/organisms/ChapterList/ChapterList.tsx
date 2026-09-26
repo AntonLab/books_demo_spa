@@ -13,8 +13,11 @@ interface ChapterListProps {
 
 // Presentational, like CardList: the page owns the query and hands the states
 // down, so this renders in a test with no network layer at all. The reader's
-// list: its page passes only the chapters that are out, in Reading order. The
-// book editor's list, with badges and drag and drop, is a SortableList.
+// list: its page passes only the chapters that are out, in Reading order, and
+// each row's number is its place here, the same place ChapterPage's
+// previous/next walks. Derived, never stored: publishing or withdrawing an
+// earlier chapter renumbers the rest. The book editor's list, with badges and
+// drag and drop, is a SortableList, which shows no numbers.
 export const ChapterList: FC<ChapterListProps> = ({
   bookId,
   items,
@@ -31,11 +34,15 @@ export const ChapterList: FC<ChapterListProps> = ({
     <Listy
       items={items}
       rowKey="id"
-      itemRender={(chapter) => (
+      itemRender={(chapter, index) => (
         <Flex justify="space-between" align="center">
-          <Link to={`/books/${bookId}/chapters/${chapter.id}`}>
-            {chapter.title}
-          </Link>
+          {/* Outside the link, so its accessible name stays the title. */}
+          <span>
+            {index + 1}.{' '}
+            <Link to={`/books/${bookId}/chapters/${chapter.id}`}>
+              {chapter.title}
+            </Link>
+          </span>
           {/* A reader's date is when the chapter came out. */}
           {chapter.publishedAt !== null && (
             <Typography.Text type="secondary">

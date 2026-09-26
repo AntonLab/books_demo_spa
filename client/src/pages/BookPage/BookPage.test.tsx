@@ -1,15 +1,17 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
+import { formatDate } from '@/format/date';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import type { BookDetail } from '@/types/book';
+import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
 import type { PublicUser } from '@/types/api';
 
@@ -52,6 +54,8 @@ const book: BookDetail = {
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: { id: 2, title: 'The Scale Cycle' },
   likeCount: 4,
+  commentCount: 0,
+  wordCount: 0,
   viewerLikeId: null,
 };
 
@@ -259,12 +263,14 @@ describe('BookPage', () => {
     });
   });
 
-  it('renders the chapters and the comments sections', async () => {
+  it('renders the chapters tab and the comments section', async () => {
     renderPage();
 
     expect(
-      await screen.findByRole('heading', { name: 'Chapters' })
+      await screen.findByRole('tab', { name: 'Chapters' })
     ).toBeInTheDocument();
+    // The tab took the old section's place, heading and all.
+    expect(screen.queryByRole('heading', { name: 'Chapters' })).toBeNull();
     expect(
       screen.getByRole('heading', { name: 'Comments' })
     ).toBeInTheDocument();
@@ -295,6 +301,19 @@ describe('BookPage on a draft', () => {
 
     expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
+
+  it('keeps all three tabs on a draft', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Description',
+      'Chapters',
+      'Statistics',
+    ]);
+  });
 });
 
 describe('BookPage edit link', () => {
@@ -312,5 +331,145 @@ describe('BookPage edit link', () => {
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+  });
+});
+
+describe('BookPage tabs', () => {
+  const chapter: ChapterSummary = {
+    id: 21,
+    bookId: 1,
+    title: 'The Gate',
+    publishedAt: '2026-09-03T00:00:00.000Z',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  };
+
+  const chaptersPage = (items: ChapterSummary[]) => ({
+    items,
+    total: items.length,
+    limit: 100,
+    offset: 0,
+  });
+
+  // A Co-author: the server hands them every chapter, Draft and Scheduled
+  // included, which is what the public tabs must filter out.
+  const coAuthor: PublicUser = { ...reader, id: 4, role: 'author' };
+
+  // Only the open tab's panel: antd marks the others aria-hidden, which role
+  // queries skip.
+  const openPanel = () => within(screen.getByRole('tabpanel'));
+
+  // Each figure is one table cell holding its label and then its value.
+  const statistic = (label: string) =>
+    openPanel()
+      .getByRole('cell', { name: new RegExp(`^${label}`) })
+      .textContent?.slice(label.length);
+
+  const openTab = async (name: string) => {
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    await userEvent.click(screen.getByRole('tab', { name }));
+  };
+
+  it('opens on Description, the first of three tabs', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Description',
+      'Chapters',
+      'Statistics',
+    ]);
+    expect(
+      screen.getByRole('tab', { name: 'Description', selected: true })
+    ).toBeInTheDocument();
+    expect(
+      openPanel().getByText('Long ago, in a kingdom of scales.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a placeholder for a description that is only blanks', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, description: ' \n\t ' });
+
+    renderPage();
+
+    expect(await screen.findByText('No description yet.')).toBeInTheDocument();
+  });
+
+  it('numbers only the published chapters, even for a Co-author', async () => {
+    mockedChapters.listChapters.mockResolvedValue(
+      chaptersPage([
+        chapter,
+        { ...chapter, id: 22, title: 'Unfinished', publishedAt: null },
+        {
+          ...chapter,
+          id: 23,
+          title: 'Coming soon',
+          publishedAt: '2999-01-01T00:00:00.000Z',
+        },
+        {
+          ...chapter,
+          id: 24,
+          title: 'Chapter 3: The Keep',
+          publishedAt: '2026-09-05T00:00:00.000Z',
+        },
+      ])
+    );
+    renderPage(coAuthor);
+
+    await openTab('Chapters');
+
+    await openPanel().findByRole('link', { name: 'The Gate' });
+    // No gap where the Draft and the Scheduled chapter sit, and a title's own
+    // number stays as written.
+    expect(
+      openPanel()
+        .getAllByRole('link')
+        .map((link) => link.parentElement?.textContent)
+    ).toEqual(['1. The Gate', '2. Chapter 3: The Keep']);
+  });
+
+  it('shows the figures, counting and dating only what is out', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      likeCount: 4,
+      commentCount: 7,
+      wordCount: 1234,
+    });
+    mockedChapters.listChapters.mockResolvedValue(
+      chaptersPage([
+        // First in Reading order, published last.
+        { ...chapter, publishedAt: '2026-09-10T00:00:00.000Z' },
+        { ...chapter, id: 22, publishedAt: null },
+        { ...chapter, id: 23, publishedAt: '2026-09-02T00:00:00.000Z' },
+        { ...chapter, id: 24, publishedAt: '2999-01-01T00:00:00.000Z' },
+      ])
+    );
+    renderPage(coAuthor);
+
+    await openTab('Statistics');
+
+    await waitFor(() => expect(statistic('Chapters')).toBe('2'));
+    expect(statistic('Words')).toBe('1,234');
+    expect(statistic('Likes')).toBe('4');
+    expect(statistic('Comments')).toBe('7');
+    expect(statistic('Release time')).toBe(
+      formatDate('2026-09-02T00:00:00.000Z')
+    );
+    expect(statistic('Last update')).toBe(
+      formatDate('2026-09-10T00:00:00.000Z')
+    );
+  });
+
+  it('dates nothing on a book with no published chapter', async () => {
+    mockedChapters.listChapters.mockResolvedValue(
+      chaptersPage([{ ...chapter, publishedAt: null }])
+    );
+    renderPage(coAuthor);
+
+    await openTab('Statistics');
+
+    await waitFor(() => expect(statistic('Chapters')).toBe('0'));
+    expect(statistic('Release time')).toBe('—');
+    expect(statistic('Last update')).toBe('—');
   });
 });
