@@ -9,7 +9,7 @@ was the last Co-author of — and neither can join the transaction that writes t
 row, so a rolled-back write still leaves its file. Object storage would also add
 infrastructure to development, CI and every deployment. In MySQL the foreign
 key's cascade removes the picture with its owner in the same transaction, the
-twelve per-suite test schemas isolate uploads for free, and a deployment needs
+per-suite test schemas isolate uploads for free, and a deployment needs
 no volume. The cost, a larger database and bytes read through Node, stays small
 because the server re-encodes every upload to a fixed size (a Cover of 600×900,
 an Avatar of 256×256) before storing it.
