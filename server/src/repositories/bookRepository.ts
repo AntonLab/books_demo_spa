@@ -191,6 +191,26 @@ async function withAuthors(
   );
 }
 
+// A page of rows as PublicBooks, in the order given: credits, Covers and
+// Genres in one query each, so a LIMIT keeps paging over books. Exported for
+// favoriteRepository, whose rows embed the books they point at.
+export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
+  const ids = rows.map((row) => row.id);
+  const [authors, coverUrls, genres] = await Promise.all([
+    loadAuthors(credits, ids),
+    loadCoverUrls(ids),
+    loadGenres(rows.map((row) => row.genreId)),
+  ]);
+  return rows.map((row) =>
+    toPublicBook(
+      row,
+      authors.get(row.id) ?? [],
+      coverUrls.get(row.id) ?? null,
+      genreOf(row.genreId, genres)
+    )
+  );
+}
+
 // The Publication time of a book's earliest (MIN) or latest (MAX) Published
 // Chapter — its Release time or Last update (CONTEXT.md) — as a correlated
 // subquery, NULL for a book with none. Chapters count once their Publication
@@ -437,26 +457,7 @@ export function createSequelizeBookRepository(): BookRepository {
                 ],
       });
 
-      const [authors, coverUrls, genres] = await Promise.all([
-        loadAuthors(
-          credits,
-          rows.map((row) => row.id)
-        ),
-        loadCoverUrls(rows.map((row) => row.id)),
-        loadGenres(rows.map((row) => row.genreId)),
-      ]);
-      return {
-        items: rows.map((row) =>
-          toPublicBook(
-            row,
-            authors.get(row.id) ?? [],
-            coverUrls.get(row.id) ?? null,
-            genreOf(row.genreId, genres)
-          )
-        ),
-        total,
-        current,
-      };
+      return { items: await publicBooksOf(rows), total, current };
     },
 
     async findById(id) {

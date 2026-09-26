@@ -102,6 +102,22 @@ async function withAuthors(
   );
 }
 
+// A page of rows as PublicSeries, in the order given, with credits and Genres
+// in one query each. Exported for favoriteRepository, whose rows embed the
+// series they point at.
+export async function publicSeriesOf(rows: Series[]): Promise<PublicSeries[]> {
+  const [authors, genres] = await Promise.all([
+    loadAuthors(
+      credits,
+      rows.map((row) => row.id)
+    ),
+    loadGenres(rows.map((row) => row.genreId)),
+  ]);
+  return rows.map((row) =>
+    toPublicSeries(row, authors.get(row.id) ?? [], genreOf(row.genreId, genres))
+  );
+}
+
 // Exported for bookRepository, which asks the same question about the series a
 // book is being filed under.
 export async function findSeriesCoAuthorIds(
@@ -200,23 +216,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         order: [['id', 'ASC']],
       });
 
-      const [authors, genres] = await Promise.all([
-        loadAuthors(
-          credits,
-          rows.map((row) => row.id)
-        ),
-        loadGenres(rows.map((row) => row.genreId)),
-      ]);
-      return {
-        items: rows.map((row) =>
-          toPublicSeries(
-            row,
-            authors.get(row.id) ?? [],
-            genreOf(row.genreId, genres)
-          )
-        ),
-        total: count,
-      };
+      return { items: await publicSeriesOf(rows), total: count };
     },
 
     async findById(id, viewer) {
