@@ -144,6 +144,7 @@ export const BookPage: FC = () => {
           never reaches the URL, so a reload opens Description. */}
       <Tabs
         className={styles.tabs}
+        classNames={{ body: styles.tabsBody }}
         items={[
           {
             key: 'description',
