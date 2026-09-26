@@ -3,6 +3,8 @@ import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
+import { Chapter } from '../models/Chapter.ts';
+import { Comment } from '../models/Comment.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
@@ -57,8 +59,8 @@ export interface BookRepository {
   list(query: ListBooksQuery, viewer: Viewer): Promise<BookListResult>;
   findById(id: number): Promise<PublicBook | null>;
   // Separate from findById rather than replacing it: the detail read costs a
-  // series join and two like queries, and the write paths that only need to
-  // know a row exists should not pay for them.
+  // series join, two like queries and two tallies, and the write paths that
+  // only need to know a row exists should not pay for them.
   //
   // null, too, for a Draft book the viewer may not read: the caller reports it
   // exactly as a missing book, so a refusal does not reveal the draft exists.
@@ -484,6 +486,17 @@ export function createSequelizeBookRepository(): BookRepository {
               attributes: ['id'],
             });
 
+      // Two more follow-up queries, for the same reason as the like ones.
+      // Published is judged on this process's clock, as readableChapterScope
+      // judges it, but the viewer never widens it: a Co-author's Draft and
+      // Scheduled chapters do not count. SUM over no row is NULL, hence ?? 0.
+      const [commentCount, wordCount] = await Promise.all([
+        Comment.count({ where: { bookId: id, tombstone: null } }),
+        Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
+          where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
+        }),
+      ]);
+
       return {
         ...(await withAuthors(book)),
         series: book.series
@@ -491,6 +504,8 @@ export function createSequelizeBookRepository(): BookRepository {
           : null,
         likeCount,
         viewerLikeId: viewerLike?.id ?? null,
+        commentCount,
+        wordCount: wordCount ?? 0,
       };
     },
 

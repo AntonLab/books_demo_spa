@@ -12,6 +12,7 @@ import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
+import { Comment } from '../models/Comment.ts';
 import { Genre } from '../models/Genre.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
@@ -766,6 +767,102 @@ describe('bookRepository against real MySQL', { skip }, () => {
         titles: ['Older', 'Newer'],
         total: 2,
       });
+    });
+  });
+
+  describe('detail tallies', () => {
+    const addChapter = (
+      bookId: number,
+      position: number,
+      text: string,
+      publishedAt: Date | null
+    ) =>
+      Chapter.create({
+        bookId,
+        title: `Chapter ${position}`,
+        text,
+        publishedAt,
+        position,
+      });
+
+    const comment = (
+      bookId: number,
+      text: string,
+      fields: { parentId?: number; tombstone?: 'deleted' | 'removed' } = {}
+    ) => Comment.create({ userId: ownerId, bookId, text, ...fields });
+
+    test('commentCount counts live comments, roots and replies, and no tombstone', async () => {
+      const book = await publishedBook('Talked about');
+      const root = await comment(book.id, 'Root');
+      await comment(book.id, 'Reply', { parentId: root.id });
+      const deleted = await comment(book.id, 'Deleted', {
+        tombstone: 'deleted',
+      });
+      // A live reply under a tombstone still counts.
+      await comment(book.id, 'Reply to a tombstone', { parentId: deleted.id });
+      await comment(book.id, 'Removed', { tombstone: 'removed' });
+      const elsewhere = await publishedBook('Elsewhere');
+      await comment(elsewhere.id, 'Not on this book');
+
+      const detail = await repository.findDetailById(book.id, null);
+
+      assert.equal(detail?.commentCount, 3);
+    });
+
+    test('wordCount sums Published chapters only, whoever reads the book', async () => {
+      const book = await publishedBook('Counted');
+      await addChapter(book.id, 1, 'one two three', daysFromNow(-2));
+      await addChapter(book.id, 2, 'four  five\n', daysFromNow(-1));
+      await addChapter(book.id, 3, 'a draft the readers never see', null);
+      await addChapter(book.id, 4, 'scheduled for later on', daysFromNow(1));
+
+      // A Co-author and a Moderator see the Draft and Scheduled chapters, but
+      // the figure is the readers' one for everybody.
+      const viewers: Viewer[] = [
+        null,
+        { id: ownerId + 1_000, role: 'user' },
+        { id: ownerId, role: 'author' },
+        { id: ownerId + 1_000, role: 'admin' },
+      ];
+      for (const viewer of viewers) {
+        assert.equal(
+          (await repository.findDetailById(book.id, viewer))?.wordCount,
+          5,
+          JSON.stringify(viewer)
+        );
+      }
+    });
+
+    test('a Draft book read by its Co-author counts only the chapters already out', async () => {
+      const draft = await repository.create({
+        userId: ownerId,
+        seriesId: null,
+        title: 'Draft',
+        description: 'Private',
+        tags: [],
+      });
+      await addChapter(draft.id, 1, 'out already', daysFromNow(-1));
+      await addChapter(draft.id, 2, 'not out yet', null);
+
+      const detail = await repository.findDetailById(draft.id, {
+        id: ownerId,
+        role: 'author',
+      });
+
+      assert.equal(detail?.wordCount, 2);
+    });
+
+    test('a book with only Draft and Scheduled chapters counts zero words, not null', async () => {
+      const book = await publishedBook('Nothing out');
+      await addChapter(book.id, 1, 'a draft', null);
+      await addChapter(book.id, 2, 'coming soon', daysFromNow(1));
+
+      const detail = await repository.findDetailById(book.id, {
+        id: ownerId,
+        role: 'author',
+      });
+
+      assert.equal(detail?.wordCount, 0);
     });
   });
 

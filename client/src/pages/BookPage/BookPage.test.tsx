@@ -52,6 +52,8 @@ const book: BookDetail = {
   updatedAt: '2026-09-01T00:00:00.000Z',
   series: { id: 2, title: 'The Scale Cycle' },
   likeCount: 4,
+  commentCount: 0,
+  wordCount: 0,
   viewerLikeId: null,
 };
 

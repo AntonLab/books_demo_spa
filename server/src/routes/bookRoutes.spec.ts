@@ -112,6 +112,7 @@ const createFakeRepository = (
     series: SERIES,
     genres: GENRES,
     likes: { count: 4, viewerLikeId: VIEWER_LIKE_ID },
+    tallies: { commentCount: 6, wordCount: 1200 },
     ...spies,
   });
 
@@ -525,6 +526,8 @@ test('GET by id embeds the co-authors and series, and never an email', async () 
       assert.equal('email' in (body.authors[0] ?? {}), false);
       assert.equal(body.series?.title, 'The Cycle');
       assert.equal(body.likeCount, 4);
+      assert.equal(body.commentCount, 6);
+      assert.equal(body.wordCount, 1200);
       assert.equal(body.viewerLikeId, null);
     }
   );
