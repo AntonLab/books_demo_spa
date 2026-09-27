@@ -104,6 +104,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 3. Conventional commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
    `test:`, `ci:`).
 4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
+   Run `npm run branch:check` before starting work and before opening a PR:
+   it fails when the branch is behind `origin/dev` and prints the fix. A
+   SessionStart hook runs it in warn mode and stays silent while fresh.
 
 ## Agent skills
 
@@ -140,14 +143,16 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 
 ### Shell on Windows
 
-Agents run Git Bash on Windows. Use forward slashes in Bash paths (a backslash
-path loses its separators); list a directory with `Glob`, since `Read` on one
-fails with EISDIR; when `Grep` fails with `EPERM ... uv_spawn 'rg'`, fall back
-to `git grep`.
+Agents run Git Bash on Windows, so commands are POSIX: `cd "D:/path" && …`
+with forward slashes (a backslash path loses its separators; `cd /d` is
+cmd.exe), `head`/`tail` in Bash only. Write files with `Write`/`Edit`: a heredoc
+or `bash -c` string breaks on the first unmatched quote. List a directory with
+`Glob`, since `Read` on one fails with EISDIR; when `Grep` fails with
+`EPERM ... uv_spawn 'rg'`, fall back to `git grep`.
 
 ### Plan pipeline agents
 
-`.claude/agents/` holds five subagents carrying the superpowers plan pipeline's
+`.claude/agents/` holds six subagents carrying the superpowers plan pipeline's
 role rules, so a dispatch sends only per-call values. They need the
 `superpowers` and `mattpocock-skills` Claude Code plugins. Their bodies are
 copied from superpowers 6.4.1 templates (named in a comment under each
@@ -158,9 +163,12 @@ frontmatter); re-sync them when those templates change.
   dispatch with that path; it refuses to run without one. Grill in the main
   session first (`/grill-with-docs`); plan-writer asks only about decisions the
   spec left open, as one `NEEDS_CONTEXT` round — put it to the user verbatim
-  and resume the agent with the answers through `SendMessage`. A plan over 10
+  and resume the agent with the answers through `SendMessage`. A plan over 6
   tasks or two workspaces comes back as part 1 with the other parts listed;
   dispatch a fresh plan-writer per part.
+- **Dispatch `code-mapper` once per spec, before the first plan-writer**, and
+  pass its `…-codemap.md` to every part: without it each part re-reads the
+  codebase. Plans carry contracts and tests, not implementation bodies.
 - **Pick the execution mode by plan size.** Up to 5 tasks: Native
   (`superpowers:executing-plans` in the main session, then one
   `sdd-final-reviewer`). Over 5: `superpowers:subagent-driven-development`.
@@ -171,23 +179,27 @@ frontmatter); re-sync them when those templates change.
   constraints, findings, context, and the worktree path as the working
   directory), never the template text. Resume an implementer for fix rounds
   with `SendMessage`.
+- **Run controller steps as `bash scripts/sdd-step.sh review|next …`** from the
+  worktree (usage in its header): one call packages a review, or appends the
+  ledger line and writes the next brief, and it refuses `dev` and `main`.
+- **Final-review fixes: one fresh `sdd-implementer` per group of up to five
+  related findings**, then one scoped re-review. This overrides the skill's
+  single fix dispatch, which ran 100 turns in one context.
 - **Pass `model` on every dispatch:** `sdd-implementer` haiku when the brief
   holds the exact code for a mechanical change (a move, a rename), sonnet
-  otherwise; `sdd-task-reviewer` the implementer's model (haiku or sonnet);
-  `sdd-re-reviewer` haiku; `plan-writer`
-  and `sdd-final-reviewer` opus.
+  otherwise; `sdd-task-reviewer` the implementer's model (haiku or sonnet,
+  never opus); `sdd-re-reviewer` and `code-mapper` haiku; `plan-writer` and
+  `sdd-final-reviewer` sonnet. Opus only when the user asks: it burned the
+  weekly limit mid-plan.
 - **Never pause between tasks.** Stop only on `BLOCKED`, `NEEDS_CONTEXT` or the
   end of the plan. After `/compact`, re-read the plan's ledger under
   `.superpowers/sdd/` and resume at its first unfinished task without asking.
-- `sdd-implementer` preloads `tdd` and `ponytail` and loads area skills
-  (`ant-design`, `mysql`, …) itself; ponytail shapes the code, never the tests
-  the brief or `tdd` call for. `sdd-final-reviewer` runs `fallow review`
-  through the `fallow-review` skill.
-- The reviewers get `Read`, `Grep`, `Glob` and `Bash` (the final reviewer also
-  `Skill`); staying read-only is a prompt rule. The implementer and
-  `plan-writer` get every tool but `Agent`.
+- Tools and skill preloads live in each agent's frontmatter. The reviewers
+  hold `Bash`, so staying read-only is a prompt rule.
 - Grilling, `finishing-a-development-branch` and the choice of findings to fix
-  stay in the main session, since a subagent cannot ask the user anything. The
-  controller creates the worktree itself before Task 1; no agent sets
+  stay in the main session, since a subagent cannot ask the user anything.
+- **The controller creates the worktree before Task 1 with
+  `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
+  `.env.local` files an agent may not copy, and an install. No agent sets
   `isolation: worktree`, which would hide each implementer's commits from the
   reviewer and the next task.

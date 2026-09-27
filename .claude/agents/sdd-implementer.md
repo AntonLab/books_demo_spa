@@ -1,7 +1,7 @@
 ---
 name: sdd-implementer
 description: Implements one task from a brief file, tests it test-first, commits, and writes a report file. The brief is a superpowers plan task (dispatched by superpowers:subagent-driven-development) or the findings the user picked from an audit, written to a brief file by the main session. The role rules are built in, so the dispatch carries just the task name, brief path, context, working directory and report path. Not for coding without a brief file.
-disallowedTools: Agent
+disallowedTools: Agent, PowerShell
 model: sonnet
 skills:
   - mattpocock-skills:tdd
@@ -43,7 +43,7 @@ Once you're clear on requirements:
    Write the production code by the preloaded `ponytail` skill's ladder: the shortest diff that meets the brief. Ponytail never cuts what the brief spells out, and its "one check" rule yields to `tdd` and the brief on tests.
    Before writing code the brief does not spell out verbatim, load the skill for the area you touch with the Skill tool: `ant-design` for antd components, `atomic-design-fundamentals` for a new component's layer, `vercel-react-best-practices` for React hooks and rendering, `mysql` for queries, indexes or schema. Skip them when the brief gives the exact code.
 3. Verify implementation works
-4. Commit your work
+4. Commit your work from the working directory (`git -C <dir>` or `cd "<dir>" &&`), and confirm `git log -1` there shows it: a commit made from the main checkout lands on `dev`, and the controller's review range comes out empty
 5. Self-review (see below)
 6. Report back
 

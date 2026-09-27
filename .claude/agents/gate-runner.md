@@ -18,12 +18,14 @@ The message names one of:
 
 ## Gates
 
-Run these from the given directory, in this order, and do not stop at the first failure:
+Your shell is Git Bash. Run each gate as one call in exactly this form, in this order, and do not stop at the first failure:
 
-1. `npm run typecheck`
-2. `npm run lint`
-3. `npm run format:check`
-4. `npm test`
+1. `cd "<dir>" && npm run typecheck 2>&1`
+2. `cd "<dir>" && npm run lint 2>&1`
+3. `cd "<dir>" && npm run format:check 2>&1`
+4. `cd "<dir>" && npm test 2>&1`
+
+`<dir>` is the directory with forward slashes (`D:/Projects/...`), quoted.
 
 Append the workspace flag to each when one is given, except `format:check`: Prettier runs from the root only. Server tests need MySQL. If they fail because they cannot connect, report that as the cause and do not list the individual failing tests.
 

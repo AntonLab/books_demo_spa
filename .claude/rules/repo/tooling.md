@@ -85,7 +85,9 @@ the types the root CLAUDE.md lists; add a type to both at once. Git's own
 
 `engine-strict=true`: npm refuses to install on a Node below `engines.node`.
 
-## `scripts/link-skills.mjs`
+## `scripts/`
 
-Plain Node with no dependencies; Prettier checks it, but no package's ESLint
-config reaches it.
+Plain Node (`*.mjs`) and one Bash script, with no dependencies; Prettier
+checks the `.mjs` files, but no package's ESLint config reaches them.
+`sdd-step.sh` finds the superpowers scripts by globbing the plugin cache for
+the newest version, so it needs no update when the plugin does.
