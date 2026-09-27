@@ -33,7 +33,11 @@ is load-bearing:
   `matchMedia` and `ResizeObserver` (antd responsive helpers),
   `TextEncoder`/`TextDecoder` (react-router builds one at import),
   `MessageChannel` (every antd `Form.Item` mount) and `scrollIntoView`
-  (`ChapterContents` once its drawer opens).
+  (`ChapterContents` once its drawer opens), and `EventSource`
+  (`src/test/eventSource.ts`, reset before each test): `NotificationBell`
+  opens a stream whenever an Account is signed in. A test drives it through
+  `FakeEventSource.latest()` — `emit(NOTIFICATION_STREAM_EVENT, n)` inside
+  `act`, or `fail(FakeEventSource.CLOSED)`.
 - `renderWithProviders` wraps the same providers as `App` around a
   `MemoryRouter` and returns `{ store, queryClient }`, so a test seeds a
   session with `queryClient.setQueryData(queryKeys.session, user)` and client
