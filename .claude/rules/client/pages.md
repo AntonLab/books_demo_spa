@@ -18,7 +18,8 @@ paths:
    or a page throws. Add a per-route boundary only when a page needs its own
    recovery UI.
 4. **Key the boundary by route** (`key={useLocation().pathname}`), or a caught
-   error persists across every later navigation.
+   error persists across every later navigation. The Profile routes share
+   one key: a key per tab would remount `ProfilePage` on every tab click.
 5. `QueryClientProvider` is the outermost provider, then the Redux
    `Provider`, then `StyleProvider` and `ThemedConfigProvider` (antd's
    algorithm from Device preferences). `AppShell` is exported apart from `App`
@@ -71,7 +72,7 @@ paths:
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
   the section has loaded more than six.
-- Pages that gate on Role (`MyBooksPage`, `AdminGenresPage`) read the session
+- Pages that gate on Role (`AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
 - What the viewer may do with a work comes from `bookCapabilities` /
@@ -115,8 +116,13 @@ paths:
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
   come from `BookDetail`.
-- `FavoritesPage` keeps one page number per tab and clamps it while
+- `FavoritesPanel` keeps one page number per tab and clamps it while
   rendering: removing the last row of the last page steps back a page.
+- `ProfilePage`'s outer tabs are paths (`/profile`, `/profile/favorites`,
+  `/profile/my-books`), since the account menu and the book and series
+  editors open a given tab; the inner Books/Series tabs stay antd state
+  (ADR-0010). A non-author on My Books is redirected only after the session
+  resolves, so an author reloading it stays.
 - `ChapterPage` applies the reading Device preferences: background and font
   through a nested `ConfigProvider` (a class overriding `--ant-*` never
   reaches antd's components, which redeclare them), size and line height
