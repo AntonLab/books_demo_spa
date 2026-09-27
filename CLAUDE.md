@@ -202,6 +202,7 @@ each frontmatter); re-sync them when those change.
   fix stay in the main session: a subagent cannot ask the user anything.
 - **The controller creates the worktree before Task 1 with
   `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
-  `.env.local` files an agent may not copy, and an install. No agent sets
-  `isolation: worktree`, which would hide each implementer's commits from the
-  reviewer and the next task.
+  `.env.local` files an agent may not copy, and an install. Once the PR merges,
+  `npm run worktree -- --remove <name>` deletes it with its branch and
+  `.playwright-mcp`; bare `git worktree remove` leaves the directory. No agent
+  sets `isolation: worktree`: it hides implementer commits from the reviewer.
