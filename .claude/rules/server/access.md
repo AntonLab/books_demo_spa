@@ -9,8 +9,7 @@ paths:
 
 # Who may touch which row
 
-The matrix (`permissions.md`) grades the module; this file is the row-level
-half. Nothing here lives in the permission table.
+`permissions.md` grades the module; this file is the row-level half.
 
 ## Ownership
 
@@ -113,8 +112,7 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   same 404, or the same absence from a list, as a missing one.
 - **Chapters** add `readableChapterScope`: a reader sees a chapter once its book
   is readable and `publishedAt` has passed. Co-authors and Moderators see all.
-- **Likes** exclude instead (`hiddenBookIds`); drafts are few, so the lists stay
-  short.
+- **Likes** exclude instead (`hiddenBookIds`); drafts are few, so lists stay short.
 - **Listed is narrower than readable** (`listedBookWhere`): no book list shows
   a draft, a Moderator's included, except `?userId=` naming the caller ("My
   books").
@@ -149,5 +147,4 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   own existing like from one is allowed. Existing replies behave normally.
 - A thread cannot be tombstoned wholesale: each reply belongs to its author.
 - **The promise ends where the book does**: deleting a book cascades and
-  hard-deletes every comment on it, other people's threads included.
-  Deliberate (ADR-0004).
+  deliberately hard-deletes every comment on it, others' threads too (ADR-0004).
