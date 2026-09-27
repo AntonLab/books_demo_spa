@@ -61,7 +61,8 @@ export const AppHeader: FC = () => {
     ...(user?.role === 'author'
       ? [{ key: '/profile/my-books', label: 'My Books' }]
       : []),
-    // Keeping the Genre list is a Moderator's job; no other Role is offered it.
+    // Keeping the Genre list is an Admin's (or Superadmin's) job; no other
+    // Role is offered it.
     ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
     { type: 'divider' },
     { key: 'logout', label: 'Log out' },
