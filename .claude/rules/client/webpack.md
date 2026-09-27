@@ -41,6 +41,10 @@ paths:
   group so vendor hashes survive app-only changes. The group takes
   `chunks: 'initial'`: with `'all'` it also swallows the libraries only lazy
   pages import, and the first load grows by about half.
+- `npm run analyze` is the production build plus `--env analyze`, which adds
+  `webpack-bundle-analyzer` in static mode: it writes `build/report.html` and
+  exits. Check it before changing `splitChunks`. Its types come from
+  `@types/webpack-bundle-analyzer` 4.x, since 5.x ships none.
 - `tsconfig.json` enables `allowImportingTsExtensions` for `shared`, whose
   relative imports end in `.ts` because Node loads it too; this package's own
   imports stay extensionless.

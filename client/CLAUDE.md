@@ -28,6 +28,7 @@ read, read the rule first:
 
 Install from the repo root. Scripts run here or from the root with `-w client`:
 `npm run dev` (port 3000, `/api` proxied to 4000), `npm run build` (`build/`),
+`npm run analyze` (the build plus `build/report.html`),
 `npm test` / `npm run test:watch`, `npm run typecheck`, `npm run lint`,
 `npm run lint:fix`. Prettier is root-only.
 

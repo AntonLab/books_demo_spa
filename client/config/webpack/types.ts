@@ -10,5 +10,6 @@ export interface BuildPaths {
 
 export interface BuildOptions {
   isDevelopment: boolean;
+  analyze: boolean;
   paths: BuildPaths;
 }
