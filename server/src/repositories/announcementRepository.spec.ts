@@ -458,6 +458,44 @@ describe('announcements against real MySQL', { skip }, () => {
     );
   });
 
+  test('a Book released outside any Series is marked announced but raises no Notification', async () => {
+    const now = new Date();
+    const writer = await account('Writer');
+    const standalone = await book('The Loner', [writer], { announced: false });
+    await chapter(standalone, 'Chapter One', 1, at(now, -minute));
+
+    assert.deepEqual(await announcements.announce(now), []);
+
+    const released = await Book.findByPk(standalone);
+    assert.deepEqual(released?.announcedAt, now);
+    assert.equal(await Notification.count(), 0);
+  });
+
+  test('a Series Co-author who is not credited on the released Book still gets its New book Notification', async () => {
+    const now = new Date();
+    const bookWriter = await account('BookWriter');
+    const seriesWriter = await account('SeriesWriter');
+    const files = await series('The Nightbus Files', [
+      bookWriter,
+      seriesWriter,
+    ]);
+    const returns = await book('The Nightbus Returns', [bookWriter], {
+      seriesId: files,
+      announced: false,
+    });
+    await chapter(returns, 'Last Stop', 1, at(now, -minute));
+    await favorite(seriesWriter, { seriesId: files });
+
+    const [only] = await announcements.announce(now);
+
+    assert.ok(only);
+    assert.equal(only.userId, seriesWriter);
+    assert.deepEqual(
+      only.notifications.map((notification) => notification.kind),
+      ['new_book']
+    );
+  });
+
   test('only an Account with its switch on and not Blocked has an email address to mail; a Pending one does', async () => {
     const now = new Date();
     const writer = await account('Writer');
