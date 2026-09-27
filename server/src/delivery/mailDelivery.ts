@@ -34,6 +34,12 @@ export function createLogMailDelivery(): MailDelivery {
   };
 }
 
+// nodemailer's defaults run up to 10 minutes (socketTimeout) before a hung
+// SMTP server gives up a send; the announcement pass sends one recipient
+// after another on the same transporter, so one stuck connection would stall
+// the whole pass behind it.
+const SMTP_TIMEOUT_MS = 15_000;
+
 export function createSmtpMailDelivery(
   config: SmtpMailConfig,
   // nodemailer connects on the first send, not here, so building the default
@@ -45,6 +51,9 @@ export function createSmtpMailDelivery(
     // upgrades with STARTTLS, which nodemailer does by itself.
     secure: config.port === 465,
     auth: { user: config.user, pass: config.password },
+    connectionTimeout: SMTP_TIMEOUT_MS,
+    greetingTimeout: SMTP_TIMEOUT_MS,
+    socketTimeout: SMTP_TIMEOUT_MS,
   })
 ): MailDelivery {
   return {
