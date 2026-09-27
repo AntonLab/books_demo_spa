@@ -36,4 +36,7 @@ export const queryKeys = {
   allFavorites: ['favorites'] as const,
   favoriteBooks: (page: number) => ['favorites', 'books', { page }] as const,
   favoriteSeries: (page: number) => ['favorites', 'series', { page }] as const,
+  // Not keyed by Account, unlike notifications: the answer is always the
+  // session's, so watchSession's refetch on an Account change is correct.
+  notificationSettings: ['notificationSettings'] as const,
 };

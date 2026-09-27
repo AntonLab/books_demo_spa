@@ -64,6 +64,10 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   session, and one retry follows 30 s later; the browser's own reconnects
   (CONNECTING) are left alone. The opener lives in `api/notificationStream.ts`,
   apart from `api/notifications.ts`, because tests automock the latter.
+- `useNotificationSettings` is keyed without the Account id on purpose: its
+  answer is always the session's, so the Account-change invalidation
+  refetches the right one. `useUpdateNotificationSettings` writes the PATCH
+  answer into the cache.
 - `@tanstack/react-query-devtools` is pinned to the same version as
   `@tanstack/react-query`: bump both together, since the devtools read the
   core's internals.

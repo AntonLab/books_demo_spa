@@ -1,4 +1,9 @@
-import { listNotifications, markNotificationsRead } from './notifications';
+import {
+  getNotificationSettings,
+  listNotifications,
+  markNotificationsRead,
+  updateNotificationSettings,
+} from './notifications';
 import { jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (response: Response): jest.Mock => {
@@ -90,5 +95,39 @@ describe('markNotificationsRead', () => {
       status: 403,
       message: 'Missing or invalid CSRF token',
     });
+  });
+});
+
+describe('getNotificationSettings', () => {
+  it('reads the session’s own settings, with no token', async () => {
+    const fetchMock = mockFetch(jsonResponse({ emailNotifications: true }));
+
+    await expect(getNotificationSettings()).resolves.toEqual({
+      emailNotifications: true,
+    });
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/notifications/settings');
+    expect(init).toMatchObject({ method: 'GET' });
+    expect(init.headers).toEqual({});
+  });
+});
+
+describe('updateNotificationSettings', () => {
+  it('patches the whole settings object, with the XSRF token', async () => {
+    const fetchMock = mockFetch(jsonResponse({ emailNotifications: false }));
+
+    await expect(
+      updateNotificationSettings({ emailNotifications: false })
+    ).resolves.toEqual({ emailNotifications: false });
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/notifications/settings');
+    expect(init.method).toBe('PATCH');
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'X-XSRF-Token': 'tok-123',
+    });
+    expect(init.body).toBe('{"emailNotifications":false}');
   });
 });
