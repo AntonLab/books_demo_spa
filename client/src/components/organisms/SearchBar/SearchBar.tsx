@@ -95,7 +95,7 @@ export const SearchBar: FC = () => {
     // button. Navigating on a clear would run a search for the term the user
     // just erased.
     //
-    // On antd 6.6.2, clearing actually forces `text` to `''` before this
+    // On antd 6.6.5, clearing actually forces `text` to `''` before this
     // handler ever sees it (@rc-component/input's resolveOnChange clones the
     // event with the target value hard-coded to '' for a click-type change),
     // so the empty-text guard below currently blocks this path too — the two
