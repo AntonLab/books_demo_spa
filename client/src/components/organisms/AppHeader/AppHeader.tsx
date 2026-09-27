@@ -60,6 +60,7 @@ export const AppHeader: FC = () => {
 
   const accountItems: MenuProps['items'] = [
     { key: '/profile', label: 'Profile' },
+    { key: '/favorites', label: 'Favorites' },
     // Keeping the Genre list is a Moderator's job; no other Role is offered it.
     ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
     { type: 'divider' },
