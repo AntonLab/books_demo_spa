@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listNotifications, markNotificationsRead } from '../api/notifications';
-import type { NotificationList } from '../types/api';
+import {
+  getNotificationSettings,
+  listNotifications,
+  markNotificationsRead,
+  updateNotificationSettings,
+} from '../api/notifications';
+import type { NotificationList, NotificationSettings } from '../types/api';
 import { queryKeys } from './keys';
 
 // How often an open tab asks again. A notification is written when someone
@@ -34,6 +39,27 @@ export const useMarkNotificationsRead = (userId: number) => {
         previous ? { ...previous, unread } : previous
       );
       void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+};
+
+export const useNotificationSettings = () => {
+  return useQuery({
+    queryKey: queryKeys.notificationSettings,
+    queryFn: () => getNotificationSettings(),
+  });
+};
+
+// The PATCH answers the stored settings, so they go straight into the cache
+// instead of costing a refetch.
+export const useUpdateNotificationSettings = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (settings: NotificationSettings) =>
+      updateNotificationSettings(settings),
+    onSuccess: (settings) => {
+      queryClient.setQueryData(queryKeys.notificationSettings, settings);
     },
   });
 };

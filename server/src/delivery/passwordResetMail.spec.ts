@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLoggerResetDelivery, resetUrl } from './resetDelivery.ts';
-import { recordLogs } from '../logger.testkit.ts';
+import { passwordResetMail, resetUrl } from './passwordResetMail.ts';
 
 test('the reset URL matches the client route the companion spec defines', () => {
   assert.equal(
@@ -24,16 +23,19 @@ test('a trailing slash on the base URL does not double up', () => {
   );
 });
 
-test('the logger delivery emits the address and the link', async (t) => {
-  const lines = recordLogs(t);
-  await createLoggerResetDelivery('http://localhost:3000').send(
+test('the reset mail goes to the account, carries the link once and no bare token', () => {
+  const mail = passwordResetMail(
+    'http://localhost:3000',
     'bob@example.com',
-    'abc'
+    'a+b'
   );
 
-  assert.equal(lines.length, 1);
-  assert.match(
-    lines[0]?.message ?? '',
-    /^Password reset for bob@example\.com: .*reset-password\?token=abc$/
+  assert.equal(mail.to, 'bob@example.com');
+  assert.equal(mail.subject, 'Reset your password');
+  assert.equal(
+    mail.text.split('http://localhost:3000/reset-password?token=a%2Bb').length,
+    2
   );
+  assert.doesNotMatch(mail.text, /a\+b/);
+  assert.match(mail.text, /one hour/);
 });

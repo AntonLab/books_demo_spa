@@ -31,6 +31,10 @@ export interface FakeBookRepositoryOptions {
   // What a book's detail reports about its likes, which live in another
   // repository: the count, and the id of a signed-in viewer's own like.
   likes?: { count: number; viewerLikeId: number | null };
+  // What a book's detail reports about its Favorites, which live in another
+  // repository: the count, and the id of a signed-in viewer's own Favorite.
+  // Whether a Draft book counts is the real repository's rule, proven on MySQL.
+  favorites?: { count: number; viewerFavoriteId: number | null };
   // What a book's detail reports from its comments and chapters, which live in
   // other repositories. Which comments and chapters count is the real
   // repository's rule, proven on MySQL.
@@ -57,6 +61,7 @@ export function createFakeBookRepository(
     series = new Map(),
     genres = new Map(),
     likes = { count: 0, viewerLikeId: null },
+    favorites = { count: 0, viewerFavoriteId: null },
     tallies = { commentCount: 0, wordCount: 0 },
     viewers = [],
     reorders = [],
@@ -212,6 +217,8 @@ export function createFakeBookRepository(
         viewerLikeId: viewer === null ? null : likes.viewerLikeId,
         commentCount: tallies.commentCount,
         wordCount: tallies.wordCount,
+        favoriteCount: favorites.count,
+        viewerFavoriteId: viewer === null ? null : favorites.viewerFavoriteId,
       };
     },
 

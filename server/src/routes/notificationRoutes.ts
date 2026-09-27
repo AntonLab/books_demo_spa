@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { createNotificationController } from '../controllers/notificationController.ts';
+import { createNotificationStreamHandler } from '../controllers/notificationStream.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   listNotificationsQuerySchema,
   markNotificationsReadSchema,
+  updateNotificationSettingsSchema,
 } from '../types/notification.ts';
 import type { RouteDeps } from './index.ts';
 
@@ -27,6 +29,18 @@ export function createNotificationRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ body: markNotificationsReadSchema }),
     controller.markRead
+  );
+  router.get('/settings', requireAuth, controller.settings);
+  router.patch(
+    '/settings',
+    requireAuth,
+    validate({ body: updateNotificationSettingsSchema }),
+    controller.updateSettings
+  );
+  router.get(
+    '/stream',
+    requireAuth,
+    createNotificationStreamHandler(deps.onlineRegistry)
   );
 
   return router;

@@ -43,6 +43,10 @@ export class Book extends Model<
   // Creation-optional: the column defaults to `draft`, which is where every
   // book starts.
   declare status: CreationOptional<BookStatus>;
+  // When the announcement pass told the Book's Series Favorite holders it is
+  // out (ADR-0013), set once its Release time has passed while it is
+  // Published; null until then and never cleared. Never sent to a client.
+  declare announcedAt: CreationOptional<Date | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 
@@ -105,6 +109,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         allowNull: false,
         defaultValue: 'draft',
       },
+      announcedAt: { type: DataTypes.DATE(3), allowNull: true },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
       createdAt: { type: DataTypes.DATE, allowNull: false },
@@ -135,6 +140,14 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         {
           name: 'books_genre_id',
           fields: ['genreId'],
+        },
+        // Serves the announcement pass's `announcedAt IS NULL AND status !=
+        // 'draft'` scan (announcementRepository.ts releaseBooks); without it
+        // every pass's FOR UPDATE takes a full-table next-key lock, mirroring
+        // chapters_announced_at_published_at (a19824e).
+        {
+          name: 'books_announced_at_status',
+          fields: ['announcedAt', 'status'],
         },
       ],
     }

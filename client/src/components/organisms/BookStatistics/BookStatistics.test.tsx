@@ -14,7 +14,7 @@ const chapter: ChapterSummary = {
 };
 
 const baseProps = {
-  book: { likeCount: 4, commentCount: 7, wordCount: 12345 },
+  book: { likeCount: 4, favoriteCount: 3, commentCount: 7, wordCount: 12345 },
   chapters: [chapter],
   isPending: false,
   isError: false,
@@ -26,6 +26,7 @@ const LABELS = [
   'Chapters',
   'Words',
   'Likes',
+  'Favorites',
   'Comments',
 ];
 
@@ -37,7 +38,7 @@ const valueOf = (label: string) =>
   cellOf(label).textContent?.slice(label.length);
 
 describe('BookStatistics', () => {
-  it('lists the six figures in order', () => {
+  it('lists the seven figures in order', () => {
     renderWithProviders(<BookStatistics {...baseProps} />);
 
     expect(LABELS.map((label) => [label, valueOf(label)])).toEqual([
@@ -46,6 +47,7 @@ describe('BookStatistics', () => {
       ['Chapters', '1'],
       ['Words', '12,345'],
       ['Likes', '4'],
+      ['Favorites', '3'],
       ['Comments', '7'],
     ]);
     // Label order on the page, not only presence.
@@ -83,7 +85,7 @@ describe('BookStatistics', () => {
     renderWithProviders(
       <BookStatistics
         {...baseProps}
-        book={{ likeCount: 0, commentCount: 0, wordCount: 0 }}
+        book={{ likeCount: 0, favoriteCount: 0, commentCount: 0, wordCount: 0 }}
         chapters={[]}
       />
     );
@@ -91,6 +93,7 @@ describe('BookStatistics', () => {
     expect(valueOf('Chapters')).toBe('0');
     expect(valueOf('Words')).toBe('0');
     expect(valueOf('Likes')).toBe('0');
+    expect(valueOf('Favorites')).toBe('0');
     expect(valueOf('Comments')).toBe('0');
     expect(valueOf('Release time')).toBe('—');
     expect(valueOf('Last update')).toBe('—');

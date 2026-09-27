@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
+import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
@@ -12,6 +13,8 @@ import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
 import { useBooksInSeries } from '@/queries/books';
+import { useToggleFavorite } from '@/queries/favorites';
+import { queryKeys } from '@/queries/keys';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
 import styles from './SeriesPage.module.css';
@@ -32,6 +35,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   const navigate = useNavigate();
   const series = useSeries(seriesId);
   const { data: session } = useSession();
+  const toggleFavorite = useToggleFavorite(queryKeys.seriesDetail(seriesId));
 
   if (series.isError) {
     // A link from a book page outlives the series it names.
@@ -44,12 +48,27 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
-  const { mayEdit } = seriesCapabilities(series.data, session);
+  const { mayEdit, mayFavorite } = seriesCapabilities(series.data, session);
 
   return (
     <>
       <SeriesCard series={series.data} />
       <Flex justify="end" align="center" gap="middle" className={styles.bar}>
+        {/* A series has no statistics tab, so the button is the only place
+            its Favorites count shows. */}
+        {mayFavorite && (
+          <FavoriteButton
+            count={series.data.favoriteCount}
+            favoriteId={series.data.viewerFavoriteId}
+            disabled={toggleFavorite.isPending}
+            onToggle={(existingId) =>
+              toggleFavorite.mutate({
+                existingId,
+                payload: { seriesId },
+              })
+            }
+          />
+        )}
         {mayEdit && (
           <Button onClick={() => void navigate(`/series/${seriesId}/edit`)}>
             Edit series

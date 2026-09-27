@@ -4,6 +4,7 @@ import { initBookAuthorModel, BookAuthor } from './BookAuthor.ts';
 import { initBookCoverModel, BookCover } from './BookCover.ts';
 import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
+import { initFavoriteModel, Favorite } from './Favorite.ts';
 import { initGenreModel, Genre } from './Genre.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
@@ -37,6 +38,7 @@ function initEachModel(sequelize: Sequelize): void {
   initChapterModel(sequelize);
   initCommentModel(sequelize);
   initLikeModel(sequelize);
+  initFavoriteModel(sequelize);
   initNotificationModel(sequelize);
   initSessionModel(sequelize);
   initPasswordResetTokenModel(sequelize);
@@ -249,6 +251,36 @@ function declareAssociations(): void {
   });
   Like.belongsTo(Comment, { as: 'comment', foreignKey: 'commentId' });
 
+  // A Favorite points at exactly one of a Book or a Series, on the same terms
+  // as a like: both targets nullable and CASCADE, because SET NULL would leave
+  // a row with neither — the state models/Favorite.ts forbids. It is the
+  // Account's own, so it goes with the Account too.
+  User.hasMany(Favorite, {
+    as: 'favorites',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Favorite.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  Book.hasMany(Favorite, {
+    as: 'favorites',
+    // allowNull restated so Sequelize does not infer NOT NULL from the
+    // association: a favorite on a series leaves this column empty.
+    foreignKey: { name: 'bookId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Favorite.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  Series.hasMany(Favorite, {
+    as: 'favorites',
+    foreignKey: { name: 'seriesId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Favorite.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
   // CASCADE, matching every other user-owned association above: a session
   // belonging to a deleted user answers to nobody. There is no recursion
   // concern — users -> sessions is a single level.
@@ -297,6 +329,16 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   Notification.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
+  // A New chapter's link to the Chapter a click opens: nulled, not cascaded,
+  // when the Chapter is deleted, like the work links above.
+  Chapter.hasMany(Notification, {
+    as: 'notifications',
+    foreignKey: { name: 'chapterId', allowNull: true },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE',
+  });
+  Notification.belongsTo(Chapter, { as: 'chapter', foreignKey: 'chapterId' });
 }
 
 export function initModels(sequelize: Sequelize): void {

@@ -97,12 +97,21 @@ that read like mistakes and are not.
   `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
   deletes the right row. It predates the icons and still uses a text glyph.
+- `FavoriteButton` has the same id-in, id-out shape but draws a star icon.
+  It shows to Co-authors too (a Favorite is a subscription, not praise) and
+  never on a Draft, whose Favorites the server neither counts nor lists.
+- `EmailNotificationsSetting`'s switch id `email-notifications` is the anchor
+  the announcement emails link to; it scrolls itself into view for that hash,
+  since the browser's own hash scroll runs before the SPA draws it.
 - Icons come from `@ant-design/icons` (ADR-0012). Each renders `role="img"`
   named after itself: an icon beside visible text takes `aria-hidden`, and an
   icon-only control takes `aria-label` on the control (or on the icon, for a
   `Segmented` option).
 - `NotificationBell` marks unread items read when opened but keeps them
-  highlighted until it closes.
+  highlighted until it closes. It holds the Account's notification stream
+  (`useNotificationStream`) and toasts each pushed Notification under the key
+  `notification-<id>`, so a merged New chapter updates its toast. `AppHeader`
+  keys it by the Account, so an Account switch drops the old toasts.
 
 ## Search suggestions (`SearchBar`, `SearchForm`)
 

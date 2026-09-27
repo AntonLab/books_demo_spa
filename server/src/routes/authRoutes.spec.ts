@@ -10,8 +10,10 @@ import type {
   SessionRecord,
 } from '../repositories/sessionRepository.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
+import type { MailMessage } from '../delivery/mailDelivery.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
+import { recordLogs } from '../logger.testkit.ts';
 import type { PublicUser } from 'shared';
 
 const registration = {
@@ -80,6 +82,10 @@ function createFakeSessions(users: UserRepository) {
     async deleteExpired() {
       throw new Error('the expiry purge is not reachable from a route');
     },
+    // The Online registry's timer calls it, never a route.
+    async findLiveSessions() {
+      throw new Error('the Online registry is not reachable from a route');
+    },
   };
 
   return { repository, rows };
@@ -141,11 +147,17 @@ function authDeps() {
       userRepository: users,
       sessionRepository: sessions.repository,
       passwordResetRepository: resets.repository,
-      resetDelivery: {
-        async send(email: string, token: string) {
-          delivered.push({ email, token });
+      mailDelivery: {
+        async send(message: MailMessage) {
+          const link = message.text.match(/https?:\/\/\S+/)?.[0];
+          assert.ok(link, `no link in the mail to ${message.to}`);
+          delivered.push({
+            email: message.to,
+            token: new URL(link).searchParams.get('token') ?? '',
+          });
         },
       },
+      appBaseUrl: 'http://localhost:3000',
     },
     users,
     sessions,
@@ -417,6 +429,47 @@ test('a reset request for an unknown address is accepted identically', async () 
     assert.equal(await known.text(), await unknown.text());
     // The difference is invisible to the caller but real on the server.
     assert.equal(delivered.length, 1);
+  });
+});
+
+test('a reset request answers 202 before the mail send settles, and logs a failed send', async (t) => {
+  const lines = recordLogs(t);
+  const { deps } = authDeps();
+  let rejectSend!: (error: Error) => void;
+  const customDeps = {
+    ...deps,
+    mailDelivery: {
+      send: () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSend = reject;
+        }),
+    },
+  };
+
+  await withApp(customDeps, async (base) => {
+    const registered = await json<PublicUser>(
+      await post(base, 'register', registration)
+    );
+    const response = await post(base, 'password-reset/request', {
+      email: 'bob@example.com',
+    });
+
+    // 202 already answered while the send is still pending: the request did
+    // not wait on it.
+    assert.equal(response.status, 202);
+    assert.deepEqual(lines, []);
+
+    rejectSend(new Error('smtp down'));
+    // Flushes the microtask the rejection's .catch runs on.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(lines, [
+      {
+        level: 'error',
+        message: 'Password reset mail failed',
+        meta: { userId: registered.id, error: 'smtp down' },
+      },
+    ]);
   });
 });
 

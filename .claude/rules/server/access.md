@@ -39,6 +39,14 @@ half. Nothing here lives in the permission table.
   check-then-write there. Safe because a comment's owner never changes, and a
   credit landing between check and insert leaves at worst one early like.
   Uniqueness stays with the indexes.
+- **Favorites are private.** Every read and the delete are scoped by the
+  session's account in `favoriteRepository`, not compared in the controller,
+  so another account's Favorite answers the same 404 as a missing one. Adding
+  one needs the work to be readable (`readableBookWhere` /
+  `visibleSeriesWhere`): a hidden Draft is 404 like a missing id. A book
+  returned to Draft keeps its Favorite rows but leaves the list and counts
+  zero on `BookDetail.favoriteCount`; its own Co-authors and Moderators still
+  see `viewerFavoriteId`.
 
 ## Co-authors (ADR-0005)
 
@@ -72,7 +80,17 @@ own credit table.
 ## Notifications
 
 - Written by `notify` inside the transaction of the change, so a failed change
-  raises nothing. The actor is never a recipient.
+  raises nothing. The actor is never a recipient. Each row is pushed to the
+  recipient's open streams from `afterCommit` (`online/notificationPublisher.ts`,
+  set by `index.ts`); with no publisher set, as in the seed and the repository
+  specs, nothing is pushed. A push that throws is logged, never rethrown:
+  Sequelize awaits `afterCommit` inside `commit()`.
+- `new_chapter` and `new_book` are raised by the announcement pass
+  (`announcements/`), never by `notify`: they carry no actor (`actorKind`
+  null), a New chapter links its first unread Chapter (`chapterId`, `SET
+NULL`) with a `chapterCount`, and a New book sets both `bookId` and its
+  Series' `seriesId`. Their recipients are Favorite holders minus the Book's
+  Co-authors.
 - Added tells the account added; removed tells the account removed; leaving
   tells every remaining Co-author; deleting a work tells every other Co-author
   (the deleter is named only if credited — otherwise a Moderator, unnamed);

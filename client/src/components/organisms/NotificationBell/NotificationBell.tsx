@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Badge, Button, Empty, Popover, Typography } from 'antd';
-import { Link } from 'react-router';
+import {
+  Badge,
+  Button,
+  Empty,
+  Popover,
+  Typography,
+  notification as antdNotification,
+} from 'antd';
+import { Link, useNavigate } from 'react-router';
 import {
   useMarkNotificationsRead,
   useNotifications,
 } from '@/queries/notifications';
+import { useNotificationStream } from '@/queries/notificationStream';
 import { formatDateTime } from '@/format/date';
-import type { PublicNotification } from '@/types/api';
+import type { CreditNotification, PublicNotification } from '@/types/api';
 import styles from './NotificationBell.module.css';
 
 interface NotificationBellProps {
@@ -18,36 +26,66 @@ interface NotificationBellProps {
 const WORK_LABELS = { book: 'the book', series: 'the series' } as const;
 
 // A book opens on its page; a series on its editor, since the public series
-// page is still a stub.
-const hrefOf = ({ work }: PublicNotification): string | null => {
+// page is still a stub. A New chapter opens its first new Chapter, or the Book
+// once that Chapter is gone.
+const hrefOf = (notification: PublicNotification): string | null => {
+  const { work } = notification;
   if (work.id === null) return null;
+  if (notification.kind === 'new_chapter' && notification.chapter.id !== null)
+    return `/books/${work.id}/chapters/${notification.chapter.id}`;
   return work.type === 'book' ? `/books/${work.id}` : `/series/${work.id}/edit`;
 };
 
-const actorOf = ({ actor }: PublicNotification): string => {
+const actorOf = ({ actor }: CreditNotification): string => {
   if (actor.kind === 'moderator') return 'A moderator';
   if (actor.kind === 'deleted_account') return 'A deleted account';
   return actor.name ?? 'A co-author';
 };
 
-// One notification as a sentence, with the work's title linked while the work
+// One notification as a sentence, with what it points at linked while that
 // still exists.
 const describe = (
   notification: PublicNotification,
   onFollow: () => void
 ): ReactNode => {
   const href = hrefOf(notification);
-  const quoted = `“${notification.work.title}”`;
+  const linked = (title: string) => {
+    const quoted = `“${title}”`;
+    return href === null ? (
+      <strong>{quoted}</strong>
+    ) : (
+      <Link to={href} onClick={onFollow}>
+        {quoted}
+      </Link>
+    );
+  };
+
+  if (notification.kind === 'new_chapter') {
+    const book = <strong>“{notification.work.title}”</strong>;
+    const chapter = linked(notification.chapter.title);
+    return notification.chapterCount === 1 ? (
+      <>
+        New chapter in the book {book}: {chapter}.
+      </>
+    ) : (
+      <>
+        {notification.chapterCount} new chapters in the book {book}, starting
+        with {chapter}.
+      </>
+    );
+  }
+  if (notification.kind === 'new_book') {
+    return (
+      <>
+        New book in the series <strong>“{notification.series.title}”</strong>:{' '}
+        {linked(notification.work.title)}.
+      </>
+    );
+  }
+
   const work = (
     <>
-      {WORK_LABELS[notification.work.type]}{' '}
-      {href === null ? (
-        <strong>{quoted}</strong>
-      ) : (
-        <Link to={href} onClick={onFollow}>
-          {quoted}
-        </Link>
-      )}
+      {WORK_LABELS[notification.work.type]} {linked(notification.work.title)}
     </>
   );
   const actor = actorOf(notification);
@@ -96,6 +134,35 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const [fresh, setFresh] = useState<ReadonlySet<number>>(new Set());
 
+  const navigate = useNavigate();
+  const [toasts, toastHolder] = antdNotification.useNotification();
+
+  // Keyed by the Notification's id: a New chapter that grows is pushed again
+  // under the same id, and open() with a key already on screen updates that
+  // toast in place.
+  useNotificationStream(userId, (item) => {
+    const key = `notification-${item.id}`;
+    const href = hrefOf(item);
+    const dismiss = () => toasts.destroy(key);
+    toasts.open({
+      key,
+      title: 'New notification',
+      description: describe(item, dismiss),
+      actions: href !== null && (
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => {
+            dismiss();
+            void navigate(href);
+          }}
+        >
+          Open
+        </Button>
+      ),
+    });
+  });
+
   const items = notifications.data?.items ?? [];
   const unread = notifications.data?.unread ?? 0;
 
@@ -143,27 +210,30 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
   );
 
   return (
-    <Popover
-      trigger="click"
-      placement="bottomRight"
-      title="Notifications"
-      content={content}
-      open={open}
-      onOpenChange={handleOpenChange}
-    >
-      <Badge count={unread} size="small">
-        {/* The count is in the name as well as the badge, which a screen
-            reader does not announce. */}
-        <Button
-          type="text"
-          aria-label={
-            unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
-          }
-          className={styles.bell}
-        >
-          🔔
-        </Button>
-      </Badge>
-    </Popover>
+    <>
+      {toastHolder}
+      <Popover
+        trigger="click"
+        placement="bottomRight"
+        title="Notifications"
+        content={content}
+        open={open}
+        onOpenChange={handleOpenChange}
+      >
+        <Badge count={unread} size="small">
+          {/* The count is in the name as well as the badge, which a screen
+              reader does not announce. */}
+          <Button
+            type="text"
+            aria-label={
+              unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
+            }
+            className={styles.bell}
+          >
+            🔔
+          </Button>
+        </Badge>
+      </Popover>
+    </>
   );
 };

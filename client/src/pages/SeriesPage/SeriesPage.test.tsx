@@ -7,15 +7,18 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
+import * as favoritesApi from '@/api/favorites';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
-import type { PublicSeries, PublicUser } from '@/types/api';
+import type { PublicUser, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
+jest.mock('@/api/favorites');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedSeries = jest.mocked(seriesApi);
+const mockedFavorites = jest.mocked(favoritesApi);
 
 const coAuthor = {
   id: 3,
@@ -25,7 +28,7 @@ const coAuthor = {
   avatarUrl: null,
 };
 
-const series: PublicSeries = {
+const series: SeriesDetail = {
   id: 12,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
@@ -34,6 +37,8 @@ const series: PublicSeries = {
   genre: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
+  favoriteCount: 0,
+  viewerFavoriteId: null,
 };
 
 const book: PublicBook = {
@@ -196,5 +201,62 @@ describe('SeriesPage', () => {
     renderPage('/series/12', account({ id: 51, role: 'author' }));
     await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
     expect(screen.queryByRole('button', { name: 'Edit series' })).toBeNull();
+  });
+});
+
+describe('SeriesPage star', () => {
+  const noBooks = { items: [], total: 0, current: 1, pageSize: 100 };
+
+  beforeEach(() => {
+    mockedBooks.listBooks.mockResolvedValue(noBooks);
+  });
+
+  it('hides the star from an anonymous visitor', async () => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
+  });
+
+  it('adds the series with its count for a signed-in reader', async () => {
+    mockedSeries.getSeries.mockResolvedValue({ ...series, favoriteCount: 6 });
+    mockedFavorites.createFavorite.mockResolvedValue({
+      id: 8,
+      userId: 9,
+      bookId: null,
+      seriesId: 12,
+      createdAt: '2026-09-26T10:00:00.000Z',
+    });
+
+    renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+    const star = await screen.findByRole('button', {
+      name: 'Add to favorites',
+    });
+    expect(star).toHaveTextContent('6');
+    await userEvent.click(star);
+
+    expect(mockedFavorites.createFavorite).toHaveBeenCalledWith({
+      seriesId: 12,
+    });
+  });
+
+  it('removes a co-author’s own Favorite by its id', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      favoriteCount: 1,
+      viewerFavoriteId: 8,
+    });
+    mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
+
+    renderPage('/series/12', account());
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Remove from favorites' })
+    );
+
+    expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(8);
   });
 });

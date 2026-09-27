@@ -69,13 +69,12 @@ export function defaultDeps(): AppDeps {
     commentRepository: createUnusedRepository('comment'),
     likeRepository: createUnusedRepository('like'),
     notificationRepository: createUnusedRepository('notification'),
+    favoriteRepository: createUnusedRepository('favorite'),
     sessionRepository: createUnusedRepository('session'),
     passwordResetRepository: createUnusedRepository('passwordReset'),
-    resetDelivery: {
-      send: () => {
-        throw new Error('reset delivery must not be used by these tests');
-      },
-    },
+    mailDelivery: createUnusedRepository('mailDelivery'),
+    appBaseUrl: 'http://localhost:3000',
+    onlineRegistry: createUnusedRepository('onlineRegistry'),
     trustedOrigin: 'http://localhost:3000',
     trustProxy: 0,
     authRateLimits: unlimitedAuthRateLimits(),

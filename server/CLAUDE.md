@@ -9,17 +9,17 @@ its own when you Read a file its `paths:` names — writing or editing one does
 not. Before creating a file, or changing a topic whose files you have not
 read, read the rule first:
 
-| Rule             | Covers                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps |
-| `access.md`      | ownership, Co-authors, Notifications, Draft books, comment tombstones               |
-| `permissions.md` | Roles, the permission matrix, account rank rules                                    |
-| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                        |
-| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                |
-| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                  |
-| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas         |
-| `seed.md`        | the demo seed                                                                       |
-| `operations.md`  | security headers, graceful shutdown, bind errors, expiry purge                      |
+| Rule             | Covers                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps                |
+| `access.md`      | ownership, Co-authors, Notifications, Draft books, comment tombstones                              |
+| `permissions.md` | Roles, the permission matrix, account rank rules                                                   |
+| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                                       |
+| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                               |
+| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                                 |
+| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas                        |
+| `seed.md`        | the demo seed                                                                                      |
+| `operations.md`  | security headers, graceful shutdown, bind errors, expiry purge, announcement pass, Online registry |
 
 ## Invariants
 
@@ -55,8 +55,9 @@ Install from the repo root. Scripts run here or from the root with `-w server`.
   `*.spec.ts`, `*.testkit.ts` and `src/db/seed/`. `dist/` still imports `shared`
   as `.ts`, so running it needs the workspace link and a type-stripping Node
   (ADR-0006).
-- `npm run seed -- --force` — **deletes every row in the ten content tables**,
-  Covers and Avatars with them; without `--force` it only reports row counts.
+- `npm run seed -- --force` — **deletes every row in the eleven content
+  tables**, Covers and Avatars with them; without `--force` it only reports
+  row counts.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`.
   Keep `--env-file-if-exists`: without it the MySQL suites skip silently.
   `posttest` drops the test schemas, and npm runs it only after a green run —
@@ -70,16 +71,17 @@ Install from the repo root. Scripts run here or from the root with `-w server`.
 `.env.local` (git-ignored) supplies these; `src/db/config.ts` validates them
 with zod and refuses to start on a malformed value.
 
-| Variable                  | Default                   | Notes                                                                                                    |
-| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`             | Also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag.           |
-| `PORT`                    | `4000`                    |                                                                                                          |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                          |
-| `DB_NAME`                 | `books_demo_spa`          |                                                                                                          |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default, so the server never starts against an unintended database. An empty password is accepted.    |
-| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin: reset links and the CSRF trusted origin.                                              |
-| `TRUST_PROXY`             | `0`                       | Proxy hops trusted for `X-Forwarded-For`. The sign-in limits key on `req.ip`: set it behind a proxy.     |
-| `RESET_DELIVERY`          | `log`; none in production | `log` is the only sink. Production refuses to start without it, so link-logging never ships by accident. |
+| Variable                  | Default                   | Notes                                                                                                      |
+| ------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                | `development`             | Also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag.             |
+| `PORT`                    | `4000`                    |                                                                                                            |
+| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                            |
+| `DB_NAME`                 | `books_demo_spa`          |                                                                                                            |
+| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default, so the server never starts against an unintended database. An empty password is accepted.      |
+| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin: emailed links and the CSRF trusted origin.                                              |
+| `TRUST_PROXY`             | `0`                       | Proxy hops trusted for `X-Forwarded-For`. The sign-in limits key on `req.ip`: set it behind a proxy.       |
+| `MAIL_DELIVERY`           | `log`; none in production | `log` or `smtp`. Production refuses to start without it, so link-logging never ships by accident.          |
+| `SMTP_HOST` … `MAIL_FROM` | none; `SMTP_PORT` 587     | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`; all but the port required under smtp. |
 
 The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
 `SKIP_MYSQL` (see `testing.md`).

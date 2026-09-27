@@ -5,7 +5,10 @@ import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 
 interface BookStatisticsProps {
-  book: Pick<BookDetail, 'likeCount' | 'commentCount' | 'wordCount'>;
+  book: Pick<
+    BookDetail,
+    'likeCount' | 'favoriteCount' | 'commentCount' | 'wordCount'
+  >;
   // The Published chapters in Reading order: the list the Chapters tab shows,
   // so the two tabs cannot disagree about what is out.
   chapters: ChapterSummary[];
@@ -17,9 +20,9 @@ interface BookStatisticsProps {
 // whatever the browser's language.
 const formatCount = (value: number) => value.toLocaleString('en');
 
-// Presentational, like ChapterList: the page owns both queries. Words, Likes
-// and Comments come from the book detail; Chapters, Release time and Last
-// update from the chapter list, so they wait for it and fail with it.
+// Presentational, like ChapterList: the page owns both queries. Words, Likes,
+// Favorites and Comments come from the book detail; Chapters, Release time
+// and Last update from the chapter list, so they wait for it and fail with it.
 export const BookStatistics: FC<BookStatisticsProps> = ({
   book,
   chapters,
@@ -73,6 +76,11 @@ export const BookStatistics: FC<BookStatisticsProps> = ({
         },
         { key: 'words', label: 'Words', children: formatCount(book.wordCount) },
         { key: 'likes', label: 'Likes', children: formatCount(book.likeCount) },
+        {
+          key: 'favorites',
+          label: 'Favorites',
+          children: formatCount(book.favoriteCount),
+        },
         {
           key: 'comments',
           label: 'Comments',
