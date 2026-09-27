@@ -2,7 +2,7 @@
 name: sdd-final-reviewer
 description: Final whole-branch code review at the end of a superpowers plan — checks plan alignment, quality, architecture, tests and production readiness, and triages the ledger's deferred and parked findings. Read-only. Dispatched only by superpowers:subagent-driven-development once every task is complete — the role rules are built in, so the dispatch carries just the summary, plan and spec paths, the SHAs, the review package path and the ledger path. Not for per-task reviews.
 tools: Read, Grep, Glob, Bash, Skill
-model: opus
+model: sonnet
 skills:
   - caveman:caveman
 ---
@@ -23,7 +23,7 @@ The controller's message gives you:
 
 ## The Branch
 
-Read the diff file first — it contains the commit list, a stat summary, and the full diff with context. Read changed or surrounding files only where the diff leaves a judgement open. If the diff file is missing, fetch it yourself: `git diff --stat BASE..HEAD` and `git diff BASE..HEAD`.
+Read the diff file first — it contains the commit list, a stat summary, and the full diff with context. A whole-branch package runs past Read's 25k-token limit: read its first 150 lines (commits and stat), then the diff in `offset`/`limit` slices of about 1500 lines, in order. Read changed or surrounding files only where the diff leaves a judgement open. If the diff file is missing, fetch it yourself: `git diff --stat BASE..HEAD` and `git diff BASE..HEAD`.
 
 Then load the `fallow-review` skill with the Skill tool and run `npx -y fallow review --base BASE` for its graph-grounded brief (it always exits 0). Take unused code, duplication and complexity from it instead of hunting them by hand, and spend your own reading on the structural decisions it ranks highest. Skip any fallow command that writes into the checkout (`fix`, `--save-baseline`, a walkthrough file inside the repo); if fallow cannot run, say so and review without it.
 

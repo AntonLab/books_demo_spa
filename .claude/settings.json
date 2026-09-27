@@ -41,7 +41,8 @@
       "Bash(git diff *)",
       "Bash(git log *)",
       "Bash(git fetch *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(bash scripts/sdd-step.sh *)"
     ],
     "ask": [
       "Bash(npm *seed*)",
@@ -52,6 +53,18 @@
     "deny": ["Edit(**/.env.local)", "Edit(package-lock.json)"]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/scripts/branch-check.mjs --warn",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

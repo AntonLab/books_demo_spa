@@ -21,6 +21,11 @@ paths:
   files only from its working directory: from the main checkout, `/.claude/*`
   would hide every worktree file. ESLint is left to the pre-commit hook; typed
   linting per edit is too slow.
+- **SessionStart runs `branch-check.mjs --warn`** on `startup` only: it
+  fetches `origin/dev` and prints one line when the branch is behind, nothing
+  otherwise, so a fresh branch costs no context. A failed fetch exits 0.
+- **`.env.local` is behind `Edit(**/.env.local)`**, which also stops an agent's
+  `cp` into a worktree. `npm run worktree` copies it instead; keep the deny.
 - **`.claude/skills/`** is ignored except `db-reset/`: the rest are junctions
   `scripts/link-skills.mjs` makes, and that script leaves a real directory
   alone.
