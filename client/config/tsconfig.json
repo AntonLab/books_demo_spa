@@ -1,0 +1,16 @@
+{
+  // The webpack config runs in Node, not the browser: Node strips its types
+  // on load (webpack-cli `import()`s it), so this program only checks them.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node 24, the engines floor, runs all of ES2024.
+    "target": "ES2024",
+    "lib": ["ES2024"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": ["."]
+}
