@@ -28,6 +28,20 @@ const below = (...levels) => ({
 const restrictImports = (...patterns) => ({
   'no-restricted-imports': ['error', { paths: [noReactDefault], patterns }],
 });
+const noDefaultExports = {
+  'no-restricted-exports': [
+    'error',
+    {
+      restrictDefaultExports: {
+        direct: true,
+        named: true,
+        defaultFrom: true,
+        namedFrom: true,
+        namespaceFrom: true,
+      },
+    },
+  ],
+};
 
 // The shared ignores, recommended sets, repo-wide rules and the Prettier tail
 // live in the root eslint.config.base.mjs. Only the React and browser
@@ -36,6 +50,7 @@ export default createConfig(
   { ignores: ['build'], tsconfigRootDir: import.meta.dirname },
   {
     files: ['**/*.{ts,tsx}'],
+    ignores: ['config/**'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: { ...globals.browser },
@@ -66,18 +81,7 @@ export default createConfig(
         },
       ],
       ...restrictImports(),
-      'no-restricted-exports': [
-        'error',
-        {
-          restrictDefaultExports: {
-            direct: true,
-            named: true,
-            defaultFrom: true,
-            namedFrom: true,
-            namespaceFrom: true,
-          },
-        },
-      ],
+      ...noDefaultExports,
       // A fetch that skips request() loses the session cookie and CSRF token.
       'no-restricted-globals': [
         'error',
@@ -121,15 +125,20 @@ export default createConfig(
       )
     ),
   },
-  // Webpack config files are CommonJS and run in Node, not the browser.
+  // The webpack config runs in Node, not the browser, so none of the React
+  // rules above reach it; named exports still hold.
   {
-    files: ['config/webpack.*.js'],
+    files: ['config/**/*.ts'],
     languageOptions: {
-      sourceType: 'commonjs',
       globals: { ...globals.node },
     },
     rules: {
-      '@typescript-eslint/no-require-imports': 'off',
+      ...noDefaultExports,
     },
+  },
+  // webpack-cli reads the config's default export.
+  {
+    files: ['config/webpack/webpack.config.ts'],
+    rules: { 'no-restricted-exports': 'off' },
   }
 );
