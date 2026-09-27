@@ -496,6 +496,7 @@ describe('BookPage tabs', () => {
     mockedBooks.getBook.mockResolvedValue({
       ...book,
       likeCount: 4,
+      favoriteCount: 2,
       commentCount: 7,
       wordCount: 1234,
     });
@@ -515,6 +516,7 @@ describe('BookPage tabs', () => {
     await waitFor(() => expect(statistic('Chapters')).toBe('2'));
     expect(statistic('Words')).toBe('1,234');
     expect(statistic('Likes')).toBe('4');
+    expect(statistic('Favorites')).toBe('2');
     expect(statistic('Comments')).toBe('7');
     expect(statistic('Release time')).toBe(
       formatDate('2026-09-02T00:00:00.000Z')

@@ -54,7 +54,7 @@ export const appTheme: ThemeConfig = {
     appSearchBarMaxWidth: 400,
     appNotificationPanelWidth: 360,
     appBookCoverWidth: 96,
-    appBookTabsHeight: 218,
+    appBookTabsHeight: 256,
     appCommentQuoteMaxHeight: 160,
     // A share of the window, kept between a floor and a ceiling. The `%`
     // resolves where the variable is used, against the Layout's full width.
