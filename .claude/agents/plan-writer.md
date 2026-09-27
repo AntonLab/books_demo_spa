@@ -18,7 +18,7 @@ Your dispatch gives you a **spec file path**, and optionally a working directory
 
 - If no spec path is given, or the file does not exist, stop at once and report `BLOCKED: no spec file` — do not reconstruct requirements from the dispatch text. You do not share the conversation that produced the design; the spec is your only source of requirements.
 - Read the spec in full, then `CONTEXT.md` and `docs/adr/` if present. Do not Read any `CLAUDE.md`: the root one is already in your context, and a package's loads by itself once you Read a file inside that package. Follow their conventions in every task.
-- The dispatch may name a **code map** (`…-codemap.md` beside the spec, written by `code-mapper`). Treat it as your index: Read a source file only for the lines a task modifies or mirrors, with `offset`/`limit`, and skip files the map already describes. Each part of a split plan shares the one map; re-reading the codebase per part is the cost the map removes.
+- The dispatch may name a **code map** (`…-codemap.md` beside the spec, written by `code-mapper`). Treat it as your index: Read a source file only for the lines a task modifies or mirrors, with `offset`/`limit`, and skip files the map already describes. Read each file once and write down what you need in the task you are drafting; the first run with a map read 14 files in full and then read 10 of them again. Each part of a split plan shares the one map; re-reading the codebase per part is the cost the map removes.
 
 ## Gaps in the Spec
 
@@ -188,6 +188,7 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 2. **Placeholder scan:** Search the plan for any of the patterns from "No Placeholders". Fix them.
 3. **Type consistency:** Do the types, method signatures, and property names used in later tasks match what earlier tasks defined? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 4. **Review Focus:** For each input class or failure mode the spec implies, is there a task whose tests exercise it? The five uncovered ones most likely to bite a person go in the Review Focus section, and each line there gets its test added to the owning task. An empty section means you checked and found none, not that you skipped the check.
+5. **Contracts gate:** run `node scripts/plan-check.mjs <plan path>` from the repo root. Exit 1 lists every non-test code block over 15 lines; replace each with behavior bullets and a `Mirror path:lines` pointer, and run it again until it prints `plan-check: OK`. A plan that fails it is not done.
 
 Fix issues inline. If you find a spec requirement with no task, add the task.
 

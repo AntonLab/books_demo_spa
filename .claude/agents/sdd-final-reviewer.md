@@ -20,6 +20,7 @@ The controller's message gives you:
 - **Base SHA** (the commit the branch started from) and **Head SHA**
 - **Diff file** — the whole-branch review package
 - **Ledger file** — its `minor (deferred)` and `parked` lines are findings earlier task reviews left for you
+- **Gates** (optional) — `gates green at <sha>`: `gate-runner` already ran typecheck, lint, format:check and test on that commit. When it names your Head SHA, take "All tests passing?" as answered and run no gate yourself; otherwise run only the ones it does not cover
 
 ## The Branch
 

@@ -91,3 +91,6 @@ Plain Node (`*.mjs`) and one Bash script, with no dependencies; Prettier
 checks the `.mjs` files, but no package's ESLint config reaches them.
 `sdd-step.sh` finds the superpowers scripts by globbing the plugin cache for
 the newest version, so it needs no update when the plugin does.
+`plan-check.mjs` tells a test block from implementation by a `test`/`it`/
+`describe`/`expect` call; a plan whose tests use another runner's names needs
+the pattern widened, not the 15-line limit.
