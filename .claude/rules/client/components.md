@@ -102,7 +102,10 @@ that read like mistakes and are not.
   icon-only control takes `aria-label` on the control (or on the icon, for a
   `Segmented` option).
 - `NotificationBell` marks unread items read when opened but keeps them
-  highlighted until it closes.
+  highlighted until it closes. It holds the Account's notification stream
+  (`useNotificationStream`) and toasts each pushed Notification under the key
+  `notification-<id>`, so a merged New chapter updates its toast. `AppHeader`
+  keys it by the Account, so an Account switch drops the old toasts.
 
 ## Search suggestions (`SearchBar`, `SearchForm`)
 

@@ -1,6 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
+import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -8,7 +9,9 @@ import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
-import type { PublicUser } from '@/types/api';
+import { ApiError } from '@/api/client';
+import { FakeEventSource } from '@/test/eventSource';
+import type { CreditNotification, PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/notifications');
@@ -419,5 +422,78 @@ describe('AppHeader theme button', () => {
     expect(
       screen.getByRole('button', { name: 'Switch to light theme' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('AppHeader notification stream', () => {
+  const pushed: CreditNotification = {
+    id: 5,
+    kind: 'co_author_added',
+    work: { type: 'book', id: 7, title: 'The Glass Harbour' },
+    actor: { kind: 'co_author', name: 'Margaret Hale' },
+    isRead: false,
+    createdAt: '2026-09-26T10:00:00.000Z',
+  };
+
+  it('opens no stream for a Guest', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+
+    expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
+  it('closes the stream on Log out', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    await renderHeader(<AppHeader />, withSession(user));
+    const source = FakeEventSource.latest();
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await screen.findByRole('menuitem', { name: 'Log in' });
+    expect(source.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it('signs the page out when the stream is refused and the session has ended', async () => {
+    mockedAuth.me.mockRejectedValue(
+      new ApiError(401, 'Authentication required')
+    );
+    await renderHeader(<AppHeader />, withSession(user));
+    const source = FakeEventSource.latest();
+
+    act(() => {
+      source.fail(FakeEventSource.CLOSED);
+    });
+
+    expect(
+      await screen.findByRole('menuitem', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+
+  it('drops the last account’s stream and toasts when another account signs in', async () => {
+    const { queryClient } = await renderHeader(
+      <AppHeader />,
+      withSession(user)
+    );
+    const first = FakeEventSource.latest();
+    act(() => {
+      first.emit(NOTIFICATION_STREAM_EVENT, pushed);
+    });
+    expect(await screen.findByText('New notification')).toBeInTheDocument();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, {
+        ...user,
+        id: 2,
+        login: 'eve',
+      });
+    });
+
+    await screen.findByText('eve');
+    expect(first.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.latest()).not.toBe(first);
+    await waitFor(() =>
+      expect(screen.queryByText('New notification')).toBeNull()
+    );
   });
 });

@@ -1,9 +1,12 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
+import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
+import { FakeEventSource } from '@/test/eventSource';
 import type {
   CreditNotification,
   NewBookNotification,
@@ -324,5 +327,93 @@ describe('NotificationBell', () => {
     expect(
       await screen.findByText(formatDateTime('2026-09-12T10:00:00.000Z'))
     ).toBeInTheDocument();
+  });
+});
+
+// Renders the current URL so a test can see where Open navigated to.
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+};
+
+const push = (item: PublicNotification) => {
+  act(() => {
+    FakeEventSource.latest().emit(NOTIFICATION_STREAM_EVENT, item);
+  });
+};
+
+describe('NotificationBell live toasts', () => {
+  beforeEach(() => {
+    mockedNotifications.listNotifications.mockResolvedValue(page([]));
+  });
+
+  it('toasts a pushed notification, refreshes the list, and opens what it points at', async () => {
+    renderWithProviders(
+      <>
+        <NotificationBell userId={3} />
+        <LocationProbe />
+      </>
+    );
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(1)
+    );
+
+    push(newChapter({}));
+
+    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      sentence('New chapter in the book “The Glass Harbour”: “The Tide Bell”.')
+    ).toBeInTheDocument();
+    // The badge learns of it at once, not at the next 60 s poll.
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(2)
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/books/7/chapters/70'
+    );
+  });
+
+  it('updates the one toast when a New chapter grows, instead of stacking another', async () => {
+    renderWithProviders(<NotificationBell userId={3} />);
+    push(newChapter({}));
+    await screen.findByText('New notification');
+
+    // The pass merges a second Chapter into the same unread Notification and
+    // pushes it again under the same id.
+    push(newChapter({ chapterCount: 2 }));
+
+    await waitFor(() =>
+      expect(
+        sentence(
+          '2 new chapters in the book “The Glass Harbour”, starting with “The Tide Bell”.'
+        )
+      ).toBeInTheDocument()
+    );
+    expect(screen.getAllByText('New notification')).toHaveLength(1);
+  });
+
+  it('toasts the credit kinds too, and offers no Open for a work that is gone', async () => {
+    renderWithProviders(<NotificationBell userId={3} />);
+
+    push(notification({}));
+
+    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      sentence(
+        'Margaret Hale added you as a co-author of the book “The Glass Harbour”.'
+      )
+    ).toBeInTheDocument();
+
+    push(
+      notification({ id: 2, work: { type: 'book', id: null, title: 'Gone' } })
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByText('New notification')).toHaveLength(2)
+    );
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1);
   });
 });
