@@ -93,7 +93,7 @@ signed-in role with no grant for that action gets 403. Ownership is enforced
 on books, series, chapters, comments and likes — only a row's owner, or an
 `admin`/`superadmin` acting as moderator, may change it. See
 `.claude/rules/server/` — `permissions.md` for the full matrix, `auth.md` for
-account blocking, `access.md` for the tombstone rules on deleted comments.
+account blocking, `visibility.md` for the tombstone rules on deleted comments.
 
 Mail goes out through `MAIL_DELIVERY`. With `log` (the default outside
 production) password-reset links and notification emails are written to the
