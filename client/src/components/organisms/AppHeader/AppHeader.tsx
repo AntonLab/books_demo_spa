@@ -123,7 +123,10 @@ export const AppHeader: FC = () => {
         <Skeleton.Button active />
       ) : user ? (
         <Space>
-          <NotificationBell userId={user.id} />
+          {/* Keyed by the Account: a sign-in as someone else in this tab
+              remounts the bell, and its toast holder takes the last
+              Account's toasts with it. */}
+          <NotificationBell key={user.id} userId={user.id} />
           <Dropdown
             menu={{ items: accountItems, onClick: handleAccountClick }}
             trigger={['click']}

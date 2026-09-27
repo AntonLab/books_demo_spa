@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import type { FC, ReactNode } from 'react';
-import { Badge, Button, Empty, Popover, Typography } from 'antd';
-import { Link } from 'react-router';
+import {
+  Badge,
+  Button,
+  Empty,
+  Popover,
+  Typography,
+  notification as antdNotification,
+} from 'antd';
+import { Link, useNavigate } from 'react-router';
 import {
   useMarkNotificationsRead,
   useNotifications,
 } from '@/queries/notifications';
+import { useNotificationStream } from '@/queries/notificationStream';
 import { formatDateTime } from '@/format/date';
 import type { CreditNotification, PublicNotification } from '@/types/api';
 import styles from './NotificationBell.module.css';
@@ -126,6 +134,35 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
   const [open, setOpen] = useState(false);
   const [fresh, setFresh] = useState<ReadonlySet<number>>(new Set());
 
+  const navigate = useNavigate();
+  const [toasts, toastHolder] = antdNotification.useNotification();
+
+  // Keyed by the Notification's id: a New chapter that grows is pushed again
+  // under the same id, and open() with a key already on screen updates that
+  // toast in place.
+  useNotificationStream(userId, (item) => {
+    const key = `notification-${item.id}`;
+    const href = hrefOf(item);
+    const dismiss = () => toasts.destroy(key);
+    toasts.open({
+      key,
+      title: 'New notification',
+      description: describe(item, dismiss),
+      actions: href !== null && (
+        <Button
+          type="primary"
+          size="small"
+          onClick={() => {
+            dismiss();
+            void navigate(href);
+          }}
+        >
+          Open
+        </Button>
+      ),
+    });
+  });
+
   const items = notifications.data?.items ?? [];
   const unread = notifications.data?.unread ?? 0;
 
@@ -173,27 +210,30 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
   );
 
   return (
-    <Popover
-      trigger="click"
-      placement="bottomRight"
-      title="Notifications"
-      content={content}
-      open={open}
-      onOpenChange={handleOpenChange}
-    >
-      <Badge count={unread} size="small">
-        {/* The count is in the name as well as the badge, which a screen
-            reader does not announce. */}
-        <Button
-          type="text"
-          aria-label={
-            unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
-          }
-          className={styles.bell}
-        >
-          🔔
-        </Button>
-      </Badge>
-    </Popover>
+    <>
+      {toastHolder}
+      <Popover
+        trigger="click"
+        placement="bottomRight"
+        title="Notifications"
+        content={content}
+        open={open}
+        onOpenChange={handleOpenChange}
+      >
+        <Badge count={unread} size="small">
+          {/* The count is in the name as well as the badge, which a screen
+              reader does not announce. */}
+          <Button
+            type="text"
+            aria-label={
+              unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
+            }
+            className={styles.bell}
+          >
+            🔔
+          </Button>
+        </Badge>
+      </Popover>
+    </>
   );
 };
