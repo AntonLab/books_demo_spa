@@ -39,7 +39,7 @@ const renderWithSession = (data: PublicUser) => {
 
 beforeEach(() => {
   jest.resetAllMocks();
-  // A default so that a successful mutation's session invalidation (K3) has
+  // A default so that a successful mutation's session invalidation has
   // something real to refetch.
   mockedAuth.me.mockResolvedValue(session);
   mockedNotifications.getNotificationSettings.mockResolvedValue({
