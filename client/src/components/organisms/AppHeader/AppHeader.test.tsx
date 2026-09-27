@@ -98,6 +98,12 @@ describe('AppHeader navigation', () => {
     expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Series' })).toBeNull();
   });
+
+  it('never shows My Books in the nav, not even for an author', async () => {
+    await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
+
+    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
+  });
 });
 
 describe('AppHeader when logged out', () => {
@@ -110,12 +116,6 @@ describe('AppHeader when logged out', () => {
     // Registration stays one click further on, through the login modal's
     // "Create an account".
     expect(screen.queryByText('Register')).toBeNull();
-  });
-
-  it('hides My Books', async () => {
-    await renderHeader(<AppHeader />, withSession(null));
-
-    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
   it('has no notifications to show and asks for none', async () => {
@@ -189,20 +189,6 @@ describe('AppHeader when logged in', () => {
       'src',
       '/api/users/1/avatar?v=1'
     );
-  });
-
-  it('shows My Books to an author', async () => {
-    await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
-
-    expect(
-      screen.getByRole('menuitem', { name: 'My Books' })
-    ).toBeInTheDocument();
-  });
-
-  it('hides My Books from a reader, who has no books to keep', async () => {
-    await renderHeader(<AppHeader />, withSession(user));
-
-    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
   });
 
   it('logs out through the dropdown, discarding the Unsaved text', async () => {
@@ -395,6 +381,52 @@ describe('AppHeader account menu', () => {
     expect(screen.queryByText('Manage genres')).toBeNull();
   });
 
+  it('offers My Books to an author, between Favorites and the divider', async () => {
+    await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
+
+    await userEvent.click(screen.getByText('bob'));
+    await screen.findByText('My Books');
+
+    const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
+    if (!dropdown) {
+      throw new Error('account dropdown popup not found');
+    }
+    const items = within(dropdown).getAllByRole('menuitem');
+
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Profile',
+      'Favorites',
+      'My Books',
+      'Log out',
+    ]);
+  });
+
+  it('hides My Books from every other role', async () => {
+    await renderHeader(<AppHeader />, withSession(user));
+
+    await userEvent.click(screen.getByText('bob'));
+    await screen.findByText('Profile');
+
+    expect(screen.queryByText('My Books')).toBeNull();
+  });
+
+  it('opens the My Books tab from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession({ ...user, role: 'author' })
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('My Books'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/profile/my-books'
+    );
+  });
+
   it('navigates to the management page when Manage genres is clicked', async () => {
     await renderHeader(
       <>
@@ -410,7 +442,7 @@ describe('AppHeader account menu', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
   });
 
-  it('opens the Favorites page from the menu', async () => {
+  it('opens the Favorites tab from the menu', async () => {
     await renderHeader(
       <>
         <AppHeader />
@@ -422,7 +454,9 @@ describe('AppHeader account menu', () => {
     await userEvent.click(screen.getByText('bob'));
     await userEvent.click(await screen.findByText('Favorites'));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/favorites');
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/profile/favorites'
+    );
   });
 });
 

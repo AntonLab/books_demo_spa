@@ -51,16 +51,16 @@ export const AppHeader: FC = () => {
           },
         ]
       : []),
-    // Only for an account holding the author Role: that is who can be credited
-    // on a book, so nobody else has anything to find there.
-    ...(user?.role === 'author'
-      ? [{ key: '/my-books', label: 'My Books' }]
-      : []),
   ];
 
   const accountItems: MenuProps['items'] = [
     { key: '/profile', label: 'Profile' },
-    { key: '/favorites', label: 'Favorites' },
+    { key: '/profile/favorites', label: 'Favorites' },
+    // Only for an account holding the author Role: that is who can be credited
+    // on a book, so nobody else has anything to find there.
+    ...(user?.role === 'author'
+      ? [{ key: '/profile/my-books', label: 'My Books' }]
+      : []),
     // Keeping the Genre list is a Moderator's job; no other Role is offered it.
     ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
     { type: 'divider' },
@@ -95,7 +95,7 @@ export const AppHeader: FC = () => {
         triggerSubMenuAction="click"
         items={navItems}
         // pathname + search, so a genre item whose key carries a query string
-        // is highlighted on its own page while / and /my-books keep working.
+        // is highlighted on its own page while / keeps working.
         selectedKeys={[`${location.pathname}${location.search}`]}
         onClick={({ key }) => void navigate(key)}
         className={styles.nav}
