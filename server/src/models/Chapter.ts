@@ -123,6 +123,13 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
         // the constraint. Not unique: a reorder rewrites every position in one
         // UPDATE, and a unique index would refuse the rows it passes through.
         { name: 'chapters_book_id_position', fields: ['bookId', 'position'] },
+        // Serves the announcement pass's `announcedAt IS NULL AND
+        // publishedAt <= now` scan (announcementRepository.ts); without it
+        // every pass's FOR UPDATE takes a full-table next-key lock.
+        {
+          name: 'chapters_announced_at_published_at',
+          fields: ['announcedAt', 'publishedAt'],
+        },
       ],
     }
   );

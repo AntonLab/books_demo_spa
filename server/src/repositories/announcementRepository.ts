@@ -269,10 +269,9 @@ async function announceChapters(
   for (const holder of holders) {
     const { bookId } = holder;
     if (bookId === null || coAuthors.get(bookId)?.has(holder.userId)) continue;
-    recipientsByBook.set(bookId, [
-      ...(recipientsByBook.get(bookId) ?? []),
-      holder.userId,
-    ]);
+    const recipients = recipientsByBook.get(bookId) ?? [];
+    recipients.push(holder.userId);
+    recipientsByBook.set(bookId, recipients);
   }
   if (recipientsByBook.size === 0) return;
 
@@ -296,12 +295,14 @@ async function announceChapters(
   }
 
   const rows: CreationAttributes<Notification>[] = [];
+  // notificationId -> how much to grow it by. Filled inside the loop below,
+  // applied after it: one increment per distinct amount, not one per Book.
+  const growthByNotificationId = new Map<number, number>();
   for (const [bookId, recipientIds] of recipientsByBook) {
     const chapters = chaptersByBook.get(bookId) ?? [];
     const [first] = chapters;
     if (!first) continue;
 
-    const grown: number[] = [];
     for (const userId of recipientIds) {
       const gathered = gatheredFor(gathering, userId);
       gathered.chapters.push(...chapters);
@@ -319,16 +320,23 @@ async function announceChapters(
         });
       } else {
         // The target stays the first unread new Chapter; only the count grows.
-        grown.push(unreadId);
         gathered.notificationIds.add(unreadId);
+        growthByNotificationId.set(unreadId, chapters.length);
       }
     }
-    if (grown.length > 0) {
-      await Notification.increment(
-        { chapterCount: chapters.length },
-        { where: { id: grown }, transaction }
-      );
-    }
+  }
+
+  const idsByAmount = new Map<number, number[]>();
+  for (const [notificationId, amount] of growthByNotificationId) {
+    const ids = idsByAmount.get(amount) ?? [];
+    ids.push(notificationId);
+    idsByAmount.set(amount, ids);
+  }
+  for (const [amount, ids] of idsByAmount) {
+    await Notification.increment(
+      { chapterCount: amount },
+      { where: { id: ids }, transaction }
+    );
   }
 
   const created = await Notification.bulkCreate(rows, { transaction });
