@@ -25,7 +25,7 @@ export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
   const [searchParams] = useSearchParams();
 
   // The emailed link is <APP_BASE_URL>/reset-password?token=... — built by
-  // `resetUrl()` in server/src/delivery/resetDelivery.ts. The path and the
+  // `resetUrl()` in server/src/delivery/passwordResetMail.ts. The path and the
   // query key must not drift. Leaving the path closes the modal.
   const resetToken =
     pathname === '/reset-password' ? searchParams.get('token') : null;

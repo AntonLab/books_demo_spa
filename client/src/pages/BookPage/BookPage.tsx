@@ -15,6 +15,7 @@ import { Link, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
@@ -23,6 +24,7 @@ import { CommentSection } from '@/components/organisms/CommentSection/CommentSec
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
+import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
@@ -43,6 +45,7 @@ export const BookPage: FC = () => {
   // needs the detail response to know what to ask for.
   const chapters = useChapters(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
+  const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
 
   if (isError) {
     return (
@@ -62,7 +65,7 @@ export const BookPage: FC = () => {
 
   // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
-  const { isCoAuthor, mayLike } = bookCapabilities(book, session);
+  const { isCoAuthor, mayLike, mayFavorite } = bookCapabilities(book, session);
   // The public list: only what is out, even for a Co-author, who manages the
   // rest from the edit page. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
@@ -128,6 +131,21 @@ export const BookPage: FC = () => {
                 }
               />
             )}
+            {mayFavorite && (
+              <FavoriteButton
+                count={book.favoriteCount}
+                favoriteId={book.viewerFavoriteId}
+                // A second click before the refetch lands would send the
+                // same add twice and meet a 409.
+                disabled={toggleFavorite.isPending}
+                onToggle={(existingId) =>
+                  toggleFavorite.mutate({
+                    existingId,
+                    payload: { bookId: book.id },
+                  })
+                }
+              />
+            )}
           </Space>
 
           {book.tags.length > 0 && (
@@ -144,6 +162,7 @@ export const BookPage: FC = () => {
           never reaches the URL, so a reload opens Description. */}
       <Tabs
         className={styles.tabs}
+        classNames={{ body: styles.tabsBody }}
         items={[
           {
             key: 'description',

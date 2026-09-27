@@ -15,6 +15,10 @@ export type AuthorSummary = Wire<Shared.AuthorSummary>;
 // order.
 export type PublicSeries = Wire<Shared.PublicSeries>;
 
+// What GET /api/series/:id answers: the series plus its Favorites count and
+// the viewer's own Favorite id (null when not a Favorite, and for a Guest).
+export type SeriesDetail = Wire<Shared.SeriesDetail>;
+
 // One book of the series editor's list. A summary, because the list reaches a
 // series' Co-authors who may not co-author a Draft book filed in it: what the
 // book is called and where it stands, never what it says.
@@ -35,8 +39,13 @@ export type CommentWithAuthor = Wire<Shared.CommentWithAuthor>;
 // to it. `actor.name` is set for a Co-author only; a Moderator and a deleted
 // account are never named.
 export type PublicNotification = Wire<Shared.PublicNotification>;
+export type CreditNotification = Wire<Shared.CreditNotification>;
+export type NewChapterNotification = Wire<Shared.NewChapterNotification>;
+export type NewBookNotification = Wire<Shared.NewBookNotification>;
 
 export type NotificationList = Wire<Shared.NotificationList>;
+
+export type NotificationSettings = Shared.NotificationSettings;
 
 export type PublicLike = Wire<Shared.PublicLike>;
 
@@ -47,3 +56,11 @@ export interface CreateLikePayload {
   commentId?: number;
   isLike: boolean;
 }
+
+export type PublicFavorite = Wire<Shared.PublicFavorite>;
+export type FavoriteBook = Wire<Shared.FavoriteBook>;
+export type FavoriteSeries = Wire<Shared.FavoriteSeries>;
+
+// Exactly one target, as the server's schema demands; no userId, since the
+// server takes the Account from the session.
+export type CreateFavoritePayload = { bookId: number } | { seriesId: number };

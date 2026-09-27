@@ -60,6 +60,18 @@ export function seriesRepositoryContract(
     assert.deepEqual(await repository.findCoAuthorIds(created.id), [authorId]);
   });
 
+  test('contract: a new series detail counts no favorites', async () => {
+    const { repository, anAuthor } = await setUp();
+    const authorId = await anAuthor();
+    const created = await aSeries(repository, authorId);
+
+    const detail = await repository.findDetailById(created.id, asModerator);
+
+    assert.equal(detail?.title, 'Contract Series');
+    assert.equal(detail?.favoriteCount, 0);
+    assert.equal(detail?.viewerFavoriteId, null);
+  });
+
   test('contract: a series created for a missing account blames the user', async () => {
     const { repository } = await setUp();
 
@@ -76,6 +88,10 @@ export function seriesRepositoryContract(
     const actor = asActor(authorId);
 
     assert.equal(await repository.findById(MISSING_ID, asModerator), null);
+    assert.equal(
+      await repository.findDetailById(MISSING_ID, asModerator),
+      null
+    );
     assert.equal(
       await repository.update(MISSING_ID, { title: 'Nobody' }),
       null

@@ -60,6 +60,7 @@ export const AppHeader: FC = () => {
 
   const accountItems: MenuProps['items'] = [
     { key: '/profile', label: 'Profile' },
+    { key: '/favorites', label: 'Favorites' },
     // Keeping the Genre list is a Moderator's job; no other Role is offered it.
     ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
     { type: 'divider' },
@@ -123,7 +124,10 @@ export const AppHeader: FC = () => {
         <Skeleton.Button active />
       ) : user ? (
         <Space>
-          <NotificationBell userId={user.id} />
+          {/* Keyed by the Account: a sign-in as someone else in this tab
+              remounts the bell, and its toast holder takes the last
+              Account's toasts with it. */}
+          <NotificationBell key={user.id} userId={user.id} />
           <Dropdown
             menu={{ items: accountItems, onClick: handleAccountClick }}
             trigger={['click']}

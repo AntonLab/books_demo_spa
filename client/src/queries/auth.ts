@@ -70,6 +70,10 @@ export const watchSession = (
     if (event.action.manual) channel?.postMessage(null);
     const next = (event.action.data as Session)?.id ?? null;
     if (accountId !== undefined && next !== accountId) {
+      // Removed, not invalidated: they belong to the Account that left, and a
+      // refetch while the bell is still mounted would ask as the next one (a
+      // Guest's 401 on Sign out).
+      client.removeQueries({ queryKey: queryKeys.allNotifications });
       void client.invalidateQueries({
         predicate: (query) => query.queryHash !== sessionHash,
       });

@@ -5,6 +5,7 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
+import { Favorite } from '../models/Favorite.ts';
 import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
@@ -188,6 +189,26 @@ async function withAuthors(
     authors.get(book.id) ?? [],
     coverUrls.get(book.id) ?? null,
     genreOf(book.genreId, genres)
+  );
+}
+
+// A page of rows as PublicBooks, in the order given: credits, Covers and
+// Genres in one query each, so a LIMIT keeps paging over books. Exported for
+// favoriteRepository, whose rows embed the books they point at.
+export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
+  const ids = rows.map((row) => row.id);
+  const [authors, coverUrls, genres] = await Promise.all([
+    loadAuthors(credits, ids),
+    loadCoverUrls(ids),
+    loadGenres(rows.map((row) => row.genreId)),
+  ]);
+  return rows.map((row) =>
+    toPublicBook(
+      row,
+      authors.get(row.id) ?? [],
+      coverUrls.get(row.id) ?? null,
+      genreOf(row.genreId, genres)
+    )
   );
 }
 
@@ -437,26 +458,7 @@ export function createSequelizeBookRepository(): BookRepository {
                 ],
       });
 
-      const [authors, coverUrls, genres] = await Promise.all([
-        loadAuthors(
-          credits,
-          rows.map((row) => row.id)
-        ),
-        loadCoverUrls(rows.map((row) => row.id)),
-        loadGenres(rows.map((row) => row.genreId)),
-      ]);
-      return {
-        items: rows.map((row) =>
-          toPublicBook(
-            row,
-            authors.get(row.id) ?? [],
-            coverUrls.get(row.id) ?? null,
-            genreOf(row.genreId, genres)
-          )
-        ),
-        total,
-        current,
-      };
+      return { items: await publicBooksOf(rows), total, current };
     },
 
     async findById(id) {
@@ -478,20 +480,36 @@ export function createSequelizeBookRepository(): BookRepository {
       // process's clock, as readableChapterScope judges it, but the viewer
       // never widens it: a Co-author's Draft and Scheduled chapters do not
       // count. SUM over no row is NULL, hence ?? 0.
-      const [likeCount, viewerLike, commentCount, wordCount] =
-        await Promise.all([
-          Like.count({ where: { bookId: id, isLike: true } }),
-          viewerId === null
-            ? null
-            : Like.findOne({
-                where: { bookId: id, userId: viewerId },
-                attributes: ['id'],
-              }),
-          Comment.count({ where: { bookId: id, tombstone: null } }),
-          Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
-            where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
-          }),
-        ]);
+      // A Draft book's Favorites are kept but not counted (CONTEXT.md,
+      // Favorite), whoever reads the detail. The viewer's own row is still
+      // named, so the button matches what exists.
+      const [
+        likeCount,
+        viewerLike,
+        commentCount,
+        wordCount,
+        favoriteCount,
+        viewerFavorite,
+      ] = await Promise.all([
+        Like.count({ where: { bookId: id, isLike: true } }),
+        viewerId === null
+          ? null
+          : Like.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['id'],
+            }),
+        Comment.count({ where: { bookId: id, tombstone: null } }),
+        Chapter.aggregate<number | null, Chapter>('wordCount', 'sum', {
+          where: { bookId: id, publishedAt: { [Op.lte]: new Date() } },
+        }),
+        book.status === 'draft' ? 0 : Favorite.count({ where: { bookId: id } }),
+        viewerId === null
+          ? null
+          : Favorite.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['id'],
+            }),
+      ]);
 
       return {
         ...(await withAuthors(book)),
@@ -502,6 +520,8 @@ export function createSequelizeBookRepository(): BookRepository {
         viewerLikeId: viewerLike?.id ?? null,
         commentCount,
         wordCount: wordCount ?? 0,
+        favoriteCount,
+        viewerFavoriteId: viewerFavorite?.id ?? null,
       };
     },
 
@@ -517,6 +537,8 @@ export function createSequelizeBookRepository(): BookRepository {
         if (!book) return null;
 
         await assertGenreExists(input.genreId, transaction);
+
+        const wasDraft = book.status === 'draft';
 
         // `update` writes only the keys present, so an omitted seriesId
         // leaves the link — and the book's place — alone, while an explicit
@@ -538,6 +560,30 @@ export function createSequelizeBookRepository(): BookRepository {
         }
 
         await book.update(changes, { transaction });
+
+        // A Book turning Published with Chapters already past their
+        // Publication time: one New book to Series Favorites; its Chapters
+        // are marked announced without Notifications (CONTEXT.md) — so a
+        // chapter that was already out when the book was still a draft never
+        // gets its own New chapter mail once the pass finds it. `silent`
+        // keeps chapters.updatedAt (the edit version) unchanged. The pass's
+        // own draft-backlog step still raises the book's New book.
+        if (wasDraft && book.status !== 'draft') {
+          const now = new Date();
+          await Chapter.update(
+            { announcedAt: now },
+            {
+              where: {
+                bookId: book.id,
+                announcedAt: null,
+                publishedAt: { [Op.lte]: now },
+              },
+              transaction,
+              silent: true,
+            }
+          );
+        }
+
         return withAuthors(book, transaction);
       });
     },

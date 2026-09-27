@@ -22,8 +22,10 @@ test('the matrix covers every role, module and action exactly once', () => {
 // The invariant that stops a bad seed from locking everyone out. Cheaper than
 // carving an exception for superadmin into the enforcement path, and it fails
 // exactly when the seed is wrong.
-test('superadmin has any on everything except creating content and rewriting comments or likes', () => {
+test('superadmin has any on everything except creating content, rewriting comments or likes, and favorites', () => {
   for (const module of MODULES) {
+    // Pinned on its own below: favorites follow the everyone-alike rule.
+    if (module === 'favorites') continue;
     for (const action of ACTIONS) {
       const createsContent =
         action === 'create' &&
@@ -131,5 +133,24 @@ test('everyone reads genres and only admins keep the list', () => {
     for (const action of ACTIONS) {
       assert.equal(scope(role, 'genres', action), 'any', `${role} ${action}`);
     }
+  }
+});
+
+// A Favorite is private to its Account: every signed-in role adds and removes
+// its own, nobody reads or edits anyone else's — a Moderator included, since
+// there is nothing to moderate in a private bookmark. The lists sit behind
+// requireAuth and read the session's rows only, so no role needs `read`.
+test('every signed-in role adds and removes its own favorites, and nothing more', () => {
+  for (const role of ['user', 'author', 'admin', 'superadmin']) {
+    assert.equal(scope(role, 'favorites', 'create'), 'own', `${role} create`);
+    assert.equal(scope(role, 'favorites', 'delete'), 'own', `${role} delete`);
+    assert.equal(scope(role, 'favorites', 'read'), 'none', `${role} read`);
+    assert.equal(scope(role, 'favorites', 'update'), 'none', `${role} update`);
+  }
+});
+
+test('a guest has no favorites grant at all', () => {
+  for (const action of ACTIONS) {
+    assert.equal(scope('guest', 'favorites', action), 'none', action);
   }
 });

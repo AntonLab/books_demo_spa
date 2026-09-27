@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { NotificationRepository } from '../repositories/notificationRepository.ts';
-import type { PublicNotification } from 'shared';
+import type { NotificationSettings, PublicNotification } from 'shared';
 import type { ListNotificationsQuery } from '../types/notification.ts';
 import {
   json,
@@ -32,6 +32,14 @@ function createFakeRepository(calls: unknown[] = []): NotificationRepository {
     async markRead(userId: number, ids: number[]) {
       calls.push({ markRead: userId, ids });
       return 0;
+    },
+    async getSettings(userId: number) {
+      calls.push({ getSettings: userId });
+      return { emailNotifications: true };
+    },
+    async updateSettings(userId: number, settings: NotificationSettings) {
+      calls.push({ updateSettings: userId, settings });
+      return settings;
     },
   };
 }
@@ -123,6 +131,95 @@ test('notifications without a session are a 401', async () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ ids: [1] }),
+          })
+        ).status,
+        401
+      );
+    }
+  );
+});
+
+test('an account reads its own email switch', async () => {
+  const calls: unknown[] = [];
+  await withAuthenticatedApp(
+    { notificationRepository: createFakeRepository(calls) },
+    async (base) => {
+      const response = await fetch(`${base}/api/notifications/settings`, {
+        headers: { cookie: ROLE_COOKIES.user },
+      });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await json(response), { emailNotifications: true });
+      assert.deepEqual(calls, [{ getSettings: USER_IDS.user }]);
+    }
+  );
+});
+
+test('an account turns its own email switch off', async () => {
+  const calls: unknown[] = [];
+  await withAuthenticatedApp(
+    { notificationRepository: createFakeRepository(calls) },
+    async (base) => {
+      const response = await fetch(`${base}/api/notifications/settings`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: ROLE_COOKIES.author,
+        },
+        body: JSON.stringify({ emailNotifications: false }),
+      });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await json(response), { emailNotifications: false });
+      assert.deepEqual(calls, [
+        {
+          updateSettings: USER_IDS.author,
+          settings: { emailNotifications: false },
+        },
+      ]);
+    }
+  );
+});
+
+test('the email switch takes a boolean and nothing else — no userId to name someone else', async () => {
+  const calls: unknown[] = [];
+  await withAuthenticatedApp(
+    { notificationRepository: createFakeRepository(calls) },
+    async (base) => {
+      for (const body of [
+        { emailNotifications: 'false' },
+        {},
+        { emailNotifications: false, userId: USER_IDS.admin },
+      ]) {
+        const response = await fetch(`${base}/api/notifications/settings`, {
+          method: 'PATCH',
+          headers: {
+            'content-type': 'application/json',
+            cookie: ROLE_COOKIES.author,
+          },
+          body: JSON.stringify(body),
+        });
+        assert.equal(response.status, 400, JSON.stringify(body));
+      }
+      assert.deepEqual(calls, []);
+    }
+  );
+});
+
+test('the email switch without a session is a 401', async () => {
+  await withApp(
+    { notificationRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/notifications/settings`)).status,
+        401
+      );
+      assert.equal(
+        (
+          await fetch(`${base}/api/notifications/settings`, {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ emailNotifications: false }),
           })
         ).status,
         401

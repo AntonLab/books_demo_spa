@@ -249,7 +249,7 @@ export function bookRepositoryContract(
 
   // Zero, not null, on both sides: the real repository's SUM over no chapter
   // is NULL, and a client adding it up would print "null".
-  test('contract: a new book detail counts no comments and no words', async () => {
+  test('contract: a new book detail counts no comments, no words and no favorites', async () => {
     const { repository, anAuthor } = await setUp();
     const authorId = await anAuthor();
     const created = await aBook(repository, authorId);
@@ -261,6 +261,8 @@ export function bookRepositoryContract(
 
     assert.equal(detail?.commentCount, 0);
     assert.equal(detail?.wordCount, 0);
+    assert.equal(detail?.favoriteCount, 0);
+    assert.equal(detail?.viewerFavoriteId, null);
   });
 
   test('contract: a removed book is gone, credits and all', async () => {

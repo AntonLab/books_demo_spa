@@ -40,6 +40,7 @@ const LAZY_PAGES = [
   'EditBookPage',
   'EditChapterPage',
   'EditSeriesPage',
+  'FavoritesPage',
   'MainPage',
   'MyBooksPage',
   'NewBookPage',
@@ -93,6 +94,8 @@ beforeEach(() => {
     likeCount: 0,
     commentCount: 0,
     wordCount: 0,
+    favoriteCount: 0,
+    viewerFavoriteId: null,
     viewerLikeId: null,
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);
@@ -115,6 +118,8 @@ beforeEach(() => {
     genre: null,
     createdAt: '2026-09-01T00:00:00.000Z',
     updatedAt: '2026-09-01T00:00:00.000Z',
+    favoriteCount: 0,
+    viewerFavoriteId: null,
   });
 });
 

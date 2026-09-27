@@ -1,6 +1,8 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
-import type { ResetDelivery } from '../delivery/resetDelivery.ts';
+import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
+import { passwordResetMail } from '../delivery/passwordResetMail.ts';
+import { logger } from '../logger.ts';
 import { validatedBody } from '../middleware/validate.ts';
 import { hashPassword, verifyPassword } from '../password.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
@@ -29,7 +31,8 @@ export interface AuthControllerDeps {
   userRepository: UserRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
-  resetDelivery: ResetDelivery;
+  mailDelivery: MailDelivery;
+  appBaseUrl: string;
   // Injectable purely so a test can prove the unknown-login path still spends
   // an argon2 verify. A wall-clock assertion would be flaky under load, and an
   // ESM import binding cannot be spied on from outside; this makes the timing
@@ -50,6 +53,9 @@ function dummyPasswordHash(): Promise<string> {
   dummyHash ??= hashPassword(randomBytes(16).toString('hex'));
   return dummyHash;
 }
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 export function createAuthController(deps: AuthControllerDeps) {
   const verify = deps.verify ?? verifyPassword;
@@ -158,6 +164,7 @@ export function createAuthController(deps: AuthControllerDeps) {
     requestReset: async (req, res) => {
       const { email } = validatedBody<ResetRequestInput>(req);
       const user = await deps.userRepository.findByEmail(email);
+      let mail: MailMessage | undefined;
 
       if (user) {
         // Supersede any outstanding token: two live links for one account
@@ -170,12 +177,26 @@ export function createAuthController(deps: AuthControllerDeps) {
           hashToken(token),
           new Date(Date.now() + RESET_TTL_MS)
         );
-        await deps.resetDelivery.send(user.email, token);
+        mail = passwordResetMail(deps.appBaseUrl, user.email, token);
       }
 
       // 202 whether or not the address exists. Branching the response here
       // would turn this endpoint into an account-enumeration oracle.
       res.status(202).end();
+
+      // Sent after the response, and not awaited: awaiting it here would let
+      // an attacker read the address's existence off the response time, and a
+      // rejection would turn a slow mail server into a 500 that does the
+      // same. Logged without the address or token, which the error alone
+      // never carries; no retry, the account can just ask again.
+      if (user && mail) {
+        void deps.mailDelivery.send(mail).catch((error: unknown) => {
+          logger.error('Password reset mail failed', {
+            userId: user.id,
+            error: messageOf(error),
+          });
+        });
+      }
     },
 
     confirmReset: async (req, res) => {

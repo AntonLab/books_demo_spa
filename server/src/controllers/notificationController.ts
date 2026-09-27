@@ -5,6 +5,7 @@ import { actorOf } from '../repositories/visibility.ts';
 import type {
   ListNotificationsQuery,
   MarkNotificationsReadInput,
+  UpdateNotificationSettingsInput,
 } from '../types/notification.ts';
 
 // Whose notifications these are comes from the session and nowhere else: there
@@ -30,6 +31,17 @@ export function createNotificationController(
       const { id } = actorOf(req);
       const { ids } = validatedBody<MarkNotificationsReadInput>(req);
       res.json({ unread: await repository.markRead(id, ids) });
+    },
+
+    settings: async (req, res) => {
+      const { id } = actorOf(req);
+      res.json(await repository.getSettings(id));
+    },
+
+    updateSettings: async (req, res) => {
+      const { id } = actorOf(req);
+      const settings = validatedBody<UpdateNotificationSettingsInput>(req);
+      res.json(await repository.updateSettings(id, settings));
     },
   } satisfies Record<string, RequestHandler>;
 }
