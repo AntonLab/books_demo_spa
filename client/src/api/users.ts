@@ -1,7 +1,7 @@
 import { request } from './client';
 import type { PublicUser } from '../types/api';
 
-// K2: the Account's Avatar. Its own module, the way authors.ts is — the
+// The Account's Avatar. Its own module, the way authors.ts is — the
 // users resource has no other writes reachable from this client yet.
 export const uploadAvatar = (
   userId: number,

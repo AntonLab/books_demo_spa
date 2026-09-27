@@ -19,7 +19,8 @@ read, read the rule first:
 | `queries.md`    | retries, the session shape, mutation wrapping, invalidation            |
 | `store.md`      | the two slices, `localStorage` persistence, binding to the Account     |
 | `components.md` | component traps: menus, comments, cards, images, icons, sortable lists |
-| `pages.md`      | routing, lazy loading and the error boundary, page-level rules         |
+| `pages.md`      | page-level rules                                                       |
+| `routing.md`    | App shell: lazy loading, `Suspense`/`ErrorBoundary`, provider order    |
 | `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                 |
 | `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
 | `webpack.md`    | the typed webpack config parts, how Node loads them, build traps       |

@@ -22,7 +22,7 @@ const ACCEPT = ACCEPTED_IMAGE_CONTENT_TYPES.join(',');
 const isAcceptedType = (type: string): type is AcceptedImageContentType =>
   (ACCEPTED_IMAGE_CONTENT_TYPES as readonly string[]).includes(type);
 
-// Purely presentational (K8/K9): the type and size prechecks so the caller
+// Purely presentational: the type and size prechecks so the caller
 // fails fast, nothing else. No query or API import — the caller decides what
 // an accepted file does.
 export const ImageUploadButton: FC<ImageUploadButtonProps> = ({

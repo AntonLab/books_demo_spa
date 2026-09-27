@@ -5,7 +5,7 @@ interface AccountAvatarProps {
   avatarUrl: string | null;
   // Whatever the account's name resolves to at the call site — a login for
   // the header's own trigger, a full name in a byline — the first
-  // character is the fallback shown when there is no picture (K5).
+  // character is the fallback shown when there is no picture.
   name: string;
   size?: 'small' | 'default' | 'large';
 }

@@ -100,7 +100,7 @@ export const useDeleteBook = (id: number) =>
   useBookMutation(() => deleteBook(id));
 
 // A Cover change invalidates the books prefix, exactly as every other book
-// mutation does (K3): a PublicBook in any list may carry it.
+// mutation does: a PublicBook in any list may carry it.
 export const useUploadBookCover = (id: number) =>
   useBookMutation((file: File) => uploadBookCover(id, file));
 
