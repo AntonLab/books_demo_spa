@@ -5,7 +5,13 @@ import { App as AntdApp, Layout, Spin } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Provider } from 'react-redux';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
@@ -46,18 +52,8 @@ const EditBookPage = lazy(() =>
     default: m.EditBookPage,
   }))
 );
-const FavoritesPage = lazy(() =>
-  import('@/pages/FavoritesPage/FavoritesPage').then((m) => ({
-    default: m.FavoritesPage,
-  }))
-);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
-);
-const MyBooksPage = lazy(() =>
-  import('@/pages/MyBooksPage/MyBooksPage').then((m) => ({
-    default: m.MyBooksPage,
-  }))
 );
 const NewBookPage = lazy(() =>
   import('@/pages/NewBookPage/NewBookPage').then((m) => ({
@@ -101,6 +97,11 @@ const SeriesPage = lazy(() =>
 export const AppShell: FC = () => {
   const { pathname } = useLocation();
   useUnsavedTextAccountBinding();
+  // The Profile routes all render ProfilePage and only switch its outer Tabs;
+  // keying the boundary by the bare pathname would remount it, and every antd
+  // pane it has mounted, on each tab click. They share one key instead.
+  const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
+  const boundaryKey = isProfile ? '/profile' : pathname;
 
   return (
     <Layout className={styles.layout}>
@@ -110,7 +111,7 @@ export const AppShell: FC = () => {
             content area so the header and the auth modals survive a page
             that throws or a chunk still in flight. Keyed by pathname so a
             caught error clears on the next navigation. */}
-        <ErrorBoundary key={pathname}>
+        <ErrorBoundary key={boundaryKey}>
           <Suspense
             fallback={<Spin size="large" className={styles.fallback} />}
           >
@@ -144,9 +145,19 @@ export const AppShell: FC = () => {
               <Route path="/series/new" element={<NewSeriesPage />} />
               <Route path="/series/:id" element={<SeriesPage />} />
               <Route path="/series/:id/edit" element={<EditSeriesPage />} />
-              <Route path="/my-books" element={<MyBooksPage />} />
+              {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/favorites" element={<FavoritesPage />} />
+              <Route path="/profile/favorites" element={<ProfilePage />} />
+              <Route path="/profile/my-books" element={<ProfilePage />} />
+              {/* The paths these tabs had as pages of their own. */}
+              <Route
+                path="/favorites"
+                element={<Navigate replace to="/profile/favorites" />}
+              />
+              <Route
+                path="/my-books"
+                element={<Navigate replace to="/profile/my-books" />}
+              />
               <Route path="/admin/genres" element={<AdminGenresPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

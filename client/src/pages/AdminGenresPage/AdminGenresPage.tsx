@@ -41,8 +41,7 @@ interface AddValues {
 }
 
 // Keeping the Genre list is a Moderator's job (ADR-0008). Every other Role gets
-// the heading and an explanation, the way MyBooksPage answers a non-author —
-// and, because the manager below is a separate component, no request at all.
+// the heading and an explanation — and, because the manager below is a separate component, no request at all.
 export const AdminGenresPage: FC = () => {
   const { data: session } = useSession();
   const isModerator = isModeratorRole(session?.role);

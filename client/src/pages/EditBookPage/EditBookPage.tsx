@@ -83,7 +83,7 @@ export const EditBookPage: FC = () => {
 
   const handleDelete = () => {
     remove.mutate(undefined, {
-      onSuccess: () => void navigate(isCoAuthor ? '/my-books' : '/'),
+      onSuccess: () => void navigate(isCoAuthor ? '/profile/my-books' : '/'),
     });
   };
 
@@ -137,7 +137,7 @@ export const EditBookPage: FC = () => {
         authors={book.authors}
         viewerId={session.id}
         canManage={isCoAuthor}
-        onLeave={() => void navigate('/my-books')}
+        onLeave={() => void navigate('/profile/my-books')}
       />
 
       <Divider />

@@ -1,10 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
+import * as favoritesApi from '@/api/favorites';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as genresApi from '@/api/genres';
@@ -15,6 +18,7 @@ jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
+jest.mock('@/api/favorites');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
 jest.mock('@/api/genres');
@@ -23,11 +27,17 @@ const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
+const mockedFavorites = jest.mocked(favoritesApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
+
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+};
 
 // Every page App.tsx loads lazily. A page's first import transforms and
 // evaluates its whole module graph, which in a loaded parallel run outlasts
@@ -40,9 +50,7 @@ const LAZY_PAGES = [
   'EditBookPage',
   'EditChapterPage',
   'EditSeriesPage',
-  'FavoritesPage',
   'MainPage',
-  'MyBooksPage',
   'NewBookPage',
   'NewChapterPage',
   'NewSeriesPage',
@@ -254,22 +262,6 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the my-books stub at /my-books', async () => {
-    renderWithProviders(<AppShell />, { route: '/my-books' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'My Books' })
-    ).toBeInTheDocument();
-  });
-
-  it('renders the profile page at /profile', async () => {
-    renderWithProviders(<AppShell />, { route: '/profile' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Profile' })
-    ).toBeInTheDocument();
-  });
-
   it('renders AdminGenresPage at /admin/genres', async () => {
     renderWithProviders(<AppShell />, { route: '/admin/genres' });
 
@@ -284,6 +276,101 @@ describe('AppShell routing', () => {
 
     expect(
       await screen.findByRole('heading', { name: 'Page not found' })
+    ).toBeInTheDocument();
+  });
+});
+
+describe('AppShell Profile routing', () => {
+  it.each(['/profile', '/profile/favorites', '/profile/my-books'])(
+    'renders ProfilePage at %s',
+    async (route) => {
+      renderWithProviders(<AppShell />, { route });
+
+      expect(
+        await screen.findByRole('heading', { name: 'Profile' })
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('redirects /favorites to /profile/favorites', async () => {
+    renderWithProviders(
+      <>
+        <AppShell />
+        <LocationProbe />
+      </>,
+      { route: '/favorites' }
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/profile/favorites'
+      )
+    );
+  });
+
+  it('redirects /my-books to /profile/my-books', async () => {
+    renderWithProviders(
+      <>
+        <AppShell />
+        <LocationProbe />
+      </>,
+      { route: '/my-books' }
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/profile/my-books'
+      )
+    );
+  });
+
+  it('keeps a Profile tab’s own state across a switch to another tab and back', async () => {
+    const signedIn: PublicUser = {
+      id: 5,
+      login: 'ann',
+      email: 'ann@example.com',
+      firstName: 'Ann',
+      lastName: 'Annson',
+      status: 'active',
+      role: 'user',
+      avatarUrl: null,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    };
+    mockedAuth.me.mockResolvedValue(signedIn);
+    mockedNotifications.listNotifications.mockResolvedValue({
+      items: [],
+      total: 0,
+      unread: 0,
+      limit: 20,
+      offset: 0,
+    });
+    mockedNotifications.getNotificationSettings.mockResolvedValue({
+      emailNotifications: true,
+    });
+    mockedFavorites.listFavoriteBooks.mockResolvedValue(emptyEnvelope);
+
+    renderWithProviders(<AppShell />, { route: '/profile' });
+    await screen.findByRole('button', { name: 'Upload avatar' });
+
+    const user = userEvent.setup({ applyAccept: false });
+    const badFile = new File([new Uint8Array([1])], 'me.gif', {
+      type: 'image/gif',
+    });
+    const input = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    await user.upload(input, badFile);
+    expect(
+      await screen.findByText('Choose a JPEG, PNG or WebP image.')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Favorites' }));
+    await screen.findByRole('tab', { name: 'Books' });
+    await user.click(screen.getByRole('tab', { name: 'Account' }));
+
+    expect(
+      screen.getByText('Choose a JPEG, PNG or WebP image.')
     ).toBeInTheDocument();
   });
 });
