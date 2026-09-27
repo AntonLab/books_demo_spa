@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { NotificationList } from '../types/api';
+import type { NotificationList, NotificationSettings } from '../types/api';
 
 // The newest page is all the bell shows; older notifications stay stored.
 const NOTIFICATIONS_PAGE_SIZE = 20;
@@ -19,5 +19,20 @@ export const markNotificationsRead = (
   return request<{ unread: number }>('/notifications/read', {
     method: 'POST',
     body: { ids },
+  });
+};
+
+// The session's own switch; nobody reads or sets another Account's.
+export const getNotificationSettings = (): Promise<NotificationSettings> => {
+  return request<NotificationSettings>('/notifications/settings');
+};
+
+// The server's schema is strict: send exactly the settings object, no extras.
+export const updateNotificationSettings = (
+  settings: NotificationSettings
+): Promise<NotificationSettings> => {
+  return request<NotificationSettings>('/notifications/settings', {
+    method: 'PATCH',
+    body: settings,
   });
 };

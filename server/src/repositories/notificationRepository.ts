@@ -1,14 +1,17 @@
 import type { Transaction } from 'sequelize';
 import { Notification, toPublicNotification } from '../models/Notification.ts';
 import { User } from '../models/User.ts';
+import { publishAfterCommit } from '../online/notificationPublisher.ts';
 import type {
   ActorKind,
-  NotificationKind,
+  CreditNotificationKind,
+  NotificationSettings,
   PublicNotification,
   WorkType,
 } from 'shared';
 import type { ListNotificationsQuery } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
+import { NotFoundError } from '../types/errors.ts';
 
 interface NotificationListResult {
   items: PublicNotification[];
@@ -26,6 +29,11 @@ export interface NotificationRepository {
   // Marks those of `ids` that are the account's own, and answers with how
   // many of its notifications are still unread.
   markRead(userId: number, ids: number[]): Promise<number>;
+  getSettings(userId: number): Promise<NotificationSettings>;
+  updateSettings(
+    userId: number,
+    settings: NotificationSettings
+  ): Promise<NotificationSettings>;
 }
 
 // Whoever made a change that raises notifications.
@@ -37,7 +45,7 @@ export interface Actor {
 // One event and everyone it is told to.
 interface NotificationEvent {
   recipientIds: number[];
-  kind: NotificationKind;
+  kind: CreditNotificationKind;
   work: { type: WorkType; id: number | null; title: string };
   actorKind: ActorKind;
   actorName: string | null;
@@ -46,8 +54,10 @@ interface NotificationEvent {
 // Writes one notification per recipient of each event, in a single insert and
 // inside the transaction of the change that raised them — so a change that
 // rolls back raises nothing, and one that commits cannot lose its
-// notifications. The actor is never among the recipients, whoever the caller
-// passes; `actorId` is null when no account acted, as for a deleted one.
+// notifications. Each one is pushed to its recipient's open streams once the
+// change commits (online/notificationPublisher.ts). The actor is never among
+// the recipients, whoever the caller passes; `actorId` is null when no
+// account acted, as for a deleted one.
 export async function notify(
   events: NotificationEvent[],
   actorId: number | null,
@@ -69,7 +79,16 @@ export async function notify(
   );
   if (rows.length === 0) return;
 
-  await Notification.bulkCreate(rows, { transaction });
+  // bulkCreate on MySQL fills in each row's auto-increment id, so the rows
+  // it returns are complete Notifications.
+  const created = await Notification.bulkCreate(rows, { transaction });
+  publishAfterCommit(
+    created.map((row) => ({
+      userId: row.userId,
+      notification: toPublicNotification(row),
+    })),
+    transaction
+  );
 }
 
 // An account's display name as it is now, for a snapshot that must outlive it.
@@ -124,6 +143,29 @@ export function createSequelizeNotificationRepository(): NotificationRepository 
         { where: { userId, id: ids, isRead: false } }
       );
       return Notification.count({ where: { userId, isRead: false } });
+    },
+
+    async getSettings(userId) {
+      const user = await User.findByPk(userId, {
+        attributes: ['emailNotifications'],
+      });
+      if (!user) throw new NotFoundError('User', userId);
+      return { emailNotifications: user.emailNotifications };
+    },
+
+    async updateSettings(userId, settings) {
+      const [updated] = await User.update(
+        { emailNotifications: settings.emailNotifications },
+        { where: { id: userId } }
+      );
+      // MySQL counts changed rows, not matched ones, so a write of the value
+      // already stored reports 0; only a missing account is an error.
+      if (
+        updated === 0 &&
+        !(await User.findByPk(userId, { attributes: ['id'] }))
+      )
+        throw new NotFoundError('User', userId);
+      return { emailNotifications: settings.emailNotifications };
     },
   };
 }

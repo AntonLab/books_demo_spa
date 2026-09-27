@@ -8,18 +8,25 @@ import type { AddressInfo } from 'node:net';
 import type { Sequelize } from 'sequelize';
 import sharp from 'sharp';
 import { createApp } from './app.ts';
+import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { parseConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
-import { createLoggerResetDelivery } from './delivery/resetDelivery.ts';
+import { createLogMailDelivery } from './delivery/mailDelivery.ts';
 import {
   XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
 } from './middleware/csrfProtection.ts';
 import { initModels } from './models/index.ts';
 import { User } from './models/User.ts';
+import {
+  createOnlineRegistry,
+  type OnlineRegistry,
+} from './online/onlineRegistry.ts';
+import { setNotificationPublisher } from './online/notificationPublisher.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
+import { createSequelizeAnnouncementRepository } from './repositories/announcementRepository.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
 import type {
@@ -187,6 +194,8 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   let server: Server;
   let base: string;
   let trustedOrigin: string;
+  let onlineRegistry: OnlineRegistry;
+  let announcementPass: { stop(): void };
 
   const openBrowser = () => createBrowser(base, trustedOrigin);
 
@@ -252,9 +261,25 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     await sequelize.sync({ force: true });
     await syncPermissions();
 
+    const repositories = createSequelizeRepositories();
+    onlineRegistry = createOnlineRegistry({
+      sessionRepository: repositories.sessionRepository,
+    });
+    onlineRegistry.start();
+    setNotificationPublisher((userId, notification) =>
+      onlineRegistry.push(userId, notification)
+    );
+    announcementPass = startAnnouncementPass({
+      announcementRepository: createSequelizeAnnouncementRepository(),
+      onlineRegistry,
+      mailDelivery: createLogMailDelivery(),
+      appBaseUrl: config.appBaseUrl,
+    });
     const app = createApp({
-      ...createSequelizeRepositories(),
-      resetDelivery: createLoggerResetDelivery(config.appBaseUrl),
+      ...repositories,
+      onlineRegistry,
+      mailDelivery: createLogMailDelivery(),
+      appBaseUrl: config.appBaseUrl,
       trustedOrigin: config.appBaseUrl,
       trustProxy: config.trustProxy,
       authRateLimits: unlimitedAuthRateLimits(),
@@ -267,6 +292,9 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   });
 
   after(async () => {
+    announcementPass.stop();
+    onlineRegistry.stop();
+    setNotificationPublisher(null);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await sequelize.close();
   });

@@ -24,6 +24,9 @@ export const seriesCapabilities = (series: Credited, session: Session) => {
     isCoAuthor,
     // A Co-author or a Moderator: the form, the order, the delete.
     mayEdit: isCoAuthor || isModeratorRole(session?.role),
+    // Any signed-in Account, Co-authors included: unlike a Like, a
+    // Favorite is only a subscription, so the server lets them add their own.
+    mayFavorite: session != null,
   };
 };
 
@@ -39,5 +42,8 @@ export const bookCapabilities = (
     mayLike: session != null && !isDraft && !shared.isCoAuthor,
     // A Draft is for its Co-authors and Moderators; anything else is public.
     mayRead: !isDraft || shared.mayEdit,
+    // The server keeps a Draft's Favorites but counts and lists none of
+    // them, so a star on a Draft would show a count that means nothing.
+    mayFavorite: session != null && !isDraft,
   };
 };

@@ -41,18 +41,31 @@ test('every notification has a recipient, a kind, a work type and a title', () =
   assert.match(createTableSql, /`userId` INTEGER UNSIGNED NOT NULL/);
   assert.match(
     createTableSql,
-    /`kind` ENUM\('co_author_added', 'co_author_removed', 'co_author_left', 'co_author_account_deleted', 'work_deleted'\) NOT NULL/
+    /`kind` ENUM\('co_author_added', 'co_author_removed', 'co_author_left', 'co_author_account_deleted', 'work_deleted', 'new_chapter', 'new_book'\) NOT NULL/
   );
   assert.match(createTableSql, /`workType` ENUM\('book', 'series'\) NOT NULL/);
   assert.match(createTableSql, /`workTitle` VARCHAR\(255\) NOT NULL/);
 });
 
+// Nullable because an announcement has no actor; toPublicNotification refuses
+// a credit row without one.
 test('the actor is kept as a kind and, for a co-author, a name', () => {
   assert.match(
     createTableSql,
-    /`actorKind` ENUM\('co_author', 'moderator', 'deleted_account'\) NOT NULL/
+    /`actorKind` ENUM\('co_author', 'moderator', 'deleted_account'\),/
   );
   assert.match(createTableSql, /`actorName` VARCHAR\(255\),/);
+});
+
+test('an announcement keeps its chapter link and count, and the titles as they were', () => {
+  assert.match(createTableSql, /`chapterId` INTEGER UNSIGNED,/);
+  assert.match(createTableSql, /`chapterTitle` VARCHAR\(255\),/);
+  assert.match(createTableSql, /`chapterCount` INTEGER UNSIGNED,/);
+  assert.match(createTableSql, /`seriesTitle` VARCHAR\(255\),/);
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`chapterId`\) REFERENCES `chapters` \(`id`\) ON DELETE SET NULL ON UPDATE CASCADE/
+  );
 });
 
 test('a notification starts unread, and keeps createdAt alone', () => {
@@ -127,8 +140,93 @@ test('toPublicNotification nests the work and the actor, with the link of whiche
     id: null,
     title: 'Letters from Blackmoor',
   });
-  assert.deepEqual(toPublicNotification(deletedSeries).actor, {
-    kind: 'moderator',
-    name: null,
+  const publicDeleted = toPublicNotification(deletedSeries);
+  assert.ok(publicDeleted.kind === 'work_deleted');
+  assert.deepEqual(publicDeleted.actor, { kind: 'moderator', name: null });
+});
+
+test('a New chapter names the book, the first new chapter and how many there are', () => {
+  const createdAt = new Date('2026-09-26T10:00:00.000Z');
+  const row = Notification.build({
+    id: 3,
+    userId: 2,
+    kind: 'new_chapter',
+    workType: 'book',
+    bookId: 7,
+    workTitle: 'The Glass Harbour',
+    chapterId: 70,
+    chapterTitle: 'The Tide Bell',
+    chapterCount: 2,
+    isRead: false,
+    createdAt,
   });
+
+  assert.deepEqual(toPublicNotification(row), {
+    id: 3,
+    kind: 'new_chapter',
+    work: { type: 'book', id: 7, title: 'The Glass Harbour' },
+    chapter: { id: 70, title: 'The Tide Bell' },
+    chapterCount: 2,
+    isRead: false,
+    createdAt,
+  });
+});
+
+test('a New chapter whose chapter is gone keeps its title and loses only the link', () => {
+  const row = Notification.build({
+    id: 4,
+    userId: 2,
+    kind: 'new_chapter',
+    workType: 'book',
+    bookId: 7,
+    workTitle: 'The Glass Harbour',
+    chapterId: null,
+    chapterTitle: 'The Tide Bell',
+    chapterCount: 1,
+    createdAt: new Date(),
+  });
+
+  const notification = toPublicNotification(row);
+  assert.ok(notification.kind === 'new_chapter');
+  assert.deepEqual(notification.chapter, { id: null, title: 'The Tide Bell' });
+});
+
+test('a New book names the book and its series', () => {
+  const createdAt = new Date('2026-09-26T10:00:00.000Z');
+  const row = Notification.build({
+    id: 5,
+    userId: 2,
+    kind: 'new_book',
+    workType: 'book',
+    bookId: 9,
+    seriesId: 4,
+    workTitle: 'The Nightbus Returns',
+    seriesTitle: 'The Nightbus Files',
+    isRead: true,
+    createdAt,
+  });
+
+  assert.deepEqual(toPublicNotification(row), {
+    id: 5,
+    kind: 'new_book',
+    work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
+    series: { id: 4, title: 'The Nightbus Files' },
+    isRead: true,
+    createdAt,
+  });
+});
+
+test('a credit notification without an actor is refused, not sent half-filled', () => {
+  const row = Notification.build({
+    id: 6,
+    userId: 2,
+    kind: 'co_author_added',
+    workType: 'book',
+    bookId: 7,
+    workTitle: 'The Glass Harbour',
+    actorKind: null,
+    createdAt: new Date(),
+  });
+
+  assert.throws(() => toPublicNotification(row), /Notification 6 has no actor/);
 });

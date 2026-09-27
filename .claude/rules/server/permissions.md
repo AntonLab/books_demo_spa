@@ -34,6 +34,11 @@ paths:
 - `genres` has no `own` anywhere, since a Genre has no Owner: everyone reads;
   `admin` (and `superadmin` through its blanket `any`) writes. Setting a work's
   `genreId` rides on that work's own grant.
+- `favorites` is `create`/`delete: own` for every signed-in role, superadmin
+  included, and nothing for `guest`. No role gets `read` or `update`: a
+  Favorite is private and has nothing to edit, so the two lists sit behind
+  `requireAuth` and read the session's own rows. The new `MODULES` value is
+  why an older dev database needs `/db-reset`.
 
 ## Enforcement
 

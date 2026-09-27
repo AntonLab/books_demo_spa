@@ -1,6 +1,10 @@
 import { request } from './client';
 import type { ListResponse } from 'shared';
-import type { PublicSeries, SeriesBookSummary } from '../types/api';
+import type {
+  PublicSeries,
+  SeriesBookSummary,
+  SeriesDetail,
+} from '../types/api';
 
 export interface ListSeriesParams {
   userId?: number;
@@ -29,8 +33,8 @@ export const listSeries = (
   );
 };
 
-export const getSeries = (id: number): Promise<PublicSeries> => {
-  return request<PublicSeries>(`/series/${id}`);
+export const getSeries = (id: number): Promise<SeriesDetail> => {
+  return request<SeriesDetail>(`/series/${id}`);
 };
 
 export interface SeriesPayload {

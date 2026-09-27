@@ -76,6 +76,11 @@ paths:
   NULLs are distinct in a unique index, so the two do not interfere. They also
   serve `?userId=`; a further index would cost every insert on the busiest
   table.
+- `favorites` copies the `likes` shape: exactly one of `bookId` / `seriesId`
+  (a `.refine()` on `createFavoriteSchema` and a model `validate`, no `CHECK`),
+  unique `(userId, bookId)` and `(userId, seriesId)`, and `CASCADE` on all
+  three references. A duplicate insert is a `UniqueConstraintError`, which the
+  repository maps to 409.
 - Creating a book or series maps a `ForeignKeyConstraintError` to
   `NotFoundError('User')`: the first credit is the only reference that can
   fail, because a series is checked under lock by `nextSeriesPosition` first.

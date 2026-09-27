@@ -46,6 +46,11 @@ const EditBookPage = lazy(() =>
     default: m.EditBookPage,
   }))
 );
+const FavoritesPage = lazy(() =>
+  import('@/pages/FavoritesPage/FavoritesPage').then((m) => ({
+    default: m.FavoritesPage,
+  }))
+);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
 );
@@ -141,6 +146,7 @@ export const AppShell: FC = () => {
               <Route path="/series/:id/edit" element={<EditSeriesPage />} />
               <Route path="/my-books" element={<MyBooksPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/favorites" element={<FavoritesPage />} />
               <Route path="/admin/genres" element={<AdminGenresPage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

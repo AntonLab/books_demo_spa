@@ -22,6 +22,7 @@ export class User extends Model<
   declare lastName: string;
   declare status: CreationOptional<UserStatus>;
   declare role: CreationOptional<UserRole>;
+  declare emailNotifications: CreationOptional<boolean>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
   // No `books` or `series`: an account reaches its works through book_authors
@@ -59,6 +60,13 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         type: DataTypes.ENUM(...USER_ROLES),
         allowNull: false,
         defaultValue: 'user',
+      },
+      // The Account's email switch for Favorite announcements. Off stops the
+      // email only: the Notification and a live toast still arrive.
+      emailNotifications: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
       },
       // allowNull: false is required explicitly here — Sequelize only applies
       // its own NOT NULL default to createdAt/updatedAt when it auto-injects

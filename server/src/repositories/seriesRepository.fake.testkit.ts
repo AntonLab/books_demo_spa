@@ -1,5 +1,10 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
+import type {
+  AuthorSummary,
+  PublicGenre,
+  PublicSeries,
+  SeriesDetail,
+} from 'shared';
 import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
 import type { SeriesListResult, SeriesRepository } from './seriesRepository.ts';
@@ -17,6 +22,9 @@ export interface FakeSeriesRepositoryOptions {
   genres?: ReadonlyMap<number, PublicGenre>;
   // Who made each credit change or delete.
   actors?: [string, Actor][];
+  // What a series' detail reports about its Favorites, which live in another
+  // repository: the count, and the id of a signed-in viewer's own Favorite.
+  favorites?: { count: number; viewerFavoriteId: number | null };
 }
 
 // An in-memory SeriesRepository for the route specs, held to the real one by
@@ -33,6 +41,7 @@ export function createFakeSeriesRepository(
     books = new Map(),
     genres = new Map(),
     actors = [],
+    favorites = { count: 0, viewerFavoriteId: null },
   } = options;
   const rows = new Map<number, PublicSeries>();
   // seriesId -> co-author ids, in credit order.
@@ -105,6 +114,17 @@ export function createFakeSeriesRepository(
     async findById(id) {
       const series = rows.get(id);
       return series ? withCredits(series) : null;
+    },
+
+    async findDetailById(id, viewer): Promise<SeriesDetail | null> {
+      const series = rows.get(id);
+      if (!series) return null;
+      return {
+        ...withCredits(series),
+        favoriteCount: favorites.count,
+        // Only a signed-in caller can hold a Favorite of their own.
+        viewerFavoriteId: viewer === null ? null : favorites.viewerFavoriteId,
+      };
     },
 
     async update(id, input) {

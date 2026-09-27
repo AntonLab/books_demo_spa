@@ -37,8 +37,13 @@ Four" reads as a test run, not a demo.
 - **Dates anchor to the run**: the newest chapter is always 2-5 days old, the
   cadence scales to `PUBLICATION_WINDOW_DAYS`, `createdAt` is passed
   explicitly, and `{ silent: true }` keeps a backdated `updatedAt`.
+- **Everything already out is announced** (`announcedAt` = the run's start) on
+  books and chapters, or the first announcement pass would mail every Favorite
+  holder about the catalogue. Scheduled chapters and Draft books stay
+  unannounced, so the pass announces them when their time comes.
 - The data never shows what the API would refuse: no like on one's own book or
-  comment, none on a tombstone or Draft book, no activity before an account's
+  comment, none on a tombstone or Draft book, no Favorite on a Draft book or on
+  a series with no non-draft book, no activity before an account's
   `createdAt`, no Notification that contradicts a byline.
 - A content bank (`ContentBank`: `GOTHIC`, `HARD_SF`, `URBAN_FANTASY`) supplies
   each author's titles, tags and prose. A bank's `genreName` is typed as the
@@ -46,16 +51,20 @@ Four" reads as a test run, not a demo.
   Horror and Romance stay empty on purpose, to demo an empty Genre.
 - Demo shape: two standalone books and one series are co-authored
   (`shareBooks`, `shareSeries`), and the tags `mystery` and `slow-burn` span
-  two banks each, so `?tag=` returns more than one author. Each author's newest book is a Draft (last two chapters Draft), the
-  one before it and its series In progress (next chapter Scheduled), older
-  ones Complete (`statusOf`, `publicationOf`). Each author starts with two
-  unread Notifications (`writeNotifications`).
+  two banks each, so `?tag=` returns more than one author. Each author's newest
+  book is a Draft (last two chapters Draft), the one before it and its series
+  In progress (next chapter Scheduled), older ones Complete (`statusOf`,
+  `publicationOf`). Each author starts with two unread Notifications
+  (`writeNotifications`). Each reader (`user1`…`user5`) holds 2-4 Favorite
+  books and one Favorite series (`planFavorites`), drawn after every other
+  draw so adding them changed nothing else.
 
 ## Deleting
 
-- Tables are deleted in an explicit order (`notifications` → `likes` →
-  `comments` → `chapters` → `book_authors` → `books` → `series_authors` →
-  `series` → `genres` → `users`), not by leaning on cascades that could change.
+- Tables are deleted in an explicit order (`notifications` → `favorites` →
+  `likes` → `comments` → `chapters` → `book_authors` → `books` →
+  `series_authors` → `series` → `genres` → `users`), not by leaning on cascades
+  that could change.
   Covers and Avatars go by cascade with `books`/`users`. `permissions` is left
   alone: `syncPermissions()` derives it from code.
 - The delete and every insert share one transaction; a failure leaves the

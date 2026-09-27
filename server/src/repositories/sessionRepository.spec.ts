@@ -362,4 +362,41 @@ describe('sessionRepository against real MySQL', { skip }, () => {
     assert.equal(await left('purge-at'), 0);
     assert.equal(await left('purge-after'), 1);
   });
+
+  test('findLiveSessions maps each live token hash to its account and leaves out the rest', async () => {
+    const liveId = await makeUser('LiveStreamOwner');
+    const expiredId = await makeUser('ExpiredStreamOwner');
+    const blockedId = await makeUser('BlockedStreamOwner');
+    await repository.create(
+      liveId,
+      hashToken('stream-live'),
+      new Date(Date.now() + hour)
+    );
+    await repository.create(
+      expiredId,
+      hashToken('stream-expired'),
+      new Date(Date.now() - hour)
+    );
+    await repository.create(
+      blockedId,
+      hashToken('stream-blocked'),
+      new Date(Date.now() + hour)
+    );
+    // Written straight into the table, as a block that purged nothing would
+    // leave it: the session row is still there, the account is not usable.
+    await User.update({ status: 'blocked' }, { where: { id: blockedId } });
+
+    const live = await repository.findLiveSessions([
+      hashToken('stream-live'),
+      hashToken('stream-expired'),
+      hashToken('stream-blocked'),
+      hashToken('stream-unknown'),
+    ]);
+
+    assert.deepEqual([...live], [[hashToken('stream-live'), liveId]]);
+  });
+
+  test('findLiveSessions answers an empty map for no token hashes', async () => {
+    assert.equal((await repository.findLiveSessions([])).size, 0);
+  });
 });

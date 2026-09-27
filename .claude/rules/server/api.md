@@ -52,6 +52,13 @@ code alone does not explain.
   Co-author's or Moderator's Draft and Scheduled chapters do not count. Both
   are follow-up queries in `findDetailById`, beside `Like.count`; list rows
   carry neither, and no chapter response carries its own count.
+  `BookDetail.favoriteCount` counts every holder, and is 0 while the book is a
+  Draft whoever reads it; `viewerFavoriteId` names the viewer's own row even
+  then.
+- `GET /api/series/:id` answers `SeriesDetail`: `PublicSeries` plus
+  `favoriteCount` (every holder; a Series has no status) and
+  `viewerFavoriteId`, from `seriesRepository.findDetailById`. `findById`
+  stays the plain record for everything else.
 
 ## Chapters
 
@@ -87,7 +94,9 @@ code alone does not explain.
   paging meaningful. Deletion is soft (see `access.md`).
 - `/api/notifications` sits behind `requireAuth`, not the matrix; whose
   notifications they are comes from the session only. No delete, no retention
-  limit.
+  limit. `GET`/`PATCH /api/notifications/settings` carry the Account's email
+  switch (`users.emailNotifications`, default on); it is kept out of
+  `PublicUser` because Admins read other Accounts' `PublicUser`.
 
 ## Genres (ADR-0008)
 

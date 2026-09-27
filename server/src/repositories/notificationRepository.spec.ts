@@ -1,12 +1,20 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  test,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
+import { NotFoundError } from '../types/errors.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { Chapter } from '../models/Chapter.ts';
@@ -16,9 +24,14 @@ import { User } from '../models/User.ts';
 import type { PublicNotification } from 'shared';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
-import { createSequelizeNotificationRepository } from './notificationRepository.ts';
+import {
+  createSequelizeNotificationRepository,
+  notify,
+} from './notificationRepository.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
+import { recordLogs } from '../logger.testkit.ts';
+import { setNotificationPublisher } from '../online/notificationPublisher.ts';
 
 // A schema of its own, for the reason every MySQL-backed suite gives: node:test
 // runs spec files in parallel processes, and two suites calling
@@ -141,6 +154,85 @@ describe('notifications against real MySQL', { skip }, () => {
     ann = await account('ann', 'Ann');
     ben = await account('ben', 'Ben');
     cleo = await account('cleo', 'Cleo');
+  });
+
+  // The publisher is process-wide; a test that sets one must not leak it into
+  // the next.
+  afterEach(() => {
+    setNotificationPublisher(null);
+  });
+
+  test('a committed change pushes each notification it wrote to its recipient', async () => {
+    const pushed: Array<{ userId: number; notification: PublicNotification }> =
+      [];
+    setNotificationPublisher((userId, notification) => {
+      pushed.push({ userId, notification });
+    });
+    const bookId = await works.book.create('Pushed', ann.id);
+
+    await books.addCoAuthor(bookId, ben.id, ann);
+
+    const stored = (await notifications.list(ben.id, { limit: 20, offset: 0 }))
+      .items;
+    assert.equal(stored.length, 1);
+    assert.equal(pushed.length, 1);
+    assert.equal(pushed[0]!.userId, ben.id);
+    // createdAt is compared as null: MySQL stores whole seconds, while the
+    // pushed row still holds the milliseconds Sequelize stamped it with.
+    assert.deepEqual(
+      { ...pushed[0]!.notification, createdAt: null },
+      { ...stored[0]!, createdAt: null }
+    );
+  });
+
+  test('a change that rolls back pushes nothing, and nothing is pushed before commit', async () => {
+    const pushed: number[] = [];
+    setNotificationPublisher((userId) => {
+      pushed.push(userId);
+    });
+    const bookId = await works.book.create('Rolled back', ann.id);
+
+    await assert.rejects(
+      sequelize.transaction(async (transaction) => {
+        await notify(
+          [
+            {
+              recipientIds: [ben.id],
+              kind: 'co_author_added',
+              work: { type: 'book', id: bookId, title: 'Rolled back' },
+              actorKind: 'co_author',
+              actorName: 'Ann Writer',
+            },
+          ],
+          ann.id,
+          transaction
+        );
+        // Written but not committed: a push now could name a row that the
+        // rollback below takes back.
+        assert.deepEqual(pushed, []);
+        throw new Error('roll back');
+      }),
+      /roll back/
+    );
+
+    assert.deepEqual(pushed, []);
+    assert.equal(await Notification.count(), 0);
+  });
+
+  test('a push that throws is logged, and the change it followed still stands', async (t) => {
+    const logs = recordLogs(t);
+    setNotificationPublisher(() => {
+      throw new Error('socket gone');
+    });
+    const bookId = await works.book.create('Unlucky', ann.id);
+
+    await books.addCoAuthor(bookId, ben.id, ann);
+
+    assert.equal((await inbox(ben.id)).length, 1);
+    assert.deepEqual(
+      logs.filter((line) => line.level === 'error').map((line) => line.message),
+      ['Could not push a notification']
+    );
   });
 
   for (const [workType, work] of Object.entries(works)) {
@@ -340,7 +432,8 @@ describe('notifications against real MySQL', { skip }, () => {
       title: 'As It Was',
     });
     // Ann's account is gone; her name, as it was, is not.
-    assert.deepEqual(added?.actor, { kind: 'co_author', name: 'Ann Writer' });
+    assert.ok(added?.kind === 'co_author_added');
+    assert.deepEqual(added.actor, { kind: 'co_author', name: 'Ann Writer' });
   });
 
   test('an account lists only its own notifications, newest first, with its unread count', async () => {
@@ -388,6 +481,40 @@ describe('notifications against real MySQL', { skip }, () => {
     assert.equal(
       (await notifications.list(cleo.id, { limit: 20, offset: 0 })).unread,
       1
+    );
+  });
+
+  test('a new account has email notifications on', async () => {
+    assert.deepEqual(await notifications.getSettings(ann.id), {
+      emailNotifications: true,
+    });
+  });
+
+  test('the email switch round-trips and touches only its own account', async () => {
+    assert.deepEqual(
+      await notifications.updateSettings(ann.id, { emailNotifications: false }),
+      { emailNotifications: false }
+    );
+
+    assert.deepEqual(await notifications.getSettings(ann.id), {
+      emailNotifications: false,
+    });
+    assert.deepEqual(await notifications.getSettings(ben.id), {
+      emailNotifications: true,
+    });
+  });
+
+  test('the email switch of a missing account is a NotFoundError naming User', async () => {
+    const missing = ann.id + 10_000;
+
+    await assert.rejects(notifications.getSettings(missing), (error) => {
+      assert.ok(error instanceof NotFoundError);
+      assert.match(error.message, /User/);
+      return true;
+    });
+    await assert.rejects(
+      notifications.updateSettings(missing, { emailNotifications: false }),
+      NotFoundError
     );
   });
 });

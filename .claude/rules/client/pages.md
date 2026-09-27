@@ -99,7 +99,8 @@ paths:
   Account no longer a Co-author) shows the Unsaved text in
   `UnsavedTextNotice`; only Discard removes it.
 - `BookPage` hides the like button from every Co-author and from everyone on a
-  Draft book. Below the Cover row sit three tabs, Description, Chapters and
+  Draft book; the Favorites star shows to Co-authors too, but not on a Draft.
+  Below the Cover row sit three tabs, Description, Chapters and
   Statistics, on every book, a Draft included; the open tab is antd's own
   state (ADR-0010), never the URL, so a reload opens Description. The panel
   has a fixed height (`appBookTabsHeight`, sized to Statistics at desktop
@@ -112,8 +113,10 @@ paths:
   else (not on `ChapterPage`, not in the editor's `SortableList`). Statistics
   takes Chapters, Release time and Last update from that same list (earliest
   and latest Publication time, not first and last in Reading order) and
-  follows its pending and error states; Words, Likes and Comments come from
-  `BookDetail`.
+  follows its pending and error states; Words, Likes, Favorites and Comments
+  come from `BookDetail`.
+- `FavoritesPage` keeps one page number per tab and clamps it while
+  rendering: removing the last row of the last page steps back a page.
 - `ChapterPage` applies the reading Device preferences: background and font
   through a nested `ConfigProvider` (a class overriding `--ant-*` never
   reaches antd's components, which redeclare them), size and line height

@@ -92,11 +92,18 @@ test('the table is InnoDB with the utf8mb4 default collation', () => {
 test('a book filter is indexed alongside position, so the Reading order needs no filesort', () => {
   assert.deepEqual(
     Chapter.options.indexes?.map((index) => index.fields),
-    [['bookId', 'position']]
+    [
+      ['bookId', 'position'],
+      ['announcedAt', 'publishedAt'],
+    ]
   );
   // Not unique: a reorder rewrites every position in one statement, and a
   // unique index would refuse the intermediate state.
   assert.equal(Chapter.options.indexes?.[0]?.unique, undefined);
+});
+
+test('the announcement pass scan is indexed, so it takes no full-table lock', () => {
+  assert.equal(Chapter.options.indexes?.[1]?.unique, undefined);
 });
 
 test('Chapter belongs to Book, and Book has many chapters', () => {
@@ -188,4 +195,9 @@ test('wordCount stays out of both chapter responses', () => {
 
   assert.ok(!('wordCount' in toPublicChapter(chapter)));
   assert.ok(!('wordCount' in toChapterSummary(chapter)));
+});
+
+test('announcedAt is a nullable, millisecond-precise moment — null is not yet announced', () => {
+  assert.match(createTableSql, /`announcedAt` DATETIME\(3\)(?! NOT NULL)/);
+  assert.doesNotMatch(createTableSql, /`announcedAt` DATETIME\(3\) NOT NULL/);
 });

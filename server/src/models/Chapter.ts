@@ -37,6 +37,10 @@ export class Chapter extends Model<
   // moment for a Scheduled one, a past one once it is Published. Nothing flips
   // a flag when the moment passes — every read compares it with the clock.
   declare publishedAt: CreationOptional<Date | null>;
+  // When the announcement pass told this Chapter's Favorite holders about it
+  // (ADR-0013): null until then, and never cleared, so a Chapter withdrawn
+  // and published again is not announced twice. Never sent to a client.
+  declare announcedAt: CreationOptional<Date | null>;
   // The chapter's place in its book's Reading order (CONTEXT.md), 1-based and
   // gapped after a delete. It orders every list and is never sent to a client.
   declare position: number;
@@ -90,6 +94,7 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       // Millisecond precision, like updatedAt below: a chapter scheduled for
       // 18:00:00.500 is not out at 18:00:00.
       publishedAt: { type: DataTypes.DATE(3), allowNull: true },
+      announcedAt: { type: DataTypes.DATE(3), allowNull: true },
       // No default: chapterRepository.create appends, and a row inserted any
       // other way should fail loudly rather than land at an arbitrary place.
       position: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
@@ -118,6 +123,13 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
         // the constraint. Not unique: a reorder rewrites every position in one
         // UPDATE, and a unique index would refuse the rows it passes through.
         { name: 'chapters_book_id_position', fields: ['bookId', 'position'] },
+        // Serves the announcement pass's `announcedAt IS NULL AND
+        // publishedAt <= now` scan (announcementRepository.ts); without it
+        // every pass's FOR UPDATE takes a full-table next-key lock.
+        {
+          name: 'chapters_announced_at_published_at',
+          fields: ['announcedAt', 'publishedAt'],
+        },
       ],
     }
   );
