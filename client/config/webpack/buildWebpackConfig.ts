@@ -1,5 +1,4 @@
 import type { Configuration } from 'webpack';
-import 'webpack-dev-server';
 
 import { buildDevServer } from './buildDevServer.ts';
 import { buildLoaders } from './buildLoaders.ts';
