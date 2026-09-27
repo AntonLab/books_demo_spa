@@ -1,103 +1,79 @@
-import { useState } from 'react';
 import type { FC } from 'react';
-import {
-  Alert,
-  Button,
-  Empty,
-  Popconfirm,
-  Space,
-  theme,
-  Typography,
-} from 'antd';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
-import { ImageUploadButton } from '@/components/molecules/ImageUploadButton/ImageUploadButton';
-import { EmailNotificationsSetting } from '@/components/organisms/EmailNotificationsSetting/EmailNotificationsSetting';
+import { Alert, Empty, Tabs, Typography } from 'antd';
+import { Navigate, useLocation, useNavigate } from 'react-router';
+import { FavoritesPanel } from '@/components/organisms/FavoritesPanel/FavoritesPanel';
+import { MyBooksPanel } from '@/components/organisms/MyBooksPanel/MyBooksPanel';
+import { ProfileSettings } from '@/components/organisms/ProfileSettings/ProfileSettings';
 import { useSession } from '@/queries/auth';
-import { useDeleteAvatar, useUploadAvatar } from '@/queries/users';
+
+// Each tab is its own path, unlike BookPage's tabs: the account menu and the
+// book and series editors must open a given tab. The key is the path, so a
+// tab change navigates to its key.
+const ACCOUNT_TAB = '/profile';
+const MY_BOOKS_TAB = '/profile/my-books';
 
 export const ProfilePage: FC = () => {
-  const { token } = theme.useToken();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { data: session, isPending, isError } = useSession();
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  // The hooks always run, even before a session exists: session?.id falls
-  // back to 0, an id that is never used, since the avatar block below only
-  // renders once `session` is a signed-in PublicUser.
-  const upload = useUploadAvatar(session?.id ?? 0);
-  const remove = useDeleteAvatar(session?.id ?? 0);
-
-  // A fresh attempt (a new pick, or another try at Remove) always clears
-  // whatever error the last one left showing.
-  const handleAvatarFile = (file: File) => {
-    setAvatarError(null);
-    upload.mutate(file, { onError: (error) => setAvatarError(error.message) });
-  };
-
-  const handleAvatarReject = (message: string) => setAvatarError(message);
-
-  const handleRemoveAvatar = () => {
-    setAvatarError(null);
-    remove.mutate(undefined, {
-      onError: (error) => setAvatarError(error.message),
-    });
-  };
+  const title = <Typography.Title level={2}>Profile</Typography.Title>;
 
   // While the session is still resolving, showing the Empty state would
   // flash a log-in prompt at a signed-in user who loaded /profile directly,
-  // and the avatar block cannot render without an id.
-  if (isPending) {
-    return <Typography.Title level={2}>Profile</Typography.Title>;
-  }
+  // and a non-author redirect would bounce an author reloading My Books.
+  if (isPending) return title;
 
   // A failed session fetch — a 5xx or a network error, distinct from the
   // ordinary "nobody is signed in" 401, which the query already turns into
-  // a `null` success — gets its own visible state, the way EditBookPage,
-  // MyBooksPage and EditChapterPage each report their own failed query.
+  // a `null` success — gets its own visible state.
   if (isError) {
     return (
       <>
-        <Typography.Title level={2}>Profile</Typography.Title>
+        {title}
         <Alert type="error" title="Could not load your profile." />
       </>
     );
   }
 
+  if (session === null) {
+    return (
+      <>
+        {title}
+        <Empty description="Log in to see your profile." />
+      </>
+    );
+  }
+
+  const isAuthor = session.role === 'author';
+  // Reached only by a typed or old link: no tab leads here for a non-author.
+  if (pathname === MY_BOOKS_TAB && !isAuthor) {
+    return <Navigate replace to={ACCOUNT_TAB} />;
+  }
+
   return (
     <>
-      <Typography.Title level={2}>Profile</Typography.Title>
-
-      {session === null ? (
-        <Empty description="Log in to see your profile." />
-      ) : (
-        <Space orientation="vertical" size={token.margin}>
-          {avatarError && <Alert type="error" title={avatarError} />}
-          <AccountAvatar
-            avatarUrl={session.avatarUrl}
-            name={session.login}
-            size="large"
-          />
-          <Space>
-            <ImageUploadButton
-              label="Upload avatar"
-              loading={upload.isPending}
-              onFile={handleAvatarFile}
-              onReject={handleAvatarReject}
-            />
-            {session.avatarUrl !== null && (
-              <Popconfirm
-                title="Remove your avatar?"
-                okText="Remove"
-                okButtonProps={{ danger: true }}
-                onConfirm={handleRemoveAvatar}
-              >
-                <Button danger loading={remove.isPending}>
-                  Remove avatar
-                </Button>
-              </Popconfirm>
-            )}
-          </Space>
-          <EmailNotificationsSetting />
-        </Space>
-      )}
+      {title}
+      <Tabs
+        activeKey={pathname}
+        onChange={(key) => void navigate(key)}
+        items={[
+          { key: ACCOUNT_TAB, label: 'Account', children: <ProfileSettings /> },
+          {
+            key: '/profile/favorites',
+            label: 'Favorites',
+            children: <FavoritesPanel />,
+          },
+          ...(isAuthor
+            ? [
+                {
+                  key: MY_BOOKS_TAB,
+                  label: 'My Books',
+                  children: <MyBooksPanel authorId={session.id} />,
+                },
+              ]
+            : []),
+        ]}
+      />
     </>
   );
 };

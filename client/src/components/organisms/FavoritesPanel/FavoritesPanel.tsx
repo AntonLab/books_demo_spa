@@ -13,7 +13,6 @@ import {
   Typography,
 } from 'antd';
 import { Link } from 'react-router';
-import { useSession } from '@/queries/auth';
 import {
   FAVORITES_PAGE_SIZE,
   useFavoriteBooks,
@@ -164,31 +163,11 @@ const FavoriteSeriesTab: FC = () => {
 
 // The signed-in Account's own Favorites; the server takes the Account from
 // the session, so there is no id to pass.
-export const FavoritesPage: FC = () => {
-  const { data: session } = useSession();
-  const title = <Typography.Title level={2}>Favorites</Typography.Title>;
-
-  // undefined while the session loads: the title alone, no flash of the
-  // Guest message.
-  if (session === undefined) return title;
-  if (session === null) {
-    return (
-      <>
-        {title}
-        <Empty description="Log in to see your favorites." />
-      </>
-    );
-  }
-
-  return (
-    <>
-      {title}
-      <Tabs
-        items={[
-          { key: 'books', label: 'Books', children: <FavoriteBooksTab /> },
-          { key: 'series', label: 'Series', children: <FavoriteSeriesTab /> },
-        ]}
-      />
-    </>
-  );
-};
+export const FavoritesPanel: FC = () => (
+  <Tabs
+    items={[
+      { key: 'books', label: 'Books', children: <FavoriteBooksTab /> },
+      { key: 'series', label: 'Series', children: <FavoriteSeriesTab /> },
+    ]}
+  />
+);

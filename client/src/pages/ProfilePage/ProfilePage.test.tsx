@@ -1,21 +1,28 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
 import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
+import * as booksApi from '@/api/books';
+import * as favoritesApi from '@/api/favorites';
 import * as notificationsApi from '@/api/notifications';
-import * as usersApi from '@/api/users';
+import * as seriesApi from '@/api/series';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
+jest.mock('@/api/books');
+jest.mock('@/api/favorites');
 jest.mock('@/api/notifications');
-jest.mock('@/api/users');
+jest.mock('@/api/series');
 const mockedAuth = jest.mocked(authApi);
+const mockedBooks = jest.mocked(booksApi);
+const mockedFavorites = jest.mocked(favoritesApi);
 const mockedNotifications = jest.mocked(notificationsApi);
-const mockedUsers = jest.mocked(usersApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const session: PublicUser = {
   id: 1,
@@ -30,22 +37,51 @@ const session: PublicUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const author: PublicUser = { ...session, role: 'author' };
+
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+};
+
 // Seeds the session cache directly, so a test settles without waiting on
-// GET /me.
-const renderWithSession = (data: PublicUser | null) => {
+// GET /me, and renders a probe beside the page so a test can see where a tab
+// click or a redirect landed.
+const renderWithSession = (data: PublicUser | null, route = '/profile') => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, data);
-  return renderWithProviders(<ProfilePage />, { queryClient });
+  return renderWithProviders(
+    <>
+      <ProfilePage />
+      <LocationProbe />
+    </>,
+    { queryClient, route }
+  );
 };
 
 beforeEach(() => {
   jest.resetAllMocks();
-  // A default so that a successful mutation's session invalidation (K3) has
-  // something real to refetch; the "while loading" test below overrides this
-  // with a promise that never resolves.
   mockedAuth.me.mockResolvedValue(session);
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
+  });
+  mockedFavorites.listFavoriteBooks.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 20,
+    offset: 0,
+  });
+  mockedBooks.listBooks.mockResolvedValue({
+    items: [],
+    total: 0,
+    current: 1,
+    pageSize: 100,
+  });
+  mockedSeries.listSeries.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
   });
 });
 
@@ -60,7 +96,7 @@ describe('ProfilePage while the session is loading', () => {
       screen.getByRole('heading', { name: 'Profile' })
     ).toBeInTheDocument();
     expect(screen.queryByText('Log in to see your profile.')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Upload avatar' })).toBeNull();
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
 
@@ -68,8 +104,6 @@ describe('ProfilePage when the session fails to load', () => {
   it('shows an error instead of the profile', async () => {
     // Not a 401: that one is the ordinary "nobody is signed in" case, which
     // the query itself turns into a `null` success (see queries/auth.ts).
-    // The test query client already sets `retry: false`, so this surfaces
-    // as `isError` on the first attempt with no backoff delay.
     mockedAuth.me.mockRejectedValue(new ApiError(500, 'Server error'));
 
     renderWithProviders(<ProfilePage />);
@@ -77,27 +111,17 @@ describe('ProfilePage when the session fails to load', () => {
     expect(
       await screen.findByText('Could not load your profile.')
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'Profile' })
-    ).toBeInTheDocument();
     expect(screen.queryByText('Log in to see your profile.')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Upload avatar' })).toBeNull();
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
 
 describe('ProfilePage, signed out', () => {
-  it('asks the visitor to log in', () => {
+  it('asks the visitor to log in and shows no tabs', () => {
     renderWithSession(null);
 
     expect(screen.getByText('Log in to see your profile.')).toBeInTheDocument();
-  });
-
-  it('offers the email switch to a signed-in account', async () => {
-    renderWithSession(session);
-
-    expect(
-      await screen.findByRole('switch', { name: 'Email notifications' })
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 
   it('offers no email switch to a Guest and asks for no settings', () => {
@@ -108,124 +132,80 @@ describe('ProfilePage, signed out', () => {
   });
 });
 
-describe('ProfilePage, signed in', () => {
-  it('shows the account avatar and an upload control', () => {
-    renderWithSession(session);
+describe('ProfilePage tabs', () => {
+  it('opens the Account tab at /profile', async () => {
+    renderWithSession(session, '/profile');
 
     expect(
-      screen.getByRole('button', { name: 'Upload avatar' })
+      await screen.findByRole('switch', { name: 'Email notifications' })
     ).toBeInTheDocument();
-  });
-
-  it('has no Remove button while there is no avatar', () => {
-    renderWithSession(session);
-
-    expect(screen.queryByRole('button', { name: 'Remove avatar' })).toBeNull();
-  });
-
-  it('offers Remove behind a confirm once an avatar exists', () => {
-    renderWithSession({ ...session, avatarUrl: '/api/users/1/avatar?v=1' });
-
-    expect(
-      screen.getByRole('button', { name: 'Remove avatar' })
-    ).toBeInTheDocument();
-  });
-
-  it('uploads the picked file', async () => {
-    mockedUsers.uploadAvatar.mockResolvedValue({
-      ...session,
-      avatarUrl: '/api/users/1/avatar?v=2',
-    });
-    renderWithSession(session);
-    const file = new File([new Uint8Array([1, 2, 3])], 'me.png', {
-      type: 'image/png',
-    });
-
-    const input = document.querySelector(
-      'input[type="file"]'
-    ) as HTMLInputElement;
-    await userEvent.upload(input, file);
-
-    expect(mockedUsers.uploadAvatar).toHaveBeenCalledWith(1, file);
-  });
-
-  it('rejects an unaccepted file type before calling the API', async () => {
-    // user-event v14 applies the input's `accept` attribute by default, which
-    // would silently drop the .gif before it ever reached the precheck.
-    const user = userEvent.setup({ applyAccept: false });
-    renderWithSession(session);
-    const file = new File([new Uint8Array([1])], 'me.gif', {
-      type: 'image/gif',
-    });
-
-    const input = document.querySelector(
-      'input[type="file"]'
-    ) as HTMLInputElement;
-    await user.upload(input, file);
-
-    expect(mockedUsers.uploadAvatar).not.toHaveBeenCalled();
-    expect(
-      screen.getByText('Choose a JPEG, PNG or WebP image.')
-    ).toBeInTheDocument();
-  });
-
-  it('rejects an oversized file before calling the API', async () => {
-    renderWithSession(session);
-    const big = new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'big.png', {
-      type: 'image/png',
-    });
-
-    const input = document.querySelector(
-      'input[type="file"]'
-    ) as HTMLInputElement;
-    await userEvent.upload(input, big);
-
-    expect(mockedUsers.uploadAvatar).not.toHaveBeenCalled();
-    expect(
-      screen.getByText('Images must be 2 MiB or smaller.')
-    ).toBeInTheDocument();
-  });
-
-  it('shows the server error on a failed upload', async () => {
-    mockedUsers.uploadAvatar.mockRejectedValue(new Error('Not a valid image'));
-    renderWithSession(session);
-    const file = new File([new Uint8Array([1])], 'me.png', {
-      type: 'image/png',
-    });
-
-    const input = document.querySelector(
-      'input[type="file"]'
-    ) as HTMLInputElement;
-    await userEvent.upload(input, file);
-
-    expect(await screen.findByText('Not a valid image')).toBeInTheDocument();
-  });
-
-  it('removes the avatar on confirm', async () => {
-    mockedUsers.deleteAvatar.mockResolvedValue(undefined);
-    renderWithSession({ ...session, avatarUrl: '/api/users/1/avatar?v=1' });
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Remove avatar' })
+    expect(screen.getByRole('tab', { name: 'Account' })).toHaveAttribute(
+      'aria-selected',
+      'true'
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
-
-    expect(mockedUsers.deleteAvatar).toHaveBeenCalledWith(1);
   });
 
-  it('shows the server error on a failed remove', async () => {
-    mockedUsers.deleteAvatar.mockRejectedValue(
-      new Error('Could not remove the avatar')
-    );
-    renderWithSession({ ...session, avatarUrl: '/api/users/1/avatar?v=1' });
-
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Remove avatar' })
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  it('keeps /profile#email-notifications on the Account tab', async () => {
+    // Announcement emails link here; the tab is found by pathname alone.
+    renderWithSession(session, '/profile#email-notifications');
 
     expect(
-      await screen.findByText('Could not remove the avatar')
+      await screen.findByRole('switch', { name: 'Email notifications' })
     ).toBeInTheDocument();
+  });
+
+  it('opens the Favorites tab at /profile/favorites', async () => {
+    renderWithSession(session, '/profile/favorites');
+
+    expect(
+      await screen.findByText('No book is in your favorites yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('opens the My Books tab at /profile/my-books for an author', async () => {
+    renderWithSession(author, '/profile/my-books');
+
+    expect(
+      await screen.findByRole('button', { name: 'Create book' })
+    ).toBeInTheDocument();
+  });
+
+  it('navigates to a tab’s path when it is clicked', async () => {
+    renderWithSession(session, '/profile');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Favorites' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/profile/favorites'
+    );
+  });
+
+  it('shows My Books to an author', () => {
+    renderWithSession(author);
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Account',
+      'Favorites',
+      'My Books',
+    ]);
+  });
+
+  it('hides My Books from every other role', () => {
+    renderWithSession(session);
+
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Account',
+      'Favorites',
+    ]);
+  });
+
+  it('sends a non-author at /profile/my-books to /profile, asking for no books', async () => {
+    renderWithSession(session, '/profile/my-books');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/profile$/)
+    );
+    expect(screen.queryByRole('button', { name: 'Create book' })).toBeNull();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 });
