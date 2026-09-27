@@ -3,7 +3,7 @@ import { deleteAvatar, uploadAvatar } from '../api/users';
 import { queryKeys } from './keys';
 
 // An Avatar change touches every place an AuthorSummary or a PublicUser is
-// embedded (K3): the session itself, and every books/series/comments list
+// embedded: the session itself, and every books/series/comments list
 // or detail that names its owner, plus the author-picker's search cache.
 const useAvatarMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>

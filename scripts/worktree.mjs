@@ -13,10 +13,17 @@
  * (Node strips types only outside `node_modules`).
  *
  * Removal refuses a worktree with uncommitted changes or a branch that
- * `origin/dev` does not contain yet.
+ * `origin/dev` does not contain yet. It also deletes the main checkout's
+ * `.playwright-mcp` and the `docs/superpowers` notes whose topic is `<name>`.
  */
 import { execFileSync, execSync } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -71,6 +78,19 @@ const remove = (name) => {
   // Playwright MCP output lands in the main checkout's root whichever
   // worktree the check ran against.
   rmSync(join(root, '.playwright-mcp'), { recursive: true, force: true });
+  // The task's spec, code map and plan are git-ignored working notes that
+  // nothing reads once its branch has merged. Only files whose topic equals
+  // `name` go, so a task still running keeps its own.
+  for (const dir of ['specs', 'plans']) {
+    const notes = join(root, 'docs', 'superpowers', dir);
+    if (!existsSync(notes)) continue;
+    for (const file of readdirSync(notes)) {
+      const topic = file
+        .slice('YYYY-MM-DD-'.length)
+        .replace(/(-design|-codemap)?\.md$/, '');
+      if (topic === name) rmSync(join(notes, file));
+    }
+  }
   console.log(`worktree: removed ${name}`);
 };
 

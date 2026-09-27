@@ -114,7 +114,7 @@ export const removeCoAuthor = (
   });
 };
 
-// K2: the body is a Blob (a File), so request() sends it as-is (K1).
+// The body is a Blob (a File), so request() sends it as-is.
 export const uploadBookCover = (
   id: number,
   file: File

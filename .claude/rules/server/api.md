@@ -25,7 +25,7 @@ code alone does not explain.
   `PublicUser` carries the email; `GET /api/authors?q=` is a separate route for
   the Co-author picker for the same reason.
 - `POST /api/books` takes no status: every book starts `draft`. Only `draft`
-  changes what anyone may do (see `access.md`).
+  changes what anyone may do (see `visibility.md`).
 - The search filters combine by AND: `q` (title or description), `status`
   (`in_progress` | `complete`; `draft` is a 400), `releasedFrom`/`releasedTo`
   and `updatedFrom`/`updatedTo` (ISO instants, both bounds inclusive, compared
@@ -85,13 +85,13 @@ code alone does not explain.
   the current children. The chapter reorder is `silent`, so no `updatedAt`
   moves and an open editor is not handed a spurious 409.
 - `GET /api/series/:id/books` names every book in the series, drafts
-  included, as a `SeriesBookSummary`; see `access.md` for why that is safe.
+  included, as a `SeriesBookSummary`; see `visibility.md` for why that is safe.
 
 ## Comments and Notifications
 
 - `GET /api/comments` returns a flat page (`parentId`, embedded `author`,
   `likeCount`, `viewerLikeId`); the client assembles the tree, which keeps
-  paging meaningful. Deletion is soft (see `access.md`).
+  paging meaningful. Deletion is soft (see `visibility.md`).
 - `/api/notifications` sits behind `requireAuth`, not the matrix; whose
   notifications they are comes from the session only. No delete, no retention
   limit. `GET`/`PATCH /api/notifications/settings` carry the Account's email

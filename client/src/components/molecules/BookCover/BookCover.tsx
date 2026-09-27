@@ -10,7 +10,7 @@ interface BookCoverProps {
   fullWidth?: boolean;
 }
 
-// K4: a 2:3 frame. The title sits right beside this in every place it
+// A 2:3 frame. The title sits right beside this in every place it
 // renders (BookCard, BookPage), so the image is decorative and the
 // placeholder's text is hidden from assistive technology.
 export const BookCover: FC<BookCoverProps> = ({
