@@ -13,11 +13,11 @@
  * the package configs.
  *
  * TypeScript files are linted with type information: the block for .ts and
- * .tsx files turns on the project service, which reads the calling package's
- * own tsconfig.json — hence `tsconfigRootDir`, which each package passes as
- * its own directory. JavaScript files (webpack configs, jest.config.mjs, the
- * eslint configs themselves) stay outside that block and are never parsed
- * with types.
+ * .tsx files turns on the project service, which reads the tsconfig.json
+ * nearest each file (the client's webpack config has its own) — hence
+ * `tsconfigRootDir`, which each package passes as its own directory.
+ * JavaScript files (jest.config.mjs, the eslint configs themselves) stay
+ * outside that block and are never parsed with types.
  */
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';

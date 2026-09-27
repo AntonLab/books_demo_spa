@@ -8,10 +8,12 @@ import {
   type Sequelize,
 } from 'sequelize';
 import type { Book } from './Book.ts';
+import type { Chapter } from './Chapter.ts';
 import type { Series } from './Series.ts';
 import type { User } from './User.ts';
 import type {
   ActorKind,
+  CreditNotificationKind,
   NotificationKind,
   PublicNotification,
   WorkType,
@@ -32,13 +34,21 @@ export class Notification extends Model<
   declare kind: NotificationKind;
   declare workType: WorkType;
   // Two links rather than one polymorphic id, like a like's two targets, so
-  // each keeps a real foreign key. The one workType names is set while that
-  // work exists; the other is always null.
+  // each keeps a real foreign key. A credit notification sets the one workType
+  // names; a New book sets both, the book as its work and its Series beside it.
   declare bookId: CreationOptional<ForeignKey<Book['id']> | null>;
   declare seriesId: CreationOptional<ForeignKey<Series['id']> | null>;
   declare workTitle: string;
-  declare actorKind: ActorKind;
+  // Null only for an announcement, which nobody performed.
+  declare actorKind: CreationOptional<ActorKind | null>;
   declare actorName: CreationOptional<string | null>;
+  // A New chapter's first unread Chapter (live link, SET NULL) and its title
+  // as it was; chapterCount is how many new Chapters the row gathers.
+  declare chapterId: CreationOptional<ForeignKey<Chapter['id']> | null>;
+  declare chapterTitle: CreationOptional<string | null>;
+  declare chapterCount: CreationOptional<number | null>;
+  // A New book's Series title as it was.
+  declare seriesTitle: CreationOptional<string | null>;
   declare isRead: CreationOptional<boolean>;
   // No updatedAt: marking a notification read is the only change it ever
   // takes, and nothing reads when that happened.
@@ -82,10 +92,27 @@ export function initNotificationModel(
       },
       actorKind: {
         type: DataTypes.ENUM(...ACTOR_KINDS),
-        allowNull: false,
+        allowNull: true,
       },
       // A first and a last name of up to 64 characters each, and the space.
       actorName: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+      },
+      chapterId: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+      },
+      // The width of chapters.title and series.title, which they copy.
+      chapterTitle: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+      },
+      chapterCount: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+      },
+      seriesTitle: {
         type: DataTypes.STRING(255),
         allowNull: true,
       },
@@ -124,14 +151,65 @@ export function initNotificationModel(
 export function toPublicNotification(
   notification: Notification
 ): PublicNotification {
+  const base = {
+    id: notification.id,
+    isRead: notification.isRead,
+    createdAt: notification.createdAt,
+  };
+  const bookWork = {
+    type: 'book' as const,
+    id: notification.bookId ?? null,
+    title: notification.workTitle,
+  };
+
+  const { kind } = notification;
+  switch (kind) {
+    case 'new_chapter':
+      return {
+        ...base,
+        kind,
+        work: bookWork,
+        chapter: {
+          id: notification.chapterId ?? null,
+          title: notification.chapterTitle ?? '',
+        },
+        chapterCount: notification.chapterCount ?? 1,
+      };
+    case 'new_book':
+      return {
+        ...base,
+        kind,
+        work: bookWork,
+        series: {
+          id: notification.seriesId ?? null,
+          title: notification.seriesTitle ?? '',
+        },
+      };
+    case 'co_author_added':
+    case 'co_author_removed':
+    case 'co_author_left':
+    case 'co_author_account_deleted':
+    case 'work_deleted':
+      return toCreditNotification(notification, kind, base);
+  }
+}
+
+function toCreditNotification(
+  notification: Notification,
+  kind: CreditNotificationKind,
+  base: { id: number; isRead: boolean; createdAt: Date }
+): PublicNotification {
+  // notify always writes one; a row without it was written some other way.
+  if (notification.actorKind === null || notification.actorKind === undefined)
+    throw new Error(`Notification ${notification.id} has no actor`);
+
   const workId =
     notification.workType === 'book'
       ? notification.bookId
       : notification.seriesId;
-
   return {
-    id: notification.id,
-    kind: notification.kind,
+    ...base,
+    kind,
     work: {
       type: notification.workType,
       id: workId ?? null,
@@ -141,7 +219,5 @@ export function toPublicNotification(
       kind: notification.actorKind,
       name: notification.actorName ?? null,
     },
-    isRead: notification.isRead,
-    createdAt: notification.createdAt,
   };
 }

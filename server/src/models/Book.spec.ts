@@ -90,8 +90,12 @@ test('seriesPosition is a nullable unsigned integer — a standalone book has no
 test('the series filter is indexed alongside the Series order, so it needs no filesort', () => {
   assert.deepEqual(
     Book.options.indexes?.map((index) => index.fields),
-    [['seriesId', 'seriesPosition'], ['genreId']]
+    [['seriesId', 'seriesPosition'], ['genreId'], ['announcedAt', 'status']]
   );
+});
+
+test('the announcement pass scan is indexed, so it takes no full-table lock', () => {
+  assert.equal(Book.options.indexes?.[2]?.unique, undefined);
 });
 
 test('toPublicBook leaves the Series order out — it orders a list and is never shown', () => {
@@ -170,4 +174,9 @@ test('toPublicBook reports a book with no Genre as genre: null, never undefined'
 
   assert.equal(output.genre, null);
   assert.ok('genre' in output);
+});
+
+test('announcedAt is a nullable, millisecond-precise moment — null is not yet announced to its Series', () => {
+  assert.match(createTableSql, /`announcedAt` DATETIME\(3\)(?! NOT NULL)/);
+  assert.doesNotMatch(createTableSql, /`announcedAt` DATETIME\(3\) NOT NULL/);
 });

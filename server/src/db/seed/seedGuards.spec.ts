@@ -5,14 +5,14 @@ import { parseConfig, type AppConfig } from '../config.ts';
 import { DEMO_DATABASE, assertSafeTarget } from './seedGuards.ts';
 
 function configFor(env: string, database: string): AppConfig {
-  // RESET_DELIVERY is set so a production config parses at all: the refusal
+  // MAIL_DELIVERY is set so a production config parses at all: the refusal
   // under test is the seed's own, not production's missing delivery.
   return parseConfig({
     DB_USER: 'u',
     DB_PASSWORD: 'p',
     NODE_ENV: env,
     DB_NAME: database,
-    RESET_DELIVERY: 'log',
+    MAIL_DELIVERY: 'log',
   });
 }
 

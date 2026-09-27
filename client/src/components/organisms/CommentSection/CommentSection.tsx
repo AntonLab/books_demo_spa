@@ -1,6 +1,8 @@
-import { useState, type FC } from 'react';
-import { Alert, Button, Empty, Input, Skeleton, Space, Typography } from 'antd';
+import { useState, type FC, type ReactNode } from 'react';
+import { Alert, Button, Empty, Flex, Skeleton, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
+import { CommentComposerModal } from '@/components/molecules/CommentComposerModal/CommentComposerModal';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { useSession } from '@/queries/auth';
 import {
@@ -29,6 +31,13 @@ interface CommentSectionProps {
   closed?: boolean;
 }
 
+// What the one composer is writing: a new Comment, a reply to one, or an edit
+// of one. One state for all three, so at most one composer is ever open.
+type Composing =
+  | { mode: 'comment' }
+  | { mode: 'reply'; id: number }
+  | { mode: 'edit'; id: number };
+
 export const CommentSection: FC<CommentSectionProps> = ({
   bookId,
   closed = false,
@@ -44,27 +53,31 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const dispatch = useAppDispatch();
   const entries = useOwnUnsavedEntries();
 
-  // `replyTo` and `editing` are mutually exclusive by construction: opening one
-  // closes the other, so there is never more than one composer on screen.
-  const [replyTo, setReplyTo] = useState<number | null>(null);
-  const [editing, setEditing] = useState<number | null>(null);
+  const [composing, setComposing] = useState<Composing | null>(null);
 
-  // The heading is rendered by both branches rather than only the loaded one,
+  // The heading is rendered by every branch rather than only the loaded one,
   // so the section keeps its place on the page while the thread is in flight.
-  const heading = <Typography.Title level={3}>Comments</Typography.Title>;
+  const header = (action?: ReactNode) => (
+    <Flex justify="space-between" align="center" className={styles.header}>
+      <Typography.Title level={3} className={styles.title}>
+        Comments
+      </Typography.Title>
+      {action}
+    </Flex>
+  );
 
   if (isError) {
     return (
       <section>
-        {heading}
-        <Alert type="error" message="Could not load the comments." />
+        {header()}
+        <Alert type="error" title="Could not load the comments." />
       </section>
     );
   }
   if (isPending) {
     return (
       <section>
-        {heading}
+        {header()}
         <Skeleton active paragraph={{ rows: 4 }} />
       </section>
     );
@@ -91,27 +104,34 @@ export const CommentSection: FC<CommentSectionProps> = ({
       (item.tombstone === null || liveReplies.has(item.id))
   );
 
+  const find = (id: number) => all.find((item) => item.id === id);
   // A target missing from the list, or a Tombstone, is gone: its composer
   // cannot reopen, so its text is offered as a notice below instead.
   const isGone = (id: number): boolean => {
-    const target = all.find((item) => item.id === id);
+    const target = find(id);
     return target === undefined || target.tombstone !== null;
   };
-  const activeEdit = editing !== null && !isGone(editing) ? editing : null;
-  const activeReply = replyTo !== null && !isGone(replyTo) ? replyTo : null;
+
+  // A reply or edit whose target went while it was open closes rather than
+  // turning into a new Comment, and its text shows as a notice. Reset during
+  // render, so a target restored later does not reopen it by surprise.
+  if (composing && composing.mode !== 'comment' && isGone(composing.id)) {
+    setComposing(null);
+  }
+  const target =
+    composing && composing.mode !== 'comment' ? find(composing.id) : undefined;
+  const editTarget = composing?.mode === 'edit' ? target : undefined;
+  const replyTarget = composing?.mode === 'reply' ? target : undefined;
 
   const composerKey =
-    activeEdit !== null
-      ? unsavedTextKeys.commentEdit(bookId, activeEdit)
-      : activeReply !== null
-        ? unsavedTextKeys.reply(bookId, activeReply)
+    editTarget !== undefined
+      ? unsavedTextKeys.commentEdit(bookId, editTarget.id)
+      : replyTarget !== undefined
+        ? unsavedTextKeys.reply(bookId, replyTarget.id)
         : unsavedTextKeys.comment(bookId);
   // An edit with no entry shows the Comment as saved; clearing it keeps an
   // empty entry, so the saved text does not come back.
-  const savedText =
-    activeEdit !== null
-      ? (all.find((item) => item.id === activeEdit)?.text ?? '')
-      : '';
+  const savedText = editTarget?.text ?? '';
   const draft = entries[composerKey]?.text ?? savedText;
 
   const orphans = session
@@ -136,32 +156,35 @@ export const CommentSection: FC<CommentSectionProps> = ({
     const onFulfilled = () => {
       // Only once the server has the text: a failed send keeps it.
       dispatch(unsavedText.remove(key));
-      setReplyTo(null);
-      setEditing(null);
+      setComposing(null);
     };
-    // Neither error is rendered anywhere in this section yet; this handler
+    // The modal shows the failure from the mutation's own state; this handler
     // exists only so the rejection is not left unhandled.
     const onRejected = () => {};
 
-    if (activeEdit !== null) {
+    if (editTarget !== undefined) {
       void update
-        .mutateAsync({ id: activeEdit, text })
+        .mutateAsync({ id: editTarget.id, text })
         .then(onFulfilled, onRejected);
     } else {
       void create
-        .mutateAsync({ bookId, parentId: activeReply, text })
+        .mutateAsync({
+          bookId,
+          // The thread stays two levels: a reply to a reply joins its root.
+          parentId: replyTarget
+            ? (replyTarget.parentId ?? replyTarget.id)
+            : null,
+          text,
+        })
         .then(onFulfilled, onRejected);
     }
   };
 
-  const startEdit = (id: number) => {
-    setEditing(id);
-    setReplyTo(null);
-  };
-
-  const startReply = (id: number) => {
-    setReplyTo(id);
-    setEditing(null);
+  // Each opening starts without the last send's failure.
+  const open = (next: Composing) => {
+    create.reset();
+    update.reset();
+    setComposing(next);
   };
 
   const deleteComment = (id: number) => {
@@ -197,23 +220,29 @@ export const CommentSection: FC<CommentSectionProps> = ({
       // refuses both cases with a 403 regardless — this only avoids offering
       // what would fail.
       canLike={canAct && session?.id !== comment.userId}
-      onReply={startReply}
-      onEdit={startEdit}
+      onReply={(id) => open({ mode: 'reply', id })}
+      onEdit={(id) => open({ mode: 'edit', id })}
       onDelete={deleteComment}
       onLike={like}
     />
   );
 
-  const composerLabel =
-    activeEdit !== null
-      ? 'Edit your comment'
-      : activeReply !== null
-        ? 'Write a reply'
-        : 'Write a comment';
+  const replyName = replyTarget?.author
+    ? `${replyTarget.author.firstName} ${replyTarget.author.lastName}`
+    : 'a comment';
 
   return (
     <section>
-      {heading}
+      {header(
+        canAct && (
+          <Button
+            icon={<PlusOutlined aria-hidden />}
+            onClick={() => open({ mode: 'comment' })}
+          >
+            Add comment
+          </Button>
+        )
+      )}
 
       {roots.length === 0 && <Empty description="No comments yet." />}
 
@@ -221,8 +250,10 @@ export const CommentSection: FC<CommentSectionProps> = ({
         <div key={comment.id}>
           {renderComment(comment, true)}
           <div className={styles.replies}>
+            {/* The server refuses a reply under a Tombstone, and a reply to
+                a reply is filed under its root. */}
             {(liveReplies.get(comment.id) ?? []).map((child) =>
-              renderComment(child, false)
+              renderComment(child, comment.tombstone === null)
             )}
           </div>
         </div>
@@ -240,30 +271,55 @@ export const CommentSection: FC<CommentSectionProps> = ({
         <Typography.Text type="secondary">
           Comments are closed while this book is a draft.
         </Typography.Text>
-      ) : session ? (
-        <Space direction="vertical" className={styles.composer}>
-          <Input.TextArea
-            rows={3}
-            value={draft}
-            aria-label={composerLabel}
-            onChange={(event) =>
-              dispatch(
-                unsavedText.upsert({
-                  key: composerKey,
-                  text: event.target.value,
-                  saved: { text: savedText },
-                })
-              )
-            }
-          />
-          <Button type="primary" onClick={submit}>
-            {activeEdit !== null ? 'Save' : 'Post'}
-          </Button>
-        </Space>
       ) : (
-        <Typography.Text type="secondary">
-          Sign in to join the discussion.
-        </Typography.Text>
+        !session && (
+          <Typography.Text type="secondary">
+            Sign in to join the discussion.
+          </Typography.Text>
+        )
+      )}
+
+      {canAct && composing && (
+        <CommentComposerModal
+          title={
+            editTarget
+              ? 'Edit comment'
+              : replyTarget
+                ? `Reply to ${replyName}`
+                : 'New comment'
+          }
+          label={
+            editTarget
+              ? 'Edit your comment'
+              : replyTarget
+                ? 'Write a reply'
+                : 'Write a comment'
+          }
+          submitText={editTarget ? 'Save' : 'Post'}
+          value={draft}
+          onChange={(text) =>
+            dispatch(
+              unsavedText.upsert({
+                key: composerKey,
+                text,
+                saved: { text: savedText },
+              })
+            )
+          }
+          onSubmit={submit}
+          onCancel={() => setComposing(null)}
+          pending={editTarget ? update.isPending : create.isPending}
+          error={
+            editTarget
+              ? update.isError
+                ? 'Could not save the comment.'
+                : null
+              : create.isError
+                ? 'Could not post the comment.'
+                : null
+          }
+          replyTo={replyTarget}
+        />
       )}
     </section>
   );

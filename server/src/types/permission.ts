@@ -17,6 +17,7 @@ export const MODULES = [
   'chapters',
   'comments',
   'likes',
+  'favorites',
   'genres',
   'reports',
 ] as const;

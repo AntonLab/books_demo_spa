@@ -22,6 +22,10 @@ const shapeOf = (plan: Plan) => ({
   comments: plan.comments.map((comment) => comment.text),
   tombstones: plan.tombstones.size,
   likes: plan.likes.length,
+  favorites: plan.favorites.map(
+    (favorite) =>
+      `${String(favorite.accountIndex)}:${favorite.book?.title ?? favorite.series?.title ?? ''}`
+  ),
 });
 
 const loginOf = (plan: Plan, accountIndex: number): string => {
@@ -117,5 +121,75 @@ test('dates nothing before it could have happened, and only tombstones a comment
       plan.comments.some((comment) => comment.parent === tombstoned),
       'a tombstone only earns its place by keeping replies in their thread'
     );
+  }
+});
+
+test('gives every reader a few favorites the API would accept, and nobody else any', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const readerIndexes = plan.accounts.flatMap((account, index) =>
+    account.spec.role === 'user' ? [index] : []
+  );
+  // A Series has no status: a reader can see it once it holds one non-draft
+  // book, and not before.
+  const booksInSeries = new Map(
+    plan.authors.flatMap((author) =>
+      author.series.map(
+        (entry, seriesIndex) =>
+          [
+            entry,
+            author.books.filter((book) => book.seriesIndex === seriesIndex),
+          ] as const
+      )
+    )
+  );
+
+  assert.equal(readerIndexes.length, 5);
+
+  for (const favorite of plan.favorites) {
+    // Exactly one target, which is what models/Favorite.ts exists to enforce.
+    assert.equal(
+      Number(favorite.book !== null) + Number(favorite.series !== null),
+      1
+    );
+    assert.ok(
+      readerIndexes.includes(favorite.accountIndex),
+      `${loginOf(plan, favorite.accountIndex)} is not a reader`
+    );
+    const account = plan.accounts[favorite.accountIndex];
+    assert.ok(account, 'every favorite has an account');
+    assert.ok(favorite.createdAt >= account.createdAt);
+
+    if (favorite.book !== null) {
+      assert.notEqual(favorite.book.status, 'draft');
+      assert.ok(favorite.createdAt >= favorite.book.createdAt);
+    }
+    if (favorite.series !== null) {
+      const books = booksInSeries.get(favorite.series);
+      assert.ok(
+        books?.some((book) => book.status !== 'draft'),
+        `${favorite.series.title} has no book a reader can see`
+      );
+      assert.ok(favorite.createdAt >= favorite.series.createdAt);
+    }
+  }
+
+  for (const accountIndex of readerIndexes) {
+    const held = plan.favorites.filter(
+      (favorite) => favorite.accountIndex === accountIndex
+    );
+    const books = held.flatMap((favorite) =>
+      favorite.book === null ? [] : [favorite.book]
+    );
+    const series = held.flatMap((favorite) =>
+      favorite.series === null ? [] : [favorite.series]
+    );
+
+    assert.ok(
+      books.length >= 2 && books.length <= 4,
+      `${loginOf(plan, accountIndex)} holds ${String(books.length)} books`
+    );
+    assert.equal(series.length, 1);
+    // The unique index on (userId, bookId) would refuse a repeat.
+    assert.equal(new Set(books).size, books.length);
   }
 });

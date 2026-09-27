@@ -1,12 +1,14 @@
 import { Router } from 'express';
-import type { ResetDelivery } from '../delivery/resetDelivery.ts';
+import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
+import type { OnlineRegistry } from '../online/onlineRegistry.ts';
 import type { Repositories } from '../repositories/sequelizeRepositories.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
 import { createChapterRoutes } from './chapterRoutes.ts';
 import { createCommentRoutes } from './commentRoutes.ts';
+import { createFavoriteRoutes } from './favoriteRoutes.ts';
 import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
@@ -14,11 +16,16 @@ import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
 export interface RouteDeps extends Repositories {
-  resetDelivery: ResetDelivery;
+  mailDelivery: MailDelivery;
+  // APP_BASE_URL: the client origin every emailed link is built on.
+  appBaseUrl: string;
   // The sign-in rate limits (middleware/authRateLimit.ts). Required, so no
   // app is ever built without them by accident; tests pass
   // unlimitedAuthRateLimits() from the route test kit.
   authRateLimits: AuthRateLimits;
+  // Who is Online: the open notification streams (online/onlineRegistry.ts).
+  // One per process; index.ts starts it and the shutdown stops it.
+  onlineRegistry: OnlineRegistry;
 }
 
 export function createApiRouter(deps: RouteDeps): Router {
@@ -36,6 +43,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/genres', createGenreRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
+  router.use('/favorites', createFavoriteRoutes(deps));
   router.use('/notifications', createNotificationRoutes(deps));
   return router;
 }

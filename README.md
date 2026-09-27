@@ -57,16 +57,19 @@ clean MySQL install needs no manual migration step.
 with zod at start-up, so a malformed value fails loudly instead of booting a
 broken server.
 
-| Variable                  | Default                    | Notes                                                                                                 |
-| ------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`              | `development` \| `test` \| `production`                                                               |
-| `PORT`                    | `4000`                     | The API's port                                                                                        |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`       |                                                                                                       |
-| `DB_NAME`                 | `books_demo_spa`           |                                                                                                       |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.               |
-| `APP_BASE_URL`            | `http://localhost:3000`    | Client origin used to build password-reset links                                                      |
-| `TRUST_PROXY`             | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none               |
-| `RESET_DELIVERY`          | `log` (none in production) | Where password-reset links go; `log` writes them to the server log. Production must set it explicitly |
+| Variable                      | Default                    | Notes                                                                                                                             |
+| ----------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                    | `development`              | `development` \| `test` \| `production`                                                                                           |
+| `PORT`                        | `4000`                     | The API's port                                                                                                                    |
+| `DB_HOST` / `DB_PORT`         | `127.0.0.1` / `3306`       |                                                                                                                                   |
+| `DB_NAME`                     | `books_demo_spa`           |                                                                                                                                   |
+| `DB_USER` / `DB_PASSWORD`     | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.                                           |
+| `APP_BASE_URL`                | `http://localhost:3000`    | Client origin used to build emailed links                                                                                         |
+| `TRUST_PROXY`                 | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none                                           |
+| `MAIL_DELIVERY`               | `log` (none in production) | `log` writes password-reset links and notification emails to the server log; `smtp` sends them. Production must set it explicitly |
+| `SMTP_HOST` / `SMTP_PORT`     | _(none)_ / `587`           | Required with `MAIL_DELIVERY=smtp` (port 465 switches to implicit TLS)                                                            |
+| `SMTP_USER` / `SMTP_PASSWORD` | _(none)_                   | Required with `MAIL_DELIVERY=smtp`                                                                                                |
+| `MAIL_FROM`                   | _(none)_                   | Sender address; required with `MAIL_DELIVERY=smtp`                                                                                |
 
 ## API
 
@@ -92,10 +95,11 @@ on books, series, chapters, comments and likes — only a row's owner, or an
 `.claude/rules/server/` — `permissions.md` for the full matrix, `auth.md` for
 account blocking, `access.md` for the tombstone rules on deleted comments.
 
-Password-reset links are not emailed: the only delivery implemented
-(`RESET_DELIVERY=log`) writes the link to the server log, so copy it from
-there when exercising the flow. Production refuses to start unless
-`RESET_DELIVERY` is set explicitly, so link-logging is never shipped by
+Mail goes out through `MAIL_DELIVERY`. With `log` (the default outside
+production) password-reset links and notification emails are written to the
+server log, so copy a link from there when exercising the flow; with `smtp`
+they are sent through the `SMTP_*` settings. Production refuses to start
+unless `MAIL_DELIVERY` is set explicitly, so link-logging is never shipped by
 accident.
 
 ## Scripts

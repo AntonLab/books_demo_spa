@@ -15,3 +15,15 @@ export interface PublicSeries {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// What GET /api/series/:id returns: the record plus the Favorite state the
+// series page renders. Additive over PublicSeries, so the endpoint's existing
+// readers are unaffected.
+export interface SeriesDetail extends PublicSeries {
+  // Accounts holding this series as a Favorite. A Series has no status, so
+  // every one counts.
+  favoriteCount: number;
+  // The id of the viewer's own Favorite, for DELETE /api/favorites/:id; null
+  // for a Guest and for an account without one.
+  viewerFavoriteId: number | null;
+}

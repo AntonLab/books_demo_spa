@@ -76,6 +76,14 @@ interface PlannedLike {
   createdAt: Date;
 }
 
+// Exactly one of book / series, as on a row of `favorites`.
+interface PlannedFavorite {
+  book: PlannedBook | null;
+  series: PlannedSeries | null;
+  accountIndex: number;
+  createdAt: Date;
+}
+
 export interface PlannedAuthor {
   spec: AuthorSpec;
   createdAt: Date;
@@ -92,6 +100,7 @@ export interface Plan {
   // the tree is built.
   tombstones: Map<PlannedComment, Tombstone>;
   likes: PlannedLike[];
+  favorites: PlannedFavorite[];
 }
 
 // Lays an author's whole history out over PUBLICATION_WINDOW_DAYS, ending a few
@@ -467,6 +476,56 @@ function planThreads(
   return { comments, tombstones, likes };
 }
 
+// Readers only: each keeps 2-4 books and one series. A reader is never
+// credited, so no Favorite lands on the holder's own work, and the API would
+// answer a reader's Favorite on a Draft book, or on a series with no
+// non-draft book, with a 404, so the seed writes neither.
+function planFavorites(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedFavorite[] {
+  const now = Date.now();
+  const books = authors
+    .flatMap((author) => author.books)
+    .filter((book) => book.status !== 'draft');
+  const series = authors.flatMap((author) =>
+    author.series.filter((_, seriesIndex) =>
+      author.books.some(
+        (book) => book.seriesIndex === seriesIndex && book.status !== 'draft'
+      )
+    )
+  );
+  // Nobody holds a work before their account, or the work, exists.
+  const heldSince = (accountCreatedAt: Date, workCreatedAt: Date): Date =>
+    new Date(
+      rng.float(
+        Math.max(accountCreatedAt.getTime(), workCreatedAt.getTime()),
+        now
+      )
+    );
+
+  return accounts.flatMap((account, accountIndex) => {
+    if (account.spec.role !== 'user') return [];
+
+    // sample() draws distinct items, so the unique indexes on
+    // (userId, bookId) and (userId, seriesId) are never tested by a repeat.
+    const heldBooks = rng.sample(books, rng.int(2, 4)).map((book) => ({
+      book,
+      series: null,
+      accountIndex,
+      createdAt: heldSince(account.createdAt, book.createdAt),
+    }));
+    const heldSeries = rng.sample(series, 1).map((entry) => ({
+      book: null,
+      series: entry,
+      accountIndex,
+      createdAt: heldSince(account.createdAt, entry.createdAt),
+    }));
+    return [...heldBooks, ...heldSeries];
+  });
+}
+
 export function buildPlan(rng: Rng): Plan {
   const authors = shareSeries(
     shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
@@ -497,6 +556,9 @@ export function buildPlan(rng: Rng): Plan {
     authors.flatMap((author) => author.books),
     accounts
   );
+  // Drawn last, so every draw above is unchanged and adding Favorites left
+  // the chapters, comments and likes of the demo as they were.
+  const favorites = planFavorites(rng, authors, accounts);
 
-  return { accounts, authors, ...threads };
+  return { accounts, authors, ...threads, favorites };
 }

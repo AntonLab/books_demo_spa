@@ -17,6 +17,7 @@ import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
+import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -35,10 +36,11 @@ const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
-// The ten tables the seed deletes from under --force. Listed again here
+// The eleven tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  Favorite,
   Like,
   Comment,
   Chapter,
@@ -105,8 +107,8 @@ test('NODE_ENV=production exits non-zero before touching the database, --force o
       ...process.env,
       NODE_ENV: 'production',
       // Set so the config parses: the refusal under test is the seed's own,
-      // not production's missing RESET_DELIVERY.
-      RESET_DELIVERY: 'log',
+      // not production's missing MAIL_DELIVERY.
+      MAIL_DELIVERY: 'log',
       DB_USER: 'u',
       DB_PASSWORD: 'p',
       DB_HOST: '127.0.0.1',
@@ -262,6 +264,48 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
+  // Written through the models, past favoriteRepository's visibility check,
+  // so nothing but this stops the seed favoriting what a reader cannot see.
+  test('gives every reader favorites, and none the API would refuse', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT u.login FROM users u
+         LEFT JOIN favorites f ON f.userId = u.id
+         WHERE u.role = 'user'
+         GROUP BY u.id, u.login
+         HAVING COUNT(f.id) = 0`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         JOIN users u ON u.id = f.userId
+         WHERE u.role <> 'user' OR f.createdAt < u.createdAt`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         JOIN books b ON b.id = f.bookId
+         WHERE b.status = 'draft'`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT f.id FROM favorites f
+         WHERE f.seriesId IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM books b
+             WHERE b.seriesId = f.seriesId AND b.status <> 'draft'
+           )`
+      ),
+      []
+    );
+  });
+
   test('titles no chapter "X and X" or "A" before a vowel sound', async () => {
     assert.deepEqual(
       await offending(
@@ -352,6 +396,52 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
         )
         .map((chapter) => chapter.id),
       []
+    );
+  });
+
+  // Otherwise the first announcement pass after a seed would mail every
+  // Favorite holder about the whole catalogue (ADR-0013).
+  test('marks every Published chapter and book announced, and leaves Scheduled chapters for the pass', async () => {
+    assert.deepEqual(
+      await offending(
+        `SELECT c.id FROM chapters c
+         JOIN books b ON b.id = c.bookId
+         WHERE b.status <> 'draft' AND c.publishedAt <= NOW(3)
+           AND c.announcedAt IS NULL`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT b.id FROM books b
+         WHERE b.status <> 'draft' AND b.announcedAt IS NULL
+           AND EXISTS (SELECT 1 FROM chapters c
+                       WHERE c.bookId = b.id AND c.publishedAt <= NOW(3))`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT c.id FROM chapters c
+         WHERE (c.publishedAt IS NULL OR c.publishedAt > NOW(3))
+           AND c.announcedAt IS NOT NULL`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT b.id FROM books b
+         WHERE b.status = 'draft' AND b.announcedAt IS NOT NULL`
+      ),
+      []
+    );
+    const [scheduled] = await sequelize.query<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM chapters WHERE publishedAt > NOW(3)`,
+      { type: QueryTypes.SELECT }
+    );
+    assert.ok(
+      Number(scheduled?.count) > 0,
+      'the seed writes Scheduled chapters for the pass to announce'
     );
   });
 });

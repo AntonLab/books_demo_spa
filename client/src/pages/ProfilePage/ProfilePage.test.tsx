@@ -6,12 +6,15 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
+import * as notificationsApi from '@/api/notifications';
 import * as usersApi from '@/api/users';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
+jest.mock('@/api/notifications');
 jest.mock('@/api/users');
 const mockedAuth = jest.mocked(authApi);
+const mockedNotifications = jest.mocked(notificationsApi);
 const mockedUsers = jest.mocked(usersApi);
 
 const session: PublicUser = {
@@ -41,6 +44,9 @@ beforeEach(() => {
   // something real to refetch; the "while loading" test below overrides this
   // with a promise that never resolves.
   mockedAuth.me.mockResolvedValue(session);
+  mockedNotifications.getNotificationSettings.mockResolvedValue({
+    emailNotifications: true,
+  });
 });
 
 describe('ProfilePage while the session is loading', () => {
@@ -84,6 +90,21 @@ describe('ProfilePage, signed out', () => {
     renderWithSession(null);
 
     expect(screen.getByText('Log in to see your profile.')).toBeInTheDocument();
+  });
+
+  it('offers the email switch to a signed-in account', async () => {
+    renderWithSession(session);
+
+    expect(
+      await screen.findByRole('switch', { name: 'Email notifications' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers no email switch to a Guest and asks for no settings', () => {
+    renderWithSession(null);
+
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(mockedNotifications.getNotificationSettings).not.toHaveBeenCalled();
   });
 });
 

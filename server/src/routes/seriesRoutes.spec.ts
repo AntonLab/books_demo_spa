@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
-import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
+import type {
+  AuthorSummary,
+  PublicGenre,
+  PublicSeries,
+  SeriesDetail,
+  Wire,
+} from 'shared';
 import {
   json,
   ROLE_COOKIES,
@@ -44,6 +50,8 @@ const SUMMARIES = new Map<number, AuthorSummary>(
   ])
 );
 
+const VIEWER_FAVORITE_ID = 77;
+
 const createFakeRepository = (
   actors: [string, Actor][] = []
 ): SeriesRepository =>
@@ -51,6 +59,7 @@ const createFakeRepository = (
     accounts: SUMMARIES,
     books: new Map([[FILED_BOOK_ID, 1]]),
     genres: GENRES,
+    favorites: { count: 3, viewerFavoriteId: VIEWER_FAVORITE_ID },
     actors,
   });
 
@@ -321,6 +330,30 @@ test('GET by id returns 404 for a missing record', async () => {
     { seriesRepository: createFakeRepository() },
     async (base) => {
       assert.equal((await fetch(`${base}/api/series/999`)).status, 404);
+    }
+  );
+});
+
+test('GET by id reports the favorite count, and the viewer own favorite only when signed in', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const anonymous = await fetch(`${base}/api/series/1`);
+      const signedIn = await fetch(`${base}/api/series/1`, {
+        headers: { cookie: ROLE_COOKIES.user },
+      });
+
+      assert.equal(anonymous.status, 200);
+      const guestBody = await json<Wire<SeriesDetail>>(anonymous);
+      assert.equal(guestBody.title, valid.title);
+      assert.equal(guestBody.favoriteCount, 3);
+      assert.equal(guestBody.viewerFavoriteId, null);
+      assert.equal(
+        (await json<Wire<SeriesDetail>>(signedIn)).viewerFavoriteId,
+        VIEWER_FAVORITE_ID
+      );
     }
   );
 });

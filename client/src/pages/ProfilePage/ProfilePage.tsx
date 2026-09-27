@@ -11,6 +11,7 @@ import {
 } from 'antd';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { ImageUploadButton } from '@/components/molecules/ImageUploadButton/ImageUploadButton';
+import { EmailNotificationsSetting } from '@/components/organisms/EmailNotificationsSetting/EmailNotificationsSetting';
 import { useSession } from '@/queries/auth';
 import { useDeleteAvatar, useUploadAvatar } from '@/queries/users';
 
@@ -94,6 +95,7 @@ export const ProfilePage: FC = () => {
               </Popconfirm>
             )}
           </Space>
+          <EmailNotificationsSetting />
         </Space>
       )}
     </>

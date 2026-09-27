@@ -1,24 +1,57 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
+import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
-import type { PublicNotification } from '@/types/api';
+import { FakeEventSource } from '@/test/eventSource';
+import type {
+  CreditNotification,
+  NewBookNotification,
+  NewChapterNotification,
+  PublicNotification,
+} from '@/types/api';
 
 jest.mock('@/api/notifications');
 
 const mockedNotifications = jest.mocked(notificationsApi);
 
 const notification = (
-  overrides: Partial<PublicNotification>
-): PublicNotification => ({
+  overrides: Partial<CreditNotification>
+): CreditNotification => ({
   id: 1,
   kind: 'co_author_added',
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   actor: { kind: 'co_author', name: 'Margaret Hale' },
   isRead: false,
   createdAt: '2026-09-12T10:00:00.000Z',
+  ...overrides,
+});
+
+const newChapter = (
+  overrides: Partial<NewChapterNotification>
+): NewChapterNotification => ({
+  id: 11,
+  kind: 'new_chapter',
+  work: { type: 'book', id: 7, title: 'The Glass Harbour' },
+  chapter: { id: 70, title: 'The Tide Bell' },
+  chapterCount: 1,
+  isRead: false,
+  createdAt: '2026-09-26T10:00:00.000Z',
+  ...overrides,
+});
+
+const newBook = (
+  overrides: Partial<NewBookNotification>
+): NewBookNotification => ({
+  id: 21,
+  kind: 'new_book',
+  work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
+  series: { id: 4, title: 'The Nightbus Files' },
+  isRead: false,
+  createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
 
@@ -216,6 +249,71 @@ describe('NotificationBell', () => {
     ).toBeInTheDocument();
   });
 
+  it('words New chapter and New book notifications and links to what is new', async () => {
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([
+        newChapter({}),
+        newChapter({
+          id: 12,
+          work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+          chapter: { id: 80, title: 'Low Water' },
+          chapterCount: 3,
+        }),
+        newChapter({
+          id: 13,
+          work: { type: 'book', id: 5, title: 'Iron Orchard' },
+          chapter: { id: null, title: 'Withdrawn' },
+        }),
+        newChapter({
+          id: 14,
+          work: { type: 'book', id: null, title: 'Gone Book' },
+          chapter: { id: null, title: 'Gone Chapter' },
+        }),
+        newBook({}),
+      ])
+    );
+    renderWithProviders(<NotificationBell userId={3} />);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /^Notifications/ })
+    );
+
+    expect(
+      await screen.findByText('The Tide Bell', { exact: false })
+    ).toBeInTheDocument();
+    expect(
+      sentence('New chapter in the book “The Glass Harbour”: “The Tide Bell”.')
+    ).toBeInTheDocument();
+    expect(
+      sentence(
+        '3 new chapters in the book “Salt and Candlelight”, starting with “Low Water”.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      sentence(
+        'New book in the series “The Nightbus Files”: “The Nightbus Returns”.'
+      )
+    ).toBeInTheDocument();
+
+    // A New chapter opens the first new Chapter; a New book opens the Book.
+    expect(
+      screen.getByRole('link', { name: '“The Tide Bell”' })
+    ).toHaveAttribute('href', '/books/7/chapters/70');
+    expect(screen.getByRole('link', { name: '“Low Water”' })).toHaveAttribute(
+      'href',
+      '/books/8/chapters/80'
+    );
+    expect(
+      screen.getByRole('link', { name: '“The Nightbus Returns”' })
+    ).toHaveAttribute('href', '/books/9');
+    // A deleted Chapter falls back to its Book; a deleted Book links nowhere.
+    expect(screen.getByRole('link', { name: '“Withdrawn”' })).toHaveAttribute(
+      'href',
+      '/books/5'
+    );
+    expect(screen.queryByRole('link', { name: '“Gone Chapter”' })).toBeNull();
+  });
+
   it('dates each notification with the app date-time helper', async () => {
     mockedNotifications.listNotifications.mockResolvedValue(
       page([notification({ id: 1 })])
@@ -229,5 +327,93 @@ describe('NotificationBell', () => {
     expect(
       await screen.findByText(formatDateTime('2026-09-12T10:00:00.000Z'))
     ).toBeInTheDocument();
+  });
+});
+
+// Renders the current URL so a test can see where Open navigated to.
+const LocationProbe = () => {
+  const location = useLocation();
+  return <div data-testid="location">{location.pathname}</div>;
+};
+
+const push = (item: PublicNotification) => {
+  act(() => {
+    FakeEventSource.latest().emit(NOTIFICATION_STREAM_EVENT, item);
+  });
+};
+
+describe('NotificationBell live toasts', () => {
+  beforeEach(() => {
+    mockedNotifications.listNotifications.mockResolvedValue(page([]));
+  });
+
+  it('toasts a pushed notification, refreshes the list, and opens what it points at', async () => {
+    renderWithProviders(
+      <>
+        <NotificationBell userId={3} />
+        <LocationProbe />
+      </>
+    );
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(1)
+    );
+
+    push(newChapter({}));
+
+    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      sentence('New chapter in the book “The Glass Harbour”: “The Tide Bell”.')
+    ).toBeInTheDocument();
+    // The badge learns of it at once, not at the next 60 s poll.
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(2)
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/books/7/chapters/70'
+    );
+  });
+
+  it('updates the one toast when a New chapter grows, instead of stacking another', async () => {
+    renderWithProviders(<NotificationBell userId={3} />);
+    push(newChapter({}));
+    await screen.findByText('New notification');
+
+    // The pass merges a second Chapter into the same unread Notification and
+    // pushes it again under the same id.
+    push(newChapter({ chapterCount: 2 }));
+
+    await waitFor(() =>
+      expect(
+        sentence(
+          '2 new chapters in the book “The Glass Harbour”, starting with “The Tide Bell”.'
+        )
+      ).toBeInTheDocument()
+    );
+    expect(screen.getAllByText('New notification')).toHaveLength(1);
+  });
+
+  it('toasts the credit kinds too, and offers no Open for a work that is gone', async () => {
+    renderWithProviders(<NotificationBell userId={3} />);
+
+    push(notification({}));
+
+    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      sentence(
+        'Margaret Hale added you as a co-author of the book “The Glass Harbour”.'
+      )
+    ).toBeInTheDocument();
+
+    push(
+      notification({ id: 2, work: { type: 'book', id: null, title: 'Gone' } })
+    );
+
+    await waitFor(() =>
+      expect(screen.getAllByText('New notification')).toHaveLength(2)
+    );
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1);
   });
 });

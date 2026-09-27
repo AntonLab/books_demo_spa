@@ -90,6 +90,13 @@ test('toPublicUser carries the role and defaults it to user', () => {
   assert.equal(toPublicUser(user, null).role, 'user');
 });
 
+test('emailNotifications is a NOT NULL boolean that defaults to on', () => {
+  assert.match(
+    generateCreateTable(),
+    /`emailNotifications` TINYINT\(1\) NOT NULL DEFAULT (true|1)/
+  );
+});
+
 test('toPublicUser carries an explicit role', () => {
   const user = User.build({
     id: 1,

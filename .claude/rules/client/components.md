@@ -29,7 +29,13 @@ that read like mistakes and are not.
 ## Comments (`CommentSection`, `Comment`)
 
 - The server returns a flat page; `CommentSection` builds the two-level tree,
-  so there is no recursive component and a reply has no Reply button.
+  so there is no recursive component. A reply's Reply files the new reply
+  under their root (`parentId` of the root), quoting the reply in the
+  composer; the Unsaved text is keyed by the reply. Replies under a
+  tombstoned root get no Reply, since the server refuses a Tombstone parent.
+- `Comment` clamps its text to 3 lines behind "Show more" / "Show less"
+  (antd `ellipsis`); the composer's quote passes `clamp={false}`. jsdom
+  measures nothing, so the clamp is checked in a browser only.
 - **It drops a tombstone with no live replies.** A tombstone earns its place
   only by keeping live replies in their thread, so a tombstoned root survives
   with at least one live direct reply, and a tombstoned reply never does.
@@ -39,15 +45,21 @@ that read like mistakes and are not.
 - Edit, delete and like render only when the server would allow them; the
   server refuses each with 403 regardless. `closed` (a Draft book) makes the
   section read-only.
-- Replying and editing are mutually exclusive state, so one composer at most is
-  on screen. The heading renders in every state so the section keeps its place.
+- The composer is one `CommentComposerModal`, opened by "Add comment" beside
+  the heading, a Comment's Reply or its Edit; one `composing` state holds the
+  mode, so at most one is open. A reply shows its target read-only above the
+  field (`Comment` with every flag off). The modal is mounted only while open,
+  focuses its field in `afterOpenChange` with the cursor at the end, and
+  shows a failed send from the mutation's state, reset on each opening. The
+  heading renders in every state so the section keeps its place.
 - The molecule may be called `Comment` because antd removed its own in v5.
 - The composer has no local state: its value is the Unsaved text entry of the
   open composer (root, reply or edit), or the saved Comment while an edit has
   none. Opening Edit writes nothing; clearing the field keeps an empty entry,
   so the saved text does not come back. A send clears the entry only on
-  success. A reply or edit whose target is gone or a Tombstone falls back to
-  the root composer, and its text shows as an `UnsavedTextNotice`.
+  success; Cancel keeps it. A reply or edit whose target is gone or a
+  Tombstone closes (reset during render, so a restored target does not reopen
+  it), and its text shows as an `UnsavedTextNotice`.
 
 ## Cards (`Card`, `BookCard`, `SeriesCard`)
 
@@ -85,12 +97,21 @@ that read like mistakes and are not.
   `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
   deletes the right row. It predates the icons and still uses a text glyph.
+- `FavoriteButton` has the same id-in, id-out shape but draws a star icon.
+  It shows to Co-authors too (a Favorite is a subscription, not praise) and
+  never on a Draft, whose Favorites the server neither counts nor lists.
+- `EmailNotificationsSetting`'s switch id `email-notifications` is the anchor
+  the announcement emails link to; it scrolls itself into view for that hash,
+  since the browser's own hash scroll runs before the SPA draws it.
 - Icons come from `@ant-design/icons` (ADR-0012). Each renders `role="img"`
   named after itself: an icon beside visible text takes `aria-hidden`, and an
   icon-only control takes `aria-label` on the control (or on the icon, for a
   `Segmented` option).
 - `NotificationBell` marks unread items read when opened but keeps them
-  highlighted until it closes.
+  highlighted until it closes. It holds the Account's notification stream
+  (`useNotificationStream`) and toasts each pushed Notification under the key
+  `notification-<id>`, so a merged New chapter updates its toast. `AppHeader`
+  keys it by the Account, so an Account switch drops the old toasts.
 
 ## Search suggestions (`SearchBar`, `SearchForm`)
 
