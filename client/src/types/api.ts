@@ -15,6 +15,10 @@ export type AuthorSummary = Wire<Shared.AuthorSummary>;
 // order.
 export type PublicSeries = Wire<Shared.PublicSeries>;
 
+// What GET /api/series/:id answers: the series plus its Favorites count and
+// the viewer's own Favorite id (null when not a Favorite, and for a Guest).
+export type SeriesDetail = Wire<Shared.SeriesDetail>;
+
 // One book of the series editor's list. A summary, because the list reaches a
 // series' Co-authors who may not co-author a Draft book filed in it: what the
 // book is called and where it stands, never what it says.
@@ -52,3 +56,11 @@ export interface CreateLikePayload {
   commentId?: number;
   isLike: boolean;
 }
+
+export type PublicFavorite = Wire<Shared.PublicFavorite>;
+export type FavoriteBook = Wire<Shared.FavoriteBook>;
+export type FavoriteSeries = Wire<Shared.FavoriteSeries>;
+
+// Exactly one target, as the server's schema demands; no userId, since the
+// server takes the Account from the session.
+export type CreateFavoritePayload = { bookId: number } | { seriesId: number };

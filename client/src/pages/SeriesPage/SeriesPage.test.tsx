@@ -9,7 +9,7 @@ import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
-import type { PublicSeries, PublicUser } from '@/types/api';
+import type { PublicUser, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
@@ -25,7 +25,7 @@ const coAuthor = {
   avatarUrl: null,
 };
 
-const series: PublicSeries = {
+const series: SeriesDetail = {
   id: 12,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
@@ -34,6 +34,8 @@ const series: PublicSeries = {
   genre: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
+  favoriteCount: 0,
+  viewerFavoriteId: null,
 };
 
 const book: PublicBook = {
