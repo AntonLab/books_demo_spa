@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
+import type { OnlineRegistry } from '../online/onlineRegistry.ts';
 import type { Repositories } from '../repositories/sequelizeRepositories.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
@@ -22,6 +23,9 @@ export interface RouteDeps extends Repositories {
   // app is ever built without them by accident; tests pass
   // unlimitedAuthRateLimits() from the route test kit.
   authRateLimits: AuthRateLimits;
+  // Who is Online: the open notification streams (online/onlineRegistry.ts).
+  // One per process; index.ts starts it and the shutdown stops it.
+  onlineRegistry: OnlineRegistry;
 }
 
 export function createApiRouter(deps: RouteDeps): Router {
