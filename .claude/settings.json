@@ -42,7 +42,8 @@
       "Bash(git log *)",
       "Bash(git fetch *)",
       "Bash(git check-ignore *)",
-      "Bash(bash scripts/sdd-step.sh *)"
+      "Bash(bash scripts/sdd-step.sh *)",
+      "Bash(node scripts/plan-check.mjs *)"
     ],
     "ask": [
       "Bash(npm *seed*)",
