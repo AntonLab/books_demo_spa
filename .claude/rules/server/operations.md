@@ -61,6 +61,10 @@ database hiccup costs one pass, not the process.
   answer 409.
 - Stream pushes and mail happen only after the commit. A failed email is
   logged (`Announcement mail failed`, with the `userId`) and not retried.
+- Shutdown does not wait for a pass already in flight: it stops the interval,
+  not the tick. A recipient not yet mailed when the process exits loses that
+  email, with no retry — the row is already claimed (`announcedAt` set), so
+  the next pass will not send it again either.
 
 ## Online registry (`online/onlineRegistry.ts`)
 
@@ -71,6 +75,9 @@ database hiccup costs one pass, not the process.
   checks each stream's session through `findLiveSessions`. It closes a stream
   whose session expired, was deleted, or belongs to a Blocked Account; the
   rest get a `: ping` comment that keeps proxies from timing it out.
+- A session that ends elsewhere — a password reset, a block, expiry — does not
+  close its stream on the spot: the stream closes at the next revalidation,
+  within 30 s.
 - The shutdown stops the registry before `server.close()`, which would
   otherwise wait on every open stream.
 
