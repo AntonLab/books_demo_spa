@@ -89,7 +89,7 @@ const renderPage = (
   return renderWithProviders(
     <Routes>
       <Route path="/books/:id/edit" element={<EditBookPage />} />
-      <Route path="/my-books" element={<p>My books list</p>} />
+      <Route path="/profile/my-books" element={<p>My books list</p>} />
     </Routes>,
     { route: '/books/1/edit', queryClient, preloadedState }
   );
