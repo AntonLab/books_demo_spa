@@ -10,7 +10,7 @@ import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries, PublicUser, SeriesBookSummary } from '@/types/api';
+import type { PublicUser, SeriesBookSummary, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/authors');
 jest.mock('@/api/genres');
@@ -35,7 +35,7 @@ const cora = {
   avatarUrl: null,
 };
 
-const series: PublicSeries = {
+const series: SeriesDetail = {
   id: 12,
   authors: [ann, cora],
   title: 'The Scale Cycle',
@@ -44,6 +44,8 @@ const series: PublicSeries = {
   genre: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
+  favoriteCount: 0,
+  viewerFavoriteId: null,
 };
 
 const book = (

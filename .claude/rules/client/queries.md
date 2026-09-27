@@ -49,6 +49,11 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
 - `useToggleLike` handles both directions from the `viewerLikeId` the caller
   holds (`null` likes, a number deletes that row) and takes the key to
   invalidate, since a book like and a comment like refresh different things.
+- `useToggleFavorite` mirrors it for Favorites but invalidates in
+  `onSettled`, not `onSuccess`: a 409 or 404 means another tab already
+  changed the Favorite, and the refetch is what corrects the star. Both it
+  and `useRemoveFavorite` invalidate the `favorites` prefix; a removal also
+  invalidates `books` and `series`, whose details carry `favoriteCount`.
 - `useOptimisticReorder` (`reorder.ts`) is the one save-on-drop for both
   orders: it rewrites the cache before the request, restores it on failure
   and refetches either way, so a 409 brings in the row a Co-author changed.
