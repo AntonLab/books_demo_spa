@@ -538,6 +538,8 @@ export function createSequelizeBookRepository(): BookRepository {
 
         await assertGenreExists(input.genreId, transaction);
 
+        const wasDraft = book.status === 'draft';
+
         // `update` writes only the keys present, so an omitted seriesId
         // leaves the link — and the book's place — alone, while an explicit
         // null clears both. Saving a book into the series it is already in
@@ -558,6 +560,30 @@ export function createSequelizeBookRepository(): BookRepository {
         }
 
         await book.update(changes, { transaction });
+
+        // A Book turning Published with Chapters already past their
+        // Publication time: one New book to Series Favorites; its Chapters
+        // are marked announced without Notifications (CONTEXT.md) — so a
+        // chapter that was already out when the book was still a draft never
+        // gets its own New chapter mail once the pass finds it. `silent`
+        // keeps chapters.updatedAt (the edit version) unchanged. The pass's
+        // own draft-backlog step still raises the book's New book.
+        if (wasDraft && book.status !== 'draft') {
+          const now = new Date();
+          await Chapter.update(
+            { announcedAt: now },
+            {
+              where: {
+                bookId: book.id,
+                announcedAt: null,
+                publishedAt: { [Op.lte]: now },
+              },
+              transaction,
+              silent: true,
+            }
+          );
+        }
+
         return withAuthors(book, transaction);
       });
     },
