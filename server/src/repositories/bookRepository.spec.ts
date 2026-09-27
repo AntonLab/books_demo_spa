@@ -157,6 +157,42 @@ describe('bookRepository against real MySQL', { skip }, () => {
     }
   });
 
+  test('a Draft turning Published marks its already-out chapters announced, without new-chapter notifications', async () => {
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Draft with a head start',
+      description: 'Chapters already out',
+      tags: [],
+    });
+    const out = await Chapter.create({
+      bookId: draft.id,
+      title: 'Chapter 1',
+      text: 'already out',
+      publishedAt: daysFromNow(-1),
+      position: 1,
+    });
+    const notYet = await Chapter.create({
+      bookId: draft.id,
+      title: 'Chapter 2',
+      text: 'not out yet',
+      publishedAt: daysFromNow(1),
+      position: 2,
+    });
+
+    await repository.update(draft.id, { status: 'in_progress' });
+
+    // Marked announced directly here, not by the announcement pass: the pass
+    // only raises the New book (books.announcedAt), and would otherwise send
+    // a New chapter notification for a chapter whose moment already passed.
+    const [announced, scheduled] = await Promise.all([
+      Chapter.findByPk(out.id),
+      Chapter.findByPk(notYet.id),
+    ]);
+    assert.ok(announced?.announcedAt);
+    assert.equal(scheduled?.announcedAt, null);
+  });
+
   test('no list shows a draft, except the caller listing their own books', async () => {
     const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
     const draft = await repository.create({
