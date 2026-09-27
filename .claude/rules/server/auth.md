@@ -60,9 +60,13 @@ paths:
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
-  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`. A
-  failed send fails the request with a 500 after the token is stored; the
-  account can ask again, and the new request supersedes the stored token.
+  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`. The
+  202 is answered before the send, which then runs detached
+  (`void … .catch(...)`): awaiting it, or branching on its outcome, would let
+  timing or a 500 tell an attacker the address exists. A failed send is
+  logged (`authController.ts`, no address or token in the line) and not
+  retried; the account can just ask again, and the new request supersedes the
+  stored token.
 
 ## CSRF (`middleware/csrfProtection.ts`)
 
