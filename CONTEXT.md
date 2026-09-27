@@ -16,6 +16,12 @@ _Avoid_: User (for a registered person in general)
 Someone with no session: an anonymous visitor.
 _Avoid_: Anonymous user
 
+**Profile**:
+An Account's own page: its avatar, its email-notification setting, its
+Favorites and, for an Author, the works it is a Co-author of. Only the Account
+itself sees it; there is no public Profile of another Account.
+_Avoid_: Settings, Account page, Cabinet
+
 **Role**:
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
 role assumed for someone with no session; no Account holds it.

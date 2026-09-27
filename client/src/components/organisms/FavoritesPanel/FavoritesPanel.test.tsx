@@ -1,18 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FavoritesPage } from './FavoritesPage';
+import { FavoritesPanel } from './FavoritesPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as favoritesApi from '@/api/favorites';
 import type { PublicBook } from '@/types/book';
-import type {
-  FavoriteBook,
-  FavoriteSeries,
-  PublicSeries,
-  PublicUser,
-} from '@/types/api';
+import type { FavoriteBook, FavoriteSeries, PublicSeries } from '@/types/api';
 
 jest.mock('@/api/favorites');
 const mockedFavorites = jest.mocked(favoritesApi);
@@ -23,19 +16,6 @@ const ann = {
   firstName: 'Ann',
   lastName: 'Author',
   avatarUrl: null,
-};
-
-const reader: PublicUser = {
-  id: 9,
-  login: 'Reader',
-  email: 'reader@example.com',
-  firstName: 'Read',
-  lastName: 'Er',
-  status: 'active',
-  role: 'user',
-  avatarUrl: null,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 const book = (id: number, title: string): PublicBook => ({
@@ -78,32 +58,13 @@ const page = <Item,>(items: Item[], total = items.length, offset = 0) => ({
   offset,
 });
 
-const renderPage = (session: PublicUser | null = reader) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
-  return renderWithProviders(<FavoritesPage />, {
-    route: '/favorites',
-    queryClient,
-  });
-};
+const renderPage = () => renderWithProviders(<FavoritesPanel />);
 
 beforeEach(() => {
   jest.resetAllMocks();
 });
 
-describe('FavoritesPage', () => {
-  it('asks a Guest to log in and fetches nothing', () => {
-    renderPage(null);
-
-    expect(
-      screen.getByRole('heading', { name: 'Favorites' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('Log in to see your favorites.')
-    ).toBeInTheDocument();
-    expect(mockedFavorites.listFavoriteBooks).not.toHaveBeenCalled();
-  });
-
+describe('FavoritesPanel', () => {
   it('lists the favorite books on the first page, each with its authors', async () => {
     mockedFavorites.listFavoriteBooks.mockResolvedValue(
       page([favoriteBook(50, book(1, 'A Tale of Dragons'))])

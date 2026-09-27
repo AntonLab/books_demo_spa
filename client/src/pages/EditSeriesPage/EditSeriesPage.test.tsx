@@ -80,7 +80,7 @@ const renderPage = (session: PublicUser | null = account()) => {
   return renderWithProviders(
     <Routes>
       <Route path="/series/:id/edit" element={<EditSeriesPage />} />
-      <Route path="/my-books" element={<p>My books list</p>} />
+      <Route path="/profile/my-books" element={<p>My books list</p>} />
       <Route path="/" element={<p>Main page</p>} />
     </Routes>,
     { route: '/series/12/edit', queryClient }

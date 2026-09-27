@@ -1,10 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
-import { MyBooksPage } from './MyBooksPage';
+import { MyBooksPanel } from './MyBooksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
@@ -55,19 +53,15 @@ const book = (
   updatedAt: '2026-09-01T00:00:00.000Z',
 });
 
-const renderPage = (session: PublicUser | null = author) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
-
-  return renderWithProviders(
+const renderPage = () =>
+  renderWithProviders(
     <Routes>
-      <Route path="/my-books" element={<MyBooksPage />} />
+      <Route path="/my-books" element={<MyBooksPanel authorId={author.id} />} />
       <Route path="/books/new" element={<p>New book form</p>} />
       <Route path="/series/new" element={<p>New series form</p>} />
     </Routes>,
-    { route: '/my-books', queryClient }
+    { route: '/my-books' }
   );
-};
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -111,7 +105,7 @@ beforeEach(() => {
   });
 });
 
-describe('MyBooksPage', () => {
+describe('MyBooksPanel', () => {
   it("lists the author's own books, drafts included, with their status", async () => {
     renderPage();
 
@@ -157,17 +151,6 @@ describe('MyBooksPage', () => {
     expect(
       await screen.findByText('You have not written a book yet.')
     ).toBeInTheDocument();
-  });
-
-  it('explains itself to an account that is not an author, and asks for nothing', async () => {
-    renderPage({ ...author, role: 'user' });
-
-    expect(
-      screen.getByText(
-        'Books are kept here for accounts holding the author role.'
-      )
-    ).toBeInTheDocument();
-    await waitFor(() => expect(mockedBooks.listBooks).not.toHaveBeenCalled());
   });
 
   it('lists the series the author co-authors under a Series tab', async () => {
