@@ -141,6 +141,14 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
           name: 'books_genre_id',
           fields: ['genreId'],
         },
+        // Serves the announcement pass's `announcedAt IS NULL AND status !=
+        // 'draft'` scan (announcementRepository.ts releaseBooks); without it
+        // every pass's FOR UPDATE takes a full-table next-key lock, mirroring
+        // chapters_announced_at_published_at (a19824e).
+        {
+          name: 'books_announced_at_status',
+          fields: ['announcedAt', 'status'],
+        },
       ],
     }
   );
