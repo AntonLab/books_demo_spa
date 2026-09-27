@@ -9,6 +9,7 @@ import { logger } from './logger.ts';
 import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
 import { createOnlineRegistry } from './online/onlineRegistry.ts';
+import { setNotificationPublisher } from './online/notificationPublisher.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeAnnouncementRepository } from './repositories/announcementRepository.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
@@ -60,6 +61,11 @@ async function main(): Promise<void> {
   const authRateLimits = createAuthRateLimits();
   const onlineRegistry = createOnlineRegistry({ sessionRepository });
   onlineRegistry.start();
+  // Credit Notifications are written inside repository transactions, which
+  // know nothing of the registry; this is where the two meet.
+  setNotificationPublisher((userId, notification) =>
+    onlineRegistry.push(userId, notification)
+  );
   const mailDelivery = createMailDelivery(config.mail);
   // After syncPermissions() like the expiry purge: the first pass runs now.
   const announcementPass = startAnnouncementPass({

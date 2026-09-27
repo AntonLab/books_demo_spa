@@ -87,7 +87,12 @@ test('a signed-in account opens an event stream registered under its session', a
 
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'text/event-stream');
-    assert.equal(response.headers.get('cache-control'), 'no-cache');
+    // no-transform keeps a compressing proxy (webpack-dev-server's among
+    // them) from buffering the stream.
+    assert.equal(
+      response.headers.get('cache-control'),
+      'no-cache, no-transform'
+    );
     assert.equal(response.headers.get('x-accel-buffering'), 'no');
     const reader = response.body!.getReader();
     assert.equal(await readUntil(reader, '\n\n'), ': connected\n\n');
