@@ -115,6 +115,8 @@ paths:
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
   come from `BookDetail`.
+- `FavoritesPage` keeps one page number per tab and clamps it while
+  rendering: removing the last row of the last page steps back a page.
 - `ChapterPage` applies the reading Device preferences: background and font
   through a nested `ConfigProvider` (a class overriding `--ant-*` never
   reaches antd's components, which redeclare them), size and line height

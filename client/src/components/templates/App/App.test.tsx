@@ -40,6 +40,7 @@ const LAZY_PAGES = [
   'EditBookPage',
   'EditChapterPage',
   'EditSeriesPage',
+  'FavoritesPage',
   'MainPage',
   'MyBooksPage',
   'NewBookPage',

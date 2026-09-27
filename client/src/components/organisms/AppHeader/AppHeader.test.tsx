@@ -350,7 +350,7 @@ describe('AppHeader genres submenu', () => {
 describe('AppHeader account menu', () => {
   const admin: PublicUser = { ...user, role: 'admin' };
 
-  it('offers Manage genres to an admin, after Profile', async () => {
+  it('offers Favorites after Profile, then Manage genres to an admin', async () => {
     await renderHeader(<AppHeader />, withSession(admin));
 
     await userEvent.click(screen.getByText('bob'));
@@ -368,6 +368,7 @@ describe('AppHeader account menu', () => {
 
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
+      'Favorites',
       'Manage genres',
       'Log out',
     ]);
@@ -407,6 +408,21 @@ describe('AppHeader account menu', () => {
     await userEvent.click(await screen.findByText('Manage genres'));
 
     expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
+  });
+
+  it('opens the Favorites page from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(user)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Favorites'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/favorites');
   });
 });
 
