@@ -81,6 +81,10 @@ function createFakeSessions(users: UserRepository) {
     async deleteExpired() {
       throw new Error('the expiry purge is not reachable from a route');
     },
+    // The Online registry's timer calls it, never a route.
+    async findLiveSessions() {
+      throw new Error('the Online registry is not reachable from a route');
+    },
   };
 
   return { repository, rows };

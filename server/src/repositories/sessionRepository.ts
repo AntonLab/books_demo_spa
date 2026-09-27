@@ -30,6 +30,12 @@ export interface SessionRepository {
     verifiedPasswordHash: string
   ): Promise<SessionOpening>;
   findValidByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
+  // Which of these token hashes still open a session — not expired, account
+  // not Blocked — each with its account id. One query for every open
+  // notification stream, which the Online registry re-checks on a timer.
+  findLiveSessions(
+    tokenHashes: readonly string[]
+  ): Promise<Map<string, number>>;
   deleteByTokenHash(tokenHash: string): Promise<boolean>;
   deleteAllForUser(userId: number): Promise<number>;
   // The expiry purge's: deletes every session whose expiresAt is at or
@@ -103,6 +109,32 @@ export function createSequelizeSessionRepository(): SessionRepository {
         where: { tokenHash, expiresAt: { [Op.gt]: new Date() } },
       });
       return session ? toRecord(session) : null;
+    },
+
+    async findLiveSessions(tokenHashes) {
+      const live = new Map<string, number>();
+      if (tokenHashes.length === 0) return live;
+
+      const sessions = await Session.findAll({
+        attributes: ['tokenHash', 'userId'],
+        where: {
+          tokenHash: [...tokenHashes],
+          expiresAt: { [Op.gt]: new Date() },
+        },
+        include: [
+          {
+            model: User,
+            as: 'user',
+            attributes: [],
+            required: true,
+            where: { status: { [Op.ne]: 'blocked' } },
+          },
+        ],
+      });
+      for (const session of sessions) {
+        live.set(session.tokenHash, session.userId);
+      }
+      return live;
     },
 
     async deleteByTokenHash(tokenHash) {
