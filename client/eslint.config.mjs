@@ -28,6 +28,20 @@ const below = (...levels) => ({
 const restrictImports = (...patterns) => ({
   'no-restricted-imports': ['error', { paths: [noReactDefault], patterns }],
 });
+const noDefaultExports = {
+  'no-restricted-exports': [
+    'error',
+    {
+      restrictDefaultExports: {
+        direct: true,
+        named: true,
+        defaultFrom: true,
+        namedFrom: true,
+        namespaceFrom: true,
+      },
+    },
+  ],
+};
 
 // The shared ignores, recommended sets, repo-wide rules and the Prettier tail
 // live in the root eslint.config.base.mjs. Only the React and browser
@@ -67,18 +81,7 @@ export default createConfig(
         },
       ],
       ...restrictImports(),
-      'no-restricted-exports': [
-        'error',
-        {
-          restrictDefaultExports: {
-            direct: true,
-            named: true,
-            defaultFrom: true,
-            namedFrom: true,
-            namespaceFrom: true,
-          },
-        },
-      ],
+      ...noDefaultExports,
       // A fetch that skips request() loses the session cookie and CSRF token.
       'no-restricted-globals': [
         'error',
@@ -130,18 +133,7 @@ export default createConfig(
       globals: { ...globals.node },
     },
     rules: {
-      'no-restricted-exports': [
-        'error',
-        {
-          restrictDefaultExports: {
-            direct: true,
-            named: true,
-            defaultFrom: true,
-            namedFrom: true,
-            namespaceFrom: true,
-          },
-        },
-      ],
+      ...noDefaultExports,
     },
   },
   // webpack-cli reads the config's default export.
