@@ -22,12 +22,13 @@ read, read the rule first:
 | `pages.md`      | routing, lazy loading and the error boundary, page-level rules         |
 | `styling.md`    | tokens and quarks, CSS Modules, the antd cascade layer                 |
 | `testing.md`    | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
-| `webpack.md`    | the one webpack config                                                 |
+| `webpack.md`    | the typed webpack config parts, how Node loads them, build traps       |
 
 ## Commands
 
 Install from the repo root. Scripts run here or from the root with `-w client`:
 `npm run dev` (port 3000, `/api` proxied to 4000), `npm run build` (`build/`),
+`npm run analyze` (the build plus `build/report.html`),
 `npm test` / `npm run test:watch`, `npm run typecheck`, `npm run lint`,
 `npm run lint:fix`. Prettier is root-only.
 
@@ -71,7 +72,7 @@ Import the file, not the folder: `@/components/organisms/BookCard/BookCard`.
 There are no barrel `index.ts` files. The `@/` alias is set in three places that
 must agree: `paths` in `tsconfig.json` (no `baseUrl`, which errors as `TS5101`
 in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
-`config/webpack.config.js` and `moduleNameMapper` in `jest.config.mjs`.
+`config/webpack/buildResolve.ts` and `moduleNameMapper` in `jest.config.mjs`.
 
 ## Conventions
 
