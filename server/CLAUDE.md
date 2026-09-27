@@ -12,7 +12,8 @@ read, read the rule first:
 | Rule             | Covers                                                                                             |
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps                |
-| `access.md`      | ownership, Co-authors, Notifications, Draft books, comment tombstones                              |
+| `access.md`      | ownership, Co-authors                                                                              |
+| `visibility.md`  | Notifications, Draft books, comment tombstones                                                     |
 | `permissions.md` | Roles, the permission matrix, account rank rules                                                   |
 | `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                                       |
 | `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                               |
