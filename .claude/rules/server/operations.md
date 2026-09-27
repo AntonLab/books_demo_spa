@@ -4,6 +4,8 @@ paths:
   - 'server/src/app.ts'
   - 'server/src/shutdown.ts'
   - 'server/src/expiryPurge.ts'
+  - 'server/src/announcements/**'
+  - 'server/src/online/**'
   - 'server/src/logger.ts'
   - 'server/src/middleware/errorHandler.ts'
 ---
@@ -43,6 +45,34 @@ Deletes expired sessions and reset tokens more than 30 days past expiry
 Once at boot after `syncPermissions()`, then hourly on an `unref()`ed interval
 the shutdown stops. Logs only when it deleted something, and never rejects: a
 database hiccup costs one pass, not the process.
+
+## Announcement pass (`announcements/announcementPass.ts`)
+
+- Once at boot, then every minute on an `unref()`ed interval the shutdown
+  stops; a tick while a pass still runs is skipped. One server instance only
+  (ADR-0013).
+- `announcementRepository.announce(now)` claims and writes everything in one
+  transaction: Chapters out while their Book is a Draft are marked silently,
+  released Books become New books, due Chapters become New chapters. Selection
+  is "`announcedAt IS NULL`", never a time window; the claim is a `FOR UPDATE`
+  read plus `UPDATE … WHERE announcedAt IS NULL`.
+- Every `announcedAt` write is `silent: true`. Without it the claim would move
+  `chapters.updatedAt`, and a Co-author's next save of that Chapter would
+  answer 409.
+- Stream pushes and mail happen only after the commit. A failed email is
+  logged (`Announcement mail failed`, with the `userId`) and not retried.
+
+## Online registry (`online/onlineRegistry.ts`)
+
+- An Account is Online while `GET /api/notifications/stream` (SSE) holds a
+  connection for it. The registry is in-process memory; a second instance
+  would not see it.
+- Every 30 s, and before each announcement pass looks at it, the registry
+  checks each stream's session through `findLiveSessions`. It closes a stream
+  whose session expired, was deleted, or belongs to a Blocked Account; the
+  rest get a `: ping` comment that keeps proxies from timing it out.
+- The shutdown stops the registry before `server.close()`, which would
+  otherwise wait on every open stream.
 
 ## Error handler
 
