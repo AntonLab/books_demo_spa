@@ -1,4 +1,5 @@
 import { createApp } from './app.ts';
+import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { createMailDelivery } from './delivery/mailDelivery.ts';
 import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
@@ -9,6 +10,7 @@ import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
 import { createOnlineRegistry } from './online/onlineRegistry.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
+import { createSequelizeAnnouncementRepository } from './repositories/announcementRepository.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { createShutdown, registerShutdownSignals } from './shutdown.ts';
 
@@ -58,10 +60,18 @@ async function main(): Promise<void> {
   const authRateLimits = createAuthRateLimits();
   const onlineRegistry = createOnlineRegistry({ sessionRepository });
   onlineRegistry.start();
+  const mailDelivery = createMailDelivery(config.mail);
+  // After syncPermissions() like the expiry purge: the first pass runs now.
+  const announcementPass = startAnnouncementPass({
+    announcementRepository: createSequelizeAnnouncementRepository(),
+    onlineRegistry,
+    mailDelivery,
+    appBaseUrl: config.appBaseUrl,
+  });
 
   const app = createApp({
     ...repositories,
-    mailDelivery: createMailDelivery(config.mail),
+    mailDelivery,
     appBaseUrl: config.appBaseUrl,
     onlineRegistry,
     trustedOrigin: config.appBaseUrl,
@@ -85,9 +95,9 @@ async function main(): Promise<void> {
   const shutdown = createShutdown({
     server,
     sequelize,
-    // The registry before the server closes: stopping it ends every open
-    // stream, which server.close() would otherwise wait on.
-    stoppables: [expiryPurge, onlineRegistry, authRateLimits],
+    // The pass before the registry, so no pass pushes to a stream the
+    // registry has just closed.
+    stoppables: [expiryPurge, announcementPass, onlineRegistry, authRateLimits],
     exit: (code) => process.exit(code),
   });
   registerShutdownSignals(shutdown);

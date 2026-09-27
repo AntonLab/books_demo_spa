@@ -9,17 +9,17 @@ its own when you Read a file its `paths:` names — writing or editing one does
 not. Before creating a file, or changing a topic whose files you have not
 read, read the rule first:
 
-| Rule             | Covers                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps |
-| `access.md`      | ownership, Co-authors, Notifications, Draft books, comment tombstones               |
-| `permissions.md` | Roles, the permission matrix, account rank rules                                    |
-| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                        |
-| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                |
-| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                  |
-| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas         |
-| `seed.md`        | the demo seed                                                                       |
-| `operations.md`  | security headers, graceful shutdown, bind errors, expiry purge                      |
+| Rule             | Covers                                                                                             |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps                |
+| `access.md`      | ownership, Co-authors, Notifications, Draft books, comment tombstones                              |
+| `permissions.md` | Roles, the permission matrix, account rank rules                                                   |
+| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                                       |
+| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                               |
+| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                                 |
+| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas                        |
+| `seed.md`        | the demo seed                                                                                      |
+| `operations.md`  | security headers, graceful shutdown, bind errors, expiry purge, announcement pass, Online registry |
 
 ## Invariants
 

@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net';
 import type { Sequelize } from 'sequelize';
 import sharp from 'sharp';
 import { createApp } from './app.ts';
+import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { parseConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
@@ -24,6 +25,7 @@ import {
   type OnlineRegistry,
 } from './online/onlineRegistry.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
+import { createSequelizeAnnouncementRepository } from './repositories/announcementRepository.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
 import type {
@@ -192,6 +194,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   let base: string;
   let trustedOrigin: string;
   let onlineRegistry: OnlineRegistry;
+  let announcementPass: { stop(): void };
 
   const openBrowser = () => createBrowser(base, trustedOrigin);
 
@@ -262,6 +265,12 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       sessionRepository: repositories.sessionRepository,
     });
     onlineRegistry.start();
+    announcementPass = startAnnouncementPass({
+      announcementRepository: createSequelizeAnnouncementRepository(),
+      onlineRegistry,
+      mailDelivery: createLogMailDelivery(),
+      appBaseUrl: config.appBaseUrl,
+    });
     const app = createApp({
       ...repositories,
       onlineRegistry,
@@ -279,6 +288,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   });
 
   after(async () => {
+    announcementPass.stop();
     onlineRegistry.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await sequelize.close();
