@@ -230,6 +230,7 @@ describe('the app', () => {
     passwordResetRepository: createUnusedRepository('passwordReset'),
     mailDelivery: createUnusedRepository('mailDelivery'),
     appBaseUrl: TRUSTED_ORIGIN,
+    onlineRegistry: createUnusedRepository('onlineRegistry'),
     trustedOrigin: TRUSTED_ORIGIN,
     trustProxy: 0,
     authRateLimits: unlimitedAuthRateLimits(),

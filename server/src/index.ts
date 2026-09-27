@@ -7,6 +7,7 @@ import { startExpiryPurge } from './expiryPurge.ts';
 import { logger } from './logger.ts';
 import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
+import { createOnlineRegistry } from './online/onlineRegistry.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { createShutdown, registerShutdownSignals } from './shutdown.ts';
@@ -55,11 +56,14 @@ async function main(): Promise<void> {
     passwordResetRepository,
   });
   const authRateLimits = createAuthRateLimits();
+  const onlineRegistry = createOnlineRegistry({ sessionRepository });
+  onlineRegistry.start();
 
   const app = createApp({
     ...repositories,
     mailDelivery: createMailDelivery(config.mail),
     appBaseUrl: config.appBaseUrl,
+    onlineRegistry,
     trustedOrigin: config.appBaseUrl,
     trustProxy: config.trustProxy,
     authRateLimits,
@@ -81,7 +85,9 @@ async function main(): Promise<void> {
   const shutdown = createShutdown({
     server,
     sequelize,
-    stoppables: [expiryPurge, authRateLimits],
+    // The registry before the server closes: stopping it ends every open
+    // stream, which server.close() would otherwise wait on.
+    stoppables: [expiryPurge, onlineRegistry, authRateLimits],
     exit: (code) => process.exit(code),
   });
   registerShutdownSignals(shutdown);

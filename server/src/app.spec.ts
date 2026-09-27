@@ -19,6 +19,10 @@ import {
 } from './middleware/csrfProtection.ts';
 import { initModels } from './models/index.ts';
 import { User } from './models/User.ts';
+import {
+  createOnlineRegistry,
+  type OnlineRegistry,
+} from './online/onlineRegistry.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
 import { unlimitedAuthRateLimits } from './routes/routeTestKit.testkit.ts';
@@ -187,6 +191,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   let server: Server;
   let base: string;
   let trustedOrigin: string;
+  let onlineRegistry: OnlineRegistry;
 
   const openBrowser = () => createBrowser(base, trustedOrigin);
 
@@ -252,8 +257,14 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     await sequelize.sync({ force: true });
     await syncPermissions();
 
+    const repositories = createSequelizeRepositories();
+    onlineRegistry = createOnlineRegistry({
+      sessionRepository: repositories.sessionRepository,
+    });
+    onlineRegistry.start();
     const app = createApp({
-      ...createSequelizeRepositories(),
+      ...repositories,
+      onlineRegistry,
       mailDelivery: createLogMailDelivery(),
       appBaseUrl: config.appBaseUrl,
       trustedOrigin: config.appBaseUrl,
@@ -268,6 +279,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   });
 
   after(async () => {
+    onlineRegistry.stop();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await sequelize.close();
   });

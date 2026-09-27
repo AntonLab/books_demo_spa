@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createNotificationController } from '../controllers/notificationController.ts';
+import { createNotificationStreamHandler } from '../controllers/notificationStream.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -35,6 +36,11 @@ export function createNotificationRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ body: updateNotificationSettingsSchema }),
     controller.updateSettings
+  );
+  router.get(
+    '/stream',
+    requireAuth,
+    createNotificationStreamHandler(deps.onlineRegistry)
   );
 
   return router;

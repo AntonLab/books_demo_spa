@@ -74,6 +74,7 @@ export function defaultDeps(): AppDeps {
     passwordResetRepository: createUnusedRepository('passwordReset'),
     mailDelivery: createUnusedRepository('mailDelivery'),
     appBaseUrl: 'http://localhost:3000',
+    onlineRegistry: createUnusedRepository('onlineRegistry'),
     trustedOrigin: 'http://localhost:3000',
     trustProxy: 0,
     authRateLimits: unlimitedAuthRateLimits(),
