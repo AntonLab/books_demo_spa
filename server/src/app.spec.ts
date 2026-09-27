@@ -24,6 +24,7 @@ import {
   createOnlineRegistry,
   type OnlineRegistry,
 } from './online/onlineRegistry.ts';
+import { setNotificationPublisher } from './online/notificationPublisher.ts';
 import { syncPermissions } from './permissions/permissionStore.ts';
 import { createSequelizeAnnouncementRepository } from './repositories/announcementRepository.ts';
 import { createSequelizeRepositories } from './repositories/sequelizeRepositories.ts';
@@ -265,6 +266,9 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       sessionRepository: repositories.sessionRepository,
     });
     onlineRegistry.start();
+    setNotificationPublisher((userId, notification) =>
+      onlineRegistry.push(userId, notification)
+    );
     announcementPass = startAnnouncementPass({
       announcementRepository: createSequelizeAnnouncementRepository(),
       onlineRegistry,
@@ -290,6 +294,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
   after(async () => {
     announcementPass.stop();
     onlineRegistry.stop();
+    setNotificationPublisher(null);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await sequelize.close();
   });

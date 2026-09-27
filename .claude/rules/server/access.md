@@ -80,7 +80,11 @@ own credit table.
 ## Notifications
 
 - Written by `notify` inside the transaction of the change, so a failed change
-  raises nothing. The actor is never a recipient.
+  raises nothing. The actor is never a recipient. Each row is pushed to the
+  recipient's open streams from `afterCommit` (`online/notificationPublisher.ts`,
+  set by `index.ts`); with no publisher set, as in the seed and the repository
+  specs, nothing is pushed. A push that throws is logged, never rethrown:
+  Sequelize awaits `afterCommit` inside `commit()`.
 - `new_chapter` and `new_book` are raised by the announcement pass
   (`announcements/`), never by `notify`: they carry no actor (`actorKind`
   null), a New chapter links its first unread Chapter (`chapterId`, `SET

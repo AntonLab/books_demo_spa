@@ -1,6 +1,13 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  describe,
+  test,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -17,9 +24,14 @@ import { User } from '../models/User.ts';
 import type { PublicNotification } from 'shared';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
-import { createSequelizeNotificationRepository } from './notificationRepository.ts';
+import {
+  createSequelizeNotificationRepository,
+  notify,
+} from './notificationRepository.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
+import { recordLogs } from '../logger.testkit.ts';
+import { setNotificationPublisher } from '../online/notificationPublisher.ts';
 
 // A schema of its own, for the reason every MySQL-backed suite gives: node:test
 // runs spec files in parallel processes, and two suites calling
@@ -142,6 +154,85 @@ describe('notifications against real MySQL', { skip }, () => {
     ann = await account('ann', 'Ann');
     ben = await account('ben', 'Ben');
     cleo = await account('cleo', 'Cleo');
+  });
+
+  // The publisher is process-wide; a test that sets one must not leak it into
+  // the next.
+  afterEach(() => {
+    setNotificationPublisher(null);
+  });
+
+  test('a committed change pushes each notification it wrote to its recipient', async () => {
+    const pushed: Array<{ userId: number; notification: PublicNotification }> =
+      [];
+    setNotificationPublisher((userId, notification) => {
+      pushed.push({ userId, notification });
+    });
+    const bookId = await works.book.create('Pushed', ann.id);
+
+    await books.addCoAuthor(bookId, ben.id, ann);
+
+    const stored = (await notifications.list(ben.id, { limit: 20, offset: 0 }))
+      .items;
+    assert.equal(stored.length, 1);
+    assert.equal(pushed.length, 1);
+    assert.equal(pushed[0]!.userId, ben.id);
+    // createdAt is compared as null: MySQL stores whole seconds, while the
+    // pushed row still holds the milliseconds Sequelize stamped it with.
+    assert.deepEqual(
+      { ...pushed[0]!.notification, createdAt: null },
+      { ...stored[0]!, createdAt: null }
+    );
+  });
+
+  test('a change that rolls back pushes nothing, and nothing is pushed before commit', async () => {
+    const pushed: number[] = [];
+    setNotificationPublisher((userId) => {
+      pushed.push(userId);
+    });
+    const bookId = await works.book.create('Rolled back', ann.id);
+
+    await assert.rejects(
+      sequelize.transaction(async (transaction) => {
+        await notify(
+          [
+            {
+              recipientIds: [ben.id],
+              kind: 'co_author_added',
+              work: { type: 'book', id: bookId, title: 'Rolled back' },
+              actorKind: 'co_author',
+              actorName: 'Ann Writer',
+            },
+          ],
+          ann.id,
+          transaction
+        );
+        // Written but not committed: a push now could name a row that the
+        // rollback below takes back.
+        assert.deepEqual(pushed, []);
+        throw new Error('roll back');
+      }),
+      /roll back/
+    );
+
+    assert.deepEqual(pushed, []);
+    assert.equal(await Notification.count(), 0);
+  });
+
+  test('a push that throws is logged, and the change it followed still stands', async (t) => {
+    const logs = recordLogs(t);
+    setNotificationPublisher(() => {
+      throw new Error('socket gone');
+    });
+    const bookId = await works.book.create('Unlucky', ann.id);
+
+    await books.addCoAuthor(bookId, ben.id, ann);
+
+    assert.equal((await inbox(ben.id)).length, 1);
+    assert.deepEqual(
+      logs.filter((line) => line.level === 'error').map((line) => line.message),
+      ['Could not push a notification']
+    );
   });
 
   for (const [workType, work] of Object.entries(works)) {

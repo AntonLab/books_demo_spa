@@ -25,7 +25,10 @@ export function createNotificationStreamHandler(
     // every text/* Content-Type, which SSE must not carry.
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    // webpack-dev-server compresses proxied responses by default, and a
+    // compressed stream is held until its buffer fills; `compression` and
+    // other transforming proxies pass a no-transform response through.
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
     // nginx buffers a proxied response by default, which would hold every
     // event back until the buffer filled.

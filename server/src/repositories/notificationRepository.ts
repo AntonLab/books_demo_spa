@@ -1,6 +1,7 @@
 import type { Transaction } from 'sequelize';
 import { Notification, toPublicNotification } from '../models/Notification.ts';
 import { User } from '../models/User.ts';
+import { publishAfterCommit } from '../online/notificationPublisher.ts';
 import type {
   ActorKind,
   CreditNotificationKind,
@@ -53,8 +54,10 @@ interface NotificationEvent {
 // Writes one notification per recipient of each event, in a single insert and
 // inside the transaction of the change that raised them — so a change that
 // rolls back raises nothing, and one that commits cannot lose its
-// notifications. The actor is never among the recipients, whoever the caller
-// passes; `actorId` is null when no account acted, as for a deleted one.
+// notifications. Each one is pushed to its recipient's open streams once the
+// change commits (online/notificationPublisher.ts). The actor is never among
+// the recipients, whoever the caller passes; `actorId` is null when no
+// account acted, as for a deleted one.
 export async function notify(
   events: NotificationEvent[],
   actorId: number | null,
@@ -76,7 +79,16 @@ export async function notify(
   );
   if (rows.length === 0) return;
 
-  await Notification.bulkCreate(rows, { transaction });
+  // bulkCreate on MySQL fills in each row's auto-increment id, so the rows
+  // it returns are complete Notifications.
+  const created = await Notification.bulkCreate(rows, { transaction });
+  publishAfterCommit(
+    created.map((row) => ({
+      userId: row.userId,
+      notification: toPublicNotification(row),
+    })),
+    transaction
+  );
 }
 
 // An account's display name as it is now, for a snapshot that must outlive it.
