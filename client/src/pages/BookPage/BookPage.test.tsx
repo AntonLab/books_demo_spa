@@ -10,6 +10,7 @@ import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
+import * as favoritesApi from '@/api/favorites';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -19,11 +20,13 @@ jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
+jest.mock('@/api/favorites');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
+const mockedFavorites = jest.mocked(favoritesApi);
 
 const book: BookDetail = {
   id: 1,
@@ -56,7 +59,7 @@ const book: BookDetail = {
   likeCount: 4,
   commentCount: 0,
   wordCount: 0,
-  favoriteCount: 0,
+  favoriteCount: 2,
   viewerFavoriteId: null,
   viewerLikeId: null,
 };
@@ -265,6 +268,64 @@ describe('BookPage', () => {
     });
   });
 
+  it('hides the star from an anonymous visitor', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
+  });
+
+  it('offers the star with its count to a co-author too', async () => {
+    renderPage({ ...reader, id: 4 });
+
+    expect(
+      await screen.findByRole('button', { name: 'Add to favorites' })
+    ).toHaveTextContent('2');
+  });
+
+  it('adds the book to the reader’s Favorites', async () => {
+    mockedFavorites.createFavorite.mockResolvedValue({
+      id: 5,
+      userId: reader.id,
+      bookId: 1,
+      seriesId: null,
+      createdAt: '2026-09-26T10:00:00.000Z',
+    });
+    renderPage(reader);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add to favorites' })
+    );
+
+    expect(mockedFavorites.createFavorite).toHaveBeenCalledWith({ bookId: 1 });
+  });
+
+  it('removes the reader’s own Favorite by its id', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, viewerFavoriteId: 5 });
+    mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
+    renderPage(reader);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Remove from favorites' })
+    );
+
+    expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(5);
+  });
+
+  it('holds the star while a toggle is in flight', async () => {
+    // Never settles, so the mutation stays pending.
+    mockedFavorites.createFavorite.mockReturnValue(new Promise(() => {}));
+    renderPage(reader);
+
+    const star = await screen.findByRole('button', {
+      name: 'Add to favorites',
+    });
+    await userEvent.click(star);
+
+    await waitFor(() => expect(star).toBeDisabled());
+    expect(mockedFavorites.createFavorite).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the chapters tab and the comments section', async () => {
     renderPage();
 
@@ -290,6 +351,7 @@ describe('BookPage on a draft', () => {
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /like/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
     expect(
       await screen.findByText('Comments are closed while this book is a draft.')
     ).toBeInTheDocument();
