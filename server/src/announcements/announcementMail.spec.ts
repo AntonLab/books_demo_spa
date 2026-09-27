@@ -158,3 +158,18 @@ test('a base URL with a trailing slash links without a doubled slash', () => {
     /^https:\/\/books\.example\.com\/profile#email-notifications$/m
   );
 });
+
+test('a CR/LF smuggled in a title cannot inject a header into the subject', () => {
+  const forged: AnnouncedChapter = {
+    ...tideBell,
+    chapterTitle: 'The Tide Bell\r\nBcc: x@example.com',
+  };
+
+  const mail = composeAnnouncementMail(
+    'reader@example.com',
+    { chapters: [forged], books: [] },
+    BASE
+  );
+
+  assert.doesNotMatch(mail.subject, /[\r\n]/);
+});
