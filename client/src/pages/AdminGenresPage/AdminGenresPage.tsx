@@ -40,8 +40,9 @@ interface AddValues {
   name: string;
 }
 
-// Keeping the Genre list is a Moderator's job (ADR-0008). Every other Role gets
-// the heading and an explanation — and, because the manager below is a separate component, no request at all.
+// Keeping the Genre list is an Admin's (or Superadmin's) job (ADR-0008).
+// Every other Role gets the heading and an explanation — and, because the
+// manager below is a separate component, no request at all.
 export const AdminGenresPage: FC = () => {
   const { data: session } = useSession();
   const isModerator = isModeratorRole(session?.role);
