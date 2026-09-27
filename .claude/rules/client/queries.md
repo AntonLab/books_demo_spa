@@ -53,6 +53,12 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   orders: it rewrites the cache before the request, restores it on failure
   and refetches either way, so a 409 brings in the row a Co-author changed.
 - `useNotifications` is the only polling query: every 60 s and on window focus.
+  `useNotificationStream` adds the live path: each pushed Notification
+  invalidates it. A stream the browser gives up on (CLOSED, most often a 401)
+  invalidates the session instead, so an ended session becomes a Lost
+  session, and one retry follows 30 s later; the browser's own reconnects
+  (CONNECTING) are left alone. The opener lives in `api/notificationStream.ts`,
+  apart from `api/notifications.ts`, because tests automock the latter.
 - `@tanstack/react-query-devtools` is pinned to the same version as
   `@tanstack/react-query`: bump both together, since the devtools read the
   core's internals.

@@ -3,6 +3,7 @@
 // under Jest's Node process.
 import { TextDecoder, TextEncoder } from 'node:util';
 import '@testing-library/jest-dom';
+import { FakeEventSource } from './eventSource';
 
 // jsdom has no Web Encoding API. react-router's package root re-exports its
 // server-runtime (cookie signing, etc.) alongside the browser router code we
@@ -93,3 +94,15 @@ if (typeof globalThis.MessageChannel === 'undefined') {
   globalThis.MessageChannel =
     FakeMessageChannel as unknown as typeof globalThis.MessageChannel;
 }
+
+// jsdom implements no EventSource, and NotificationBell opens one whenever an
+// Account is signed in, so every test that renders the header needs it.
+// Reset per test so `FakeEventSource.latest()` never returns a stream an
+// earlier test opened.
+if (typeof globalThis.EventSource === 'undefined') {
+  globalThis.EventSource =
+    FakeEventSource as unknown as typeof globalThis.EventSource;
+}
+beforeEach(() => {
+  FakeEventSource.reset();
+});
