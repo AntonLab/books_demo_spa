@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
   Button,
   Divider,
+  Flex,
   Popconfirm,
   Skeleton,
   Space,
@@ -11,18 +13,14 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCoverManager } from '@/components/organisms/BookCoverManager/BookCoverManager';
-import { BookForm } from '@/components/organisms/BookForm/BookForm';
-import type { BookFormValues } from '@/components/organisms/BookForm/BookForm';
+import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { useSession } from '@/queries/auth';
 import { bookCapabilities } from '@/types/capabilities';
-import { useBook, useDeleteBook, useUpdateBook } from '@/queries/books';
-import { useGenres } from '@/queries/genres';
-import { useMySeries } from '@/queries/series';
+import { useBook, useDeleteBook } from '@/queries/books';
 import spacing from '@/theme/spacing.module.css';
-import styles from './EditBookPage.module.css';
 
 export const EditBookPage: FC = () => {
   const navigate = useNavigate();
@@ -30,11 +28,7 @@ export const EditBookPage: FC = () => {
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
-  const series = useMySeries(
-    session?.role === 'author' ? session.id : undefined
-  );
-  const genres = useGenres();
-  const update = useUpdateBook(bookId);
+  const [editing, setEditing] = useState(false);
   const remove = useDeleteBook(bookId);
 
   if (isError) {
@@ -65,22 +59,6 @@ export const EditBookPage: FC = () => {
     );
   }
 
-  // The book's current series is always an option, even one the viewer does
-  // not co-author — a Moderator's, or a series whose credits changed — so the
-  // select shows its name rather than a bare id.
-  const own = (series.data?.items ?? []).map(({ id, title }) => ({
-    id,
-    title,
-  }));
-  const seriesOptions =
-    book.series && !own.some((entry) => entry.id === book.series?.id)
-      ? [...own, book.series]
-      : own;
-
-  const handleSubmit = (values: BookFormValues) => {
-    update.mutate(values);
-  };
-
   const handleDelete = () => {
     remove.mutate(undefined, {
       onSuccess: () => void navigate(isCoAuthor ? '/profile/my-books' : '/'),
@@ -89,34 +67,17 @@ export const EditBookPage: FC = () => {
 
   return (
     <>
-      <Typography.Title level={2}>Edit book</Typography.Title>
+      <Flex justify="space-between" align="center">
+        <Typography.Title level={2}>Manage book: {book.title}</Typography.Title>
+        <Button onClick={() => setEditing(true)}>Edit details</Button>
+      </Flex>
       <Link to={`/books/${book.id}`}>View the book page</Link>
-
-      <div className={styles.body}>
-        {update.isSuccess && (
-          <Alert type="success" title="Saved." className={spacing.gapBelow} />
-        )}
-        <BookForm
-          // Keyed by the last save, so the fields reset to what the server
-          // stored rather than keeping a stale copy of the loaded book.
-          key={book.updatedAt}
-          seriesOptions={seriesOptions}
-          genreOptions={genres.data?.items ?? []}
-          submitLabel="Save"
-          showStatus
-          initialValues={{
-            title: book.title,
-            description: book.description,
-            tags: book.tags,
-            seriesId: book.seriesId,
-            genreId: book.genre?.id ?? null,
-            status: book.status,
-          }}
-          isSubmitting={update.isPending}
-          error={update.error?.message ?? null}
-          onSubmit={handleSubmit}
+      {editing && (
+        <BookEditDetailsModal
+          bookId={bookId}
+          onClose={() => setEditing(false)}
         />
-      </div>
+      )}
 
       <Divider />
 

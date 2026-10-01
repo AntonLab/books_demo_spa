@@ -121,57 +121,20 @@ beforeEach(() => {
 });
 
 describe('EditSeriesPage', () => {
-  it('loads the series and saves its fields', async () => {
-    mockedSeries.updateSeries.mockResolvedValue(series);
+  it('is titled "Manage series: <title>" and keeps its details form behind Edit details', async () => {
     renderPage();
 
-    const title = await screen.findByLabelText('Title');
-    expect(title).toHaveValue('The Scale Cycle');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Manage series: The Scale Cycle',
+      })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
 
-    await userEvent.clear(title);
-    await userEvent.type(title, 'The Scale Saga');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit details' }));
 
-    expect(mockedSeries.updateSeries).toHaveBeenCalledWith(12, {
-      title: 'The Scale Saga',
-      description: 'Dragons, in four parts.',
-      tags: ['epic'],
-      genreId: null,
-    });
-    expect(await screen.findByText('Saved.')).toBeInTheDocument();
-  });
-
-  it('shows the series’ own genre in the select', async () => {
-    mockedSeries.getSeries.mockResolvedValue({
-      ...series,
-      genre: { id: 4, name: 'Gothic' },
-    });
-
-    renderPage();
-
-    // The select's chosen label, rendered beside the combobox.
-    expect(await screen.findByText('Gothic')).toBeInTheDocument();
-  });
-
-  it('keeps an existing genre on an unrelated save', async () => {
-    mockedSeries.getSeries.mockResolvedValue({
-      ...series,
-      genre: { id: 4, name: 'Gothic' },
-    });
-    mockedSeries.updateSeries.mockResolvedValue(series);
-    renderPage();
-
-    const title = await screen.findByLabelText('Title');
-    await userEvent.clear(title);
-    await userEvent.type(title, 'The Scale Saga');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(mockedSeries.updateSeries).toHaveBeenCalledWith(12, {
-      title: 'The Scale Saga',
-      description: 'Dragons, in four parts.',
-      tags: ['epic'],
-      genreId: 4,
-    });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('The Scale Cycle');
   });
 
   it('lists every book in Series order with its status, a co-author’s draft included', async () => {
@@ -240,7 +203,9 @@ describe('EditSeriesPage', () => {
   it('lets a moderator edit the series and open every book, but not change its byline', async () => {
     renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
 
-    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Edit details' })
+    ).toBeInTheDocument();
     await screen.findByText('Cora’s Draft');
     expect(
       screen.getByRole('link', { name: 'Cora’s Draft' })
