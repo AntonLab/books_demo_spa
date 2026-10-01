@@ -5,18 +5,13 @@ import type { FormInstance } from 'antd';
 import type { FC } from 'react';
 import { SeriesForm } from './SeriesForm';
 import type { SeriesFieldValues } from './SeriesForm';
+import { clearSelect } from '@/test/clearSelect';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const genres = [
   { id: 4, name: 'Gothic' },
   { id: 5, name: 'Hard SF' },
 ];
-
-// antd draws the clear icon inside the select that wraps the labelled input.
-const clearSelect = async (label: string) => {
-  const select = screen.getByLabelText(label).closest('.ant-select');
-  await userEvent.click(select!.querySelector('.ant-select-clear')!);
-};
 
 describe('SeriesForm', () => {
   it('fills the form instance it is given, so a caller can read its state', async () => {

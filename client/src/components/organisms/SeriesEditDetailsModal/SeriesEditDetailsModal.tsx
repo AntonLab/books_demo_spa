@@ -2,7 +2,10 @@ import type { FC } from 'react';
 import { Alert, Form, Skeleton, message } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
-import type { SeriesFieldValues } from '@/components/organisms/SeriesForm/SeriesForm';
+import type {
+  SeriesFieldValues,
+  SeriesFormValues,
+} from '@/components/organisms/SeriesForm/SeriesForm';
 import { useSession } from '@/queries/auth';
 import { useGenres } from '@/queries/genres';
 import { useSeries, useUpdateSeries } from '@/queries/series';
@@ -31,6 +34,16 @@ export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
     session != null &&
     seriesCapabilities(series, session).mayEdit;
 
+  const handleSubmit = (values: SeriesFormValues) => {
+    update.mutate(values, {
+      onSuccess: () => {
+        onClose();
+        // Fire-and-forget: the toast's promise settles when it closes.
+        void message.success('Series saved.');
+      },
+    });
+  };
+
   const renderBody = () => {
     if (isError) {
       return <Alert type="error" title="Could not load this series." />;
@@ -58,15 +71,7 @@ export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
         }}
         isSubmitting={update.isPending}
         error={update.error?.message ?? null}
-        onSubmit={(values) =>
-          update.mutate(values, {
-            onSuccess: () => {
-              onClose();
-              // Fire-and-forget: the toast's promise settles when it closes.
-              void message.success('Series saved.');
-            },
-          })
-        }
+        onSubmit={handleSubmit}
       />
     );
   };

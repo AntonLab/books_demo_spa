@@ -5,7 +5,7 @@ import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import type { PublicGenre } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 
-interface SeriesFormValues {
+export interface SeriesFormValues {
   title: string;
   description: string;
   tags: string[];

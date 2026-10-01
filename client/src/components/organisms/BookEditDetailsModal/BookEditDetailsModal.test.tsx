@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { message } from 'antd';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
@@ -85,8 +85,8 @@ beforeEach(() => {
   });
 });
 
-// The static message API outlives a test's DOM, so a toast would leak into the next test.
-afterEach(() => message.destroy());
+// The static message API outlives a test's DOM, so a toast would leak into the next test. Wrapped in act because destroy updates mounted toast state.
+afterEach(() => act(() => message.destroy()));
 
 describe('BookEditDetailsModal', () => {
   it('loads the book into the form and saves it, then closes and announces it', async () => {
@@ -154,10 +154,19 @@ describe('BookEditDetailsModal', () => {
       seriesId: 12,
       series: { id: 12, title: 'The Scale Cycle' },
     });
+    mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderModal();
 
-    await screen.findByLabelText('Title');
+    const title = await screen.findByLabelText('Title');
     expect(screen.getByText('The Scale Cycle')).toBeInTheDocument();
+    await userEvent.type(title, '!');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(mockedBooks.updateBook).toHaveBeenCalled());
+    expect(mockedBooks.updateBook).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ seriesId: 12 })
+    );
   });
 
   it('keeps the modal, the message and the typed text when the server refuses', async () => {

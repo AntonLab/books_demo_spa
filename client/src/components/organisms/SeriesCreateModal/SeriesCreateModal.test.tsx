@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { message } from 'antd';
 import { SeriesCreateModal } from './SeriesCreateModal';
@@ -48,8 +48,8 @@ beforeEach(() => {
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
 });
 
-// The static message API outlives a test's DOM, so a toast would leak into the next test.
-afterEach(() => message.destroy());
+// The static message API outlives a test's DOM, so a toast would leak into the next test. Wrapped in act because destroy updates mounted toast state.
+afterEach(() => act(() => message.destroy()));
 
 describe('SeriesCreateModal', () => {
   it('creates the series with explicit nulls, closes and announces it', async () => {
@@ -96,6 +96,19 @@ describe('SeriesCreateModal', () => {
     renderModal({ onClose });
 
     await userEvent.type(screen.getByLabelText('Title'), 'x');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect((await screen.findAllByText('Discard changes?')).length).not.toBe(0);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still asks when the typed input was cleared back to empty', async () => {
+    const onClose = jest.fn();
+    renderModal({ onClose });
+
+    const title = screen.getByLabelText('Title');
+    await userEvent.type(title, 'x');
+    await userEvent.clear(title);
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     expect((await screen.findAllByText('Discard changes?')).length).not.toBe(0);
