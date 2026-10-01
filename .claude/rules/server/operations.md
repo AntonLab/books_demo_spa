@@ -42,6 +42,8 @@ closes.
 
 Deletes expired sessions and reset tokens more than 30 days past expiry
 (`RESET_TOKEN_RETENTION_MS`; the month keeps evidence of a reset request).
+It also deletes Notifications read more than `NOTIFICATION_READ_TTL_MS` (one
+minute) ago; the list already hides them, so the purge only reclaims rows.
 Once at boot after `syncPermissions()`, then hourly on an `unref()`ed interval
 the shutdown stops. Logs only when it deleted something, and never rejects: a
 database hiccup costs one pass, not the process.

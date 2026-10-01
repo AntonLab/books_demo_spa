@@ -1,4 +1,6 @@
+import { NOTIFICATION_READ_TTL_MS } from 'shared';
 import { logger } from './logger.ts';
+import type { NotificationRepository } from './repositories/notificationRepository.ts';
 import {
   RESET_TOKEN_RETENTION_MS,
   type PasswordResetRepository,
@@ -10,14 +12,16 @@ export const EXPIRY_PURGE_INTERVAL_MS = 60 * 60 * 1000;
 export interface ExpiryPurgeDeps {
   sessionRepository: Pick<SessionRepository, 'deleteExpired'>;
   passwordResetRepository: Pick<PasswordResetRepository, 'deleteExpiredBefore'>;
+  notificationRepository: Pick<NotificationRepository, 'deleteReadBefore'>;
 }
 
 interface ExpiryPurge {
   stop(): void;
 }
 
-// One pass: sessions nothing will accept again, and reset tokens a month past
-// their own expiry. Never rejects — a failure is logged and the next pass
+// One pass: sessions nothing will accept again, reset tokens a month past
+// their own expiry, and Notifications the list already hides because they
+// were read over NOTIFICATION_READ_TTL_MS ago. Never rejects — a failure is logged and the next pass
 // tries again, so a database hiccup cannot take the process down.
 export async function purgeExpiredRows(deps: ExpiryPurgeDeps): Promise<void> {
   const now = Date.now();
@@ -26,8 +30,15 @@ export async function purgeExpiredRows(deps: ExpiryPurgeDeps): Promise<void> {
     const resetTokens = await deps.passwordResetRepository.deleteExpiredBefore(
       new Date(now - RESET_TOKEN_RETENTION_MS)
     );
-    if (sessions > 0 || resetTokens > 0) {
-      logger.info('Purged expired rows', { sessions, resetTokens });
+    const notifications = await deps.notificationRepository.deleteReadBefore(
+      new Date(now - NOTIFICATION_READ_TTL_MS)
+    );
+    if (sessions > 0 || resetTokens > 0 || notifications > 0) {
+      logger.info('Purged expired rows', {
+        sessions,
+        resetTokens,
+        notifications,
+      });
     }
   } catch (error) {
     logger.error(
