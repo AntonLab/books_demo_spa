@@ -1,9 +1,6 @@
 import type { FC } from 'react';
 import { Alert, Button, Form } from 'antd';
-import {
-  NO_GENRE,
-  WorkFields,
-} from '@/components/molecules/WorkFields/WorkFields';
+import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import type { PublicGenre } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 
@@ -25,8 +22,9 @@ interface SeriesFormProps {
   error?: string | null;
 }
 
+// Cleared or untouched, Genre is undefined inside the form, like BookForm's.
 interface FieldValues extends Omit<SeriesFormValues, 'genreId'> {
-  genreId: number;
+  genreId?: number | null;
 }
 
 // Presentational, like BookForm: the page that renders it owns the mutation
@@ -44,7 +42,7 @@ export const SeriesForm: FC<SeriesFormProps> = ({
     onSubmit({
       ...rest,
       tags: rest.tags ?? [],
-      genreId: genreId === NO_GENRE ? null : genreId,
+      genreId: genreId ?? null,
     });
   };
 
@@ -59,7 +57,7 @@ export const SeriesForm: FC<SeriesFormProps> = ({
         initialValues={{
           tags: [],
           ...initialValues,
-          genreId: initialValues?.genreId ?? NO_GENRE,
+          genreId: initialValues?.genreId ?? undefined,
         }}
         onFinish={handleFinish}
       >

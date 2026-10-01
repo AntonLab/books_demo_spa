@@ -3,10 +3,6 @@ import { Form, Input, Select } from 'antd';
 import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
 import type { PublicGenre } from 'shared';
 
-// A select cannot hold `null` as an option value and stay clearable, so "No
-// genre" travels as 0 inside the form and becomes null on the way out.
-export const NO_GENRE = 0;
-
 interface Props {
   genreOptions: PublicGenre[];
   // Fields of one kind of work only, placed between the tags and the Genre.
@@ -45,13 +41,12 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
     <Form.Item name="genreId" label="Genre">
       <Select
         aria-label="Genre"
-        options={[
-          { value: NO_GENRE, label: 'No genre' },
-          ...genreOptions.map((genre) => ({
-            value: genre.id,
-            label: genre.name,
-          })),
-        ]}
+        allowClear
+        placeholder="No genre"
+        options={genreOptions.map((genre) => ({
+          value: genre.id,
+          label: genre.name,
+        }))}
       />
     </Form.Item>
   </>

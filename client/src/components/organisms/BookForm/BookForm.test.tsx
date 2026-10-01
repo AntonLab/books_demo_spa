@@ -13,6 +13,12 @@ const genres = [
   { id: 5, name: 'Hard SF' },
 ];
 
+// antd draws the clear icon inside the select that wraps the labelled input.
+const clearSelect = async (label: string) => {
+  const select = screen.getByLabelText(label).closest('.ant-select');
+  await userEvent.click(select!.querySelector('.ant-select-clear')!);
+};
+
 describe('BookForm', () => {
   it('submits what was typed, standalone by default', async () => {
     const onSubmit = jest.fn();
@@ -150,17 +156,19 @@ describe('BookForm', () => {
     );
   });
 
-  it('offers No genre first and submits null for it', async () => {
+  it('shows both placeholders and submits null for an untouched Series and Genre', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
       <BookForm
-        seriesOptions={[]}
+        seriesOptions={series}
         genreOptions={genres}
         submitLabel="Create book"
         onSubmit={onSubmit}
       />
     );
 
+    expect(screen.getByText('No series')).toBeInTheDocument();
+    expect(screen.getByText('No genre')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Title'), 'A Tale of Dragons');
     await userEvent.type(screen.getByLabelText('Description'), 'Long ago.');
     await userEvent.click(screen.getByRole('button', { name: 'Create book' }));
@@ -172,6 +180,75 @@ describe('BookForm', () => {
       seriesId: null,
       genreId: null,
     });
+  });
+
+  it('submits null explicitly for a cleared Series and Genre when editing', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        showStatus
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: ['epic'],
+          seriesId: 7,
+          genreId: 4,
+          status: 'draft',
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await clearSelect('Series');
+    expect(screen.getByText('No series')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenLastCalledWith({
+      title: 'A Tale of Dragons',
+      description: 'Long ago.',
+      tags: ['epic'],
+      seriesId: null,
+      genreId: 4,
+      status: 'draft',
+    });
+
+    await clearSelect('Genre');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ seriesId: null, genreId: null })
+    );
+  });
+
+  it('submits the picked id after a select was cleared', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: [],
+          seriesId: 7,
+          genreId: null,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await clearSelect('Series');
+    await userEvent.click(screen.getByLabelText('Series'));
+    await userEvent.click(await screen.findByText('Letters from Blackmoor'));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ seriesId: 8, genreId: null })
+    );
   });
 
   it('round-trips a chosen genre as its id', async () => {

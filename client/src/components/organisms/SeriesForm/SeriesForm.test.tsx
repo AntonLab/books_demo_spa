@@ -8,6 +8,12 @@ const genres = [
   { id: 5, name: 'Hard SF' },
 ];
 
+// antd draws the clear icon inside the select that wraps the labelled input.
+const clearSelect = async (label: string) => {
+  const select = screen.getByLabelText(label).closest('.ant-select');
+  await userEvent.click(select!.querySelector('.ant-select-clear')!);
+};
+
 describe('SeriesForm', () => {
   it('submits what was typed, with no tags by default', async () => {
     const onSubmit = jest.fn();
@@ -95,7 +101,7 @@ describe('SeriesForm', () => {
     expect(screen.getByText('Validation failed')).toBeInTheDocument();
   });
 
-  it('offers No genre first and submits null for it', async () => {
+  it('shows the Genre placeholder and submits null for an untouched Genre', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
       <SeriesForm
@@ -105,19 +111,44 @@ describe('SeriesForm', () => {
       />
     );
 
+    expect(screen.getByText('No genre')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Title'), 'The Scale Cycle');
-    await userEvent.type(
-      screen.getByLabelText('Description'),
-      'Dragons, in four parts.'
-    );
+    await userEvent.type(screen.getByLabelText('Description'), 'Dragons.');
     await userEvent.click(
       screen.getByRole('button', { name: 'Create series' })
     );
 
     expect(onSubmit).toHaveBeenCalledWith({
       title: 'The Scale Cycle',
-      description: 'Dragons, in four parts.',
+      description: 'Dragons.',
       tags: [],
+      genreId: null,
+    });
+  });
+
+  it('submits null explicitly for a cleared Genre when editing', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <SeriesForm
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'The Scale Cycle',
+          description: 'Dragons.',
+          tags: ['epic'],
+          genreId: 4,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await clearSelect('Genre');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      title: 'The Scale Cycle',
+      description: 'Dragons.',
+      tags: ['epic'],
       genreId: null,
     });
   });

@@ -81,9 +81,12 @@ that read like mistakes and are not.
 
 ## Forms and pickers
 
-- `BookForm` / `SeriesForm`: "No series" and "No genre" travel as `0` inside the
-  form and leave as `null`. Creating omits the status radios: every new book is
-  a draft.
+- `BookForm` / `SeriesForm`: the Series and Genre selects are `allowClear`,
+  with "No series" / "No genre" as placeholders, not options. An empty or
+  cleared select is `undefined` inside the form and leaves as an explicit
+  `null` (the server accepts `null` for both). A stored `null` is seeded as
+  `undefined`, since a select shows its placeholder only for that. Creating
+  omits the status radios: every new book is a draft.
 - `CoAuthorManager`'s picker draws avatars through `optionRender`; the option's
   `label` stays a plain string so antd's tooltip and rc-select's filter still
   work. The last Co-author is never offered Leave.
