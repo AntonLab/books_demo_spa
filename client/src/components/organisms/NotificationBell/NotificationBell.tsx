@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { FC, ReactNode } from 'react';
+import type { CSSProperties, FC, ReactNode } from 'react';
 import { NOTIFICATION_READ_TTL_MS } from 'shared';
 import {
   Badge,
@@ -17,6 +17,7 @@ import {
 import { useNotificationStream } from '@/queries/notificationStream';
 import { formatDateTime } from '@/format/date';
 import type { CreditNotification, PublicNotification } from '@/types/api';
+import { COLLAPSE_MS } from './collapse';
 import styles from './NotificationBell.module.css';
 
 interface NotificationBellProps {
@@ -125,10 +126,6 @@ const describe = (
   }
 };
 
-// Matches the `.leaving` transition, so the row is removed once it has
-// collapsed.
-const COLLAPSE_MS = 200;
-
 const expiresAt = (readAt: string): number =>
   Date.parse(readAt) + NOTIFICATION_READ_TTL_MS;
 
@@ -161,7 +158,12 @@ const NotificationRow: FC<NotificationRowProps> = ({
         setLeaving(true);
         removal = setTimeout(() => onLeave(id), COLLAPSE_MS);
       },
-      Math.max(0, expiresAt(readAt) - Date.now())
+      // readAt is server time: a browser clock behind it would otherwise hold
+      // the row for the TTL plus the skew.
+      Math.min(
+        NOTIFICATION_READ_TTL_MS,
+        Math.max(0, expiresAt(readAt) - Date.now())
+      )
     );
     return () => {
       clearTimeout(collapse);
@@ -179,6 +181,7 @@ const NotificationRow: FC<NotificationRowProps> = ({
         fresh ? styles.fresh : '',
         leaving ? styles.leaving : '',
       ].join(' ')}
+      style={{ '--collapse-ms': `${COLLAPSE_MS}ms` } as CSSProperties}
     >
       <Typography.Paragraph className={styles.text}>
         {describe(item, onFollow)}
@@ -231,6 +234,13 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
   });
 
   const items = notifications.data?.items ?? [];
+  // Ids the server has purged are forgotten, so the set cannot grow for ever.
+  // Adjusted during render: it settles at once, as a pruned set has nothing
+  // left to prune.
+  const listed = new Set(items.map((item) => item.id));
+  if ([...dismissed].some((id) => !listed.has(id))) {
+    setDismissed(new Set([...dismissed].filter((id) => listed.has(id))));
+  }
   const unread = notifications.data?.unread ?? 0;
 
   const handleOpenChange = (next: boolean) => {

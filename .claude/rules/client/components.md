@@ -120,7 +120,8 @@ that read like mistakes and are not.
   `notification-<id>`, so a merged New chapter updates its toast. `AppHeader`
   keys it by the Account, so an Account switch drops the old toasts. A read
   row leaves the open popover when `readAt` plus `NOTIFICATION_READ_TTL_MS`
-  passes: a per-row timer collapses it, then drops it. Rows already expired in
+  passes: a per-row timer collapses it, then drops it, waiting at most the TTL
+  so a browser clock behind the server cannot hold a row longer. Rows already expired in
   a stale cache are filtered at render. The Popover is `destroyOnHidden`:
   antd keeps hidden content mounted otherwise, and the row timers would keep
   running.

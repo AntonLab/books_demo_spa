@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { NOTIFICATION_READ_TTL_MS, NOTIFICATION_STREAM_EVENT } from 'shared';
 import { NotificationBell } from './NotificationBell';
+import { COLLAPSE_MS } from './collapse';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
@@ -332,8 +333,6 @@ describe('NotificationBell', () => {
 });
 
 const NOW = Date.parse('2026-09-26T12:00:00.000Z');
-// Mirrors the row's collapse; jsdom runs no transition.
-const COLLAPSE_MS = 200;
 const readAgo = (ms: number) => new Date(NOW - ms).toISOString();
 
 describe('NotificationBell read expiry', () => {
@@ -447,6 +446,78 @@ describe('NotificationBell read expiry', () => {
 
     expect(
       screen.getByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('drops a row whose readAt is ahead of the browser clock within the TTL', async () => {
+    // A browser clock behind the server must not keep the row up to TTL + skew.
+    await openBell([notification({ id: 1, readAt: readAgo(-30_000) })]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(NOTIFICATION_READ_TTL_MS + COLLAPSE_MS);
+    });
+
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+  });
+
+  it('forgets a dismissed row once the list no longer holds it', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(1_000 + COLLAPSE_MS);
+    });
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+
+    // A push only triggers a refetch; its toast names another book so it never
+    // matches the row under test.
+    const refetch = () =>
+      push(
+        newChapter({
+          id: 99,
+          work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+        })
+      );
+
+    // Still listed after a refetch: stays hidden.
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([
+        notification({
+          id: 1,
+          readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+        }),
+      ])
+    );
+    refetch();
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+
+    // Purged by the server, then listed again under the same id: shows.
+    mockedNotifications.listNotifications.mockResolvedValue(page([]));
+    refetch();
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(3)
+    );
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([notification({ id: 1 })])
+    );
+    refetch();
+
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
     ).toBeInTheDocument();
   });
 

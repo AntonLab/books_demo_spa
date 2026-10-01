@@ -11,10 +11,12 @@
   border-radius: var(--ant-border-radius-sm);
   /* A start value for the collapse: room for a three-line row. */
   max-height: calc(var(--ant-control-height-lg) * 4);
+  /* --collapse-ms is set on the row from COLLAPSE_MS, which also times its
+     removal. */
   transition:
-    opacity var(--ant-motion-duration-mid),
-    max-height var(--ant-motion-duration-mid),
-    padding var(--ant-motion-duration-mid);
+    opacity var(--collapse-ms),
+    max-height var(--collapse-ms),
+    padding var(--collapse-ms);
 }
 
 .leaving {
