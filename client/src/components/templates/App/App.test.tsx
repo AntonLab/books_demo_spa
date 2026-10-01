@@ -177,11 +177,11 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows "Could not load this book." at the old /books/new bookmark without asking the server', async () => {
+  it('shows "This book no longer exists." at the old /books/new bookmark without asking the server', async () => {
     renderWithProviders(<AppShell />, { route: '/books/new' });
 
     expect(
-      await screen.findByText('Could not load this book.')
+      await screen.findByText('This book no longer exists.')
     ).toBeInTheDocument();
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });

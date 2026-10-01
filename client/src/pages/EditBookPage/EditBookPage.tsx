@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Divider,
+  Empty,
   Flex,
   Popconfirm,
   Skeleton,
@@ -28,7 +29,7 @@ export const EditBookPage: FC = () => {
   return Number.isInteger(bookId) && bookId > 0 ? (
     <EditBookView bookId={bookId} />
   ) : (
-    <Alert type="error" title="Could not load this book." />
+    <Empty description="This book no longer exists." />
   );
 };
 
@@ -112,7 +113,7 @@ const EditBookView: FC<{ bookId: number }> = ({ bookId }) => {
 
       <Divider />
 
-      <Space direction="vertical">
+      <Space orientation="vertical">
         {remove.error && <Alert type="error" title={remove.error.message} />}
         <Popconfirm
           title="Delete this book?"

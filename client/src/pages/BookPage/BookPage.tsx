@@ -41,7 +41,7 @@ export const BookPage: FC = () => {
   return Number.isInteger(bookId) && bookId > 0 ? (
     <BookView bookId={bookId} />
   ) : (
-    <Alert type="error" title="Could not load this book." />
+    <Empty description="This book no longer exists." />
   );
 };
 

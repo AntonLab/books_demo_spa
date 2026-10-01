@@ -203,7 +203,7 @@ describe('EditBookPage', () => {
     renderPage(account({}), undefined, '/books/new/edit');
 
     expect(
-      await screen.findByText('Could not load this book.')
+      await screen.findByText('This book no longer exists.')
     ).toBeInTheDocument();
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
