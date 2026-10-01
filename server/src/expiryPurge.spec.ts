@@ -121,6 +121,18 @@ test('a failed Notification purge is logged at error and does not reject', async
   ]);
 });
 
+test('a failed session purge does not skip the other purges', async (t) => {
+  const { deps, lines, resetCutoffs, notificationCutoffs } = fakes(t, {
+    failure: new Error('connection lost'),
+  });
+
+  await purgeExpiredRows(deps);
+
+  assert.equal(resetCutoffs.length, 1);
+  assert.equal(notificationCutoffs.length, 1);
+  assert.equal(lines.length, 1);
+});
+
 test('logs nothing when nothing had expired', async (t) => {
   const { deps, lines } = fakes(t);
 

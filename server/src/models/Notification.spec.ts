@@ -93,14 +93,13 @@ test('the recipient cascades, and each work link is nulled when its work is dele
   );
 });
 
-test('a recipient’s notifications are indexed by when they were read', () => {
+test('notifications are indexed by recipient and read time, and by read time alone for the purge', () => {
   assert.deepEqual(
-    Notification.options.indexes?.map((index) => index.fields),
-    [['userId', 'readAt']]
-  );
-  assert.equal(
-    Notification.options.indexes?.[0]?.name,
-    'notifications_user_id_read_at'
+    Notification.options.indexes?.map((index) => [index.name, index.fields]),
+    [
+      ['notifications_user_id_read_at', ['userId', 'readAt']],
+      ['notifications_read_at', ['readAt']],
+    ]
   );
 });
 

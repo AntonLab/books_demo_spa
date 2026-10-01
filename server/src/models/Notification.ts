@@ -143,6 +143,12 @@ export function initNotificationModel(
           name: 'notifications_user_id_read_at',
           fields: ['userId', 'readAt'],
         },
+        // The hourly expiry purge deletes by readAt alone, which the index
+        // above cannot serve: its leading column is userId.
+        {
+          name: 'notifications_read_at',
+          fields: ['readAt'],
+        },
       ],
     }
   );
