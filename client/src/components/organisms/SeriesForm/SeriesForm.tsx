@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Alert, Button, Form } from 'antd';
+import type { FormInstance } from 'antd';
 import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import type { PublicGenre } from 'shared';
 import spacing from '@/theme/spacing.module.css';
@@ -16,6 +17,9 @@ interface SeriesFormProps {
   submitLabel: string;
   onSubmit: (values: SeriesFormValues) => void;
   initialValues?: SeriesFormValues;
+  // A caller that needs the form's state, such as a modal asking before it
+  // discards typed input, passes its own instance.
+  form?: FormInstance<SeriesFieldValues>;
   isSubmitting?: boolean;
   // A server refusal, shown above the fields. The form keeps its values while
   // it is on screen, because antd's Form holds them rather than the caller.
@@ -23,7 +27,7 @@ interface SeriesFormProps {
 }
 
 // Cleared or untouched, Genre is undefined inside the form, like BookForm's.
-interface FieldValues extends Omit<SeriesFormValues, 'genreId'> {
+export interface SeriesFieldValues extends Omit<SeriesFormValues, 'genreId'> {
   genreId?: number | null;
 }
 
@@ -35,10 +39,11 @@ export const SeriesForm: FC<SeriesFormProps> = ({
   submitLabel,
   onSubmit,
   initialValues,
+  form,
   isSubmitting = false,
   error = null,
 }) => {
-  const handleFinish = ({ genreId, ...rest }: FieldValues) => {
+  const handleFinish = ({ genreId, ...rest }: SeriesFieldValues) => {
     onSubmit({
       ...rest,
       tags: rest.tags ?? [],
@@ -52,7 +57,8 @@ export const SeriesForm: FC<SeriesFormProps> = ({
         <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
-      <Form<FieldValues>
+      <Form<SeriesFieldValues>
+        form={form}
         layout="vertical"
         initialValues={{
           tags: [],

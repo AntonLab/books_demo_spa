@@ -1,6 +1,10 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Form } from 'antd';
+import type { FormInstance } from 'antd';
+import type { FC } from 'react';
 import { BookForm } from './BookForm';
+import type { BookFieldValues } from './BookForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const series = [
@@ -20,6 +24,29 @@ const clearSelect = async (label: string) => {
 };
 
 describe('BookForm', () => {
+  it('fills the form instance it is given, so a caller can read its state', async () => {
+    let captured: FormInstance<BookFieldValues> | undefined;
+    const Harness: FC = () => {
+      const [form] = Form.useForm<BookFieldValues>();
+      captured = form;
+      return (
+        <BookForm
+          form={form}
+          seriesOptions={[]}
+          genreOptions={[]}
+          submitLabel="Create book"
+          onSubmit={jest.fn()}
+        />
+      );
+    };
+    renderWithProviders(<Harness />);
+    expect(captured?.isFieldsTouched()).toBe(false);
+
+    await userEvent.type(screen.getByLabelText('Title'), 'x');
+
+    expect(captured?.isFieldsTouched()).toBe(true);
+  });
+
   it('submits what was typed, standalone by default', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(

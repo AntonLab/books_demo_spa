@@ -1,6 +1,10 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Form } from 'antd';
+import type { FormInstance } from 'antd';
+import type { FC } from 'react';
 import { SeriesForm } from './SeriesForm';
+import type { SeriesFieldValues } from './SeriesForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const genres = [
@@ -15,6 +19,28 @@ const clearSelect = async (label: string) => {
 };
 
 describe('SeriesForm', () => {
+  it('fills the form instance it is given, so a caller can read its state', async () => {
+    let captured: FormInstance<SeriesFieldValues> | undefined;
+    const Harness: FC = () => {
+      const [form] = Form.useForm<SeriesFieldValues>();
+      captured = form;
+      return (
+        <SeriesForm
+          form={form}
+          genreOptions={[]}
+          submitLabel="Create series"
+          onSubmit={jest.fn()}
+        />
+      );
+    };
+    renderWithProviders(<Harness />);
+    expect(captured?.isFieldsTouched()).toBe(false);
+
+    await userEvent.type(screen.getByLabelText('Title'), 'x');
+
+    expect(captured?.isFieldsTouched()).toBe(true);
+  });
+
   it('submits what was typed, with no tags by default', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(

@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Alert, Button, Form, Radio, Select } from 'antd';
+import type { FormInstance } from 'antd';
 import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import { BOOK_STATUSES } from 'shared';
 import { BOOK_STATUS_LABELS } from '@/types/book';
@@ -22,6 +23,9 @@ interface BookFormProps {
   submitLabel: string;
   onSubmit: (values: BookFormValues) => void;
   initialValues?: BookFormValues;
+  // A caller that needs the form's state, such as a modal asking before it
+  // discards typed input, passes its own instance.
+  form?: FormInstance<BookFieldValues>;
   // Off when creating: the server makes every new book a draft whatever the
   // body says, so offering a choice there would only be ignored.
   showStatus?: boolean;
@@ -33,7 +37,10 @@ interface BookFormProps {
 
 // A cleared or untouched select is undefined inside the form; it leaves as an
 // explicit null, so an edit can unset it.
-interface FieldValues extends Omit<BookFormValues, 'seriesId' | 'genreId'> {
+export interface BookFieldValues extends Omit<
+  BookFormValues,
+  'seriesId' | 'genreId'
+> {
   seriesId?: number | null;
   genreId?: number | null;
 }
@@ -47,6 +54,7 @@ export const BookForm: FC<BookFormProps> = ({
   submitLabel,
   onSubmit,
   initialValues,
+  form,
   showStatus = false,
   isSubmitting = false,
   error = null,
@@ -56,7 +64,7 @@ export const BookForm: FC<BookFormProps> = ({
     genreId,
     status,
     ...rest
-  }: FieldValues) => {
+  }: BookFieldValues) => {
     onSubmit({
       ...rest,
       tags: rest.tags ?? [],
@@ -72,7 +80,8 @@ export const BookForm: FC<BookFormProps> = ({
         <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
-      <Form<FieldValues>
+      <Form<BookFieldValues>
+        form={form}
         layout="vertical"
         initialValues={{
           tags: [],
