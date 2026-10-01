@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Alert, Form, Skeleton, message } from 'antd';
+import { Alert, App, Form, Skeleton } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { BookForm } from '@/components/organisms/BookForm/BookForm';
 import type {
@@ -24,6 +24,7 @@ export const BookEditDetailsModal: FC<BookEditDetailsModalProps> = ({
   bookId,
   onClose,
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm<BookFieldValues>();
   const { data: session } = useSession();
   const { data: book, isPending, isError } = useBook(bookId);

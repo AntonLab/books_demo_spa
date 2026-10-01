@@ -1,3 +1,4 @@
+import { App as AntdApp } from 'antd';
 import { render, renderHook } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
@@ -60,15 +61,22 @@ const setUpProviders = ({
       <QueryClientProvider client={queryClient}>
         <Provider store={store}>
           <ThemedConfigProvider zeroRuntime>
-            <MemoryRouter initialEntries={[route]}>
-              {path ? (
-                <Routes>
-                  <Route path={path} element={children} />
-                </Routes>
-              ) : (
-                children
-              )}
-            </MemoryRouter>
+            {/* Same as App: toasts come from App.useApp(). Its holder
+                unmounts with the render, so no toast outlives a test.
+                `component={false}` skips the wrapper div, which would
+                break `container` being empty for a component that renders
+                nothing. */}
+            <AntdApp component={false}>
+              <MemoryRouter initialEntries={[route]}>
+                {path ? (
+                  <Routes>
+                    <Route path={path} element={children} />
+                  </Routes>
+                ) : (
+                  children
+                )}
+              </MemoryRouter>
+            </AntdApp>
           </ThemedConfigProvider>
         </Provider>
       </QueryClientProvider>

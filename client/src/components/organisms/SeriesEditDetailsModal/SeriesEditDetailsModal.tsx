@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Alert, Form, Skeleton, message } from 'antd';
+import { Alert, App, Form, Skeleton } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import type {
@@ -23,6 +23,7 @@ export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
   seriesId,
   onClose,
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm<SeriesFieldValues>();
   const { data: session } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);

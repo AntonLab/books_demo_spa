@@ -1,6 +1,5 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { message } from 'antd';
 import { Route, Routes } from 'react-router';
 import { MyBooksPanel } from './MyBooksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -113,9 +112,6 @@ const renderPage = () => {
     { route: '/my-books', queryClient }
   );
 };
-
-// The static message API outlives a test's DOM, so a toast would leak into the next test. Wrapped in act because destroy updates mounted toast state.
-afterEach(() => act(() => message.destroy()));
 
 beforeEach(() => {
   jest.resetAllMocks();

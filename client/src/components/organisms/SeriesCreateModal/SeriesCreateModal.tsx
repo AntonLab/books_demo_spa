@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Form, message } from 'antd';
+import { App, Form } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import type { SeriesFieldValues } from '@/components/organisms/SeriesForm/SeriesForm';
@@ -12,6 +12,7 @@ interface SeriesCreateModalProps {
 
 // Mounted only while open, so each opening starts with an empty form.
 export const SeriesCreateModal: FC<SeriesCreateModalProps> = ({ onClose }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm<SeriesFieldValues>();
   const genres = useGenres();
   const create = useCreateSeries();

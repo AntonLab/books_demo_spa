@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Form, message } from 'antd';
+import { App, Form } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { BookForm } from '@/components/organisms/BookForm/BookForm';
 import type {
@@ -21,6 +21,7 @@ export const BookCreateModal: FC<BookCreateModalProps> = ({
   authorId,
   onClose,
 }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm<BookFieldValues>();
   const series = useMySeries(authorId);
   const genres = useGenres();

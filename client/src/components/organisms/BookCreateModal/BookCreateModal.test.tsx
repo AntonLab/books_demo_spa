@@ -1,6 +1,5 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { message } from 'antd';
 import { BookCreateModal } from './BookCreateModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
@@ -60,9 +59,6 @@ beforeEach(() => {
   });
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
 });
-
-// The static message API outlives a test's DOM, so a toast would leak into the next test. Wrapped in act because destroy updates mounted toast state.
-afterEach(() => act(() => message.destroy()));
 
 describe('BookCreateModal', () => {
   it('creates the book with explicit nulls, closes and announces it', async () => {

@@ -58,7 +58,7 @@ export const MyBooksPanel: FC<Props> = ({ authorId }) => {
         rowKey="id"
         itemRender={(entry) => (
           <Flex justify="space-between" align="center" gap="small">
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Link to={`/series/${entry.id}/edit`}>{entry.title}</Link>
               <Typography.Text type="secondary">
                 {entry.authors
