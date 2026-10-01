@@ -1,0 +1,5 @@
+/* antd fades the clear icon in on hover only; it is rendered only while the
+   select has a value, so showing it always is safe. */
+.select :global(.ant-select-clear) {
+  opacity: 1;
+}

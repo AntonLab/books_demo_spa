@@ -9,7 +9,7 @@ const newChapter: NewChapterNotification = {
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   chapter: { id: 70, title: 'The Tide Bell' },
   chapterCount: 1,
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-26T10:00:00.000Z',
 };
 

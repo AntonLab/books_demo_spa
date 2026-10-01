@@ -1,8 +1,9 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
-import { NOTIFICATION_STREAM_EVENT } from 'shared';
+import { NOTIFICATION_READ_TTL_MS, NOTIFICATION_STREAM_EVENT } from 'shared';
 import { NotificationBell } from './NotificationBell';
+import { COLLAPSE_MS } from './collapse';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
 import * as notificationsApi from '@/api/notifications';
@@ -25,7 +26,7 @@ const notification = (
   kind: 'co_author_added',
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   actor: { kind: 'co_author', name: 'Margaret Hale' },
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-12T10:00:00.000Z',
   ...overrides,
 });
@@ -38,7 +39,7 @@ const newChapter = (
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   chapter: { id: 70, title: 'The Tide Bell' },
   chapterCount: 1,
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
@@ -50,7 +51,7 @@ const newBook = (
   kind: 'new_book',
   work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
   series: { id: 4, title: 'The Nightbus Files' },
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
@@ -58,7 +59,7 @@ const newBook = (
 const page = (items: PublicNotification[]) => ({
   items,
   total: items.length,
-  unread: items.filter((item) => !item.isRead).length,
+  unread: items.filter((item) => item.readAt === null).length,
   limit: 20,
   offset: 0,
 });
@@ -83,7 +84,7 @@ describe('NotificationBell', () => {
       page([
         notification({ id: 1 }),
         notification({ id: 2 }),
-        notification({ id: 3, isRead: true }),
+        notification({ id: 3, readAt: '2026-09-26T10:00:00.000Z' }),
       ])
     );
     renderWithProviders(<NotificationBell userId={3} />);
@@ -95,7 +96,7 @@ describe('NotificationBell', () => {
 
   it('says nothing is unread when nothing is', async () => {
     mockedNotifications.listNotifications.mockResolvedValue(
-      page([notification({ isRead: true })])
+      page([notification({ readAt: '2026-09-26T10:00:00.000Z' })])
     );
     renderWithProviders(<NotificationBell userId={3} />);
 
@@ -193,15 +194,15 @@ describe('NotificationBell', () => {
       .mockResolvedValueOnce(
         page([
           notification({ id: 1 }),
-          notification({ id: 2, isRead: true }),
+          notification({ id: 2, readAt: '2026-09-26T10:00:00.000Z' }),
           notification({ id: 3 }),
         ])
       )
       .mockResolvedValue(
         page([
-          notification({ id: 1, isRead: true }),
-          notification({ id: 2, isRead: true }),
-          notification({ id: 3, isRead: true }),
+          notification({ id: 1, readAt: '2026-09-26T10:00:00.000Z' }),
+          notification({ id: 2, readAt: '2026-09-26T10:00:00.000Z' }),
+          notification({ id: 3, readAt: '2026-09-26T10:00:00.000Z' }),
         ])
       );
     renderWithProviders(<NotificationBell userId={3} />);
@@ -221,8 +222,9 @@ describe('NotificationBell', () => {
   });
 
   it('asks the server to mark nothing when everything is already read', async () => {
+    // Read just now: a row read over a minute ago is no longer shown.
     mockedNotifications.listNotifications.mockResolvedValue(
-      page([notification({ isRead: true })])
+      page([notification({ readAt: new Date().toISOString() })])
     );
     renderWithProviders(<NotificationBell userId={3} />);
 
@@ -327,6 +329,213 @@ describe('NotificationBell', () => {
     expect(
       await screen.findByText(formatDateTime('2026-09-12T10:00:00.000Z'))
     ).toBeInTheDocument();
+  });
+});
+
+const NOW = Date.parse('2026-09-26T12:00:00.000Z');
+const readAgo = (ms: number) => new Date(NOW - ms).toISOString();
+
+describe('NotificationBell read expiry', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const openBell = async (items: PublicNotification[]) => {
+    mockedNotifications.listNotifications.mockResolvedValue(page(items));
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderWithProviders(<NotificationBell userId={3} />);
+    await user.click(
+      await screen.findByRole('button', { name: /^Notifications/ })
+    );
+    return user;
+  };
+
+  it('drops a read row once readAt plus the TTL passes, and keeps the others', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+      notification({
+        id: 2,
+        work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(10_000 + COLLAPSE_MS);
+    });
+
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+    expect(
+      screen.getByText('Salt and Candlelight', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a read row until the TTL, not a moment before', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(9_999);
+    });
+
+    expect(
+      screen.getByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('does not show a row that expired in the cache before the popover opened', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS + 5_000),
+      }),
+    ]);
+
+    expect(
+      await screen.findByText('No notifications yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+  });
+
+  it('shows the empty state once the last row has gone', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1_000 + COLLAPSE_MS);
+    });
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+  });
+
+  it('never drops an unread row, however long the popover stays open', async () => {
+    await openBell([notification({ id: 1 })]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(10 * NOTIFICATION_READ_TTL_MS);
+    });
+
+    expect(
+      screen.getByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('drops a row whose readAt is ahead of the browser clock within the TTL', async () => {
+    // A browser clock behind the server must not keep the row up to TTL + skew.
+    await openBell([notification({ id: 1, readAt: readAgo(-30_000) })]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(NOTIFICATION_READ_TTL_MS + COLLAPSE_MS);
+    });
+
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+  });
+
+  it('forgets a dismissed row once the list no longer holds it', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(1_000 + COLLAPSE_MS);
+    });
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+
+    // A push only triggers a refetch; its toast names another book so it never
+    // matches the row under test.
+    const refetch = () =>
+      push(
+        newChapter({
+          id: 99,
+          work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+        })
+      );
+
+    // Still listed after a refetch: stays hidden.
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([
+        notification({
+          id: 1,
+          readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+        }),
+      ])
+    );
+    refetch();
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(2)
+    );
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+
+    // Purged by the server, then listed again under the same id: shows.
+    mockedNotifications.listNotifications.mockResolvedValue(page([]));
+    refetch();
+    await waitFor(() =>
+      expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(3)
+    );
+    mockedNotifications.listNotifications.mockResolvedValue(
+      page([notification({ id: 1 })])
+    );
+    refetch();
+
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('clears the row timers when the popover closes', async () => {
+    const user = await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+    const whileOpen = jest.getTimerCount();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(jest.getTimerCount()).toBeLessThan(whileOpen));
   });
 });
 

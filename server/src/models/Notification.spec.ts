@@ -68,8 +68,9 @@ test('an announcement keeps its chapter link and count, and the titles as they w
   );
 });
 
-test('a notification starts unread, and keeps createdAt alone', () => {
-  assert.match(createTableSql, /`isRead` TINYINT\(1\) NOT NULL DEFAULT false/);
+test('a notification starts unread (null readAt), and keeps createdAt alone', () => {
+  assert.match(createTableSql, /`readAt` DATETIME,/);
+  assert.doesNotMatch(createTableSql, /isRead/);
   assert.match(createTableSql, /`createdAt` DATETIME NOT NULL/);
   assert.doesNotMatch(createTableSql, /updatedAt/);
 });
@@ -92,10 +93,13 @@ test('the recipient cascades, and each work link is nulled when its work is dele
   );
 });
 
-test('a recipient’s unread notifications are indexed', () => {
+test('notifications are indexed by recipient and read time, and by read time alone for the purge', () => {
   assert.deepEqual(
-    Notification.options.indexes?.map((index) => index.fields),
-    [['userId', 'isRead']]
+    Notification.options.indexes?.map((index) => [index.name, index.fields]),
+    [
+      ['notifications_user_id_read_at', ['userId', 'readAt']],
+      ['notifications_read_at', ['readAt']],
+    ]
   );
 });
 
@@ -111,7 +115,7 @@ test('toPublicNotification nests the work and the actor, with the link of whiche
     workTitle: 'The Glass Harbour',
     actorKind: 'co_author',
     actorName: 'Margaret Hale',
-    isRead: false,
+    readAt: null,
     createdAt,
   });
 
@@ -120,7 +124,7 @@ test('toPublicNotification nests the work and the actor, with the link of whiche
     kind: 'co_author_added',
     work: { type: 'book', id: 7, title: 'The Glass Harbour' },
     actor: { kind: 'co_author', name: 'Margaret Hale' },
-    isRead: false,
+    readAt: null,
     createdAt,
   });
 
@@ -132,9 +136,13 @@ test('toPublicNotification nests the work and the actor, with the link of whiche
     workTitle: 'Letters from Blackmoor',
     actorKind: 'moderator',
     actorName: null,
-    isRead: true,
+    readAt: new Date('2026-09-13T10:05:00.000Z'),
     createdAt,
   });
+  assert.deepEqual(
+    toPublicNotification(deletedSeries).readAt,
+    new Date('2026-09-13T10:05:00.000Z')
+  );
   assert.deepEqual(toPublicNotification(deletedSeries).work, {
     type: 'series',
     id: null,
@@ -157,7 +165,7 @@ test('a New chapter names the book, the first new chapter and how many there are
     chapterId: 70,
     chapterTitle: 'The Tide Bell',
     chapterCount: 2,
-    isRead: false,
+    readAt: null,
     createdAt,
   });
 
@@ -167,7 +175,7 @@ test('a New chapter names the book, the first new chapter and how many there are
     work: { type: 'book', id: 7, title: 'The Glass Harbour' },
     chapter: { id: 70, title: 'The Tide Bell' },
     chapterCount: 2,
-    isRead: false,
+    readAt: null,
     createdAt,
   });
 });
@@ -202,7 +210,7 @@ test('a New book names the book and its series', () => {
     seriesId: 4,
     workTitle: 'The Nightbus Returns',
     seriesTitle: 'The Nightbus Files',
-    isRead: true,
+    readAt: createdAt,
     createdAt,
   });
 
@@ -211,7 +219,7 @@ test('a New book names the book and its series', () => {
     kind: 'new_book',
     work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
     series: { id: 4, title: 'The Nightbus Files' },
-    isRead: true,
+    readAt: createdAt,
     createdAt,
   });
 });

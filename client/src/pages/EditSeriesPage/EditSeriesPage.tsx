@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
   Button,
   Divider,
+  Empty,
+  Flex,
   Popconfirm,
   Skeleton,
   Space,
@@ -10,22 +13,28 @@ import {
 } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
-import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
+import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
-import { useGenres } from '@/queries/genres';
-import { useDeleteSeries, useSeries, useUpdateSeries } from '@/queries/series';
-import spacing from '@/theme/spacing.module.css';
+import { useDeleteSeries, useSeries } from '@/queries/series';
 
 export const EditSeriesPage: FC = () => {
-  const navigate = useNavigate();
   const seriesId = Number(useParams().id);
+  // Not an id the server could answer for, so it is not asked.
+  return Number.isInteger(seriesId) && seriesId > 0 ? (
+    <EditSeriesView seriesId={seriesId} />
+  ) : (
+    <Empty description="This series no longer exists." />
+  );
+};
+
+const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
+  const navigate = useNavigate();
 
   const { data: session } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);
-  const genres = useGenres();
-  const update = useUpdateSeries(seriesId);
+  const [editing, setEditing] = useState(false);
   const remove = useDeleteSeries(seriesId);
 
   if (isError) {
@@ -51,27 +60,18 @@ export const EditSeriesPage: FC = () => {
 
   return (
     <>
-      <Typography.Title level={2}>Edit series</Typography.Title>
-
-      {update.isSuccess && (
-        <Alert type="success" title="Saved." className={spacing.gapBelow} />
+      <Flex justify="space-between" align="center">
+        <Typography.Title level={2}>
+          Manage series: {series.title}
+        </Typography.Title>
+        <Button onClick={() => setEditing(true)}>Edit details</Button>
+      </Flex>
+      {editing && (
+        <SeriesEditDetailsModal
+          seriesId={seriesId}
+          onClose={() => setEditing(false)}
+        />
       )}
-      <SeriesForm
-        // Keyed by the last save, so the fields reset to what the server
-        // stored rather than keeping a stale copy of the loaded series.
-        key={series.updatedAt}
-        genreOptions={genres.data?.items ?? []}
-        submitLabel="Save"
-        initialValues={{
-          title: series.title,
-          description: series.description,
-          tags: series.tags,
-          genreId: series.genre?.id ?? null,
-        }}
-        isSubmitting={update.isPending}
-        error={update.error?.message ?? null}
-        onSubmit={(values) => update.mutate(values)}
-      />
 
       <Divider />
 
@@ -93,7 +93,7 @@ export const EditSeriesPage: FC = () => {
 
       <Divider />
 
-      <Space direction="vertical">
+      <Space orientation="vertical">
         {remove.error && <Alert type="error" title={remove.error.message} />}
         <Popconfirm
           title="Delete this series?"

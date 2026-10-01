@@ -21,7 +21,7 @@ import { Chapter } from '../models/Chapter.ts';
 import { Notification } from '../models/Notification.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
-import type { PublicNotification } from 'shared';
+import { NOTIFICATION_READ_TTL_MS, type PublicNotification } from 'shared';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import {
@@ -91,7 +91,7 @@ describe('notifications against real MySQL', { skip }, () => {
       seriesId: row.seriesId ?? null,
       actorKind: row.actorKind,
       actorName: row.actorName ?? null,
-      isRead: row.isRead,
+      readAt: row.readAt ?? null,
     }));
 
   // The same events on both kinds of work, through each kind's repository.
@@ -249,7 +249,7 @@ describe('notifications against real MySQL', { skip }, () => {
           ...work.link(id),
           actorKind: 'co_author',
           actorName: 'Ann Writer',
-          isRead: false,
+          readAt: null,
         },
       ]);
       assert.deepEqual(await inbox(ann.id), []);
@@ -307,7 +307,7 @@ describe('notifications against real MySQL', { skip }, () => {
           ...work.link(null),
           actorKind: 'co_author',
           actorName: 'Ben Writer',
-          isRead: false,
+          readAt: null,
         },
       ]);
       assert.deepEqual(await inbox(ben.id), []);
@@ -391,7 +391,7 @@ describe('notifications against real MySQL', { skip }, () => {
         seriesId: sharedSeries,
         actorKind: 'deleted_account',
         actorName: null,
-        isRead: false,
+        readAt: null,
       },
       {
         kind: 'co_author_account_deleted',
@@ -401,7 +401,7 @@ describe('notifications against real MySQL', { skip }, () => {
         seriesId: null,
         actorKind: 'deleted_account',
         actorName: null,
-        isRead: false,
+        readAt: null,
       },
     ]);
     // The work Ann alone was credited on went with her, and told nobody.
@@ -473,15 +473,96 @@ describe('notifications against real MySQL', { skip }, () => {
     // Cleo's id alongside Ben's own: only Ben's is his to mark.
     assert.equal(await notifications.markRead(ben.id, [bens.id, cleos.id]), 0);
 
-    assert.equal(
+    assert.ok(
       (await notifications.list(ben.id, { limit: 20, offset: 0 })).items[0]
-        ?.isRead,
-      true
+        ?.readAt instanceof Date
     );
     assert.equal(
       (await notifications.list(cleo.id, { limit: 20, offset: 0 })).unread,
       1
     );
+  });
+
+  test('marking read stamps readAt on unread rows and leaves an earlier readAt alone', async () => {
+    const id = await works.series.create('Stamped', ann.id);
+    await series.addCoAuthor(id, ben.id, ann);
+    const earlier = new Date('2026-09-01T10:00:00.000Z');
+    const [row] = await Notification.findAll({ where: { userId: ben.id } });
+    assert.ok(row);
+    assert.equal(row.readAt, null);
+    const before = Date.now();
+
+    assert.equal(await notifications.markRead(ben.id, [row.id]), 0);
+    // Read off reload()'s result: the null assertion above narrowed row.readAt.
+    const { readAt: stamped } = await row.reload();
+    assert.ok(stamped && stamped.getTime() >= before - 1000);
+
+    await Notification.update({ readAt: earlier }, { where: { id: row.id } });
+    assert.equal(await notifications.markRead(ben.id, [row.id]), 0);
+    await row.reload();
+    assert.deepEqual(row.readAt, earlier);
+  });
+
+  test('list hides a notification read more than a minute ago, and total and unread agree', async () => {
+    const a = await works.series.create('Fresh', ann.id);
+    await series.addCoAuthor(a, ben.id, ann);
+    const b = await works.series.create('Just read', ann.id);
+    await series.addCoAuthor(b, ben.id, ann);
+    const c = await works.series.create('Long read', ann.id);
+    await series.addCoAuthor(c, ben.id, ann);
+    const rows = await Notification.findAll({
+      where: { userId: ben.id },
+      order: [['id', 'ASC']],
+    });
+    const [fresh, justRead, longRead] = rows;
+    assert.ok(fresh && justRead && longRead);
+    const now = Date.now();
+    await justRead.update({
+      readAt: new Date(now - NOTIFICATION_READ_TTL_MS + 5_000),
+    });
+    await longRead.update({
+      readAt: new Date(now - NOTIFICATION_READ_TTL_MS - 5_000),
+    });
+
+    const page = await notifications.list(ben.id, { limit: 20, offset: 0 });
+
+    assert.deepEqual(
+      page.items.map((item) => item.work.title),
+      ['Just read', 'Fresh']
+    );
+    assert.equal(page.total, 2);
+    assert.equal(page.unread, 1);
+    const paged = await notifications.list(ben.id, { limit: 1, offset: 1 });
+    assert.deepEqual(
+      paged.items.map((item) => item.work.title),
+      ['Fresh']
+    );
+    assert.equal(paged.total, 2);
+  });
+
+  test('deleteReadBefore removes only rows read before the cutoff, across accounts, and counts them', async () => {
+    const id = await works.series.create('Purged', ann.id);
+    await series.addCoAuthor(id, ben.id, ann);
+    await series.addCoAuthor(id, cleo.id, ann);
+    const cutoff = new Date('2026-09-20T12:00:00.000Z');
+    const [bens] = await Notification.findAll({ where: { userId: ben.id } });
+    const [cleos] = await Notification.findAll({ where: { userId: cleo.id } });
+    assert.ok(bens && cleos);
+    await bens.update({ readAt: new Date(cutoff.getTime() - 1) });
+    await cleos.update({ readAt: cutoff });
+    const other = await works.series.create('Still unread', ann.id);
+    await series.addCoAuthor(other, ben.id, ann);
+
+    assert.equal(await notifications.deleteReadBefore(cutoff), 1);
+
+    assert.equal(await Notification.count({ where: { id: bens.id } }), 0);
+    assert.equal(await Notification.count({ where: { id: cleos.id } }), 1);
+    // An unread row has a null readAt and is never purged.
+    assert.equal(
+      await Notification.count({ where: { userId: ben.id, readAt: null } }),
+      1
+    );
+    assert.equal(await notifications.deleteReadBefore(cutoff), 0);
   });
 
   test('a new account has email notifications on', async () => {

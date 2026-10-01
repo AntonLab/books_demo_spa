@@ -1,6 +1,11 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Form } from 'antd';
+import type { FormInstance } from 'antd';
+import type { FC } from 'react';
 import { SeriesForm } from './SeriesForm';
+import type { SeriesFieldValues } from './SeriesForm';
+import { clearSelect } from '@/test/clearSelect';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const genres = [
@@ -9,6 +14,28 @@ const genres = [
 ];
 
 describe('SeriesForm', () => {
+  it('fills the form instance it is given, so a caller can read its state', async () => {
+    let captured: FormInstance<SeriesFieldValues> | undefined;
+    const Harness: FC = () => {
+      const [form] = Form.useForm<SeriesFieldValues>();
+      captured = form;
+      return (
+        <SeriesForm
+          form={form}
+          genreOptions={[]}
+          submitLabel="Create series"
+          onSubmit={jest.fn()}
+        />
+      );
+    };
+    renderWithProviders(<Harness />);
+    expect(captured?.isFieldsTouched()).toBe(false);
+
+    await userEvent.type(screen.getByLabelText('Title'), 'x');
+
+    expect(captured?.isFieldsTouched()).toBe(true);
+  });
+
   it('submits what was typed, with no tags by default', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
@@ -95,7 +122,7 @@ describe('SeriesForm', () => {
     expect(screen.getByText('Validation failed')).toBeInTheDocument();
   });
 
-  it('offers No genre first and submits null for it', async () => {
+  it('shows the Genre placeholder and submits null for an untouched Genre', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
       <SeriesForm
@@ -105,19 +132,44 @@ describe('SeriesForm', () => {
       />
     );
 
+    expect(screen.getByText('No genre')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Title'), 'The Scale Cycle');
-    await userEvent.type(
-      screen.getByLabelText('Description'),
-      'Dragons, in four parts.'
-    );
+    await userEvent.type(screen.getByLabelText('Description'), 'Dragons.');
     await userEvent.click(
       screen.getByRole('button', { name: 'Create series' })
     );
 
     expect(onSubmit).toHaveBeenCalledWith({
       title: 'The Scale Cycle',
-      description: 'Dragons, in four parts.',
+      description: 'Dragons.',
       tags: [],
+      genreId: null,
+    });
+  });
+
+  it('submits null explicitly for a cleared Genre when editing', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <SeriesForm
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'The Scale Cycle',
+          description: 'Dragons.',
+          tags: ['epic'],
+          genreId: 4,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await clearSelect('Genre');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      title: 'The Scale Cycle',
+      description: 'Dragons.',
+      tags: ['epic'],
       genreId: null,
     });
   });

@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button, Form } from 'antd';
-import { NO_GENRE, WorkFields } from './WorkFields';
+import { WorkFields } from './WorkFields';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
 const GENRES = [{ id: 3, name: 'Fantasy' }];
@@ -27,10 +27,10 @@ describe('WorkFields', () => {
     expect(follows(extra, labels[3]!)).toBe(true);
   });
 
-  it('offers "No genre" as the 0 option beside every Genre', async () => {
+  it('shows "No genre" as the placeholder and lists only real genres', async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <Form initialValues={{ genreId: NO_GENRE }}>
+      <Form>
         <WorkFields genreOptions={GENRES} />
       </Form>
     );
@@ -38,6 +38,7 @@ describe('WorkFields', () => {
     expect(screen.getByText('No genre')).toBeInTheDocument();
     await user.click(screen.getByLabelText('Genre'));
     expect(await screen.findByText('Fantasy')).toBeInTheDocument();
+    expect(screen.getAllByText('No genre')).toHaveLength(1);
   });
 
   it('refuses a blank title and description', async () => {

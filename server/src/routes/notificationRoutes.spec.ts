@@ -16,7 +16,7 @@ const NOTIFICATION: PublicNotification = {
   kind: 'co_author_added',
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   actor: { kind: 'co_author', name: 'Margaret Hale' },
-  isRead: false,
+  readAt: null,
   createdAt: new Date('2026-09-13T10:00:00.000Z'),
 };
 
@@ -31,6 +31,9 @@ function createFakeRepository(calls: unknown[] = []): NotificationRepository {
     },
     async markRead(userId: number, ids: number[]) {
       calls.push({ markRead: userId, ids });
+      return 0;
+    },
+    async deleteReadBefore() {
       return 0;
     },
     async getSettings(userId: number) {

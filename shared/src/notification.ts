@@ -41,7 +41,8 @@ export type ActorKind = (typeof ACTOR_KINDS)[number];
 
 interface NotificationBase {
   id: number;
-  isRead: boolean;
+  // null while unread.
+  readAt: Date | null;
   createdAt: Date;
 }
 
@@ -76,6 +77,10 @@ export type PublicNotification =
 // The SSE event name GET /api/notifications/stream sends each notification
 // under; the client's EventSource listens for the same one.
 export const NOTIFICATION_STREAM_EVENT = 'notification';
+
+// How long a read Notification lives after its readAt: the list stops
+// returning it, the bell drops it, and the expiry purge deletes it.
+export const NOTIFICATION_READ_TTL_MS = 60_000;
 
 // What GET /api/notifications returns: a page like any other, plus the
 // account's unread count across every page, which the bell's badge shows.

@@ -8,6 +8,7 @@ import {
   type ExpiryPurgeDeps,
 } from './expiryPurge.ts';
 import { RESET_TOKEN_RETENTION_MS } from './repositories/passwordResetRepository.ts';
+import { NOTIFICATION_READ_TTL_MS } from 'shared';
 
 const NOW = Date.parse('2026-09-18T12:00:00.000Z');
 
@@ -15,11 +16,17 @@ const NOW = Date.parse('2026-09-18T12:00:00.000Z');
 // with a fixed count, or fail. The shared logger is recorded, not printed.
 function fakes(
   t: TestContext,
-  answer: { sessions?: number; resetTokens?: number; failure?: Error } = {}
+  answer: {
+    sessions?: number;
+    resetTokens?: number;
+    notifications?: number;
+    failure?: Error;
+  } = {}
 ) {
   const lines = recordLogs(t);
   const sessionMoments: Date[] = [];
   const resetCutoffs: Date[] = [];
+  const notificationCutoffs: Date[] = [];
   const deps: ExpiryPurgeDeps = {
     sessionRepository: {
       async deleteExpired(now) {
@@ -34,8 +41,14 @@ function fakes(
         return answer.resetTokens ?? 0;
       },
     },
+    notificationRepository: {
+      async deleteReadBefore(cutoff) {
+        notificationCutoffs.push(cutoff);
+        return answer.notifications ?? 0;
+      },
+    },
   };
-  return { deps, lines, sessionMoments, resetCutoffs };
+  return { deps, lines, sessionMoments, resetCutoffs, notificationCutoffs };
 }
 
 test('deletes the sessions expired by now and the reset tokens 30 days past their expiry', async (t) => {
@@ -49,8 +62,23 @@ test('deletes the sessions expired by now and the reset tokens 30 days past thei
   assert.equal(RESET_TOKEN_RETENTION_MS, 30 * 24 * 60 * 60 * 1000);
 });
 
+test('deletes Notifications read more than the read TTL ago', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: NOW });
+  const { deps, notificationCutoffs } = fakes(t);
+
+  await purgeExpiredRows(deps);
+
+  assert.deepEqual(notificationCutoffs, [
+    new Date(NOW - NOTIFICATION_READ_TTL_MS),
+  ]);
+});
+
 test('logs the counts at info when it deleted something', async (t) => {
-  const { deps, lines } = fakes(t, { sessions: 3, resetTokens: 1 });
+  const { deps, lines } = fakes(t, {
+    sessions: 3,
+    resetTokens: 1,
+    notifications: 2,
+  });
 
   await purgeExpiredRows(deps);
 
@@ -58,9 +86,51 @@ test('logs the counts at info when it deleted something', async (t) => {
     {
       level: 'info',
       message: 'Purged expired rows',
-      meta: { sessions: 3, resetTokens: 1 },
+      meta: { sessions: 3, resetTokens: 1, notifications: 2 },
     },
   ]);
+});
+
+test('logs the pass when only Notifications were deleted', async (t) => {
+  const { deps, lines } = fakes(t, { notifications: 1 });
+
+  await purgeExpiredRows(deps);
+
+  assert.equal(lines.length, 1);
+});
+
+test('a failed Notification purge is logged at error and does not reject', async (t) => {
+  const { deps, lines } = fakes(t);
+  const failing: ExpiryPurgeDeps = {
+    ...deps,
+    notificationRepository: {
+      async deleteReadBefore() {
+        throw new Error('lock wait timeout');
+      },
+    },
+  };
+
+  await purgeExpiredRows(failing);
+
+  assert.deepEqual(lines, [
+    {
+      level: 'error',
+      message: 'Expiry purge failed',
+      meta: 'lock wait timeout',
+    },
+  ]);
+});
+
+test('a failed session purge does not skip the other purges', async (t) => {
+  const { deps, lines, resetCutoffs, notificationCutoffs } = fakes(t, {
+    failure: new Error('connection lost'),
+  });
+
+  await purgeExpiredRows(deps);
+
+  assert.equal(resetCutoffs.length, 1);
+  assert.equal(notificationCutoffs.length, 1);
+  assert.equal(lines.length, 1);
 });
 
 test('logs nothing when nothing had expired', async (t) => {

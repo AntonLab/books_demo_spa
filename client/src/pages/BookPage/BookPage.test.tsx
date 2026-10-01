@@ -79,13 +79,14 @@ const reader: PublicUser = {
 
 const renderPage = (
   session?: PublicUser,
-  preloadedState?: Partial<RootState>
+  preloadedState?: Partial<RootState>,
+  id = '1'
 ) => {
   const queryClient = createTestQueryClient();
   if (session) queryClient.setQueryData(queryKeys.session, session);
 
   return renderWithProviders(<BookPage />, {
-    route: '/books/1',
+    route: `/books/${id}`,
     path: '/books/:id',
     queryClient,
     preloadedState,
@@ -200,6 +201,15 @@ describe('BookPage', () => {
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
+  });
+
+  it('does not ask the server for an id that is not a book id', async () => {
+    renderPage(undefined, undefined, 'new');
+
+    expect(
+      await screen.findByText('This book no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
   it('reports a book that will not load', async () => {

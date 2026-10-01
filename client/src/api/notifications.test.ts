@@ -43,7 +43,7 @@ describe('listNotifications', () => {
 
   it('returns the page with its unread count', async () => {
     const page = {
-      items: [{ id: 4, kind: 'co_author_added', isRead: false }],
+      items: [{ id: 4, kind: 'co_author_added', readAt: null }],
       total: 1,
       unread: 1,
       limit: 20,

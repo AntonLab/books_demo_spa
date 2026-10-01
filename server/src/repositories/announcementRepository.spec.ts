@@ -201,7 +201,7 @@ describe('announcements against real MySQL', { skip }, () => {
       work: { type: 'book', id: harbour, title: 'The Glass Harbour' },
       chapter: { id: bell, title: 'The Tide Bell' },
       chapterCount: 1,
-      isRead: false,
+      readAt: null,
     });
     assert.deepEqual(await chapterAnnouncedAt(bell), now);
 
@@ -285,7 +285,10 @@ describe('announcements against real MySQL', { skip }, () => {
     assert.equal(grown.chapterCount, 2);
     assert.deepEqual(grown.chapter, { id: first, title: 'First Light' });
 
-    await Notification.update({ isRead: true }, { where: { id: opened.id } });
+    await Notification.update(
+      { readAt: new Date() },
+      { where: { id: opened.id } }
+    );
     const [three] = await announcements.announce(at(base, 2 * minute));
     const fresh = three?.notifications[0];
     assert.ok(fresh?.kind === 'new_chapter');
@@ -396,7 +399,7 @@ describe('announcements against real MySQL', { skip }, () => {
       kind: 'new_book',
       work: { type: 'book', id: returns, title: 'The Nightbus Returns' },
       series: { id: files, title: 'The Nightbus Files' },
-      isRead: false,
+      readAt: null,
     });
     assert.equal(
       await Notification.count({ where: { kind: 'new_chapter' } }),

@@ -1,9 +1,10 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Modal, Result } from 'antd';
+import { Alert, Button, Form, Result } from 'antd';
 import { useNavigate } from 'react-router';
 import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
 import { useConfirmReset } from '@/queries/auth';
+import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import spacing from '@/theme/spacing.module.css';
 
 interface ResetConfirmValues {
@@ -43,7 +44,12 @@ export const ResetConfirmModal: FC<Props> = ({ token }) => {
   };
 
   return (
-    <Modal open title="Choose a new password" onCancel={dismiss} footer={null}>
+    <DiscardGuardModal
+      title="Choose a new password"
+      onClose={dismiss}
+      footer={null}
+      form={done ? undefined : form}
+    >
       {done ? (
         <Result
           status="success"
@@ -87,6 +93,6 @@ export const ResetConfirmModal: FC<Props> = ({ token }) => {
           </Form>
         </>
       )}
-    </Modal>
+    </DiscardGuardModal>
   );
 };

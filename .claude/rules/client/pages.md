@@ -133,3 +133,11 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
   and opens the confirm modal over it. The path and key are a contract with
   `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.
+- `EditBookPage` / `EditSeriesPage` are "Manage" pages whose details live in an
+  `Edit details` modal. My books creates in `BookCreateModal` /
+  `SeriesCreateModal` and edits in the same edit modals. `/books/new` and
+  `/series/new` no longer exist, so an old link reaches `BookPage` /
+  `SeriesPage` with the id `new`. Neither asks the server: `BookPage` shows
+  "This book no longer exists." and `SeriesPage` "This series no longer exists.".
+  `EditBookPage` / `EditSeriesPage` split into a guard and a view the same way,
+  so `/books/new/edit` shows the same message and asks nothing.

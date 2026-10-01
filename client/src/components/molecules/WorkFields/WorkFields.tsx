@@ -2,10 +2,7 @@ import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
 import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
 import type { PublicGenre } from 'shared';
-
-// A select cannot hold `null` as an option value and stay clearable, so "No
-// genre" travels as 0 inside the form and becomes null on the way out.
-export const NO_GENRE = 0;
+import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
 
 interface Props {
   genreOptions: PublicGenre[];
@@ -43,15 +40,13 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
     {children}
 
     <Form.Item name="genreId" label="Genre">
-      <Select
+      <ClearableSelect
         aria-label="Genre"
-        options={[
-          { value: NO_GENRE, label: 'No genre' },
-          ...genreOptions.map((genre) => ({
-            value: genre.id,
-            label: genre.name,
-          })),
-        ]}
+        placeholder="No genre"
+        options={genreOptions.map((genre) => ({
+          value: genre.id,
+          label: genre.name,
+        }))}
       />
     </Form.Item>
   </>

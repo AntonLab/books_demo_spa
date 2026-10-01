@@ -81,9 +81,21 @@ that read like mistakes and are not.
 
 ## Forms and pickers
 
-- `BookForm` / `SeriesForm`: "No series" and "No genre" travel as `0` inside the
-  form and leave as `null`. Creating omits the status radios: every new book is
-  a draft.
+- Toasts come from `App.useApp().message`, never antd's static `message` or
+  `notification`: statics skip the ConfigProvider theme. The holder lives in
+  `App`, so a toast outlives the modal that fired it.
+- Every modal holding a form uses `DiscardGuardModal`, except
+  `CommentComposerModal` (its text is Unsaved text). Pass `form` only while the
+  `Form` is mounted. A successful submit calls `onClose` itself and so skips
+  the guard.
+- `BookForm` / `SeriesForm`: the Series and Genre selects are `ClearableSelect`
+  (`allowClear`; antd shows the icon only on hover and it takes no focus, so it
+  keeps the icon visible and clears on Delete or Backspace while closed),
+  with "No series" / "No genre" as placeholders, not options. An empty or
+  cleared select is `undefined` inside the form and leaves as an explicit
+  `null` (the server accepts `null` for both). A stored `null` is seeded as
+  `undefined`, since a select shows its placeholder only for that. Creating
+  omits the status radios: every new book is a draft.
 - `CoAuthorManager`'s picker draws avatars through `optionRender`; the option's
   `label` stays a plain string so antd's tooltip and rc-select's filter still
   work. The last Co-author is never offered Leave.
@@ -111,7 +123,13 @@ that read like mistakes and are not.
   highlighted until it closes. It holds the Account's notification stream
   (`useNotificationStream`) and toasts each pushed Notification under the key
   `notification-<id>`, so a merged New chapter updates its toast. `AppHeader`
-  keys it by the Account, so an Account switch drops the old toasts.
+  keys it by the Account, so an Account switch drops the old toasts. A read
+  row leaves the open popover when `readAt` plus `NOTIFICATION_READ_TTL_MS`
+  passes: a per-row timer collapses it, then drops it, waiting at most the TTL
+  so a browser clock behind the server cannot hold a row longer. Rows already expired in
+  a stale cache are filtered at render. The Popover is `destroyOnHidden`:
+  antd keeps hidden content mounted otherwise, and the row timers would keep
+  running.
 
 ## Search suggestions (`SearchBar`, `SearchForm`)
 

@@ -1,9 +1,8 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Radio, Select } from 'antd';
-import {
-  NO_GENRE,
-  WorkFields,
-} from '@/components/molecules/WorkFields/WorkFields';
+import { Alert, Button, Form, Radio } from 'antd';
+import type { FormInstance } from 'antd';
+import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
+import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import { BOOK_STATUSES } from 'shared';
 import { BOOK_STATUS_LABELS } from '@/types/book';
 import type { PublicGenre, BookStatus } from 'shared';
@@ -25,6 +24,9 @@ interface BookFormProps {
   submitLabel: string;
   onSubmit: (values: BookFormValues) => void;
   initialValues?: BookFormValues;
+  // A caller that needs the form's state, such as a modal asking before it
+  // discards typed input, passes its own instance.
+  form?: FormInstance<BookFieldValues>;
   // Off when creating: the server makes every new book a draft whatever the
   // body says, so offering a choice there would only be ignored.
   showStatus?: boolean;
@@ -34,12 +36,14 @@ interface BookFormProps {
   error?: string | null;
 }
 
-// "No series" travels as 0 inside the form, like WorkFields' "No genre".
-const NO_SERIES = 0;
-
-interface FieldValues extends Omit<BookFormValues, 'seriesId' | 'genreId'> {
-  seriesId: number;
-  genreId: number;
+// A cleared or untouched select is undefined inside the form; it leaves as an
+// explicit null, so an edit can unset it.
+export interface BookFieldValues extends Omit<
+  BookFormValues,
+  'seriesId' | 'genreId'
+> {
+  seriesId?: number | null;
+  genreId?: number | null;
 }
 
 // Presentational: it neither fetches nor saves. The page that renders it owns
@@ -51,6 +55,7 @@ export const BookForm: FC<BookFormProps> = ({
   submitLabel,
   onSubmit,
   initialValues,
+  form,
   showStatus = false,
   isSubmitting = false,
   error = null,
@@ -60,12 +65,12 @@ export const BookForm: FC<BookFormProps> = ({
     genreId,
     status,
     ...rest
-  }: FieldValues) => {
+  }: BookFieldValues) => {
     onSubmit({
       ...rest,
       tags: rest.tags ?? [],
-      seriesId: seriesId === NO_SERIES ? null : seriesId,
-      genreId: genreId === NO_GENRE ? null : genreId,
+      seriesId: seriesId ?? null,
+      genreId: genreId ?? null,
       ...(showStatus && status !== undefined ? { status } : {}),
     });
   };
@@ -76,27 +81,27 @@ export const BookForm: FC<BookFormProps> = ({
         <Alert type="error" title={error} className={spacing.gapBelow} />
       )}
 
-      <Form<FieldValues>
+      <Form<BookFieldValues>
+        form={form}
         layout="vertical"
         initialValues={{
           tags: [],
           ...initialValues,
-          seriesId: initialValues?.seriesId ?? NO_SERIES,
-          genreId: initialValues?.genreId ?? NO_GENRE,
+          // A select shows its placeholder only for undefined, not null.
+          seriesId: initialValues?.seriesId ?? undefined,
+          genreId: initialValues?.genreId ?? undefined,
         }}
         onFinish={handleFinish}
       >
         <WorkFields genreOptions={genreOptions}>
           <Form.Item name="seriesId" label="Series">
-            <Select
+            <ClearableSelect
               aria-label="Series"
-              options={[
-                { value: NO_SERIES, label: 'No series' },
-                ...seriesOptions.map((series) => ({
-                  value: series.id,
-                  label: series.title,
-                })),
-              ]}
+              placeholder="No series"
+              options={seriesOptions.map((series) => ({
+                value: series.id,
+                label: series.title,
+              }))}
             />
           </Form.Item>
         </WorkFields>

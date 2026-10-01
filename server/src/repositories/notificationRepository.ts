@@ -1,13 +1,14 @@
-import type { Transaction } from 'sequelize';
+import { Op, type Transaction } from 'sequelize';
 import { Notification, toPublicNotification } from '../models/Notification.ts';
 import { User } from '../models/User.ts';
 import { publishAfterCommit } from '../online/notificationPublisher.ts';
-import type {
-  ActorKind,
-  CreditNotificationKind,
-  NotificationSettings,
-  PublicNotification,
-  WorkType,
+import {
+  NOTIFICATION_READ_TTL_MS,
+  type ActorKind,
+  type CreditNotificationKind,
+  type NotificationSettings,
+  type PublicNotification,
+  type WorkType,
 } from 'shared';
 import type { ListNotificationsQuery } from '../types/notification.ts';
 import type { Role } from '../types/permission.ts';
@@ -29,6 +30,9 @@ export interface NotificationRepository {
   // Marks those of `ids` that are the account's own, and answers with how
   // many of its notifications are still unread.
   markRead(userId: number, ids: number[]): Promise<number>;
+  // The expiry purge's, so not scoped to an account: deletes every row read
+  // before `cutoff` and answers how many.
+  deleteReadBefore(cutoff: Date): Promise<number>;
   getSettings(userId: number): Promise<NotificationSettings>;
   updateSettings(
     userId: number,
@@ -122,14 +126,18 @@ export async function deleterOf(
 export function createSequelizeNotificationRepository(): NotificationRepository {
   return {
     async list(userId, query) {
+      const cutoff = new Date(Date.now() - NOTIFICATION_READ_TTL_MS);
       const { rows, count } = await Notification.findAndCountAll({
-        where: { userId },
+        where: {
+          userId,
+          [Op.or]: [{ readAt: null }, { readAt: { [Op.gt]: cutoff } }],
+        },
         limit: query.limit,
         offset: query.offset,
         order: [['id', 'DESC']],
       });
       const unread = await Notification.count({
-        where: { userId, isRead: false },
+        where: { userId, readAt: null },
       });
 
       return { items: rows.map(toPublicNotification), total: count, unread };
@@ -139,10 +147,15 @@ export function createSequelizeNotificationRepository(): NotificationRepository 
       // userId in the WHERE is the whole ownership check: another account's
       // id matches no row here.
       await Notification.update(
-        { isRead: true },
-        { where: { userId, id: ids, isRead: false } }
+        { readAt: new Date() },
+        { where: { userId, id: ids, readAt: null } }
       );
-      return Notification.count({ where: { userId, isRead: false } });
+      return Notification.count({ where: { userId, readAt: null } });
+    },
+
+    async deleteReadBefore(cutoff) {
+      // NULL never satisfies <, so an unread row survives.
+      return Notification.destroy({ where: { readAt: { [Op.lt]: cutoff } } });
     },
 
     async getSettings(userId) {

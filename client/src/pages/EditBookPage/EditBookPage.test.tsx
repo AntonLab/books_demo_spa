@@ -81,7 +81,8 @@ const account = (overrides: Partial<PublicUser>): PublicUser => ({
 
 const renderPage = (
   session: PublicUser | null = account({}),
-  preloadedState?: Partial<RootState>
+  preloadedState?: Partial<RootState>,
+  route = '/books/1/edit'
 ) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
@@ -91,7 +92,7 @@ const renderPage = (
       <Route path="/books/:id/edit" element={<EditBookPage />} />
       <Route path="/profile/my-books" element={<p>My books list</p>} />
     </Routes>,
-    { route: '/books/1/edit', queryClient, preloadedState }
+    { route, queryClient, preloadedState }
   );
 };
 
@@ -117,50 +118,20 @@ beforeEach(() => {
 });
 
 describe('EditBookPage', () => {
-  it('loads the book and saves its fields and status', async () => {
-    mockedBooks.updateBook.mockResolvedValue(book);
+  it('is titled "Manage book: <title>" and keeps its details form behind Edit details', async () => {
     renderPage();
 
-    const title = await screen.findByLabelText('Title');
-    expect(title).toHaveValue('A Tale of Dragons');
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Manage book: A Tale of Dragons',
+      })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Title')).toBeNull();
 
-    await userEvent.clear(title);
-    await userEvent.type(title, 'Dragons, Revised');
-    await userEvent.click(screen.getByText('In progress'));
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit details' }));
 
-    expect(mockedBooks.updateBook).toHaveBeenCalledWith(1, {
-      title: 'Dragons, Revised',
-      description: 'Long ago.',
-      tags: ['epic'],
-      seriesId: null,
-      genreId: null,
-      status: 'in_progress',
-    });
-    expect(await screen.findByText('Saved.')).toBeInTheDocument();
-  });
-
-  it('keeps an existing genre on an unrelated save', async () => {
-    mockedBooks.getBook.mockResolvedValue({
-      ...book,
-      genre: { id: 4, name: 'Gothic' },
-    });
-    mockedBooks.updateBook.mockResolvedValue(book);
-    renderPage();
-
-    const title = await screen.findByLabelText('Title');
-    await userEvent.clear(title);
-    await userEvent.type(title, 'Dragons, Revised');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(mockedBooks.updateBook).toHaveBeenCalledWith(1, {
-      title: 'Dragons, Revised',
-      description: 'Long ago.',
-      tags: ['epic'],
-      seriesId: null,
-      genreId: 4,
-      status: 'draft',
-    });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('A Tale of Dragons');
   });
 
   it('manages the co-authors from the same page', async () => {
@@ -211,7 +182,9 @@ describe('EditBookPage', () => {
   it('lets a moderator edit the book but not its byline', async () => {
     renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
 
-    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Edit details' })
+    ).toBeInTheDocument();
     expect(screen.getByText('Cora Writer')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull();
@@ -224,6 +197,15 @@ describe('EditBookPage', () => {
     expect(
       await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
+  });
+
+  it('does not ask the server for an id that is not a book id', async () => {
+    renderPage(account({}), undefined, '/books/new/edit');
+
+    expect(
+      await screen.findByText('This book no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
   it('offers the Unsaved text of a book that no longer exists', async () => {
@@ -295,7 +277,7 @@ describe('EditBookPage chapters', () => {
   it('offers no new chapter to a moderator, who may not create one', async () => {
     renderPage(account({ id: 99, login: 'admin', role: 'admin' }));
 
-    await screen.findByLabelText('Title');
+    await screen.findByRole('button', { name: 'Edit details' });
     expect(screen.queryByRole('link', { name: 'Add chapter' })).toBeNull();
   });
 });
@@ -446,7 +428,7 @@ describe('EditBookPage, the Cover block', () => {
       coverUrl: '/api/books/1/cover?v=2',
     });
     renderPage();
-    await screen.findByLabelText('Title');
+    await screen.findByRole('button', { name: 'Edit details' });
     const file = new File([new Uint8Array([1, 2, 3])], 'cover.png', {
       type: 'image/png',
     });
@@ -463,7 +445,7 @@ describe('EditBookPage, the Cover block', () => {
     // would silently drop the .gif before it ever reached the precheck.
     const user = userEvent.setup({ applyAccept: false });
     renderPage();
-    await screen.findByLabelText('Title');
+    await screen.findByRole('button', { name: 'Edit details' });
     const file = new File([new Uint8Array([1])], 'cover.gif', {
       type: 'image/gif',
     });
@@ -481,7 +463,7 @@ describe('EditBookPage, the Cover block', () => {
       new Error('Not a valid image')
     );
     renderPage();
-    await screen.findByLabelText('Title');
+    await screen.findByRole('button', { name: 'Edit details' });
     const file = new File([new Uint8Array([1])], 'cover.png', {
       type: 'image/png',
     });
@@ -533,7 +515,7 @@ describe('EditBookPage, the Cover block', () => {
       coverUrl: '/api/books/1/cover?v=2',
     });
     renderPage();
-    await screen.findByLabelText('Title');
+    await screen.findByRole('button', { name: 'Edit details' });
     const bad = new File([new Uint8Array([1])], 'cover.gif', {
       type: 'image/gif',
     });

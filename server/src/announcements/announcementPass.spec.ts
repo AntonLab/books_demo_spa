@@ -20,7 +20,7 @@ const newChapter = (id: number): PublicNotification => ({
   work: { type: 'book', id: 3, title: 'The Glass Harbour' },
   chapter: { id: 41, title: 'The Tide Bell' },
   chapterCount: 1,
-  isRead: false,
+  readAt: null,
   createdAt: NOW,
 });
 

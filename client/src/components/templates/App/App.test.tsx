@@ -51,9 +51,7 @@ const LAZY_PAGES = [
   'EditChapterPage',
   'EditSeriesPage',
   'MainPage',
-  'NewBookPage',
   'NewChapterPage',
-  'NewSeriesPage',
   'NotFoundPage',
   'ProfilePage',
   'SearchPage',
@@ -179,14 +177,11 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders NewBookPage at /books/new, not BookPage', async () => {
+  it('shows "This book no longer exists." at the old /books/new bookmark without asking the server', async () => {
     renderWithProviders(<AppShell />, { route: '/books/new' });
 
-    // An anonymous visitor: the page explains itself instead of a form.
     expect(
-      await screen.findByText(
-        'Only an account holding the author role can create books.'
-      )
+      await screen.findByText('This book no longer exists.')
     ).toBeInTheDocument();
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
@@ -228,14 +223,13 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders NewSeriesPage at /series/new', async () => {
+  it('shows "This series no longer exists." at the old /series/new bookmark without asking the server', async () => {
     renderWithProviders(<AppShell />, { route: '/series/new' });
 
     expect(
-      await screen.findByText(
-        'Only an account holding the author role can create series.'
-      )
+      await screen.findByText('This series no longer exists.')
     ).toBeInTheDocument();
+    expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
   it('renders EditSeriesPage at /series/:id/edit', async () => {

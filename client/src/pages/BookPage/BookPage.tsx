@@ -35,9 +35,18 @@ import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
 
 export const BookPage: FC = () => {
+  const bookId = Number(useParams().id);
+  // Not an id the server could answer for (an old /books/new bookmark), so it
+  // is not asked.
+  return Number.isInteger(bookId) && bookId > 0 ? (
+    <BookView bookId={bookId} />
+  ) : (
+    <Empty description="This book no longer exists." />
+  );
+};
+
+const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
-  const { id } = useParams();
-  const bookId = Number(id);
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
@@ -52,7 +61,7 @@ export const BookPage: FC = () => {
       <>
         <Alert
           type="error"
-          message="Could not load this book."
+          title="Could not load this book."
           className={spacing.gapBelow}
         />
         {error instanceof ApiError && error.status === 404 && (

@@ -1,7 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Result } from 'antd';
+import { Alert, Button, Form, Input, Result } from 'antd';
 import { useRequestReset } from '@/queries/auth';
+import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
 import spacing from '@/theme/spacing.module.css';
 
@@ -36,7 +37,12 @@ export const ResetRequestModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   };
 
   return (
-    <Modal open title="Reset your password" onCancel={onClose} footer={null}>
+    <DiscardGuardModal
+      title="Reset your password"
+      onClose={onClose}
+      footer={null}
+      form={sent ? undefined : form}
+    >
       {sent ? (
         <Result status="success" title={CONFIRMATION} />
       ) : (
@@ -85,6 +91,6 @@ export const ResetRequestModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           </Form>
         </>
       )}
-    </Modal>
+    </DiscardGuardModal>
   );
 };

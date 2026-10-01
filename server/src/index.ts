@@ -52,11 +52,13 @@ async function main(): Promise<void> {
   await syncPermissions();
 
   const repositories = createSequelizeRepositories();
-  const { sessionRepository, passwordResetRepository } = repositories;
+  const { sessionRepository, passwordResetRepository, notificationRepository } =
+    repositories;
   // After syncPermissions(): by now the schema is known to be provisioned.
   const expiryPurge = startExpiryPurge({
     sessionRepository,
     passwordResetRepository,
+    notificationRepository,
   });
   const authRateLimits = createAuthRateLimits();
   const onlineRegistry = createOnlineRegistry({ sessionRepository });
