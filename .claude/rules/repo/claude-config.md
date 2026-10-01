@@ -29,6 +29,9 @@ paths:
 - **`.claude/skills/`** is ignored except `db-reset/`: the rest are junctions
   `scripts/link-skills.mjs` makes, and that script leaves a real directory
   alone.
+- **`.claude/agents/`** is ignored and was removed from history with
+  `git filter-repo`: subagent definitions are per clone. Do not `git add -f`
+  them back.
 - **`.mcp.json`** starts Playwright through `node -e` spawning `npx` with
   `shell: true`: Claude Code spawns without a shell, so a bare `npx` fails on
   native Windows (it is `npx.cmd`) and `cmd /c npx` fails everywhere else.

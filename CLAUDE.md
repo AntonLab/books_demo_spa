@@ -135,6 +135,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   no dev server, takes no snapshot and never Reads a screenshot.
 - **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
   `general-purpose`: the latter ran on Sonnet and loaded the full context.
+- `.claude/agents/` is git-ignored: each clone keeps its own copy, and a fresh
+  clone has none, so every agent named here and in `pipeline.md` exists only
+  where someone put the files by hand. A dispatch to a missing one fails.
 - Every agent in `.claude/agents/` preloads `caveman`: its final message is
   caveman, while the files it writes stay normal prose. Needs the `caveman`
   plugin; a missing skill preloads nothing, silently.

@@ -1,23 +1,13 @@
-# Only what this repo's own tools produce, or a secret. OS and editor files
-# (.DS_Store, .vscode/) go in ~/.config/git/ignore. Unanchored rules match in
-# every workspace.
-
+# Tool output and secrets only; OS/editor files go in ~/.config/git/ignore.
 node_modules/
-# Jest --coverage; client webpack; server tsc
 coverage/
 build/
 dist/
-
-# every .env variant (the server reads .env.local) except the example
 .env
 .env.*
 !.env.example
 
-# Claude Code, per clone: skills restored by `npm run skills` (.agents/ plus
-# the machine-specific junctions scripts/link-skills.mjs makes in
-# .claude/skills/; db-reset is hand-written and checked in), subagent
-# definitions, task worktrees, personal settings. Everything else under
-# .claude/ is shared.
+# Per clone: restored skills (db-reset is checked in), agents, worktrees
 /.agents/
 /.claude/agents/
 /.claude/skills/*
@@ -25,13 +15,9 @@ dist/
 /.claude/worktrees/
 /.claude/settings.local.json
 
-# agent working notes (plans, specs); docs/agents/ and docs/adr/ are real docs
+# Agent scratch; docs/agents/ and docs/adr/ are real docs
 /docs/*
 !/docs/agents/
 !/docs/adr/
-
-# subagent-driven-development scratch (ledger, briefs, review packages)
 /.superpowers
-
-# Playwright MCP (.mcp.json) writes page snapshots and console logs here
 /.playwright-mcp
