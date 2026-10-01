@@ -87,6 +87,6 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   any owner comparison: `PATCH` 403, a second `DELETE` 404, for everyone.
 - A tombstone takes no reply and no new or flipped like (403); removing your
   own existing like from one is allowed. Existing replies behave normally.
-- A thread cannot be tombstoned wholesale: each reply belongs to its author.
+- A thread cannot be tombstoned wholesale: each reply belongs to its Owner.
 - **The promise ends where the book does**: deleting a book cascades and
   deliberately hard-deletes every comment on it, others' threads too (ADR-0004).

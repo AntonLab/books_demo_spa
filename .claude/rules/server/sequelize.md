@@ -17,7 +17,7 @@ paths:
 - Tables are `utf8mb4` / `utf8mb4_0900_ai_ci`; MySQL's `utf8` is 3-byte and
   drops emoji. Past `VARCHAR(255)`, index with a prefix.
 - **`login` is `utf8mb4_0900_as_cs`**, given as a raw type string because
-  Sequelize 6 has no per-column collation, so `Bob` and `bob` are two users.
+  Sequelize 6 has no per-column collation, so `Bob` and `bob` are two Accounts.
   `email` inherits the case-insensitive default. A query matching `login`
   alongside such fields needs an explicit `COLLATE` (`buildWhere` in
   `userRepository.ts`).

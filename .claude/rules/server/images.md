@@ -9,9 +9,9 @@ paths:
 
 # Covers and Avatars (ADR-0007)
 
-- Stored as bytes in `book_covers` / `user_avatars`, keyed by the owner's id,
-  never as a column on `books`/`users`, so no list query can drag them along.
-  Both cascade from their owner, so a deleted Book or Account takes its picture
+- Stored as bytes in `book_covers` / `user_avatars`, keyed by the Book's or Account's
+  id, never as a column on `books`/`users`, so no list query can drag them
+  along. Both cascade from that row, so a deleted Book or Account takes its picture
   with it, with no application code.
 - Every `sharp` call lives in `src/images.ts`. It decodes the upload for real
   (`metadata().format`, never the `Content-Type` header), applies and drops

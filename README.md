@@ -17,7 +17,7 @@ npm workspaces (the third, `shared/`, holds the API types both read).
 
 ## Layout
 
-```
+```text
 client/   React SPA bundled with webpack 5   — see client/CLAUDE.md
 server/   Express API on Sequelize/MySQL     — see server/CLAUDE.md
 shared/   API types and string unions both use, .ts source with no build step

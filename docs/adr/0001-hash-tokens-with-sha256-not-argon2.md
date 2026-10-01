@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-09-12
+---
+
 # Hash session and reset tokens with SHA-256, not argon2
 
 Session and password-reset tokens are opaque 256-bit random values, verified on every

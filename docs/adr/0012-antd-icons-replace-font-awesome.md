@@ -1,9 +1,16 @@
+---
+status: accepted
+date: 2026-09-25
+supersedes: ADR-0011
+---
+
 # Icons come from @ant-design/icons, replacing Font Awesome
 
 Supersedes ADR-0011. The client drew eight icons in three files with three
 Font Awesome packages, while `@ant-design/icons` was already in the tree as a
-dependency of antd itself. The reasons ADR-0011 gave did not hold up at this
-size: a wider free set buys nothing when antd's set covers every icon in use,
+dependency of antd itself.
+
+The reasons ADR-0011 gave did not hold up at this size: a wider free set buys nothing when antd's set covers every icon in use,
 and replacing antd would rewrite every component anyway, so icons that
 survive the swap save little. We now import antd's icons one at a time
 (`SettingOutlined`, `ArrowLeftOutlined`, …) and dropped all three

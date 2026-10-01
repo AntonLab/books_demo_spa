@@ -39,7 +39,7 @@ that read like mistakes and are not.
 - **It drops a tombstone with no live replies.** A tombstone earns its place
   only by keeping live replies in their thread, so a tombstoned root survives
   with at least one live direct reply, and a tombstoned reply never does.
-- A surviving tombstone renders as `TOMBSTONE_LABELS` text with no author, no
+- A surviving tombstone renders as `TOMBSTONE_LABELS` text with no Owner, no
   avatar and no controls, for anyone. There are no moderation buttons in the
   client: remove and restore stay API-only until a moderation screen exists.
 - Edit, delete and like render only when the server would allow them; the
@@ -98,7 +98,7 @@ that read like mistakes and are not.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
   deletes the right row. It predates the icons and still uses a text glyph.
 - `FavoriteButton` has the same id-in, id-out shape but draws a star icon.
-  It shows to Co-authors too (a Favorite is a subscription, not praise) and
+  It shows to Co-authors too (a Favorite asks for news, it is not praise) and
   never on a Draft, whose Favorites the server neither counts nor lists.
 - `EmailNotificationsSetting`'s switch id `email-notifications` is the anchor
   the announcement emails link to; it scrolls itself into view for that hash,

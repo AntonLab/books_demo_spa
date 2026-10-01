@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-09-12
+---
+
 # `comments.parentId` uses `ON DELETE SET NULL`, not `CASCADE`
 
 A reply's `parentId` looks like an obvious `CASCADE` candidate — delete a comment,

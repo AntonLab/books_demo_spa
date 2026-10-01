@@ -1,14 +1,24 @@
+---
+status: accepted
+date: 2026-09-19
+---
+
 # Genres are a list Admins keep, not a fixed list in code
 
 A Genre is a row in a table of its own that Admins and Superadmins add to,
 rename and delete through the API and a management page, and a Book or a Series
-points at one or at none. Book statuses and Roles are closed `as const` lists
-in `shared`, so a reader would expect Genres to be one too. We rejected that
-because the catalogue's categories are editorial, not structural: adding
-"Horror" or renaming "Hard SF" should not take a code change and a deploy,
-whereas a new Book status changes what the server enforces. We also rejected
-treating a curated subset of Tags as Genres, since Tags are free-form: a Book
-tagged `Gothic` rather than `gothic` would silently fall out of its Genre.
+points at one or at none.
+
+Genres are editorial, not structural: adding "Horror" or
+renaming "Hard SF" should not take a code change and a deploy, whereas a new
+Book status changes what the server enforces.
+
+## Considered Options
+
+- **A closed `as const` list in `shared`**, like Book statuses and Roles, which
+  is what a reader would expect. Rejected for the reason above.
+- **A curated subset of Tags.** Tags are free-form: a Book tagged `Gothic`
+  rather than `gothic` would silently fall out of its Genre.
 
 ## Consequences
 
