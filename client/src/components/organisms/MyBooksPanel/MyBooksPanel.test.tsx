@@ -4,11 +4,13 @@ import { message } from 'antd';
 import { Route, Routes } from 'react-router';
 import { MyBooksPanel } from './MyBooksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicBook } from '@/types/book';
-import type { PublicSeries, PublicUser } from '@/types/api';
+import type { BookDetail, PublicBook } from '@/types/book';
+import type { PublicSeries, PublicUser, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/genres');
@@ -83,13 +85,34 @@ const seriesFixture: PublicSeries = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-const renderPage = () =>
-  renderWithProviders(
+const bookDetail = (id: number, title: string): BookDetail => ({
+  ...book(id, title, 'complete'),
+  series: null,
+  likeCount: 0,
+  commentCount: 0,
+  wordCount: 0,
+  favoriteCount: 0,
+  viewerFavoriteId: null,
+  viewerLikeId: null,
+});
+
+const seriesDetail: SeriesDetail = {
+  ...seriesFixture,
+  favoriteCount: 0,
+  viewerFavoriteId: null,
+};
+
+const renderPage = () => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, author);
+
+  return renderWithProviders(
     <Routes>
       <Route path="/my-books" element={<MyBooksPanel authorId={author.id} />} />
     </Routes>,
-    { route: '/my-books' }
+    { route: '/my-books', queryClient }
   );
+};
 
 // The static message API outlives a test's DOM, so a toast would leak into the next test.
 afterEach(() => message.destroy());
@@ -231,6 +254,70 @@ describe('MyBooksPanel', () => {
       userId: author.id,
       limit: 100,
     });
+  });
+
+  it('opens the edit-details modal from a book row and saves in place', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail(2, 'Out Now'));
+    mockedBooks.updateBook.mockResolvedValue(bookDetail(2, 'Out Now'));
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit Out Now' })
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Edit book details',
+    });
+    expect(await within(dialog).findByLabelText('Title')).toHaveValue(
+      'Out Now'
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Book saved.')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Edit book details' })
+    ).toBeNull();
+  });
+
+  it('opens the edit-details modal from a series row', async () => {
+    mockedSeries.getSeries.mockResolvedValue(seriesDetail);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Series' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit The Scale Cycle' })
+    );
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Edit series details',
+    });
+    expect(await within(dialog).findByLabelText('Title')).toHaveValue(
+      'The Scale Cycle'
+    );
+  });
+
+  it('offers no Edit on a row the viewer may not edit', async () => {
+    // A series whose credits do not include the session Account (a stale list).
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [
+        {
+          ...seriesFixture,
+          authors: seriesFixture.authors.filter(
+            ({ login }) => login === 'cora'
+          ),
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Series' }));
+    await screen.findByRole('link', { name: 'The Scale Cycle' });
+
+    expect(
+      screen.queryByRole('button', { name: 'Edit The Scale Cycle' })
+    ).toBeNull();
   });
 
   it('says so when the author has no series yet', async () => {
