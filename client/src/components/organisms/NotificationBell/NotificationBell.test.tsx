@@ -1,7 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
-import { NOTIFICATION_STREAM_EVENT } from 'shared';
+import { NOTIFICATION_READ_TTL_MS, NOTIFICATION_STREAM_EVENT } from 'shared';
 import { NotificationBell } from './NotificationBell';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
@@ -221,8 +221,9 @@ describe('NotificationBell', () => {
   });
 
   it('asks the server to mark nothing when everything is already read', async () => {
+    // Read just now: a row read over a minute ago is no longer shown.
     mockedNotifications.listNotifications.mockResolvedValue(
-      page([notification({ readAt: '2026-09-26T10:00:00.000Z' })])
+      page([notification({ readAt: new Date().toISOString() })])
     );
     renderWithProviders(<NotificationBell userId={3} />);
 
@@ -327,6 +328,143 @@ describe('NotificationBell', () => {
     expect(
       await screen.findByText(formatDateTime('2026-09-12T10:00:00.000Z'))
     ).toBeInTheDocument();
+  });
+});
+
+const NOW = Date.parse('2026-09-26T12:00:00.000Z');
+// Mirrors the row's collapse; jsdom runs no transition.
+const COLLAPSE_MS = 200;
+const readAgo = (ms: number) => new Date(NOW - ms).toISOString();
+
+describe('NotificationBell read expiry', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const openBell = async (items: PublicNotification[]) => {
+    mockedNotifications.listNotifications.mockResolvedValue(page(items));
+    const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+    renderWithProviders(<NotificationBell userId={3} />);
+    await user.click(
+      await screen.findByRole('button', { name: /^Notifications/ })
+    );
+    return user;
+  };
+
+  it('drops a read row once readAt plus the TTL passes, and keeps the others', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+      notification({
+        id: 2,
+        work: { type: 'book', id: 8, title: 'Salt and Candlelight' },
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(10_000 + COLLAPSE_MS);
+    });
+
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+    expect(
+      screen.getByText('Salt and Candlelight', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps a read row until the TTL, not a moment before', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(9_999);
+    });
+
+    expect(
+      screen.getByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('does not show a row that expired in the cache before the popover opened', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS + 5_000),
+      }),
+    ]);
+
+    expect(
+      await screen.findByText('No notifications yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('The Glass Harbour', { exact: false })
+    ).toBeNull();
+  });
+
+  it('shows the empty state once the last row has gone', async () => {
+    await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 1_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1_000 + COLLAPSE_MS);
+    });
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+  });
+
+  it('never drops an unread row, however long the popover stays open', async () => {
+    await openBell([notification({ id: 1 })]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(10 * NOTIFICATION_READ_TTL_MS);
+    });
+
+    expect(
+      screen.getByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+  });
+
+  it('clears the row timers when the popover closes', async () => {
+    const user = await openBell([
+      notification({
+        id: 1,
+        readAt: readAgo(NOTIFICATION_READ_TTL_MS - 10_000),
+      }),
+    ]);
+    expect(
+      await screen.findByText('The Glass Harbour', { exact: false })
+    ).toBeInTheDocument();
+    const whileOpen = jest.getTimerCount();
+
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(jest.getTimerCount()).toBeLessThan(whileOpen));
   });
 });
 

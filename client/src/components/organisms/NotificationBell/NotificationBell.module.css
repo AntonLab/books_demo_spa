@@ -9,6 +9,20 @@
 .item {
   padding: var(--ant-padding-xs) var(--ant-padding-sm);
   border-radius: var(--ant-border-radius-sm);
+  /* A start value for the collapse: room for a three-line row. */
+  max-height: calc(var(--ant-control-height-lg) * 4);
+  transition:
+    opacity var(--ant-motion-duration-mid),
+    max-height var(--ant-motion-duration-mid),
+    padding var(--ant-motion-duration-mid);
+}
+
+.leaving {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 .fresh {
