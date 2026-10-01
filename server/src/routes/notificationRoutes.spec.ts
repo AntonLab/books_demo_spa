@@ -33,6 +33,9 @@ function createFakeRepository(calls: unknown[] = []): NotificationRepository {
       calls.push({ markRead: userId, ids });
       return 0;
     },
+    async deleteReadBefore() {
+      return 0;
+    },
     async getSettings(userId: number) {
       calls.push({ getSettings: userId });
       return { emailNotifications: true };

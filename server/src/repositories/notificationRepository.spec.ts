@@ -21,7 +21,7 @@ import { Chapter } from '../models/Chapter.ts';
 import { Notification } from '../models/Notification.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
-import type { PublicNotification } from 'shared';
+import { NOTIFICATION_READ_TTL_MS, type PublicNotification } from 'shared';
 import type { Role } from '../types/permission.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import {
@@ -501,6 +501,68 @@ describe('notifications against real MySQL', { skip }, () => {
     assert.equal(await notifications.markRead(ben.id, [row.id]), 0);
     await row.reload();
     assert.deepEqual(row.readAt, earlier);
+  });
+
+  test('list hides a notification read more than a minute ago, and total and unread agree', async () => {
+    const a = await works.series.create('Fresh', ann.id);
+    await series.addCoAuthor(a, ben.id, ann);
+    const b = await works.series.create('Just read', ann.id);
+    await series.addCoAuthor(b, ben.id, ann);
+    const c = await works.series.create('Long read', ann.id);
+    await series.addCoAuthor(c, ben.id, ann);
+    const rows = await Notification.findAll({
+      where: { userId: ben.id },
+      order: [['id', 'ASC']],
+    });
+    const [fresh, justRead, longRead] = rows;
+    assert.ok(fresh && justRead && longRead);
+    const now = Date.now();
+    await justRead.update({
+      readAt: new Date(now - NOTIFICATION_READ_TTL_MS + 5_000),
+    });
+    await longRead.update({
+      readAt: new Date(now - NOTIFICATION_READ_TTL_MS - 5_000),
+    });
+
+    const page = await notifications.list(ben.id, { limit: 20, offset: 0 });
+
+    assert.deepEqual(
+      page.items.map((item) => item.work.title),
+      ['Just read', 'Fresh']
+    );
+    assert.equal(page.total, 2);
+    assert.equal(page.unread, 1);
+    const paged = await notifications.list(ben.id, { limit: 1, offset: 1 });
+    assert.deepEqual(
+      paged.items.map((item) => item.work.title),
+      ['Fresh']
+    );
+    assert.equal(paged.total, 2);
+  });
+
+  test('deleteReadBefore removes only rows read before the cutoff, across accounts, and counts them', async () => {
+    const id = await works.series.create('Purged', ann.id);
+    await series.addCoAuthor(id, ben.id, ann);
+    await series.addCoAuthor(id, cleo.id, ann);
+    const cutoff = new Date('2026-09-20T12:00:00.000Z');
+    const [bens] = await Notification.findAll({ where: { userId: ben.id } });
+    const [cleos] = await Notification.findAll({ where: { userId: cleo.id } });
+    assert.ok(bens && cleos);
+    await bens.update({ readAt: new Date(cutoff.getTime() - 1) });
+    await cleos.update({ readAt: cutoff });
+    const other = await works.series.create('Still unread', ann.id);
+    await series.addCoAuthor(other, ben.id, ann);
+
+    assert.equal(await notifications.deleteReadBefore(cutoff), 1);
+
+    assert.equal(await Notification.count({ where: { id: bens.id } }), 0);
+    assert.equal(await Notification.count({ where: { id: cleos.id } }), 1);
+    // An unread row has a null readAt and is never purged.
+    assert.equal(
+      await Notification.count({ where: { userId: ben.id, readAt: null } }),
+      1
+    );
+    assert.equal(await notifications.deleteReadBefore(cutoff), 0);
   });
 
   test('a new account has email notifications on', async () => {
