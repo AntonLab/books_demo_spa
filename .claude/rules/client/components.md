@@ -81,6 +81,10 @@ that read like mistakes and are not.
 
 ## Forms and pickers
 
+- Every modal holding a form uses `DiscardGuardModal`, except
+  `CommentComposerModal` (its text is Unsaved text). Pass `form` only while the
+  `Form` is mounted. A successful submit calls `onClose` itself and so skips
+  the guard.
 - `BookForm` / `SeriesForm`: the Series and Genre selects are `allowClear`,
   with "No series" / "No genre" as placeholders, not options. An empty or
   cleared select is `undefined` inside the form and leaves as an explicit
