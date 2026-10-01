@@ -1,7 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Form, Input, Modal, Space } from 'antd';
+import { Alert, Button, Form, Input, Space } from 'antd';
 import { useLogin } from '@/queries/auth';
+import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
 import spacing from '@/theme/spacing.module.css';
 
@@ -31,7 +32,12 @@ export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   };
 
   return (
-    <Modal open title="Log in" onCancel={onClose} footer={null}>
+    <DiscardGuardModal
+      title="Log in"
+      onClose={onClose}
+      footer={null}
+      form={form}
+    >
       {formError !== null && (
         <Alert type="error" title={formError} className={spacing.gapBelow} />
       )}
@@ -79,6 +85,6 @@ export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           </Button>
         </Space>
       </Form>
-    </Modal>
+    </DiscardGuardModal>
   );
 };

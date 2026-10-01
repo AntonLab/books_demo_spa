@@ -108,4 +108,24 @@ describe('LoginModal', () => {
 
     expect(onOpen).toHaveBeenCalledWith('register');
   });
+
+  it('closes at once when nothing was typed', async () => {
+    renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before discarding typed input, and closes on confirm', async () => {
+    renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText('Login'), 'bob');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

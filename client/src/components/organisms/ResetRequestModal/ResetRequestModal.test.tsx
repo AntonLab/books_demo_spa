@@ -94,4 +94,46 @@ describe('ResetRequestModal', () => {
 
     expect(onOpen).toHaveBeenCalledWith('login');
   });
+
+  it('closes at once when nothing was typed', async () => {
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks before discarding typed input, and closes on confirm', async () => {
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
+
+    await userEvent.type(screen.getByLabelText('Email'), 'bob');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes without asking once the reset link was sent', async () => {
+    mockedAuth.requestReset.mockResolvedValue(undefined);
+    renderWithProviders(
+      <ResetRequestModal onOpen={onOpen} onClose={onClose} />
+    );
+
+    await userEvent.type(screen.getByLabelText('Email'), 'bob@example.com');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Send reset link' })
+    );
+    await screen.findByText(CONFIRMATION);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByText('Discard changes?')).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

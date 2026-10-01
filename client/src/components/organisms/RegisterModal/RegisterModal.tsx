@@ -1,7 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, Button, Checkbox, Form, Input, Modal } from 'antd';
+import { Alert, Button, Checkbox, Form, Input } from 'antd';
 import { useRegister } from '@/queries/auth';
+import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ApiError } from '@/api/client';
 import { NewPasswordFields } from '@/components/molecules/NewPasswordFields/NewPasswordFields';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
@@ -66,7 +67,12 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   };
 
   return (
-    <Modal open title="Create an account" onCancel={onClose} footer={null}>
+    <DiscardGuardModal
+      title="Create an account"
+      onClose={onClose}
+      footer={null}
+      form={form}
+    >
       {formError !== null && (
         <Alert type="error" title={formError} className={spacing.gapBelow} />
       )}
@@ -144,6 +150,6 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           Already have an account?
         </Button>
       </Form>
-    </Modal>
+    </DiscardGuardModal>
   );
 };

@@ -157,4 +157,50 @@ describe('ResetConfirmModal', () => {
     ).toBeInTheDocument();
     expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
   });
+
+  it('asks before discarding a typed password, and leaves on confirm', async () => {
+    renderWithProviders(
+      <>
+        <ResetConfirmModal token="tok-123" />
+        <LocationProbe />
+      </>,
+      { ...withSession(), route: '/reset-password?token=tok-123' }
+    );
+
+    await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/reset-password?token=tok-123'
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+  });
+
+  it('closes without asking once the password was reset', async () => {
+    mockedAuth.confirmReset.mockResolvedValue(undefined);
+    renderWithProviders(
+      <>
+        <ResetConfirmModal token="tok-123" />
+        <LocationProbe />
+      </>,
+      { ...withSession(), route: '/reset-password?token=tok-123' }
+    );
+
+    await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
+    await userEvent.type(
+      screen.getByLabelText('Confirm password'),
+      'newsecret1'
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Set new password' })
+    );
+    await screen.findByText('Your password has been reset.');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(screen.queryByText('Discard changes?')).toBeNull();
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+  });
 });
