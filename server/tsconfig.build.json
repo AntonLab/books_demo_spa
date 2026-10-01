@@ -5,6 +5,7 @@
     "node_modules",
     "src/**/*.spec.ts",
     "src/**/*.testkit.ts",
+    "src/**/*.typetest.ts",
     "src/db/seed/**"
   ]
 }

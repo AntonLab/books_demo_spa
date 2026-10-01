@@ -82,3 +82,23 @@ export const SEARCH_TEXT_MAX_LENGTH = 200;
 // after its "to"): the server's zod refinement and the client's form rule
 // both say this, so the error reads the same whichever one catches it.
 export const RANGE_ORDER = 'Must not be after the end date.';
+
+// The body of POST /api/books. No userId: the first Co-author is whoever is
+// signed in. Stricter than the server, which defaults `seriesId` and `tags`;
+// the form always sends both.
+export interface CreateBookPayload {
+  title: string;
+  description: string;
+  tags: string[];
+  seriesId: number | null;
+  // Optional, because the wire contract is: absent means `null` on create and
+  // "leave the Genre as it is" on PATCH. JSON.stringify drops an undefined key,
+  // so omitting it here is what sends nothing.
+  genreId?: number | null;
+}
+
+// The body of PATCH /api/books/:id. Every field optional, as the server's
+// schema is. `status` is here and not on create: a new book is always a draft.
+export type UpdateBookPayload = Partial<CreateBookPayload> & {
+  status?: BookStatus;
+};

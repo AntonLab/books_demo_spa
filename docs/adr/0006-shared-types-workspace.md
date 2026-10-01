@@ -47,7 +47,12 @@ shared arrays, but no schema is shared, so zod never enters the client bundle.
 - `shared` has no `build` or `test` script, so the root fan-outs of both run
   with `--if-present`. `Wire<T>` is pinned by type-level assertions in
   `wire.typetest.ts`, which `npm run typecheck` checks.
-- Only the response shapes are shared. The client's request payloads are still
-  written by hand beside its API calls, and what the server's controllers wrap
-  around a result (the list envelope's `limit` and `offset`) is not
-  type-checked against the shared `ListResponse`.
+- The client's request payloads are shared too, as plain types, alongside the
+  field limits both sides check and the reset-link path the server mails and
+  the client routes. The server parses with its own schemas, so
+  `server/src/types/payloads.typetest.ts` pins each payload as assignable to
+  its schema's `z.input`, in that direction only: the client may be stricter
+  than the server's defaults. What the server's controllers wrap around a
+  paged result (the list envelope's `limit` and `offset`) is still not
+  type-checked against the shared `ListResponse`; the unpaged `ItemsResponse`
+  is, through `satisfies`.

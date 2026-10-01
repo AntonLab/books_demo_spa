@@ -2,8 +2,9 @@ import { request } from './client';
 import type {
   PagedResponse,
   BookSort,
-  BookStatus,
+  CreateBookPayload,
   SearchableBookStatus,
+  UpdateBookPayload,
 } from 'shared';
 import type { BookDetail, PublicBook } from '../types/book';
 
@@ -31,23 +32,6 @@ export interface ListBooksParams {
   current?: number;
   pageSize?: number;
 }
-
-export interface CreateBookPayload {
-  title: string;
-  description: string;
-  tags: string[];
-  seriesId: number | null;
-  // Optional, because the wire contract is: absent means `null` on create and
-  // "leave the Genre as it is" on PATCH. JSON.stringify drops an undefined key,
-  // so omitting it here is what sends nothing.
-  genreId?: number | null;
-}
-
-// Every field optional, as the server's PATCH schema is. `status` is here and
-// not on create: a new book is always a draft.
-export type UpdateBookPayload = Partial<CreateBookPayload> & {
-  status?: BookStatus;
-};
 
 // Every filter combines with the others by AND. Written in the order the
 // caller gave them; an undefined or empty value is left out, since the server

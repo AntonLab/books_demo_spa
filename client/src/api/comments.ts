@@ -1,14 +1,8 @@
 import { request } from './client';
-import type { ListResponse } from 'shared';
+import type { CreateCommentPayload, ListResponse } from 'shared';
 import type { CommentWithAuthor, PublicComment } from '../types/api';
 
 const COMMENTS_PAGE_SIZE = 100;
-
-export interface CreateCommentPayload {
-  bookId: number;
-  parentId: number | null;
-  text: string;
-}
 
 export const listComments = (
   bookId: number

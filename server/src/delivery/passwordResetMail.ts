@@ -1,9 +1,8 @@
+import { PASSWORD_RESET_PATH } from 'shared';
 import type { MailMessage } from './mailDelivery.ts';
 
-// The path is a contract with the client spec, which routes /reset-password to
-// the confirm modal. The two must not drift.
 export function resetUrl(baseUrl: string, token: string): string {
-  const url = new URL('/reset-password', baseUrl);
+  const url = new URL(PASSWORD_RESET_PATH, baseUrl);
   url.searchParams.set('token', token);
   return url.toString();
 }

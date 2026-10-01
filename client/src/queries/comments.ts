@@ -4,8 +4,8 @@ import {
   deleteComment,
   listComments,
   updateComment,
-  type CreateCommentPayload,
 } from '../api/comments';
+import type { CreateCommentPayload } from 'shared';
 import { queryKeys } from './keys';
 
 export const useComments = (bookId: number) => {

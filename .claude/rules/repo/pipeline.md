@@ -11,7 +11,9 @@ paths:
 
 Six subagents carry the superpowers pipeline's role rules, so a dispatch sends
 only per-call values. Bodies come from superpowers 6.4.1 templates (named under
-each frontmatter); re-sync them when those change.
+each frontmatter); re-sync them when those change. `.claude/agents/` is
+git-ignored, so the files live only in the clone that has them; without them,
+fall back to the skill's own templates.
 
 - **Before `plan-writer`, save the spec** to
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored) and

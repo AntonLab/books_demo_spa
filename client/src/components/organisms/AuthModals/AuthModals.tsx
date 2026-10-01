@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
+import { PASSWORD_RESET_PATH } from 'shared';
 import { LoginModal } from '@/components/organisms/LoginModal/LoginModal';
 import { RegisterModal } from '@/components/organisms/RegisterModal/RegisterModal';
 import { ResetConfirmModal } from '@/components/organisms/ResetConfirmModal/ResetConfirmModal';
@@ -24,11 +25,11 @@ export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
 
-  // The emailed link is <APP_BASE_URL>/reset-password?token=... — built by
-  // `resetUrl()` in server/src/delivery/passwordResetMail.ts. The path and the
-  // query key must not drift. Leaving the path closes the modal.
+  // The emailed link is <APP_BASE_URL><PASSWORD_RESET_PATH>?token=... — built
+  // by `resetUrl()` in server/src/delivery/passwordResetMail.ts. The query key
+  // must not drift. Leaving the path closes the modal.
   const resetToken =
-    pathname === '/reset-password' ? searchParams.get('token') : null;
+    pathname === PASSWORD_RESET_PATH ? searchParams.get('token') : null;
   if (resetToken) {
     return <ResetConfirmModal token={resetToken} />;
   }

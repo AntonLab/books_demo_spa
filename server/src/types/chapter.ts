@@ -1,7 +1,7 @@
+import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
 import { z } from 'zod';
 import { idSchema } from './params.ts';
 
-export const CHAPTER_TITLE_MAX_LENGTH = 255;
 // Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
 // were a 4-byte astral one, a million of them reach 4 MB.
 export const CHAPTER_TEXT_MAX_LENGTH = 1_000_000;

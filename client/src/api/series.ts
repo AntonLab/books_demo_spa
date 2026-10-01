@@ -1,5 +1,5 @@
 import { request } from './client';
-import type { ListResponse } from 'shared';
+import type { ItemsResponse, ListResponse, SeriesPayload } from 'shared';
 import type {
   PublicSeries,
   SeriesBookSummary,
@@ -36,15 +36,6 @@ export const listSeries = (
 export const getSeries = (id: number): Promise<SeriesDetail> => {
   return request<SeriesDetail>(`/series/${id}`);
 };
-
-export interface SeriesPayload {
-  title: string;
-  description: string;
-  tags: string[];
-  // Optional for the same reason as on a book: absent means `null` on create
-  // and "leave it alone" on PATCH.
-  genreId?: number | null;
-}
 
 export const createSeries = (payload: SeriesPayload): Promise<PublicSeries> => {
   return request<PublicSeries>('/series', { method: 'POST', body: payload });
@@ -89,8 +80,8 @@ export const removeSeriesCoAuthor = (
 // in Series order. Only its Co-authors and Moderators may read it.
 export const listSeriesBooks = (
   seriesId: number
-): Promise<{ items: SeriesBookSummary[] }> => {
-  return request<{ items: SeriesBookSummary[] }>(`/series/${seriesId}/books`);
+): Promise<ItemsResponse<SeriesBookSummary>> => {
+  return request<ItemsResponse<SeriesBookSummary>>(`/series/${seriesId}/books`);
 };
 
 // The series' whole Series order, first book first. The server answers 409

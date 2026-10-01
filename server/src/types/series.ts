@@ -1,24 +1,11 @@
 import { z } from 'zod';
 import { idSchema } from './params.ts';
-
-const SERIES_TAG_MAX_LENGTH = 32;
-const SERIES_MAX_TAGS = 20;
-const SERIES_DESCRIPTION_MAX_LENGTH = 5000;
-const SERIES_TITLE_MAX_LENGTH = 255;
-
-// Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
-// anyway — collapsing them here keeps what lands in the JSON column canonical.
-const tagListSchema = z
-  .array(z.string().trim().min(1).max(SERIES_TAG_MAX_LENGTH))
-  .max(SERIES_MAX_TAGS)
-  .transform((tags) => [...new Set(tags)]);
-
-const descriptionSchema = z.string().min(1).max(SERIES_DESCRIPTION_MAX_LENGTH);
-// Trimmed, unlike descriptionSchema and for the reason recorded in
-// types/chapter.ts: a title is echoed in every summary list, where stray
-// whitespace is pure noise. Trimming runs before the length checks, so a
-// whitespace-only title fails min(1) rather than landing as an empty string.
-const titleSchema = z.string().trim().min(1).max(SERIES_TITLE_MAX_LENGTH);
+import {
+  WORK_TAG_MAX_LENGTH,
+  workDescriptionSchema as descriptionSchema,
+  workTagListSchema as tagListSchema,
+  workTitleSchema as titleSchema,
+} from './work.ts';
 
 // No userId: the first Co-author is whoever is signed in, never someone the
 // body names. Without that, an author could create a series credited to
@@ -60,7 +47,7 @@ export const listSeriesQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
   userId: idSchema.optional(),
   genreId: idSchema.optional(),
-  tag: z.string().min(1).max(SERIES_TAG_MAX_LENGTH).optional(),
+  tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),
 });
 

@@ -1,4 +1,5 @@
 import { request } from './client';
+import type { ItemsResponse } from 'shared';
 import type { AuthorSummary } from '../types/api';
 
 // The Co-author picker's search: accounts holding the author Role, never with
@@ -6,7 +7,7 @@ import type { AuthorSummary } from '../types/api';
 // lists the first authors instead.
 export const searchAuthors = async (q: string): Promise<AuthorSummary[]> => {
   const query = q ? `?${new URLSearchParams({ q }).toString()}` : '';
-  const { items } = await request<{ items: AuthorSummary[] }>(
+  const { items } = await request<ItemsResponse<AuthorSummary>>(
     `/authors${query}`
   );
   return items;

@@ -128,5 +128,7 @@ The directories are what their names say; these are what they do not:
 - `*.testkit.ts` means test support and is never emitted. `src/db/seed/` is not
   test support and carries no such suffix; `tsconfig.build.json` excludes the
   directory instead.
-- `types/` holds the zod schemas only; response types and shared unions are
-  imported from `shared`, so a change to what the API returns starts there.
+- `types/` holds the zod schemas only; response types, request payloads and
+  shared unions are imported from `shared`, so a change to what the API takes
+  or returns starts there. `types/payloads.typetest.ts` fails `typecheck` when
+  a shared payload no longer fits its route's schema.

@@ -1,18 +1,13 @@
 import { request } from './client';
-import type { PublicGenre } from 'shared';
-
-// Both writes send the same one-field body, so one payload type covers them.
-export interface GenrePayload {
-  name: string;
-}
+import type { GenrePayload, ItemsResponse, PublicGenre } from 'shared';
 
 // Sorted by name, with no paging: the list is short and the header's submenu
 // shows all of it, so the response is `{ items }` rather than a paged
 // envelope. `nonEmpty` keeps only Genres with a Book in progress or complete.
 export const listGenres = (
   params: { nonEmpty?: boolean } = {}
-): Promise<{ items: PublicGenre[] }> => {
-  return request<{ items: PublicGenre[] }>(
+): Promise<ItemsResponse<PublicGenre>> => {
+  return request<ItemsResponse<PublicGenre>>(
     params.nonEmpty ? '/genres?nonEmpty=true' : '/genres'
   );
 };

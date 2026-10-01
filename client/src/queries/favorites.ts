@@ -6,7 +6,7 @@ import {
   listFavoriteBooks,
   listFavoriteSeries,
 } from '../api/favorites';
-import type { CreateFavoritePayload } from '../types/api';
+import type { CreateFavoritePayload } from 'shared';
 import { queryKeys } from './keys';
 
 export const FAVORITES_PAGE_SIZE = 20;

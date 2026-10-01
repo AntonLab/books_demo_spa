@@ -39,7 +39,9 @@ code alone does not explain.
   default 20), not `limit` / `offset`, and answers `PagedResponse`
   (`{ items, total, current, pageSize }`). It counts first: past the end it
   serves the last non-empty page, page 1 when nothing matches, and says so in
-  `current`. Every other list keeps `limit` / `offset` and `ListResponse`.
+  `current`. Every other paged list keeps `limit` / `offset` and
+  `ListResponse`; a short list served whole (Genres, authors, a series'
+  books) answers `ItemsResponse`, checked with `satisfies` at `res.json`.
 - `?sort=popular|new|updated` ranks by Popularity, Release time or Last update
   (CONTEXT.md), best first, ties to the higher id, overriding Series order.
   Each is a correlated subquery on the book row; `new` and `updated` drop a

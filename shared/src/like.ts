@@ -8,3 +8,11 @@ export interface PublicLike {
   // No updatedAt: the table keeps createdAt alone.
   createdAt: Date;
 }
+
+// The body of POST /api/likes: exactly one target. No userId: the server takes
+// the liker from the session. `isLike` separates a like from a dislike.
+export interface CreateLikePayload {
+  bookId?: number;
+  commentId?: number;
+  isLike: boolean;
+}

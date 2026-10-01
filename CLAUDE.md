@@ -8,7 +8,8 @@ of them read.
 
 - `client/` — React 19 SPA. See `client/CLAUDE.md`.
 - `server/` — Express 5 + Sequelize/MySQL API. See `server/CLAUDE.md`.
-- `shared/` — what the API returns and the string unions both packages use,
+- `shared/` — what the API returns, the request bodies the client sends, the
+  field limits both sides check, and the string unions both packages use,
   as TypeScript source with no build step (ADR-0006). Response types are in the
   server's shape (dates as `Date`); the client reads each through `Wire<T>`,
   which turns every `Date` into a string. Each union derives from an
@@ -134,6 +135,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   no dev server, takes no snapshot and never Reads a screenshot.
 - **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
   `general-purpose`: the latter ran on Sonnet and loaded the full context.
+- `.claude/agents/` is git-ignored: each clone keeps its own copy, and a fresh
+  clone has none, so every agent named here and in `pipeline.md` exists only
+  where someone put the files by hand. A dispatch to a missing one fails.
 - Every agent in `.claude/agents/` preloads `caveman`: its final message is
   caveman, while the files it writes stay normal prose. Needs the `caveman`
   plugin; a missing skill preloads nothing, silently.

@@ -4,8 +4,8 @@ import {
   deleteGenre,
   listGenres,
   renameGenre,
-  type GenrePayload,
 } from '../api/genres';
+import type { GenrePayload } from 'shared';
 import { queryKeys } from './keys';
 
 // The whole list, unpaged: the header's submenu, both forms' select and the

@@ -8,8 +8,8 @@ import {
   removeBookFromSeries,
   reorderSeriesBooks,
   updateSeries,
-  type SeriesPayload,
 } from '../api/series';
+import type { SeriesPayload } from 'shared';
 import type { SeriesBookSummary } from '../types/api';
 import { queryKeys } from './keys';
 import { useOptimisticReorder } from './reorder';

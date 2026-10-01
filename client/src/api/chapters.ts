@@ -1,5 +1,9 @@
 import { request } from './client';
-import type { ListResponse } from 'shared';
+import type {
+  CreateChapterPayload,
+  ListResponse,
+  UpdateChapterPayload,
+} from 'shared';
 import type { ChapterSummary, PublicChapter } from '../types/chapter';
 
 // The server caps limit at 100. A book with more chapters than that would need
@@ -18,27 +22,6 @@ export const listChapters = (
 export const getChapter = (id: number): Promise<PublicChapter> => {
   return request<PublicChapter>(`/chapters/${id}`);
 };
-
-// How a save sets the Publication time: 'now' publishes at the server's clock,
-// an ISO instant schedules, and null keeps the chapter a draft.
-export type PublishedAtPayload = 'now' | string | null;
-
-export interface CreateChapterPayload {
-  bookId: number;
-  title: string;
-  text: string;
-  publishedAt: PublishedAtPayload;
-}
-
-// `expectedUpdatedAt` is the version this save was based on; the server
-// answers 409 if the chapter changed since. `publishedAt` is left out to keep
-// the Publication time as it is — the only way to edit a Published chapter.
-export interface UpdateChapterPayload {
-  title?: string;
-  text?: string;
-  publishedAt?: PublishedAtPayload;
-  expectedUpdatedAt: string;
-}
 
 export const createChapter = (
   payload: CreateChapterPayload

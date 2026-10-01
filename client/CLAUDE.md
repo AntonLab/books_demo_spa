@@ -95,8 +95,8 @@ in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
   `src/api/client`, and components and pages import `@/api` only as types,
   plus `ApiError`.
 - **Types come from `shared`** through `Wire<T>`: dates cross the wire as ISO
-  strings. `src/types/` adds only client-side labels, helpers and request
-  payloads. Format a date through `src/format/date.ts` only (fixed `en` locale,
+  strings. Request payloads and field limits come from `shared` as they are;
+  `src/types/` adds only client-side labels and helpers. Format a date through `src/format/date.ts` only (fixed `en` locale,
   the browser's time zone).
 - **`noUncheckedIndexedAccess`**: component code handles a miss with `?.`/`??`
   or an early return; only tests (`*.test.ts(x)`, `src/test/`) may write `!`
