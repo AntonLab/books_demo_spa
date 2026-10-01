@@ -1,17 +1,30 @@
+---
+status: accepted
+date: 2026-09-13
+---
+
 # Response types live in a source-only `shared` workspace
 
 The client used to keep hand-copied versions of the server's response types and
-string unions, and nothing failed when the two drifted apart. They now live in
-a third npm workspace, `shared`, consumed as TypeScript source with no build
-step: its `exports` point at `src/index.ts`, which the client's webpack and
-Jest transpile like their own code and the server's Node loads by stripping
-types. It holds what the API returns, written in the server's shape (dates as
-`Date`), and the `as const` arrays behind the string unions both packages use,
-with each union derived from its array. The client reads every shape through
-`Wire<T>`, which turns each `Date` into the ISO string it arrives as, so no
-copy with string dates is left to drift. Both packages import from `shared`
-directly; `client/src/types` keeps the `Wire<T>` aliases and `server/src/types`
-the zod schemas. zod stays out of it: the server's schemas build their enums from the
+string unions, and nothing failed when the two drifted apart.
+
+They now live in a third npm workspace, `shared`, consumed as TypeScript source
+with no build step: its `exports` point at `src/index.ts`, which the client's
+webpack and Jest transpile like their own code and the server's Node loads by
+stripping types.
+
+`shared` holds:
+
+- what the API returns, written in the server's shape (dates as `Date`);
+- the `as const` arrays behind the string unions both packages use, with each
+  union derived from its array.
+
+The client reads every shape through `Wire<T>`, which turns each `Date` into
+the ISO string it arrives as, so no copy with string dates is left to drift.
+Both packages import from `shared` directly; `client/src/types` keeps the
+`Wire<T>` aliases and `server/src/types` the zod schemas.
+
+zod stays out of `shared`: the server's schemas build their enums from the
 shared arrays, but no schema is shared, so zod never enters the client bundle.
 
 ## Considered Options

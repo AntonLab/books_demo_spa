@@ -1,18 +1,31 @@
+---
+status: accepted
+date: 2026-09-14
+---
+
 # Covers and Avatars are stored in MySQL, not on disk or in object storage
 
 A Book's Cover and an Account's Avatar are uploaded files, and their bytes live
 in MySQL, one row per Book or Account in a table of their own, served through an
-API route rather than as static files. We rejected a directory on the server's
-disk and S3-compatible object storage. Both leave a file behind whenever the
-database cascades a row away — deleting a Book, or an Account and the works it
-was the last Co-author of — and neither can join the transaction that writes the
-row, so a rolled-back write still leaves its file. Object storage would also add
-infrastructure to development, CI and every deployment. In MySQL the foreign
-key's cascade removes the picture with its owner in the same transaction, the
-per-suite test schemas isolate uploads for free, and a deployment needs
-no volume. The cost, a larger database and bytes read through Node, stays small
-because the server re-encodes every upload to a fixed size (a Cover of 600×900,
-an Avatar of 256×256) before storing it.
+API route rather than as static files.
+
+In MySQL the foreign key's cascade removes the picture with its Book or Account in
+the same transaction, the per-suite test schemas isolate uploads for free, and a
+deployment needs no volume.
+
+The cost, a larger database and bytes read through Node, stays small because
+the server re-encodes every upload to a fixed size (a Cover of 600×900, an
+Avatar of 256×256) before storing it.
+
+## Considered Options
+
+- **A directory on the server's disk** and **S3-compatible object storage.**
+  Both leave a file behind whenever the database cascades a row away — deleting
+  a Book, or an Account and the works it was the last Co-author of — and
+  neither can join the transaction that writes the row, so a rolled-back write
+  still leaves its file.
+- Object storage would also add infrastructure to development, CI and every
+  deployment.
 
 ## Consequences
 

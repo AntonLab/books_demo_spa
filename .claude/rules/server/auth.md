@@ -24,8 +24,8 @@ paths:
 - Session and reset tokens are stored as SHA-256 hashes, not argon2 (ADR-0001).
 - Login always opens a new session row, which rules out session fixation.
 - `resolveSessionUser` (`middleware/sessionUser.ts`) reports nobody for a
-  missing cookie, unknown token, expired session, deleted user or blocked
-  account: a guarded route answers 401, a public one serves a Guest.
+  missing cookie, unknown token, expired session, deleted or Blocked
+  Account: a guarded route answers 401, a public one serves a Guest.
 
 ## Login
 
@@ -47,8 +47,8 @@ paths:
 - Blocking ends the account's sessions in the same transaction, only on the
   transition into `blocked`. A block written straight into the table purges
   nothing; `resolveSessionUser` is the second layer that catches it.
-- Blocking does not touch content: no query filters by the author's `status`.
-  Hiding a blocked author's work is a separate Moderator action.
+- Blocking does not touch content: no query filters by a Co-author's `status`.
+  Hiding a Blocked Account's work is a separate Moderator action.
 - A password change through `PATCH /api/users/:id` ends every session on the
   account, the caller's included, and clears the caller's own `sid`.
 

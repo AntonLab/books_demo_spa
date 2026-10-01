@@ -1,3 +1,8 @@
+---
+status: accepted
+date: 2026-09-23
+---
+
 # Server state in TanStack Query, shared client state in Redux, the rest in components
 
 The client keeps three kinds of state apart:

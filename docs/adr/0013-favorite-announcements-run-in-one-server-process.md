@@ -1,16 +1,25 @@
+---
+status: accepted
+date: 2026-09-26
+---
+
 # Favorite announcements run in one server process
 
 New chapters and New books are announced by a pass that runs on a timer inside
-the API process, and whether an Account is Online is read from the live
+the API process. Whether an Account is Online is read from the live
 event-stream connections that same process holds in memory. Nothing is shared
-between processes, so the API must run as a single instance. We rejected an
-external scheduler or a job queue because a Scheduled chapter's Publication
-time passes without any request to hang the announcement on, and the one timer
-the server already runs (the expiry purge) shows an in-process interval is
-enough at this scale; a queue or a pub/sub broker would add infrastructure the
-project otherwise has no use for. We rejected announcing by time window ("since
-the last pass") because a Book that turns Published with Chapters already past
-their Publication time would fall outside every window.
+between processes, so the API must run as a single instance.
+
+## Considered Options
+
+- **An external scheduler or a job queue.** A Scheduled chapter's Publication
+  time passes without any request to hang the announcement on, and the one
+  timer the server already runs (the expiry purge) shows an in-process interval
+  is enough at this scale. A queue or a pub/sub broker would add infrastructure
+  the project otherwise has no use for.
+- **Announcing by time window** ("since the last pass"). A Book that turns
+  Published with Chapters already past their Publication time would fall
+  outside every window.
 
 ## Consequences
 

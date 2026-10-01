@@ -9,6 +9,10 @@ This is a single-context repo:
 - **`CONTEXT.md`** at the repo root — the glossary.
 - **`docs/adr/`** — read the ADRs that touch the area you're about to work in
   (`0005-co-authors-are-equal.md`, `0006-shared-types-workspace.md`, …).
+  Each opens with frontmatter: `status` (`accepted` or `superseded`), `date`,
+  and `supersedes` / `superseded-by` / `amends` / `amended-by` where another
+  ADR changed it. Skip a superseded ADR unless you need its history. A new ADR
+  carries the same fields, and the one it changes gets the reverse link.
 
 The `/domain-modeling` skill updates both when a term or a decision gets resolved.
 

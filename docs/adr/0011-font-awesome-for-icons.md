@@ -1,3 +1,9 @@
+---
+status: superseded
+date: 2026-09-24
+superseded-by: ADR-0012
+---
+
 # Icons come from Font Awesome, not @ant-design/icons
 
 Superseded by ADR-0012.
