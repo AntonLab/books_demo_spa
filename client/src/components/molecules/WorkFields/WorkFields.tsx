@@ -1,5 +1,6 @@
 import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
+import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
 import type { PublicGenre } from 'shared';
 
 // A select cannot hold `null` as an option value and stay clearable, so "No
@@ -22,7 +23,7 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
       label="Title"
       rules={[{ required: true, whitespace: true, message: 'Enter a title' }]}
     >
-      <Input maxLength={255} />
+      <Input maxLength={WORK_TITLE_MAX_LENGTH} />
     </Form.Item>
 
     <Form.Item
@@ -32,7 +33,7 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
         { required: true, whitespace: true, message: 'Enter a description' },
       ]}
     >
-      <Input.TextArea rows={4} maxLength={5000} />
+      <Input.TextArea rows={4} maxLength={WORK_DESCRIPTION_MAX_LENGTH} />
     </Form.Item>
 
     <Form.Item name="tags" label="Tags">

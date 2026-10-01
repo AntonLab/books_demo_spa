@@ -27,3 +27,14 @@ export interface SeriesDetail extends PublicSeries {
   // for a Guest and for an account without one.
   viewerFavoriteId: number | null;
 }
+
+// The body of POST /api/series; PATCH takes a Partial of it. No userId, as on
+// a book.
+export interface SeriesPayload {
+  title: string;
+  description: string;
+  tags: string[];
+  // Optional for the same reason as on a book: absent means `null` on create
+  // and "leave it alone" on PATCH.
+  genreId?: number | null;
+}

@@ -1,7 +1,6 @@
 import { request } from './client';
-import type { ListResponse } from 'shared';
+import type { CreateFavoritePayload, ListResponse } from 'shared';
 import type {
-  CreateFavoritePayload,
   FavoriteBook,
   FavoriteSeries,
   PublicFavorite,

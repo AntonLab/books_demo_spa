@@ -25,3 +25,7 @@ export interface FavoriteSeries {
   createdAt: Date;
   series: PublicSeries;
 }
+
+// The body of POST /api/favorites: exactly one target, as the server's schema
+// demands; no userId, since the server takes the Account from the session.
+export type CreateFavoritePayload = { bookId: number } | { seriesId: number };

@@ -1,4 +1,5 @@
 import type { RequestHandler } from 'express';
+import type { ItemsResponse, PublicGenre } from 'shared';
 import {
   validatedBody,
   validatedParams,
@@ -22,7 +23,8 @@ export function createGenreController(repository: GenreRepository) {
     // the list is short and every caller wants it whole.
     list: async (req, res) => {
       const { nonEmpty = false } = validatedQuery<ListGenresQuery>(req);
-      res.json({ items: await repository.list({ nonEmpty }) });
+      const items = await repository.list({ nonEmpty });
+      res.json({ items } satisfies ItemsResponse<PublicGenre>);
     },
 
     // A name already taken is the repository's ConflictError (409); a

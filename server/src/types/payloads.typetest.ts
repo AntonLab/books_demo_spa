@@ -1,0 +1,52 @@
+// Type-level assertions that every request body the client sends, as `shared`
+// declares it, still parses under the schema that guards its route. Nothing
+// runs this file: `npm run typecheck` compiles it, and a drift fails there as
+// `Type 'false' does not satisfy the constraint 'true'`.
+//
+// The check runs one way only, payload into `z.input`: the client may be
+// stricter than the server (it always sends `tags`, which the server would
+// default), but never send a key the schema does not know or omit one the
+// schema requires.
+import type {
+  CreateBookPayload,
+  CreateChapterPayload,
+  CreateCommentPayload,
+  CreateFavoritePayload,
+  CreateLikePayload,
+  GenrePayload,
+  SeriesPayload,
+  UpdateBookPayload,
+  UpdateChapterPayload,
+} from 'shared';
+import type { z } from 'zod';
+import type { createBookSchema, updateBookSchema } from './book.ts';
+import type { createChapterSchema, updateChapterSchema } from './chapter.ts';
+import type { createCommentSchema } from './comment.ts';
+import type { createFavoriteSchema } from './favorite.ts';
+import type { genreBodySchema } from './genre.ts';
+import type { createLikeSchema } from './like.ts';
+import type { createSeriesSchema, updateSeriesSchema } from './series.ts';
+
+type Expect<T extends true> = T;
+
+// Distributes over a union payload, so each of its members must fit.
+type Fits<Payload, Schema extends z.ZodType> =
+  Payload extends z.input<Schema>
+    ? keyof Payload extends keyof z.input<Schema>
+      ? true
+      : false
+    : false;
+
+// Exported only so that noUnusedLocals leaves the tuple alone.
+export type PayloadAssertions = [
+  Expect<Fits<CreateBookPayload, typeof createBookSchema>>,
+  Expect<Fits<UpdateBookPayload, typeof updateBookSchema>>,
+  Expect<Fits<SeriesPayload, typeof createSeriesSchema>>,
+  Expect<Fits<Partial<SeriesPayload>, typeof updateSeriesSchema>>,
+  Expect<Fits<CreateChapterPayload, typeof createChapterSchema>>,
+  Expect<Fits<UpdateChapterPayload, typeof updateChapterSchema>>,
+  Expect<Fits<CreateCommentPayload, typeof createCommentSchema>>,
+  Expect<Fits<GenrePayload, typeof genreBodySchema>>,
+  Expect<Fits<CreateLikePayload, typeof createLikeSchema>>,
+  Expect<Fits<CreateFavoritePayload, typeof createFavoriteSchema>>,
+];

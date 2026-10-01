@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
 import {
   CHAPTER_TEXT_MAX_LENGTH,
-  CHAPTER_TITLE_MAX_LENGTH,
   createChapterSchema,
   listChaptersQuerySchema,
   reorderChaptersSchema,

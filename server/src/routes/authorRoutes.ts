@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { AuthorSummary, ItemsResponse } from 'shared';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate, validatedQuery } from '../middleware/validate.ts';
 import {
@@ -25,7 +26,7 @@ export function createAuthorRoutes(deps: RouteDeps): Router {
     async (req, res) => {
       const query = validatedQuery<ListAuthorsQuery>(req);
       const items = await deps.userRepository.listAuthors(query);
-      res.json({ items });
+      res.json({ items } satisfies ItemsResponse<AuthorSummary>);
     }
   );
 

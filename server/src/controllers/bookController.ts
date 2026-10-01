@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from 'express';
+import type { ItemsResponse, SeriesBookSummary } from 'shared';
 import { processCoverImage } from '../images.ts';
 import {
   validatedBody,
@@ -139,7 +140,7 @@ export function createBookController(repository: BookRepository) {
 
       const items = await repository.listInSeries(id);
       if (!items) throw new NotFoundError('Series', id);
-      res.json({ items });
+      res.json({ items } satisfies ItemsResponse<SeriesBookSummary>);
     },
 
     reorderInSeries: async (req, res) => {

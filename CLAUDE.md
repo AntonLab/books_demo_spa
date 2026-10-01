@@ -8,7 +8,8 @@ of them read.
 
 - `client/` — React 19 SPA. See `client/CLAUDE.md`.
 - `server/` — Express 5 + Sequelize/MySQL API. See `server/CLAUDE.md`.
-- `shared/` — what the API returns and the string unions both packages use,
+- `shared/` — what the API returns, the request bodies the client sends, the
+  field limits both sides check, and the string unions both packages use,
   as TypeScript source with no build step (ADR-0006). Response types are in the
   server's shape (dates as `Date`); the client reads each through `Wire<T>`,
   which turns every `Date` into a string. Each union derives from an

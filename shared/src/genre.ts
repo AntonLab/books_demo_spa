@@ -11,3 +11,8 @@ export interface PublicGenre {
 // VARCHAR(50), and the client validates against this rather than waiting for
 // the server's 400.
 export const GENRE_NAME_MAX_LENGTH = 50;
+
+// The body of both writes, POST /api/genres and the rename PATCH.
+export interface GenrePayload {
+  name: string;
+}

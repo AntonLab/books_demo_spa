@@ -34,3 +34,11 @@ export interface CommentWithAuthor extends PublicComment {
   likeCount: number;
   viewerLikeId: number | null;
 }
+
+// The body of POST /api/comments. No userId: the author comes from the
+// session. A null parentId starts a thread.
+export interface CreateCommentPayload {
+  bookId: number;
+  parentId: number | null;
+  text: string;
+}

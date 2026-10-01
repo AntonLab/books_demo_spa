@@ -8,25 +8,12 @@ import {
 } from 'shared';
 import { z } from 'zod';
 import { idSchema } from './params.ts';
-
-const BOOK_TAG_MAX_LENGTH = 32;
-const BOOK_MAX_TAGS = 20;
-const BOOK_DESCRIPTION_MAX_LENGTH = 5000;
-const BOOK_TITLE_MAX_LENGTH = 255;
-
-// Duplicates carry no meaning in a tag set, and JSON_CONTAINS ignores them
-// anyway — collapsing them here keeps what lands in the JSON column canonical.
-const tagListSchema = z
-  .array(z.string().trim().min(1).max(BOOK_TAG_MAX_LENGTH))
-  .max(BOOK_MAX_TAGS)
-  .transform((tags) => [...new Set(tags)]);
-
-const descriptionSchema = z.string().min(1).max(BOOK_DESCRIPTION_MAX_LENGTH);
-// Trimmed, unlike descriptionSchema and for the reason recorded in
-// types/chapter.ts: a title is echoed in every summary list, where stray
-// whitespace is pure noise. Trimming runs before the length checks, so a
-// whitespace-only title fails min(1) rather than landing as an empty string.
-const titleSchema = z.string().trim().min(1).max(BOOK_TITLE_MAX_LENGTH);
+import {
+  WORK_TAG_MAX_LENGTH,
+  workDescriptionSchema as descriptionSchema,
+  workTagListSchema as tagListSchema,
+  workTitleSchema as titleSchema,
+} from './work.ts';
 
 // No userId: the first Co-author is whoever is signed in, never someone the
 // body names. Without that, an author could create a book credited to someone
@@ -96,7 +83,7 @@ export const listBooksQuerySchema = z
     userId: idSchema.optional(),
     seriesId: idSchema.optional(),
     genreId: idSchema.optional(),
-    tag: z.string().min(1).max(BOOK_TAG_MAX_LENGTH).optional(),
+    tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),
     q: searchTextSchema.optional(),
     // `draft` is not offered: no search lists a Draft book.
     status: z.enum(SEARCHABLE_BOOK_STATUSES).optional(),

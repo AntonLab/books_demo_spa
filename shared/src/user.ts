@@ -19,6 +19,10 @@ export interface PublicUser {
   updatedAt: Date;
 }
 
+// Where the emailed reset link lands: the server builds the link from it, and
+// the client routes it and reads the token there.
+export const PASSWORD_RESET_PATH = '/reset-password';
+
 // The longest term the Co-author picker's search accepts. The server refuses a
 // longer `q` with a 400, so the client stops typing here instead of showing
 // "No authors found" for a search that never ran.

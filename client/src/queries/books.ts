@@ -7,11 +7,9 @@ import {
   listBooks,
   updateBook,
   uploadBookCover,
-  type CreateBookPayload,
   type ListBooksParams,
-  type UpdateBookPayload,
 } from '../api/books';
-import type { BookSort } from 'shared';
+import type { BookSort, CreateBookPayload, UpdateBookPayload } from 'shared';
 import { PAGE_SIZE_MAX } from 'shared';
 import { queryKeys } from './keys';
 

@@ -12,6 +12,7 @@ import {
   Routes,
   useLocation,
 } from 'react-router';
+import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
@@ -119,7 +120,7 @@ export const AppShell: FC = () => {
               <Route path="/" element={<MainPage />} />
               {/* The emailed reset link lands here; AuthModals reads its
                   token and opens the confirm modal over the home page. */}
-              <Route path="/reset-password" element={<MainPage />} />
+              <Route path={PASSWORD_RESET_PATH} element={<MainPage />} />
               {/* A static segment outranks `:id`, so /books/new never reaches
                   BookPage whatever order these are declared in. */}
               <Route path="/books/new" element={<NewBookPage />} />
