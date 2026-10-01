@@ -245,6 +245,63 @@ describe('BookForm', () => {
     );
   });
 
+  it('clears a focused Series and Genre with Delete, for a keyboard user', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: [],
+          seriesId: 7,
+          genreId: 4,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    screen.getByLabelText('Series').focus();
+    await userEvent.keyboard('{Delete}');
+    screen.getByLabelText('Genre').focus();
+    await userEvent.keyboard('{Backspace}');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ seriesId: null, genreId: null })
+    );
+  });
+
+  it('leaves a value alone when Delete is pressed while the dropdown is open', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: [],
+          seriesId: null,
+          genreId: 4,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await userEvent.click(screen.getByLabelText('Genre'));
+    await userEvent.keyboard('{Delete}');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ genreId: 4 })
+    );
+  });
+
   it('submits the picked id after a select was cleared', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(

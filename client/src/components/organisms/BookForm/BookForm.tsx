@@ -1,6 +1,7 @@
 import type { FC } from 'react';
-import { Alert, Button, Form, Radio, Select } from 'antd';
+import { Alert, Button, Form, Radio } from 'antd';
 import type { FormInstance } from 'antd';
+import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
 import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import { BOOK_STATUSES } from 'shared';
 import { BOOK_STATUS_LABELS } from '@/types/book';
@@ -94,9 +95,8 @@ export const BookForm: FC<BookFormProps> = ({
       >
         <WorkFields genreOptions={genreOptions}>
           <Form.Item name="seriesId" label="Series">
-            <Select
+            <ClearableSelect
               aria-label="Series"
-              allowClear
               placeholder="No series"
               options={seriesOptions.map((series) => ({
                 value: series.id,

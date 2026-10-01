@@ -2,6 +2,7 @@ import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
 import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
 import type { PublicGenre } from 'shared';
+import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
 
 interface Props {
   genreOptions: PublicGenre[];
@@ -39,9 +40,8 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
     {children}
 
     <Form.Item name="genreId" label="Genre">
-      <Select
+      <ClearableSelect
         aria-label="Genre"
-        allowClear
         placeholder="No genre"
         options={genreOptions.map((genre) => ({
           value: genre.id,
