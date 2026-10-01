@@ -21,6 +21,16 @@ paths:
   files only from its working directory: from the main checkout, `/.claude/*`
   would hide every worktree file. ESLint is left to the pre-commit hook; typed
   linting per edit is too slow.
+- **`guard-shell.mjs`** (PreToolUse on Bash and PowerShell) refuses `sed -i`,
+  shell redirects and `tee` into anything but a temp or scratchpad path,
+  scripts calling `writeFileSync`/`open(…, 'w')`, `find` over a drive root,
+  and, outside a subagent (`agent_type` absent), a package-wide
+  `npm run typecheck|lint|format:check` or `npm test`; a focused
+  `npm test -w client -- <path>` passes. Prose rules alone failed: one
+  session broke each of them. A redirect to `$VAR/file` is refused too,
+  since the hook cannot resolve the variable; write the path literally.
+  Quoted text is skipped (a commit message may name `sed -i`), except a
+  quoted redirect target and a `node`/`python` script body.
 - **SessionStart runs `branch-check.mjs --warn`** on `startup` only: it
   fetches `origin/dev` and prints one line when the branch is behind, nothing
   otherwise, so a fresh branch costs no context. A failed fetch exits 0.

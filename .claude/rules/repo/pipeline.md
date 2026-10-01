@@ -28,11 +28,34 @@ fall back to the skill's own templates.
   not implementation bodies; `node scripts/plan-check.mjs <plan>` enforces it.
 - **A small feature skips plan-writer**: when the map names one workspace and
   up to about 10 files, the main session writes the plan itself (contracts,
-  plan-check green) and runs it Native (`superpowers:executing-plans`, then one
-  `sdd-final-reviewer`), since it reads those files anyway. Otherwise plan-writer,
-  then Native up to 5 tasks, `superpowers:subagent-driven-development` over 5.
-- **Run the gates through `gate-runner` before the final review** and pass
-  `gates green at <sha>` in its dispatch, so the reviewer does not rerun them.
+  plan-check green). Otherwise plan-writer. If plan-writer returns
+  `DONE_WITH_CONCERNS`, put its decisions and concerns to the user verbatim and
+  wait for the answers before Task 1; the work-modals run skipped them.
+- **The main session edits no source file while a plan runs.** Up to 5 tasks
+  run light: `bash scripts/sdd-step.sh next` writes each brief, one fresh
+  `sdd-implementer` per task, no task reviewer, then gate-runner and one
+  `sdd-final-reviewer`. Over 5 tasks, full
+  `superpowers:subagent-driven-development`. Do not run
+  `superpowers:executing-plans` inline: on the work-modals branch its two
+  parts cost the Opus session 10.8M tokens, close to all 11 implementers'
+  13.1M, and drove two of its three compactions.
+- **Run the gates through `gate-runner` before the final review**, in every
+  mode, and quote its last line in the dispatch (`gates green at <sha>`, with
+  the subset if it ran one). Never write that line yourself: the work-modals
+  run claimed typecheck and lint that never ran. The `guard-shell` hook
+  refuses a package-wide gate in the main session.
+- **A diff that touches `client/src` gets a `ui-checker` run** after the final
+  review's fixes and before `finishing-a-development-branch`: a numbered
+  checklist from the spec's user-visible behavior, the worktree as working
+  directory. It serves the worktree on ports 3100/4100 and never touches the
+  user's server on 3000. Its FAIL items are fixed like final-review findings.
+  On the work-modals branch it ran only on request, after finishing, and found
+  four defects every review had passed.
+- **Follow-ups live in a file, not in the chat.** Each deferred finding,
+  out-of-scope observation or unresolved item goes, the moment it appears, into
+  `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`.
+  Before the PR, each line is fixed or filed as an issue (`gh issue create`)
+  and marked so. A compaction summary dropped one such item on work-modals.
 - **In `superpowers:subagent-driven-development`, dispatch the named agents**:
   implementer → `sdd-implementer`, task reviewer → `sdd-task-reviewer`, scoped
   re-review → `sdd-re-reviewer`, final review → `sdd-final-reviewer`. Send only
@@ -58,11 +81,16 @@ fall back to the skill's own templates.
 - Tools and preloads live in each frontmatter; reviewers stay read-only by
   prompt. Grilling, `finishing-a-development-branch` and picking findings to
   fix stay in the main session: a subagent cannot ask the user anything.
+- **`/db-reset` is the user's command** (`disable-model-invocation`): when the
+  database needs a rebuild, ask the user to type it; the Skill call is refused.
+- **Each agent body carries a `<!-- Revised: YYYY-MM-DD … -->` line.** Bump it
+  with every change: the bodies are not in git, and a session diagnosis can
+  tell which version ran only from that line and the file's mtime.
 - **The controller creates the worktree before Task 1 with
   `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
   `.env.local` files an agent may not copy, and an install. Name the worktree
   after the spec's `<topic>`. Once the PR merges,
   `npm run worktree -- --remove <name>` deletes it with its branch,
-  `.playwright-mcp` and the `docs/superpowers` spec, code map and plan whose
-  topic is `<name>`; bare `git worktree remove` leaves the directory. No agent
+  `.playwright-mcp` and the `docs/superpowers` spec, code map, follow-ups and
+  plan whose topic is `<name>`; bare `git worktree remove` leaves the directory. No agent
   sets `isolation: worktree`: it hides implementer commits from the reviewer.
