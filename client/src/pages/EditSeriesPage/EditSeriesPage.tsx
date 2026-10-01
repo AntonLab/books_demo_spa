@@ -93,7 +93,7 @@ const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
 
       <Divider />
 
-      <Space direction="vertical">
+      <Space orientation="vertical">
         {remove.error && <Alert type="error" title={remove.error.message} />}
         <Popconfirm
           title="Delete this series?"

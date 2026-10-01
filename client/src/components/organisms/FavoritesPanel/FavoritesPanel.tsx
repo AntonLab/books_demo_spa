@@ -70,7 +70,7 @@ const FavoriteList: FC<FavoriteListProps> = ({
         rowKey="id"
         itemRender={(row) => (
           <Flex justify="space-between" align="center" gap="small">
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Link to={row.href}>{row.title}</Link>
               <Typography.Text type="secondary">
                 {row.authors
