@@ -139,3 +139,5 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   `/series/new` no longer exist, so an old link reaches `BookPage` /
   `SeriesPage` with the id `new`. Neither asks the server: `BookPage` shows
   "Could not load this book." and `SeriesPage` "This series no longer exists.".
+  `EditBookPage` / `EditSeriesPage` split into a guard and a view the same way,
+  so `/books/new/edit` shows the same message and asks nothing.

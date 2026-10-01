@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Divider,
+  Empty,
   Flex,
   Popconfirm,
   Skeleton,
@@ -19,8 +20,17 @@ import { seriesCapabilities } from '@/types/capabilities';
 import { useDeleteSeries, useSeries } from '@/queries/series';
 
 export const EditSeriesPage: FC = () => {
-  const navigate = useNavigate();
   const seriesId = Number(useParams().id);
+  // Not an id the server could answer for, so it is not asked.
+  return Number.isInteger(seriesId) && seriesId > 0 ? (
+    <EditSeriesView seriesId={seriesId} />
+  ) : (
+    <Empty description="This series no longer exists." />
+  );
+};
+
+const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
+  const navigate = useNavigate();
 
   const { data: session } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);

@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
 import type { FC } from 'react';
@@ -80,6 +80,29 @@ describe('DiscardGuardModal', () => {
 
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toHaveValue('x');
+  });
+
+  it('opens one confirm however often close is pressed, and asks again once it is answered', async () => {
+    const onClose = jest.fn();
+    renderWithProviders(<Harness onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText('Name'), 'x');
+    const closeIcon = screen.getByRole('button', { name: 'Close' });
+    fireEvent.click(closeIcon);
+    await screen.findByRole('button', { name: 'Keep editing' });
+    fireEvent.click(closeIcon);
+    fireEvent.click(closeIcon);
+
+    expect(document.querySelectorAll('.ant-modal-confirm')).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+    await waitFor(() =>
+      expect(document.querySelectorAll('.ant-modal-confirm')).toHaveLength(0)
+    );
+    fireEvent.click(closeIcon);
+
+    await screen.findByRole('button', { name: 'Keep editing' });
+    expect(document.querySelectorAll('.ant-modal-confirm')).toHaveLength(1);
   });
 
   it('still asks when a field was changed back to its first value', async () => {

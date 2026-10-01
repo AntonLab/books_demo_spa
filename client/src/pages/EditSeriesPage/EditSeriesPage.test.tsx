@@ -73,7 +73,10 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   ...overrides,
 });
 
-const renderPage = (session: PublicUser | null = account()) => {
+const renderPage = (
+  session: PublicUser | null = account(),
+  route = '/series/12/edit'
+) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
 
@@ -83,7 +86,7 @@ const renderPage = (session: PublicUser | null = account()) => {
       <Route path="/profile/my-books" element={<p>My books list</p>} />
       <Route path="/" element={<p>Main page</p>} />
     </Routes>,
-    { route: '/series/12/edit', queryClient }
+    { route, queryClient }
   );
 };
 
@@ -221,6 +224,17 @@ describe('EditSeriesPage', () => {
     expect(
       await screen.findByText('Could not load this series.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('EditSeriesPage with an id that is not a series id', () => {
+  it('says the series is gone and does not ask the server', async () => {
+    renderPage(account(), '/series/new/edit');
+
+    expect(
+      await screen.findByText('This series no longer exists.')
+    ).toBeInTheDocument();
+    expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 });
 

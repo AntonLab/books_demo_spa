@@ -81,7 +81,8 @@ const account = (overrides: Partial<PublicUser>): PublicUser => ({
 
 const renderPage = (
   session: PublicUser | null = account({}),
-  preloadedState?: Partial<RootState>
+  preloadedState?: Partial<RootState>,
+  route = '/books/1/edit'
 ) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
@@ -91,7 +92,7 @@ const renderPage = (
       <Route path="/books/:id/edit" element={<EditBookPage />} />
       <Route path="/profile/my-books" element={<p>My books list</p>} />
     </Routes>,
-    { route: '/books/1/edit', queryClient, preloadedState }
+    { route, queryClient, preloadedState }
   );
 };
 
@@ -196,6 +197,15 @@ describe('EditBookPage', () => {
     expect(
       await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
+  });
+
+  it('does not ask the server for an id that is not a book id', async () => {
+    renderPage(account({}), undefined, '/books/new/edit');
+
+    expect(
+      await screen.findByText('Could not load this book.')
+    ).toBeInTheDocument();
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
   it('offers the Unsaved text of a book that no longer exists', async () => {

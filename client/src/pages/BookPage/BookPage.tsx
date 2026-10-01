@@ -41,7 +41,7 @@ export const BookPage: FC = () => {
   return Number.isInteger(bookId) && bookId > 0 ? (
     <BookView bookId={bookId} />
   ) : (
-    <Alert type="error" message="Could not load this book." />
+    <Alert type="error" title="Could not load this book." />
   );
 };
 
@@ -61,7 +61,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       <>
         <Alert
           type="error"
-          message="Could not load this book."
+          title="Could not load this book."
           className={spacing.gapBelow}
         />
         {error instanceof ApiError && error.status === 404 && (

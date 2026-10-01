@@ -23,8 +23,17 @@ import { useBook, useDeleteBook } from '@/queries/books';
 import spacing from '@/theme/spacing.module.css';
 
 export const EditBookPage: FC = () => {
-  const navigate = useNavigate();
   const bookId = Number(useParams().id);
+  // Not an id the server could answer for, so it is not asked.
+  return Number.isInteger(bookId) && bookId > 0 ? (
+    <EditBookView bookId={bookId} />
+  ) : (
+    <Alert type="error" title="Could not load this book." />
+  );
+};
+
+const EditBookView: FC<{ bookId: number }> = ({ bookId }) => {
+  const navigate = useNavigate();
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
