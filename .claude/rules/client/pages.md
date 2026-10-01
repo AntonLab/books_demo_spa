@@ -137,4 +137,5 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   `Edit details` modal. My books creates in `BookCreateModal` /
   `SeriesCreateModal` and edits in the same edit modals. `/books/new` and
   `/series/new` no longer exist, so an old link reaches `BookPage` /
-  `SeriesPage` with the id `new` and shows their not-found state.
+  `SeriesPage` with the id `new`. Neither asks the server: `BookPage` shows
+  "Could not load this book." and `SeriesPage` "This series no longer exists.".
