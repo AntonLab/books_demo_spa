@@ -15,9 +15,11 @@ dist/
 
 # Claude Code, per clone: skills restored by `npm run skills` (.agents/ plus
 # the machine-specific junctions scripts/link-skills.mjs makes in
-# .claude/skills/; db-reset is hand-written and checked in), task worktrees,
-# personal settings. Everything else under .claude/ is shared.
+# .claude/skills/; db-reset is hand-written and checked in), subagent
+# definitions, task worktrees, personal settings. Everything else under
+# .claude/ is shared.
 /.agents/
+/.claude/agents/
 /.claude/skills/*
 !/.claude/skills/db-reset/
 /.claude/worktrees/
