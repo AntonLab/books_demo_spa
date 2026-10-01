@@ -15,8 +15,8 @@ interface BookCreateModalProps {
   onClose: () => void;
 }
 
-// Mounted only while open, so each opening starts with an empty form. Like
-// NewBookPage it collects the book's own fields: every new book is a draft.
+// Mounted only while open, so each opening starts with an empty form. It
+// collects the book's own fields: every new book is a draft.
 export const BookCreateModal: FC<BookCreateModalProps> = ({
   authorId,
   onClose,

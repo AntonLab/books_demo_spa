@@ -1,21 +1,22 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
   Button,
   Empty,
-  Flex,
   Listy,
   Skeleton,
   Space,
   Tabs,
   Typography,
 } from 'antd';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import { BookCreateModal } from '@/components/organisms/BookCreateModal/BookCreateModal';
 import { CardList } from '@/components/organisms/CardList/CardList';
+import { SeriesCreateModal } from '@/components/organisms/SeriesCreateModal/SeriesCreateModal';
 import { useMyBooks } from '@/queries/books';
 import { useMySeries } from '@/queries/series';
-import spacing from '@/theme/spacing.module.css';
 
 interface Props {
   // Always an Account holding the author Role: the caller gates on it.
@@ -28,7 +29,7 @@ interface Props {
 // on /api/series, which shows a Co-author their series even before it holds a
 // published book.
 export const MyBooksPanel: FC<Props> = ({ authorId }) => {
-  const navigate = useNavigate();
+  const [creating, setCreating] = useState<'book' | 'series' | null>(null);
   const books = useMyBooks(authorId);
   const series = useMySeries(authorId);
 
@@ -61,13 +62,15 @@ export const MyBooksPanel: FC<Props> = ({ authorId }) => {
 
   return (
     <>
-      <Flex justify="flex-end" className={spacing.gapBelow}>
-        <Button type="primary" onClick={() => void navigate('/books/new')}>
-          Create book
-        </Button>
-      </Flex>
-
       <Tabs
+        tabBarExtraContent={
+          <Space>
+            <Button type="primary" onClick={() => setCreating('book')}>
+              Create book
+            </Button>
+            <Button onClick={() => setCreating('series')}>Create series</Button>
+          </Space>
+        }
         items={[
           {
             key: 'books',
@@ -87,19 +90,20 @@ export const MyBooksPanel: FC<Props> = ({ authorId }) => {
           {
             key: 'series',
             label: 'Series',
-            children: (
-              <>
-                <Flex justify="flex-end" className={spacing.gapBelow}>
-                  <Button onClick={() => void navigate('/series/new')}>
-                    Create series
-                  </Button>
-                </Flex>
-                {seriesTab()}
-              </>
-            ),
+            children: seriesTab(),
           },
         ]}
       />
+
+      {creating === 'book' && (
+        <BookCreateModal
+          authorId={authorId}
+          onClose={() => setCreating(null)}
+        />
+      )}
+      {creating === 'series' && (
+        <SeriesCreateModal onClose={() => setCreating(null)} />
+      )}
     </>
   );
 };

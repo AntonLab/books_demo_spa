@@ -56,19 +56,9 @@ const EditBookPage = lazy(() =>
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
 );
-const NewBookPage = lazy(() =>
-  import('@/pages/NewBookPage/NewBookPage').then((m) => ({
-    default: m.NewBookPage,
-  }))
-);
 const NewChapterPage = lazy(() =>
   import('@/pages/NewChapterPage/NewChapterPage').then((m) => ({
     default: m.NewChapterPage,
-  }))
-);
-const NewSeriesPage = lazy(() =>
-  import('@/pages/NewSeriesPage/NewSeriesPage').then((m) => ({
-    default: m.NewSeriesPage,
   }))
 );
 const NotFoundPage = lazy(() =>
@@ -121,17 +111,13 @@ export const AppShell: FC = () => {
               {/* The emailed reset link lands here; AuthModals reads its
                   token and opens the confirm modal over the home page. */}
               <Route path={PASSWORD_RESET_PATH} element={<MainPage />} />
-              {/* A static segment outranks `:id`, so /books/new never reaches
-                  BookPage whatever order these are declared in. */}
-              <Route path="/books/new" element={<NewBookPage />} />
               <Route path="/books/:id" element={<BookPage />} />
               <Route path="/books/:id/edit" element={<EditBookPage />} />
               <Route
                 path="/books/:bookId/chapters/:chapterId"
                 element={<ChapterPage />}
               />
-              {/* The static `new` segment outranks `:chapterId`, as
-                  /books/new does `:id` above. */}
+              {/* The static `new` segment outranks `:chapterId`. */}
               <Route
                 path="/books/:bookId/chapters/new"
                 element={<NewChapterPage />}
@@ -141,9 +127,7 @@ export const AppShell: FC = () => {
                 element={<EditChapterPage />}
               />
               <Route path="/search" element={<SearchPage />} />
-              {/* The static `new` segment outranks `:id`, as /books/new
-                  does. A bare /series stays NotFoundPage. */}
-              <Route path="/series/new" element={<NewSeriesPage />} />
+              {/* A bare /series stays NotFoundPage. */}
               <Route path="/series/:id" element={<SeriesPage />} />
               <Route path="/series/:id/edit" element={<EditSeriesPage />} />
               {/* One page whose tabs are paths; see ProfilePage. */}
