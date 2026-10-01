@@ -236,7 +236,8 @@ who is credited on a shared Book or Series, or deleted it; or it tells an
 Account that something it holds as a Favorite has a New chapter or a New book.
 It keeps the work's title and the actor's name as they were at the time, so it
 outlives both. New chapters of one Book gather into one unread Notification
-until the Account reads it.
+until the Account reads it. Opening the Notification list reads every unread
+one at once; a minute after it is read, a Notification is deleted for good.
 _Avoid_: Notice, alert, message, push
 
 **New chapter**:
@@ -252,7 +253,8 @@ _Avoid_: New release (that is a Sort order)
 **Online**:
 An Account that has the app open on at least one device at the moment of an
 event. An Online Account is shown a New chapter or New book at once; one that
-is not Online is sent an email as well. Either way the Notification is kept.
+is not Online is sent an email as well. Either way the Notification is kept
+until it is read.
 
 ### Favorites
 

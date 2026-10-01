@@ -41,7 +41,8 @@ export type ActorKind = (typeof ACTOR_KINDS)[number];
 
 interface NotificationBase {
   id: number;
-  isRead: boolean;
+  // null while unread.
+  readAt: Date | null;
   createdAt: Date;
 }
 

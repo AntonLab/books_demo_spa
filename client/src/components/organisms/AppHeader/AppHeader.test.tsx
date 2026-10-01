@@ -481,7 +481,7 @@ describe('AppHeader notification stream', () => {
     kind: 'co_author_added',
     work: { type: 'book', id: 7, title: 'The Glass Harbour' },
     actor: { kind: 'co_author', name: 'Margaret Hale' },
-    isRead: false,
+    readAt: null,
     createdAt: '2026-09-26T10:00:00.000Z',
   };
 

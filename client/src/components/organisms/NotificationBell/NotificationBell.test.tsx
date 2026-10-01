@@ -25,7 +25,7 @@ const notification = (
   kind: 'co_author_added',
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   actor: { kind: 'co_author', name: 'Margaret Hale' },
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-12T10:00:00.000Z',
   ...overrides,
 });
@@ -38,7 +38,7 @@ const newChapter = (
   work: { type: 'book', id: 7, title: 'The Glass Harbour' },
   chapter: { id: 70, title: 'The Tide Bell' },
   chapterCount: 1,
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
@@ -50,7 +50,7 @@ const newBook = (
   kind: 'new_book',
   work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
   series: { id: 4, title: 'The Nightbus Files' },
-  isRead: false,
+  readAt: null,
   createdAt: '2026-09-26T10:00:00.000Z',
   ...overrides,
 });
@@ -58,7 +58,7 @@ const newBook = (
 const page = (items: PublicNotification[]) => ({
   items,
   total: items.length,
-  unread: items.filter((item) => !item.isRead).length,
+  unread: items.filter((item) => item.readAt === null).length,
   limit: 20,
   offset: 0,
 });
@@ -83,7 +83,7 @@ describe('NotificationBell', () => {
       page([
         notification({ id: 1 }),
         notification({ id: 2 }),
-        notification({ id: 3, isRead: true }),
+        notification({ id: 3, readAt: '2026-09-26T10:00:00.000Z' }),
       ])
     );
     renderWithProviders(<NotificationBell userId={3} />);
@@ -95,7 +95,7 @@ describe('NotificationBell', () => {
 
   it('says nothing is unread when nothing is', async () => {
     mockedNotifications.listNotifications.mockResolvedValue(
-      page([notification({ isRead: true })])
+      page([notification({ readAt: '2026-09-26T10:00:00.000Z' })])
     );
     renderWithProviders(<NotificationBell userId={3} />);
 
@@ -193,15 +193,15 @@ describe('NotificationBell', () => {
       .mockResolvedValueOnce(
         page([
           notification({ id: 1 }),
-          notification({ id: 2, isRead: true }),
+          notification({ id: 2, readAt: '2026-09-26T10:00:00.000Z' }),
           notification({ id: 3 }),
         ])
       )
       .mockResolvedValue(
         page([
-          notification({ id: 1, isRead: true }),
-          notification({ id: 2, isRead: true }),
-          notification({ id: 3, isRead: true }),
+          notification({ id: 1, readAt: '2026-09-26T10:00:00.000Z' }),
+          notification({ id: 2, readAt: '2026-09-26T10:00:00.000Z' }),
+          notification({ id: 3, readAt: '2026-09-26T10:00:00.000Z' }),
         ])
       );
     renderWithProviders(<NotificationBell userId={3} />);
@@ -222,7 +222,7 @@ describe('NotificationBell', () => {
 
   it('asks the server to mark nothing when everything is already read', async () => {
     mockedNotifications.listNotifications.mockResolvedValue(
-      page([notification({ isRead: true })])
+      page([notification({ readAt: '2026-09-26T10:00:00.000Z' })])
     );
     renderWithProviders(<NotificationBell userId={3} />);
 

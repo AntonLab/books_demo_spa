@@ -49,9 +49,11 @@ export class Notification extends Model<
   declare chapterCount: CreationOptional<number | null>;
   // A New book's Series title as it was.
   declare seriesTitle: CreationOptional<string | null>;
-  declare isRead: CreationOptional<boolean>;
+  // null while unread. The list hides a row, and the expiry purge deletes it,
+  // once this is older than NOTIFICATION_READ_TTL_MS.
+  declare readAt: CreationOptional<Date | null>;
   // No updatedAt: marking a notification read is the only change it ever
-  // takes, and nothing reads when that happened.
+  // takes, and readAt already records when.
   declare createdAt: CreationOptional<Date>;
 }
 
@@ -116,10 +118,9 @@ export function initNotificationModel(
         type: DataTypes.STRING(255),
         allowNull: true,
       },
-      isRead: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false,
+      readAt: {
+        type: DataTypes.DATE,
+        allowNull: true,
       },
       // See User.ts: declaring the timestamp ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
@@ -134,12 +135,13 @@ export function initNotificationModel(
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
         // Serves both reads the bell makes: one account's unread count, and
-        // its list, which takes a filesort over that one account's rows. It
-        // is also a leftmost prefix of userId's foreign key, so InnoDB reuses
-        // it rather than adding a second index for the constraint.
+        // its list of live rows, which takes a filesort over that one
+        // account's rows. It is also a leftmost prefix of userId's foreign
+        // key, so InnoDB reuses it rather than adding a second index for the
+        // constraint.
         {
-          name: 'notifications_user_id_is_read',
-          fields: ['userId', 'isRead'],
+          name: 'notifications_user_id_read_at',
+          fields: ['userId', 'readAt'],
         },
       ],
     }
@@ -153,7 +155,7 @@ export function toPublicNotification(
 ): PublicNotification {
   const base = {
     id: notification.id,
-    isRead: notification.isRead,
+    readAt: notification.readAt ?? null,
     createdAt: notification.createdAt,
   };
   const bookWork = {
@@ -197,7 +199,7 @@ export function toPublicNotification(
 function toCreditNotification(
   notification: Notification,
   kind: CreditNotificationKind,
-  base: { id: number; isRead: boolean; createdAt: Date }
+  base: { id: number; readAt: Date | null; createdAt: Date }
 ): PublicNotification {
   // notify always writes one; a row without it was written some other way.
   if (notification.actorKind === null || notification.actorKind === undefined)

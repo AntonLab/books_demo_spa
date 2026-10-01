@@ -280,7 +280,7 @@ async function announceChapters(
     attributes: ['id', 'userId', 'bookId'],
     where: {
       kind: 'new_chapter',
-      isRead: false,
+      readAt: null,
       bookId: [...recipientsByBook.keys()],
       userId: [...new Set([...recipientsByBook.values()].flat())],
     },

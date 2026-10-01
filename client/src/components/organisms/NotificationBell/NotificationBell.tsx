@@ -174,7 +174,7 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
     }
 
     const unreadIds = items
-      .filter((item) => !item.isRead)
+      .filter((item) => item.readAt === null)
       .map((item) => item.id);
     setFresh(new Set(unreadIds));
     if (unreadIds.length > 0) markRead.mutate(unreadIds);

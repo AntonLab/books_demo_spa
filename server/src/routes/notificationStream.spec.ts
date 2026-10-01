@@ -19,7 +19,7 @@ const NEW_BOOK: PublicNotification = {
   kind: 'new_book',
   work: { type: 'book', id: 9, title: 'The Nightbus Returns' },
   series: { id: 4, title: 'The Nightbus Files' },
-  isRead: false,
+  readAt: null,
   createdAt: new Date('2026-09-26T10:00:00.000Z'),
 };
 

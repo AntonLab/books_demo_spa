@@ -91,7 +91,7 @@ describe('notifications against real MySQL', { skip }, () => {
       seriesId: row.seriesId ?? null,
       actorKind: row.actorKind,
       actorName: row.actorName ?? null,
-      isRead: row.isRead,
+      readAt: row.readAt ?? null,
     }));
 
   // The same events on both kinds of work, through each kind's repository.
@@ -249,7 +249,7 @@ describe('notifications against real MySQL', { skip }, () => {
           ...work.link(id),
           actorKind: 'co_author',
           actorName: 'Ann Writer',
-          isRead: false,
+          readAt: null,
         },
       ]);
       assert.deepEqual(await inbox(ann.id), []);
@@ -307,7 +307,7 @@ describe('notifications against real MySQL', { skip }, () => {
           ...work.link(null),
           actorKind: 'co_author',
           actorName: 'Ben Writer',
-          isRead: false,
+          readAt: null,
         },
       ]);
       assert.deepEqual(await inbox(ben.id), []);
@@ -391,7 +391,7 @@ describe('notifications against real MySQL', { skip }, () => {
         seriesId: sharedSeries,
         actorKind: 'deleted_account',
         actorName: null,
-        isRead: false,
+        readAt: null,
       },
       {
         kind: 'co_author_account_deleted',
@@ -401,7 +401,7 @@ describe('notifications against real MySQL', { skip }, () => {
         seriesId: null,
         actorKind: 'deleted_account',
         actorName: null,
-        isRead: false,
+        readAt: null,
       },
     ]);
     // The work Ann alone was credited on went with her, and told nobody.
@@ -473,15 +473,34 @@ describe('notifications against real MySQL', { skip }, () => {
     // Cleo's id alongside Ben's own: only Ben's is his to mark.
     assert.equal(await notifications.markRead(ben.id, [bens.id, cleos.id]), 0);
 
-    assert.equal(
+    assert.ok(
       (await notifications.list(ben.id, { limit: 20, offset: 0 })).items[0]
-        ?.isRead,
-      true
+        ?.readAt instanceof Date
     );
     assert.equal(
       (await notifications.list(cleo.id, { limit: 20, offset: 0 })).unread,
       1
     );
+  });
+
+  test('marking read stamps readAt on unread rows and leaves an earlier readAt alone', async () => {
+    const id = await works.series.create('Stamped', ann.id);
+    await series.addCoAuthor(id, ben.id, ann);
+    const earlier = new Date('2026-09-01T10:00:00.000Z');
+    const [row] = await Notification.findAll({ where: { userId: ben.id } });
+    assert.ok(row);
+    assert.equal(row.readAt, null);
+    const before = Date.now();
+
+    assert.equal(await notifications.markRead(ben.id, [row.id]), 0);
+    // Read off reload()'s result: the null assertion above narrowed row.readAt.
+    const { readAt: stamped } = await row.reload();
+    assert.ok(stamped && stamped.getTime() >= before - 1000);
+
+    await Notification.update({ readAt: earlier }, { where: { id: row.id } });
+    assert.equal(await notifications.markRead(ben.id, [row.id]), 0);
+    await row.reload();
+    assert.deepEqual(row.readAt, earlier);
   });
 
   test('a new account has email notifications on', async () => {

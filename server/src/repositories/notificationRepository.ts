@@ -129,7 +129,7 @@ export function createSequelizeNotificationRepository(): NotificationRepository 
         order: [['id', 'DESC']],
       });
       const unread = await Notification.count({
-        where: { userId, isRead: false },
+        where: { userId, readAt: null },
       });
 
       return { items: rows.map(toPublicNotification), total: count, unread };
@@ -139,10 +139,10 @@ export function createSequelizeNotificationRepository(): NotificationRepository 
       // userId in the WHERE is the whole ownership check: another account's
       // id matches no row here.
       await Notification.update(
-        { isRead: true },
-        { where: { userId, id: ids, isRead: false } }
+        { readAt: new Date() },
+        { where: { userId, id: ids, readAt: null } }
       );
-      return Notification.count({ where: { userId, isRead: false } });
+      return Notification.count({ where: { userId, readAt: null } });
     },
 
     async getSettings(userId) {

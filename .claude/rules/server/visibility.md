@@ -38,6 +38,9 @@ NULL`) with a `chapterCount`, and a New book sets both `bookId` and its
   deleting an account tells the remaining Co-authors of each shared work, as
   `deleted_account`. Text, status, filing, order and chapter changes raise
   nothing.
+- Read state is `readAt`, null while unread. New chapters gather only into a
+  row whose `readAt` is null; a read row is never revived, so a Chapter after
+  it raises a new row.
 - **A snapshot, not a view**: the row copies the title and the actor's name.
   Only `bookId`/`seriesId` stay live (`SET NULL`), so `work.id` becomes `null`.
 - The writes that raise one take an `Actor`, built with `actorOf` in
