@@ -209,6 +209,24 @@ describe('SeriesEditDetailsModal tabs', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the Cover control on the Details tab, with Remove once the series has a cover', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      coverUrl: '/api/series/12/cover?v=1',
+    });
+    renderModal();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Cover' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Upload cover' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Remove cover' })
+    ).toBeInTheDocument();
+  });
+
   it('shows the Series order on the Books tab', async () => {
     renderModal();
 

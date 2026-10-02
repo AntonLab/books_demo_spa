@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Alert, Button, Divider, Popconfirm, Space } from 'antd';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
+import { SeriesCoverManager } from '@/components/organisms/SeriesCoverManager/SeriesCoverManager';
 import { DELETE_SERIES_CONFIRM } from '@/constants/deleteWork';
 import { useDeleteSeries } from '@/queries/series';
 import { seriesCapabilities } from '@/types/capabilities';
@@ -12,7 +13,7 @@ interface SeriesDetailsExtrasProps {
   onGone: () => void;
 }
 
-// What sits under the Details form: Co-authors and Delete series.
+// What sits under the Details form: Cover, Co-authors and Delete series.
 export const SeriesDetailsExtras: FC<SeriesDetailsExtrasProps> = ({
   series,
   session,
@@ -25,6 +26,14 @@ export const SeriesDetailsExtras: FC<SeriesDetailsExtrasProps> = ({
 
   return (
     <>
+      <Divider />
+
+      <SeriesCoverManager
+        seriesId={series.id}
+        coverUrl={series.coverUrl}
+        title={series.title}
+      />
+
       <Divider />
 
       <CoAuthorManager
