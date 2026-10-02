@@ -136,6 +136,20 @@ test('updateSeriesSchema keeps an absent genreId absent and an explicit null nul
   assert.deepEqual(updateSeriesSchema.parse({ genreId: '4' }), { genreId: 4 });
 });
 
+test('listSeriesQuerySchema takes favoritedBy=me and refuses any other value', () => {
+  assert.equal(
+    listSeriesQuerySchema.parse({ favoritedBy: 'me' }).favoritedBy,
+    'me'
+  );
+  assert.equal(listSeriesQuerySchema.parse({}).favoritedBy, undefined);
+  for (const bad of ['ME', '1', '', 'you']) {
+    assert.equal(
+      listSeriesQuerySchema.safeParse({ favoritedBy: bad }).success,
+      false
+    );
+  }
+});
+
 test('listSeriesQuerySchema takes genreId as a filter', () => {
   assert.equal(listSeriesQuerySchema.parse({ genreId: '4' }).genreId, 4);
   assert.equal(listSeriesQuerySchema.parse({}).genreId, undefined);

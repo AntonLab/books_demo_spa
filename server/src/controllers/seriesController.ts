@@ -42,6 +42,9 @@ export function createSeriesController(repository: SeriesRepository) {
 
     list: async (req, res) => {
       const query = validatedQuery<ListSeriesQuery>(req);
+      if (query.favoritedBy !== undefined && !req.user) {
+        throw new UnauthorizedError();
+      }
       const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },

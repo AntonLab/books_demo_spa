@@ -23,6 +23,7 @@ import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
+import type { PublicSeries, WithFavoriteId } from 'shared';
 
 // A schema of its own rather than the users suite's: node:test runs spec
 // files in parallel processes, and two suites calling sync({ force: true })
@@ -751,12 +752,16 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       });
     };
 
-    const aPublishedSeries = async (title: string) => {
+    const aPublishedSeries = async (
+      title: string,
+      extra: { tags?: string[]; genreId?: number } = {}
+    ) => {
       const series = await repository.create({
         userId: ownerId,
         title,
         description: title,
         tags: [],
+        ...extra,
       });
       await createCreditedBook(
         {
@@ -800,6 +805,99 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         asGuest?.authors.map((author) => author.id),
         [ownerId]
       );
+    });
+
+    const favoriteQuery = { limit: 20, offset: 0, favoritedBy: 'me' } as const;
+
+    test('favoritedBy=me lists only the viewer own favorited series, each with its favoriteId', async () => {
+      const mine = await aPublishedSeries('Mine');
+      const theirs = await aPublishedSeries('Theirs');
+      await aPublishedSeries('Nobody');
+      const fan = await aFan();
+      const other = await aFan();
+      const row = await Favorite.create({ userId: fan.id, seriesId: mine.id });
+      await Favorite.create({ userId: other.id, seriesId: theirs.id });
+      await Favorite.create({ userId: other.id, seriesId: mine.id });
+
+      const page = await repository.list(favoriteQuery, {
+        id: fan.id,
+        role: 'user',
+      });
+
+      assert.deepEqual(
+        page.items.map((item) => item.id),
+        [mine.id]
+      );
+      assert.equal(page.total, 1);
+      assert.equal(
+        (page.items[0] as WithFavoriteId<PublicSeries>).favoriteId,
+        row.id
+      );
+    });
+
+    test('favoritedBy=me matches nothing for a viewer with no Favorites, and for no viewer', async () => {
+      await aPublishedSeries('Unloved');
+      const fan = await aFan();
+
+      const none = await repository.list(favoriteQuery, {
+        id: fan.id,
+        role: 'user',
+      });
+      const guest = await repository.list(favoriteQuery, null);
+
+      assert.deepEqual([none.total, guest.total], [0, 0]);
+    });
+
+    test('favoritedBy=me combines by AND with q, tag, genreId and paging', async () => {
+      const genre = await Genre.create({ name: 'Favorite Series Genre' });
+      const saga = await aPublishedSeries('Dragon Saga', {
+        tags: ['epic'],
+        genreId: genre.id,
+      });
+      const tales = await aPublishedSeries('Dragon Tales');
+      const hills = await aPublishedSeries('Quiet Hills', {
+        genreId: genre.id,
+      });
+      await aPublishedSeries('Dragon Lore', {
+        tags: ['epic'],
+        genreId: genre.id,
+      });
+      const fan = await aFan();
+      const viewer = { id: fan.id, role: 'user' } as const;
+      for (const series of [saga, tales, hills]) {
+        await Favorite.create({ userId: fan.id, seriesId: series.id });
+      }
+
+      const byText = await repository.list(
+        { ...favoriteQuery, q: 'Dragon' },
+        viewer
+      );
+      const byTag = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', tag: 'epic' },
+        viewer
+      );
+      const byGenre = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', genreId: genre.id },
+        viewer
+      );
+      const paged = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', limit: 1 },
+        viewer
+      );
+
+      assert.deepEqual(
+        byText.items.map((item) => item.id).sort(),
+        [saga.id, tales.id].sort()
+      );
+      assert.deepEqual(
+        byTag.items.map((item) => item.id),
+        [saga.id]
+      );
+      assert.deepEqual(
+        byGenre.items.map((item) => item.id),
+        [saga.id]
+      );
+      assert.deepEqual([paged.total, paged.items.length], [2, 1]);
     });
 
     test('a series the viewer may not see has no detail, as findById has no record', async () => {

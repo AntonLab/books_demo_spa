@@ -138,16 +138,34 @@ export async function findSeriesCoAuthorIds(
 
 // creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
 // LIMIT keeps paging over series rather than credit rows.
+async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
+  if (viewer === null) return new Map();
+  const rows = await Favorite.findAll({
+    where: { userId: viewer.id, seriesId: { [Op.ne]: null } },
+    attributes: ['id', 'seriesId'],
+  });
+  return new Map(
+    rows.flatMap((row) =>
+      row.seriesId === null ? [] : [[row.seriesId, row.id]]
+    )
+  );
+}
+
 function buildWhere(
   query: ListSeriesQuery,
   creditedSeriesIds: number[] | undefined,
-  genreIds: number[] | undefined
+  genreIds: number[] | undefined,
+  favorites: Map<number, number> | undefined
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
 
   if (creditedSeriesIds !== undefined) {
     // An empty list becomes `IN (NULL)`, which matches nothing, as it should.
     clauses.push({ id: creditedSeriesIds });
+  }
+
+  if (favorites !== undefined) {
+    clauses.push({ id: [...favorites.keys()] });
   }
 
   // genreIds is the Genre `?genreId=` names plus its Subgenres, looked up
@@ -220,10 +238,13 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
           ? undefined
           : await genreFamilyIds(query.genreId);
 
+      const favorites =
+        query.favoritedBy === undefined ? undefined : await favoritesOf(viewer);
+
       const { rows, count } = await Series.findAndCountAll({
         where: {
           [Op.and]: [
-            buildWhere(query, creditedSeriesIds, genreIds),
+            buildWhere(query, creditedSeriesIds, genreIds, favorites),
             await visibleSeriesWhere(viewer),
           ],
         },
@@ -232,7 +253,17 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         order: [['id', 'ASC']],
       });
 
-      return { items: await publicSeriesOf(rows), total: count };
+      const items = await publicSeriesOf(rows);
+      return {
+        items:
+          favorites === undefined
+            ? items
+            : items.map((item) => ({
+                ...item,
+                favoriteId: favorites.get(item.id),
+              })),
+        total: count,
+      };
     },
 
     async findById(id, viewer) {

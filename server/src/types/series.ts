@@ -46,6 +46,7 @@ export const listSeriesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
   userId: idSchema.optional(),
+  favoritedBy: z.literal('me').optional(),
   genreId: idSchema.optional(),
   tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),
   q: z.string().min(1).max(200).optional(),

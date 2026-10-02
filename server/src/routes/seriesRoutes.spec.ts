@@ -275,6 +275,19 @@ test('GET list filters by genre', async () => {
   );
 });
 
+test('GET list with favoritedBy=me is 401 for a Guest and 400 for another value', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const guest = await fetch(`${base}/api/series?favoritedBy=me`);
+      const bad = await fetch(`${base}/api/series?favoritedBy=you`);
+
+      assert.equal(guest.status, 401);
+      assert.equal(bad.status, 400);
+    }
+  );
+});
+
 test('GET list returns items with the paging envelope', async () => {
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository() },
