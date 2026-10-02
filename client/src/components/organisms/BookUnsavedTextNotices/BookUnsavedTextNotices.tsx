@@ -9,9 +9,10 @@ interface BookUnsavedTextNoticesProps {
   bookId: number;
 }
 
-// Every Unsaved text typed anywhere in a Book whose page found it gone. Its
-// own component so a page subscribes to the entries only in that branch,
-// rather than re-rendering on every keystroke typed elsewhere.
+// Every Unsaved text typed anywhere in a Book that is gone, or that the
+// Account may no longer edit. Its own component so a page subscribes to the
+// entries only in that branch, rather than re-rendering on every keystroke
+// typed elsewhere.
 export const BookUnsavedTextNotices: FC<BookUnsavedTextNoticesProps> = ({
   bookId,
 }) => {

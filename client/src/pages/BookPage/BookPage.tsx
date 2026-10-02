@@ -75,7 +75,10 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
   // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
-  const { isCoAuthor, mayLike, mayFavorite } = bookCapabilities(book, session);
+  const { isCoAuthor, mayEdit, mayLike, mayFavorite } = bookCapabilities(
+    book,
+    session
+  );
   // The public list: only what is out, even for a Co-author, who manages the
   // rest from the edit page. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
@@ -83,6 +86,9 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
   return (
     <article>
+      {/* The chapter pages turn this Account away, so this is the only place
+          its Unsaved text shows. */}
+      {!mayEdit && <BookUnsavedTextNotices bookId={bookId} />}
       {/* Flex, not Space: Space wraps each child in a div.ant-space-item
           that carries no flex rule of its own, so a flex style on a child
           beneath it does nothing. Flex's children are the flex items
