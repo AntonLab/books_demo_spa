@@ -1,6 +1,7 @@
 import { describe } from 'node:test';
 import type { PublicBook, PublicSeries } from 'shared';
 import { readingListContract } from './readingListRepository.contract.testkit.ts';
+import { readingListCopyContract } from './readingListRepository.copy.contract.testkit.ts';
 import { readingListItemsContract } from './readingListRepository.items.contract.testkit.ts';
 import {
   aPublicBook,
@@ -51,4 +52,5 @@ describe('the fake readingListRepository', () => {
   };
   readingListContract(setUp);
   readingListItemsContract(setUp);
+  readingListCopyContract(setUp);
 });

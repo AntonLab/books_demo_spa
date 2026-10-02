@@ -19,14 +19,14 @@ import {
 } from './readingListRepository.contract.testkit.ts';
 
 const NEW_LIST = { title: 'Cold nights', description: '', tags: [] };
-const keyOf = (item: ReadingListItem | ReadingListEditItem): string =>
+export const keyOf = (item: ReadingListItem | ReadingListEditItem): string =>
   item.kind === 'book'
     ? `book:${item.book.id}`
     : item.kind === 'series'
       ? `series:${item.series.id}`
       : 'unavailable';
-const book = (bookId: number) => ({ bookId, seriesId: null });
-const series = (seriesId: number) => ({ bookId: null, seriesId });
+export const book = (bookId: number) => ({ bookId, seriesId: null });
+export const series = (seriesId: number) => ({ bookId: null, seriesId });
 
 // Registers the item cases every ReadingListRepository must pass. Called from
 // the fake spec and from the MySQL spec.

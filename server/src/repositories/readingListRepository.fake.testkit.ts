@@ -107,7 +107,7 @@ export function createFakeReadingListRepository(
     updatedAt: list.updatedAt,
   });
 
-  return {
+  const repository: ReadingListRepository = {
     async create(input, account) {
       if (!accounts.has(account.id)) {
         throw new NotFoundError('User', account.id);
@@ -232,11 +232,51 @@ export function createFakeReadingListRepository(
       });
       list.updatedAt = now();
     },
-    async copy() {
-      throw new Error('not implemented: Task 5');
+
+    async copy(id, account) {
+      const source = lists.get(id);
+      if (!source) throw new NotFoundError('ReadingList', id);
+      const shown = shownItems(id);
+      const copy = await repository.create(
+        {
+          title: source.title,
+          description: source.description,
+          tags: [...source.tags],
+        },
+        account
+      );
+      shown.forEach((item, index) => {
+        const row: ItemRow = {
+          id: nextItemId++,
+          listId: copy.id,
+          bookId: item.kind === 'book' ? item.book.id : null,
+          seriesId: item.kind === 'series' ? item.series.id : null,
+          position: index + 1,
+        };
+        items.set(row.id, row);
+      });
+      const detail = await repository.findById(copy.id);
+      if (!detail) throw new Error('copied list is missing');
+      return detail;
     },
-    async listMine() {
-      throw new Error('not implemented: Task 5');
+
+    async listMine(query, account) {
+      return [...lists.values()]
+        .filter((list) => list.userId === account.id)
+        .sort(
+          (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime() || b.id - a.id
+        )
+        .map((list) => ({
+          ...toPublic(list),
+          itemId:
+            rowsOf(list.id).find((row) =>
+              query.bookId !== undefined
+                ? row.bookId === query.bookId
+                : query.seriesId !== undefined &&
+                  row.seriesId === query.seriesId
+            )?.id ?? null,
+        }));
     },
   };
+  return repository;
 }
