@@ -109,7 +109,7 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
         isPending={books.isPending}
         isError={books.isError}
         errorText="Could not load the books of this series."
-        emptyText="No books in this series yet. File one into it from the book's Edit book dialog."
+        emptyText="No books yet. Add a book to this series from the book's Edit dialog."
         onReorder={(bookIds) => reorder.mutate(bookIds)}
       />
     </>

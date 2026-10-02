@@ -15,8 +15,9 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   out by the server. The books are asked for only once the series loads, so a
   404, like an id that is not a positive integer, shows "This series no
   longer exists." and nothing else is requested. "Edit series" opens the
-  Series edit modal and shows for its Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
-  link points here, and old `/search?series=` links are not redirected.
+  Series edit modal and shows for its Co-authors and Moderators. A bare
+  `/series` is `NotFoundPage`; every series link points here, and old
+  `/search?series=` links are not redirected.
 - `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
   paginated book results. The URL is its only state, read and written through
   `useSearchPage` (beside the page) and `types/bookSearch.ts`; every link into

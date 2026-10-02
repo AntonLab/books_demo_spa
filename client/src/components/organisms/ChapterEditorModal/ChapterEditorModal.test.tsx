@@ -191,6 +191,18 @@ describe('ChapterEditorModal', () => {
     ).toHaveValue('Chapter One\n\nMy text');
   });
 
+  it('removes the Unsaved text of a chapter that is gone on Discard', async () => {
+    mockedChapters.getChapter.mockRejectedValue(new ApiError(404, 'Not found'));
+    const { store } = renderModal(9, editorAccount(), editEntry);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Discard' })
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull()
+    );
+    expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
   it('offers the Unsaved text, not the form, once the account may no longer edit', async () => {
     mockedBooks.getBook.mockResolvedValue({
       ...editorBook,

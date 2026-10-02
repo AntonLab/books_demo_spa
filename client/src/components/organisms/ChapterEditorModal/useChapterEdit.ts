@@ -49,7 +49,7 @@ const newest = (a: string, b: string | undefined): string =>
   b !== undefined && b > a ? b : a;
 
 // The version rules of editing a Chapter against Co-authors' saves
-// (.claude/rules/client/pages.md). The page only lays them out.
+// (.claude/rules/client/chapter-editor.md). The modal only lays them out.
 export const useChapterEdit = (
   bookId: number,
   chapterId: number,

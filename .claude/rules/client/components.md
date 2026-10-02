@@ -88,9 +88,8 @@ that read like mistakes and are not.
   `App`, so a toast outlives the modal that fired it.
 - Every modal holding a form uses `DiscardGuardModal`, except
   `CommentComposerModal` and `ChapterEditorModal` (their text is Unsaved
-  text). Pass `form` only while the
-  `Form` is mounted. A successful submit calls `onClose` itself and so skips
-  the guard.
+  text). Pass `form` only while the `Form` is mounted. A successful submit
+  calls `onClose` itself and so skips the guard.
 - `BookForm` / `SeriesForm`: the Series select is a `ClearableSelect` and the
   Genre select a `GenreTreeSelect` (a tree of Genres and Subgenres, any node
   choosable). Both are `allowClear`; antd shows the icon only on hover and it

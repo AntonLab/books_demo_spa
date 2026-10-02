@@ -101,6 +101,17 @@ describe('SeriesOrderList', () => {
     ).toHaveAttribute('href', '/books/2');
   });
 
+  it('tells the user to add a book from the book’s Edit dialog when the series is empty', async () => {
+    mockedSeries.listSeriesBooks.mockResolvedValue(listing([]));
+    renderList();
+
+    expect(
+      await screen.findByText(
+        "No books yet. Add a book to this series from the book's Edit dialog."
+      )
+    ).toBeInTheDocument();
+  });
+
   it('asks for no books at all until the viewer is known to be allowed to edit', () => {
     renderList({ mayEdit: false });
 
