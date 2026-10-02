@@ -14,6 +14,11 @@ import {
   PasswordResetToken,
 } from './PasswordResetToken.ts';
 import { initPermissionModel } from './Permission.ts';
+import { initReadingListModel, ReadingList } from './ReadingList.ts';
+import {
+  initReadingListItemModel,
+  ReadingListItem,
+} from './ReadingListItem.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initSeriesCoverModel, SeriesCover } from './SeriesCover.ts';
 import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
@@ -43,6 +48,8 @@ function initEachModel(sequelize: Sequelize): void {
   initLikeModel(sequelize);
   initFavoriteModel(sequelize);
   initLibraryEntryModel(sequelize);
+  initReadingListModel(sequelize);
+  initReadingListItemModel(sequelize);
   initNotificationModel(sequelize);
   initSessionModel(sequelize);
   initPasswordResetTokenModel(sequelize);
@@ -311,6 +318,43 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   LibraryEntry.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  // A Reading list is the Account's own and goes with it; its items go with
+  // the list.
+  User.hasMany(ReadingList, {
+    as: 'readingLists',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  ReadingList.belongsTo(User, { as: 'owner', foreignKey: 'userId' });
+
+  ReadingList.hasMany(ReadingListItem, {
+    as: 'items',
+    foreignKey: 'listId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  ReadingListItem.belongsTo(ReadingList, { as: 'list', foreignKey: 'listId' });
+
+  // An item has no meaning without its work, so Book and Series cascade; both
+  // targets are nullable (exactly one is set), so SET NULL would leave an item
+  // with neither.
+  Book.hasMany(ReadingListItem, {
+    as: 'readingListItems',
+    foreignKey: { name: 'bookId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  ReadingListItem.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  Series.hasMany(ReadingListItem, {
+    as: 'readingListItems',
+    foreignKey: { name: 'seriesId', allowNull: true },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  ReadingListItem.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
 
   // CASCADE, matching every other user-owned association above: a session
   // belonging to a deleted user answers to nobody. There is no recursion
