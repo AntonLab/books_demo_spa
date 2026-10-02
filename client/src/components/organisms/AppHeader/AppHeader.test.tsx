@@ -434,6 +434,7 @@ describe('AppHeader account menu', () => {
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
       'Favorites',
+      'Library',
       'Manage genres',
       'Log out',
     ]);
@@ -475,6 +476,7 @@ describe('AppHeader account menu', () => {
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
       'Favorites',
+      'Library',
       'My works',
       'Log out',
     ]);
@@ -519,6 +521,23 @@ describe('AppHeader account menu', () => {
     await userEvent.click(await screen.findByText('Manage genres'));
 
     expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
+  });
+
+  it('opens the Library tab from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(user)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Library'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/profile/library'
+    );
   });
 
   it('opens the Favorites tab from the menu', async () => {

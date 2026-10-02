@@ -297,16 +297,18 @@ describe('removed Chapter pages', () => {
 });
 
 describe('AppShell Profile routing', () => {
-  it.each(['/profile', '/profile/favorites', '/profile/my-books'])(
-    'guards ProfilePage at %s',
-    async (route) => {
-      renderWithProviders(<AppShell />, { route });
+  it.each([
+    '/profile',
+    '/profile/favorites',
+    '/profile/library',
+    '/profile/my-books',
+  ])('guards ProfilePage at %s', async (route) => {
+    renderWithProviders(<AppShell />, { route });
 
-      expect(
-        await screen.findByRole('dialog', { name: 'Log in' })
-      ).toBeInTheDocument();
-    }
-  );
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
 
   it('redirects /favorites to /profile/favorites', async () => {
     renderWithProviders(

@@ -9,6 +9,7 @@ import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
+import * as libraryApi from '@/api/library';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as usersApi from '@/api/users';
@@ -20,6 +21,8 @@ jest.mock('@/api/books');
 jest.mock('@/api/genres');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
+jest.mock('@/api/library');
+const mockedLibrary = jest.mocked(libraryApi);
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
@@ -182,6 +185,64 @@ describe('ProfilePage tabs', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the Library tab at /profile/library', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile/library');
+
+    expect(
+      await screen.findByText('Your Library is empty.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Library', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('lists the Library tab after Favorites for a plain reader', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    const names = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(names).toEqual(['Account', 'Favorites', 'Library']);
+  });
+
+  it('does not fetch the Library while another tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedLibrary.listLibrary).not.toHaveBeenCalled();
+  });
+
+  it('navigates to /profile/library when the Library tab is clicked', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile');
+    await screen.findByRole('switch', { name: 'Email notifications' });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      /^\/profile\/library$/
+    );
+  });
+
+  it('sends a Guest at /profile/library home and asks for no Library', async () => {
+    renderWithSession(null, '/profile/library');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(mockedLibrary.listLibrary).not.toHaveBeenCalled();
+  });
+
   it('opens the My works tab at /profile/my-books for an author', async () => {
     renderWithSession(author, '/profile/my-books');
 
@@ -251,6 +312,7 @@ describe('ProfilePage tabs', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Account',
       'Favorites',
+      'Library',
       'My works',
     ]);
   });
@@ -261,6 +323,7 @@ describe('ProfilePage tabs', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Account',
       'Favorites',
+      'Library',
     ]);
   });
 

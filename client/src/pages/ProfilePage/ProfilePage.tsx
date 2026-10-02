@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { ProfileWorksPanel } from '@/components/organisms/ProfileWorksPanel/ProfileWorksPanel';
+import { LibraryPanel } from '@/components/organisms/LibraryPanel/LibraryPanel';
 import { ProfileSettings } from '@/components/organisms/ProfileSettings/ProfileSettings';
 import { useSession } from '@/queries/auth';
 
@@ -54,9 +55,9 @@ export const ProfilePage: FC = () => {
   return (
     <>
       {title}
-      {/* antd keeps a visited tab mounted; a hidden works panel would keep its
-          list query and URL-driven state alive on a path where ?tab and the
-          filters mean nothing. Account stays mounted so its form state
+      {/* antd keeps a visited tab mounted; a hidden works or Library panel would
+          keep its list query and URL-driven state alive on a path where ?tab,
+          ?status and the filters mean nothing. Account stays mounted so its form state
           survives a tab switch. */}
       <Tabs
         activeKey={pathname}
@@ -70,6 +71,12 @@ export const ProfilePage: FC = () => {
             children: (
               <ProfileWorksPanel scope="favorites" viewerId={session.id} />
             ),
+          },
+          {
+            key: '/profile/library',
+            label: 'Library',
+            destroyOnHidden: true,
+            children: <LibraryPanel />,
           },
           ...(isAuthor
             ? [

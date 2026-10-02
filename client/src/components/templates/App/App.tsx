@@ -113,6 +113,7 @@ export const AppShell: FC = () => {
               {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/favorites" element={<ProfilePage />} />
+              <Route path="/profile/library" element={<ProfilePage />} />
               <Route path="/profile/my-books" element={<ProfilePage />} />
               {/* The paths these tabs had as pages of their own. */}
               <Route
