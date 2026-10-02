@@ -14,6 +14,7 @@ import {
   DatePicker,
   Flex,
   Form,
+  Input,
   Row,
   Select,
   Spin,
@@ -65,6 +66,8 @@ interface SearchFormProps {
   fieldErrors: SearchFieldError[];
   onSearch: (values: BookSearchFormValues) => void;
   onReset: () => void;
+  // Series mode offers Text, Genre and Tag, and suggests no books.
+  mode?: 'books' | 'series';
   ref?: Ref<SearchFormHandle>;
 }
 
@@ -158,8 +161,10 @@ export const SearchForm: FC<SearchFormProps> = ({
   fieldErrors,
   onSearch,
   onReset,
+  mode = 'books',
   ref,
 }) => {
+  const isBooks = mode === 'books';
   const [form] = Form.useForm<BookSearchFormValues>();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -217,142 +222,161 @@ export const SearchForm: FC<SearchFormProps> = ({
         <Row gutter={16}>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="q" label="Text" rules={[textRule]}>
-              <AutoComplete
-                placeholder="Title or description"
-                allowClear
-                onClear={() => setTypedText('')}
-                showSearch={suggestOn(setTypedText)}
-                notFoundContent={pendingOf(books.isFetching)}
-                options={bookOptions(books.items)}
-                onSelect={(bookId) => void navigate(`/books/${bookId}`)}
-              />
+              {isBooks ? (
+                <AutoComplete
+                  placeholder="Title or description"
+                  allowClear
+                  onClear={() => setTypedText('')}
+                  showSearch={suggestOn(setTypedText)}
+                  notFoundContent={pendingOf(books.isFetching)}
+                  options={bookOptions(books.items)}
+                  onSelect={(bookId) => void navigate(`/books/${bookId}`)}
+                />
+              ) : (
+                <Input placeholder="Title or description" allowClear />
+              )}
             </Form.Item>
           </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item name="author" label="Author" rules={[textRule]}>
-              <AutoComplete<string, IdOption>
-                placeholder="Login or name"
-                allowClear
-                // A clear is not a keystroke, so the typing handler misses it.
-                onClear={() => {
-                  setTypedAuthor('');
-                  form.setFieldValue('authorId', undefined);
-                }}
-                showSearch={suggestOn((text) => {
-                  setTypedAuthor(text);
-                  form.setFieldValue('authorId', undefined);
-                })}
-                notFoundContent={pendingOf(authors.isFetching)}
-                options={authorOptions(authors.items)}
-                onSelect={(_login, option) =>
-                  form.setFieldValue('authorId', option.id)
-                }
-              />
-            </Form.Item>
-            <Form.Item name="authorId" hidden noStyle />
-          </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item name="seriesTitle" label="Series" rules={[textRule]}>
-              <AutoComplete<string, IdOption>
-                placeholder="Series title"
-                allowClear
-                onClear={() => {
-                  setTypedSeries('');
-                  form.setFieldValue('seriesId', undefined);
-                }}
-                showSearch={suggestOn((text) => {
-                  setTypedSeries(text);
-                  form.setFieldValue('seriesId', undefined);
-                })}
-                notFoundContent={pendingOf(series.isFetching)}
-                options={seriesOptions(series.items)}
-                onSelect={(_title, option) =>
-                  form.setFieldValue('seriesId', option.id)
-                }
-              />
-            </Form.Item>
-            <Form.Item name="seriesId" hidden noStyle />
-          </Col>
+          {isBooks && (
+            <>
+              <Col {...FIELD_COLUMNS}>
+                <Form.Item name="author" label="Author" rules={[textRule]}>
+                  <AutoComplete<string, IdOption>
+                    placeholder="Login or name"
+                    allowClear
+                    // A clear is not a keystroke, so the typing handler misses it.
+                    onClear={() => {
+                      setTypedAuthor('');
+                      form.setFieldValue('authorId', undefined);
+                    }}
+                    showSearch={suggestOn((text) => {
+                      setTypedAuthor(text);
+                      form.setFieldValue('authorId', undefined);
+                    })}
+                    notFoundContent={pendingOf(authors.isFetching)}
+                    options={authorOptions(authors.items)}
+                    onSelect={(_login, option) =>
+                      form.setFieldValue('authorId', option.id)
+                    }
+                  />
+                </Form.Item>
+                <Form.Item name="authorId" hidden noStyle />
+              </Col>
+              <Col {...FIELD_COLUMNS}>
+                <Form.Item name="seriesTitle" label="Series" rules={[textRule]}>
+                  <AutoComplete<string, IdOption>
+                    placeholder="Series title"
+                    allowClear
+                    onClear={() => {
+                      setTypedSeries('');
+                      form.setFieldValue('seriesId', undefined);
+                    }}
+                    showSearch={suggestOn((text) => {
+                      setTypedSeries(text);
+                      form.setFieldValue('seriesId', undefined);
+                    })}
+                    notFoundContent={pendingOf(series.isFetching)}
+                    options={seriesOptions(series.items)}
+                    onSelect={(_title, option) =>
+                      form.setFieldValue('seriesId', option.id)
+                    }
+                  />
+                </Form.Item>
+                <Form.Item name="seriesId" hidden noStyle />
+              </Col>
+            </>
+          )}
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="genre" label="Genre">
               <GenreTreeSelect placeholder="Any" genres={genres} />
             </Form.Item>
           </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item name="status" label="Status">
-              <Select
-                allowClear
-                placeholder="Any"
-                options={SEARCHABLE_BOOK_STATUSES.map((status) => ({
-                  value: status,
-                  label: BOOK_STATUS_LABELS[status],
-                }))}
-              />
-            </Form.Item>
-          </Col>
-          {/* One cell per range. Its pickers sit `small` (8px) apart, not
+          {!isBooks && (
+            <Col {...FIELD_COLUMNS}>
+              <Form.Item name="tag" label="Tag" rules={[textRule]}>
+                <Input allowClear />
+              </Form.Item>
+            </Col>
+          )}
+          {isBooks && (
+            <>
+              <Col {...FIELD_COLUMNS}>
+                <Form.Item name="status" label="Status">
+                  <Select
+                    allowClear
+                    placeholder="Any"
+                    options={SEARCHABLE_BOOK_STATUSES.map((status) => ({
+                      value: status,
+                      label: BOOK_STATUS_LABELS[status],
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              {/* One cell per range. Its pickers sit `small` (8px) apart, not
               the Row's 16px gutter: at four columns that leaves a picker too
               narrow for a whole YYYY-MM-DD. The inner items are
               `noStyle`, so the outer one shows their errors under the pair,
               and each picker carries its own name, since the label covers
               both. */}
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item label="Released">
-              <Flex gap="small">
-                <Form.Item
-                  name="releasedFrom"
-                  noStyle
-                  dependencies={['releasedTo']}
-                  rules={[startsBefore('releasedTo')]}
-                >
-                  <DatePicker
-                    aria-label="Released from"
-                    placeholder="From"
-                    className={styles.picker}
-                    disabledDate={after(releasedTo)}
-                  />
+              <Col {...FIELD_COLUMNS}>
+                <Form.Item label="Released">
+                  <Flex gap="small">
+                    <Form.Item
+                      name="releasedFrom"
+                      noStyle
+                      dependencies={['releasedTo']}
+                      rules={[startsBefore('releasedTo')]}
+                    >
+                      <DatePicker
+                        aria-label="Released from"
+                        placeholder="From"
+                        className={styles.picker}
+                        disabledDate={after(releasedTo)}
+                      />
+                    </Form.Item>
+                    <Form.Item name="releasedTo" noStyle>
+                      <DatePicker
+                        aria-label="Released to"
+                        placeholder="To"
+                        className={styles.picker}
+                        disabledDate={before(releasedFrom)}
+                      />
+                    </Form.Item>
+                  </Flex>
                 </Form.Item>
-                <Form.Item name="releasedTo" noStyle>
-                  <DatePicker
-                    aria-label="Released to"
-                    placeholder="To"
-                    className={styles.picker}
-                    disabledDate={before(releasedFrom)}
-                  />
+              </Col>
+              <Col {...FIELD_COLUMNS}>
+                <Form.Item label="Updated">
+                  <Flex gap="small">
+                    <Form.Item
+                      name="updatedFrom"
+                      noStyle
+                      dependencies={['updatedTo']}
+                      rules={[startsBefore('updatedTo')]}
+                    >
+                      <DatePicker
+                        aria-label="Updated from"
+                        placeholder="From"
+                        className={styles.picker}
+                        disabledDate={after(updatedTo)}
+                      />
+                    </Form.Item>
+                    <Form.Item name="updatedTo" noStyle>
+                      <DatePicker
+                        aria-label="Updated to"
+                        placeholder="To"
+                        className={styles.picker}
+                        disabledDate={before(updatedFrom)}
+                      />
+                    </Form.Item>
+                  </Flex>
                 </Form.Item>
-              </Flex>
-            </Form.Item>
-          </Col>
-          <Col {...FIELD_COLUMNS}>
-            <Form.Item label="Updated">
-              <Flex gap="small">
-                <Form.Item
-                  name="updatedFrom"
-                  noStyle
-                  dependencies={['updatedTo']}
-                  rules={[startsBefore('updatedTo')]}
-                >
-                  <DatePicker
-                    aria-label="Updated from"
-                    placeholder="From"
-                    className={styles.picker}
-                    disabledDate={after(updatedTo)}
-                  />
-                </Form.Item>
-                <Form.Item name="updatedTo" noStyle>
-                  <DatePicker
-                    aria-label="Updated to"
-                    placeholder="To"
-                    className={styles.picker}
-                    disabledDate={before(updatedFrom)}
-                  />
-                </Form.Item>
-              </Flex>
-            </Form.Item>
-          </Col>
+              </Col>
+            </>
+          )}
         </Row>
         {/* Picked in the page's toolbar; held here so Search keeps it. */}
-        <Form.Item name="sort" hidden noStyle />
+        {isBooks && <Form.Item name="sort" hidden noStyle />}
         <Flex gap="small">
           <Button type="primary" htmlType="submit">
             Search

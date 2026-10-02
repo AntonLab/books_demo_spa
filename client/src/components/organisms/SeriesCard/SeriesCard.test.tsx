@@ -103,3 +103,11 @@ describe('SeriesCard', () => {
     expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
   });
 });
+
+it('links its title to href when given one, as a list row', () => {
+  renderWithProviders(<SeriesCard series={series} href="/series/12" />);
+
+  expect(
+    screen.getByRole('link', { name: 'The Ashgrove Chronicles' })
+  ).toHaveAttribute('href', '/series/12');
+});

@@ -429,3 +429,47 @@ describe('SearchFiltersToggle', () => {
     expect(store.getState().devicePreferences.searchFormExpanded).toBe(false);
   });
 });
+
+describe('SearchForm in series mode', () => {
+  it('offers Text, Genre and Tag only', () => {
+    renderForm({ mode: 'series' });
+
+    expect(screen.getByLabelText('Text')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tag')).toBeInTheDocument();
+    expect(screen.getByText('Genre')).toBeInTheDocument();
+    for (const label of ['Author', 'Series', 'Status', 'Released from']) {
+      expect(screen.queryByLabelText(label)).toBeNull();
+    }
+    expect(screen.queryByLabelText('Updated from')).toBeNull();
+  });
+
+  it('searches with the typed text and the tag, and suggests no books', async () => {
+    const { onSearch } = renderForm({
+      mode: 'series',
+      initialValues: { q: 'saga', tag: 'epic', sort: 'popular' },
+    });
+
+    await userEvent.type(screen.getByLabelText('Text'), ' two');
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'saga two', tag: 'epic' })
+    );
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+
+  it('shows a 400 issue on the Tag field', async () => {
+    renderForm({
+      mode: 'series',
+      fieldErrors: [{ name: 'tag', errors: ['Too long.'] }],
+    });
+
+    expect(await screen.findByText('Too long.')).toBeInTheDocument();
+  });
+
+  it('shows no Tag field in books mode', () => {
+    renderForm();
+
+    expect(screen.queryByLabelText('Tag')).toBeNull();
+  });
+});
