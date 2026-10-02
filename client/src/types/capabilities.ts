@@ -30,6 +30,32 @@ export const seriesCapabilities = (series: Credited, session: Session) => {
   };
 };
 
+export const readingListCapabilities = (
+  list: { owner: { id: number } },
+  session: Session
+) => {
+  const isOwner = session != null && list.owner.id === session.id;
+  return {
+    isOwner,
+    // No Moderator override: a list is its owner's.
+    mayEdit: isOwner,
+    // Any signed-in Account but the owner, who already has it.
+    mayCopy: session != null && !isOwner,
+  };
+};
+
+export const mayAddBookToReadingList = (
+  book: { status: BookStatus },
+  session: Session
+) => session != null && book.status !== 'draft';
+
+// bookCount covers Published Books only, so it equals the server's rule for
+// what a Series adds.
+export const mayAddSeriesToReadingList = (
+  series: { bookCount: number },
+  session: Session
+) => session != null && series.bookCount > 0;
+
 export const bookCapabilities = (
   book: Credited & { status: BookStatus },
   session: Session

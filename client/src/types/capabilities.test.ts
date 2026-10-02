@@ -1,5 +1,11 @@
 import type { BookStatus } from 'shared';
-import { bookCapabilities, seriesCapabilities } from './capabilities';
+import {
+  bookCapabilities,
+  mayAddBookToReadingList,
+  mayAddSeriesToReadingList,
+  readingListCapabilities,
+  seriesCapabilities,
+} from './capabilities';
 import type { PublicUser } from './api';
 
 const account = (id: number, role: PublicUser['role']): PublicUser => ({
@@ -73,6 +79,45 @@ describe('bookCapabilities mayKeepInLibrary', () => {
       expected
     );
   });
+});
+
+describe('readingListCapabilities', () => {
+  const list = { owner: { id: 1 } };
+  it.each([
+    ['a Guest', null, false, false, false],
+    ['the owner', COAUTHOR, true, true, false],
+    ['another Account', STRANGER, false, false, true],
+    ['an admin', ADMIN, false, false, true],
+  ] as const)(
+    '%s: isOwner, mayEdit, mayCopy',
+    (_n, session, isOwner, mayEdit, mayCopy) => {
+      expect(readingListCapabilities(list, session)).toEqual({
+        isOwner,
+        mayEdit,
+        mayCopy,
+      });
+    }
+  );
+});
+
+describe('what may be added to a Reading list', () => {
+  it.each([
+    ['a Guest', null, 'complete', false],
+    ['a signed-in Account', STRANGER, 'complete', true],
+    ['a signed-in Account', STRANGER, 'draft', false],
+  ] as const)('%s on a %s Book: %s', (_n, session, status, expected) => {
+    expect(mayAddBookToReadingList({ status }, session)).toBe(expected);
+  });
+  it.each([
+    ['a Guest', null, 2, false],
+    ['a signed-in Account', STRANGER, 2, true],
+    ['a signed-in Account', STRANGER, 0, false],
+  ] as const)(
+    '%s on a Series with %s Published Books: %s',
+    (_n, session, bookCount, expected) => {
+      expect(mayAddSeriesToReadingList({ bookCount }, session)).toBe(expected);
+    }
+  );
 });
 
 describe('seriesCapabilities', () => {

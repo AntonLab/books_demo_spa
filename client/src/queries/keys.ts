@@ -1,5 +1,6 @@
 import type { ListBooksParams } from '../api/books';
 import type { ListLibraryParams } from '../api/library';
+import type { ListReadingListsParams, WorkTarget } from '../api/readingLists';
 import type { ListSeriesParams } from '../api/series';
 
 // One place where every cache key is spelled, so no two call sites can
@@ -39,6 +40,17 @@ export const queryKeys = {
   library: (params: ListLibraryParams) => ['library', params] as const,
   // The prefix a Reading status change invalidates.
   allLibrary: ['library'] as const,
+  // Keyed by a bare id, like `book`, so neither collides with the by-Account
+  // list, which is keyed by a params object.
+  readingList: (id: number) => ['readingLists', id] as const,
+  readingListItems: (id: number) => ['readingLists', id, 'items'] as const,
+  readingListsByAccount: (params: ListReadingListsParams) =>
+    ['readingLists', params] as const,
+  // The Lists of the session's Account that hold (or could take) a work.
+  myListsForWork: (target: WorkTarget) => ['myReadingLists', target] as const,
+  // The prefixes a Reading list write invalidates.
+  allReadingLists: ['readingLists'] as const,
+  allMyReadingLists: ['myReadingLists'] as const,
   // Not keyed by Account, unlike notifications: the answer is always the
   // session's, so watchSession's refetch on an Account change is correct.
   notificationSettings: ['notificationSettings'] as const,
