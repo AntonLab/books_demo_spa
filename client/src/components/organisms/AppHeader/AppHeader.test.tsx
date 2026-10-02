@@ -342,8 +342,10 @@ describe('AppHeader genres submenu', () => {
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'Fantasy' })
     );
-    const menus = await screen.findAllByRole('menu');
-    const popup = menus[menus.length - 1] as HTMLElement;
+    // The submenu mounts after the click, so find it by its own entry.
+    const popup = (
+      await screen.findByRole('menuitem', { name: 'Urban Fantasy' })
+    ).closest<HTMLElement>('[role="menu"]')!;
     const entries = within(popup)
       .getAllByRole('menuitem')
       .map((entry) => entry.textContent);
