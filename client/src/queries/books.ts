@@ -84,21 +84,27 @@ export const useMyBooks = (userId: number | undefined) => {
 // goes too, because filing a book into a series, or taking it out, changes that
 // series' book list. The `genres` prefix goes as well: a status change can
 // move a Genre into or out of the list of Genres with a published book.
+// `refreshOnError` is for a delete: one that fails because the book is already
+// gone (404) or no longer editable (403) leaves the lists stale, whereas a
+// failed update must not refetch the form's own data under the user's edits.
 const useBookMutation = <TVariables, TResult>(
-  mutationFn: (variables: TVariables) => Promise<TResult>
+  mutationFn: (variables: TVariables) => Promise<TResult>,
+  { refreshOnError = false }: { refreshOnError?: boolean } = {}
 ) => {
   const queryClient = useQueryClient();
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['books'] }),
+      queryClient.invalidateQueries({ queryKey: ['series'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.genres }),
+    ]);
 
   return useMutation({
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.genres }),
-      ]),
+    onSuccess: refresh,
+    ...(refreshOnError && { onError: refresh }),
   });
 };
 
@@ -109,7 +115,7 @@ export const useUpdateBook = (id: number) =>
   useBookMutation((payload: UpdateBookPayload) => updateBook(id, payload));
 
 export const useDeleteBook = (id: number) =>
-  useBookMutation(() => deleteBook(id));
+  useBookMutation(() => deleteBook(id), { refreshOnError: true });
 
 // A Cover change invalidates the books prefix, exactly as every other book
 // mutation does: a PublicBook in any list may carry it.

@@ -67,20 +67,27 @@ export const useSeriesBooks = (id: number, enabled: boolean) => {
 // Every series write invalidates the `series` prefix and the `books` one: a
 // deleted series unlinks its books, and a book taken out of one changes what
 // that book's page shows.
+// `refreshOnError` is for a delete: one that fails because the series is
+// already gone (404) or no longer editable (403) leaves the lists stale,
+// whereas a failed update must not refetch the form's own data under the
+// user's edits.
 const useSeriesMutation = <TVariables, TResult>(
-  mutationFn: (variables: TVariables) => Promise<TResult>
+  mutationFn: (variables: TVariables) => Promise<TResult>,
+  { refreshOnError = false }: { refreshOnError?: boolean } = {}
 ) => {
   const queryClient = useQueryClient();
+  const refresh = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['series'] }),
+      queryClient.invalidateQueries({ queryKey: ['books'] }),
+    ]);
 
   return useMutation({
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-      ]),
+    onSuccess: refresh,
+    ...(refreshOnError && { onError: refresh }),
   });
 };
 
@@ -93,7 +100,7 @@ export const useUpdateSeries = (id: number) =>
   );
 
 export const useDeleteSeries = (id: number) =>
-  useSeriesMutation(() => deleteSeries(id));
+  useSeriesMutation(() => deleteSeries(id), { refreshOnError: true });
 
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));

@@ -16,6 +16,7 @@ import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthor
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { DELETE_SERIES_CONFIRM } from '@/constants/deleteWork';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
@@ -106,9 +107,7 @@ const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
       <Space orientation="vertical">
         {remove.error && <Alert type="error" title={remove.error.message} />}
         <Popconfirm
-          title="Delete this series?"
-          description="Its books stay, outside any series."
-          okText="Delete"
+          {...DELETE_SERIES_CONFIRM}
           okButtonProps={{ danger: true }}
           onConfirm={handleDelete}
         >

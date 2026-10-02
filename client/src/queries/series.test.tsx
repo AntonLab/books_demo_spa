@@ -1,5 +1,6 @@
 import { waitFor } from '@testing-library/react';
-import { useFavoritedSeries, useSeriesList } from './series';
+import { ApiError } from '../api/client';
+import { useDeleteSeries, useFavoritedSeries, useSeriesList } from './series';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import * as seriesApi from '../api/series';
 
@@ -26,6 +27,22 @@ describe('useSeriesList', () => {
       userId: 3,
       limit: 20,
     });
+  });
+});
+
+describe('useDeleteSeries', () => {
+  it('refreshes the lists after a failed delete too', async () => {
+    mockedSeries.deleteSeries.mockRejectedValue(new ApiError(404, 'gone'));
+
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useDeleteSeries(12)
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
   });
 });
 

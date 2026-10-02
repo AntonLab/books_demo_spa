@@ -19,6 +19,7 @@ import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNo
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { DELETE_BOOK_CONFIRM } from '@/constants/deleteWork';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import { bookCapabilities } from '@/types/capabilities';
@@ -125,9 +126,7 @@ const EditBookView: FC<{ bookId: number }> = ({ bookId }) => {
       <Space orientation="vertical">
         {remove.error && <Alert type="error" title={remove.error.message} />}
         <Popconfirm
-          title="Delete this book?"
-          description="Its chapters and comments are deleted with it."
-          okText="Delete"
+          {...DELETE_BOOK_CONFIRM}
           okButtonProps={{ danger: true }}
           onConfirm={handleDelete}
         >

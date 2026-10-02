@@ -1,8 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { ApiError } from '../api/client';
 import {
   useBookSearch,
+  useDeleteBook,
   useDeleteBookCover,
   useFavoritedBooks,
   useSortedBooks,
@@ -204,6 +206,22 @@ describe('useDeleteBookCover', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
+  });
+});
+
+describe('useDeleteBook', () => {
+  it('refreshes the lists after a failed delete too, as the book may be gone already', async () => {
+    mockedBooks.deleteBook.mockRejectedValue(new ApiError(404, 'gone'));
+    const client = createTestQueryClient();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(() => useDeleteBook(7), {
+      wrapper: wrapper(client),
+    });
+
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
   });
 });
 
