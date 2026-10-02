@@ -45,7 +45,6 @@ const LAZY_PAGES = [
   'AdminGenresPage',
   'BookPage',
   'ChapterPage',
-  'EditBookPage',
   'EditChapterPage',
   'EditSeriesPage',
   'MainPage',
@@ -184,14 +183,13 @@ describe('AppShell routing', () => {
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  // A Guest on a guarded page is sent home with Log in open, which only the
-  // page's own guard can cause.
-  it('guards EditBookPage at /books/:id/edit', async () => {
+  it('renders the not-found page at the removed /books/:id/edit', async () => {
     renderWithProviders(<AppShell />, { route: '/books/1/edit' });
 
     expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
+      await screen.findByRole('heading', { name: 'Page not found' })
     ).toBeInTheDocument();
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
   it('guards NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {

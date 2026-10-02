@@ -6,16 +6,20 @@ import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
+import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
+jest.mock('@/api/chapters');
+jest.mock('@/api/authors');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedChapters = jest.mocked(chaptersApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
@@ -62,18 +66,25 @@ const author: PublicUser = {
 };
 
 const onClose = jest.fn();
+const onGone = jest.fn();
 
 const renderModal = (session: PublicUser = author) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
   return renderWithProviders(
-    <BookEditDetailsModal bookId={1} onClose={onClose} />,
+    <BookEditDetailsModal bookId={1} onClose={onClose} onGone={onGone} />,
     { queryClient }
   );
 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedChapters.listChapters.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
   mockedSeries.listSeries.mockResolvedValue({
     items: [],
     total: 0,
@@ -225,5 +236,95 @@ describe('BookEditDetailsModal', () => {
       await screen.findByText('Only its co-authors can edit this book.')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+});
+
+describe('BookEditDetailsModal tabs', () => {
+  it('opens on Details with the form, Cover, Co-authors and Delete book', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit book' })
+    ).toBeInTheDocument();
+    expect(await screen.findByLabelText('Title')).toBeVisible();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Details',
+      'Chapters',
+    ]);
+    expect(screen.getByRole('heading', { name: 'Cover' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Co-authors' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Add a co-author')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete book' })
+    ).toBeInTheDocument();
+  });
+
+  it('gives a Moderator the form and Delete book but no co-author picker', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal({ ...author, id: 99, role: 'admin' });
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete book' })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add a co-author')).toBeNull();
+  });
+
+  it('keeps typed Details values over a Chapters tab round trip and still asks before closing', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal();
+
+    await userEvent.type(await screen.findByLabelText('Title'), '!');
+    await userEvent.click(screen.getByRole('tab', { name: 'Chapters' }));
+    expect(await screen.findByText('No chapters yet.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    expect(screen.getByLabelText('Title')).toHaveValue('A Tale of Dragons!');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Chapters' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect((await screen.findAllByText('Discard changes?')).length).not.toBe(0);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('deletes the book once confirmed, closes and reports it gone', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedBooks.deleteBook.mockResolvedValue(undefined);
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    expect(mockedBooks.deleteBook).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    await waitFor(() => expect(onGone).toHaveBeenCalledTimes(1));
+    expect(mockedBooks.deleteBook).toHaveBeenCalledWith(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays open with the server message when the delete is refused', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedBooks.deleteBook.mockRejectedValue(
+      new Error('You may not delete this book')
+    );
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(
+      await screen.findByText('You may not delete this book')
+    ).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onGone).not.toHaveBeenCalled();
   });
 });

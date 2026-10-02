@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes } from 'react-router';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
@@ -12,6 +13,8 @@ import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import * as favoritesApi from '@/api/favorites';
+import * as genresApi from '@/api/genres';
+import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -22,12 +25,17 @@ jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/favorites');
+jest.mock('@/api/genres');
+jest.mock('@/api/series');
+jest.mock('@/api/authors');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
+const mockedGenres = jest.mocked(genresApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const book: BookDetail = {
   id: 1,
@@ -97,6 +105,13 @@ const renderPage = (
 beforeEach(() => {
   jest.resetAllMocks();
   mockedBooks.getBook.mockResolvedValue(book);
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
+  mockedSeries.listSeries.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
   mockedChapters.listChapters.mockResolvedValue({
     items: [],
     total: 0,
@@ -407,21 +422,58 @@ describe('BookPage on a draft', () => {
   });
 });
 
-describe('BookPage edit link', () => {
-  it('offers Edit to every co-author', async () => {
+describe('BookPage Edit button', () => {
+  it('opens the Book edit modal for a co-author, over the page', async () => {
     renderPage({ ...reader, id: 4, role: 'author' });
 
-    expect(await screen.findByRole('link', { name: 'Edit' })).toHaveAttribute(
-      'href',
-      '/books/1/edit'
-    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit book' })
+    ).toBeInTheDocument();
   });
 
-  it('offers Edit to nobody else', async () => {
-    renderPage(reader);
+  it('offers a Moderator the same Edit button, and a plain reader none', async () => {
+    const { unmount } = renderPage({ ...reader, id: 50, role: 'admin' });
+    expect(
+      await screen.findByRole('button', { name: 'Edit' })
+    ).toBeInTheDocument();
+    unmount();
 
+    renderPage(reader);
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
-    expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
+  it.each([
+    [
+      'a co-author goes to My works',
+      { id: 4, role: 'author' as const },
+      'My works',
+    ],
+    ['a moderator goes home', { id: 50, role: 'admin' as const }, 'Home'],
+  ])('after delete from the modal, %s', async (_name, who, landing) => {
+    mockedBooks.deleteBook.mockResolvedValue(undefined);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, { ...reader, ...who });
+    renderWithProviders(
+      <Routes>
+        <Route path="/books/:id" element={<BookPage />} />
+        <Route path="/" element={<p>Home</p>} />
+        <Route path="/profile/my-books" element={<p>My works</p>} />
+      </Routes>,
+      { route: '/books/1', queryClient }
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(await screen.findByText(landing)).toBeInTheDocument();
   });
 });
 

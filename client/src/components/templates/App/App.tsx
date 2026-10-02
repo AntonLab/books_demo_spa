@@ -49,11 +49,6 @@ const EditSeriesPage = lazy(() =>
     default: m.EditSeriesPage,
   }))
 );
-const EditBookPage = lazy(() =>
-  import('@/pages/EditBookPage/EditBookPage').then((m) => ({
-    default: m.EditBookPage,
-  }))
-);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
 );
@@ -111,7 +106,6 @@ export const AppShell: FC = () => {
                   token and opens the confirm modal over the home page. */}
               <Route path={PASSWORD_RESET_PATH} element={<MainPage />} />
               <Route path="/books/:id" element={<BookPage />} />
-              <Route path="/books/:id/edit" element={<EditBookPage />} />
               <Route
                 path="/books/:bookId/chapters/:chapterId"
                 element={<ChapterPage />}

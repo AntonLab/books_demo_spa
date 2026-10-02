@@ -169,7 +169,7 @@ describe('ProfileWorksPanel edit modals', () => {
       await screen.findByRole('button', { name: 'Edit Out Now' })
     );
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Edit book details')).toBeInTheDocument();
+    expect(within(dialog).getByText('Edit book')).toBeInTheDocument();
     expect(await within(dialog).findByLabelText('Title')).toHaveValue(
       'Out Now'
     );

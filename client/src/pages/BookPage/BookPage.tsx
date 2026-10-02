@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
+  Button,
   Divider,
   Empty,
   Flex,
@@ -11,7 +13,7 @@ import {
   theme,
   Typography,
 } from 'antd';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
@@ -19,6 +21,7 @@ import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteBu
 import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { TagList } from '@/components/molecules/TagList/TagList';
+import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
 import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
@@ -48,6 +51,8 @@ export const BookPage: FC = () => {
 
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const [editing, setEditing] = useState(false);
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
@@ -80,7 +85,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
     session
   );
   // The public list: only what is out, even for a Co-author, who manages the
-  // rest from the edit page. The Chapters and Statistics tabs share it, so
+  // rest from the Edit modal. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
   const published = publishedChapters(chapters.data?.items ?? []);
 
@@ -124,9 +129,11 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
             <Tag color={BOOK_STATUS_COLORS[book.status]}>
               {BOOK_STATUS_LABELS[book.status]}
             </Tag>
-            {/* Only for a Co-author: a Moderator reaches the edit page by
-                its address, the way they reach a draft. */}
-            {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
+            {mayEdit && (
+              <Button size="small" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            )}
             {book.series && (
               <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
             )}
@@ -214,6 +221,14 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       <Divider />
 
       <CommentSection bookId={bookId} closed={isDraft} />
+
+      {editing && (
+        <BookEditDetailsModal
+          bookId={bookId}
+          onClose={() => setEditing(false)}
+          onGone={() => void navigate(isCoAuthor ? '/profile/my-books' : '/')}
+        />
+      )}
     </article>
   );
 };
