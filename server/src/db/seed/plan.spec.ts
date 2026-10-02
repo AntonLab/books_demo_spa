@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RNG_SEED, createRng } from './rng.ts';
-import { READING_STATUSES } from 'shared';
+import { READING_LIST_TITLE_MAX_LENGTH, READING_STATUSES } from 'shared';
 import { buildPlan, type Plan } from './plan.ts';
 
 // Everything about the plan except its dates, which are anchored to the moment
@@ -157,6 +157,66 @@ test('gives every reader a Library of Published books, one status each, every st
       `${status} is held`
     );
   }
+});
+
+test('gives every reader one or two Reading lists of distinct shown works, mixing Books and Series', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const readerIndexes = plan.accounts.flatMap((account, index) =>
+    account.spec.role === 'user' ? [index] : []
+  );
+  const owned = (index: number) =>
+    plan.readingLists.filter((list) => list.accountIndex === index);
+  const shownSeries = new Set(
+    plan.authors.flatMap((author) =>
+      author.series.filter((_, seriesIndex) =>
+        author.books.some(
+          (book) => book.seriesIndex === seriesIndex && book.status !== 'draft'
+        )
+      )
+    )
+  );
+
+  for (const list of plan.readingLists) {
+    assert.ok(
+      readerIndexes.includes(list.accountIndex),
+      'only readers own a list'
+    );
+    assert.ok(list.items.length >= 3 && list.items.length <= 6);
+    assert.ok(
+      list.title.length >= 1 &&
+        list.title.length <= READING_LIST_TITLE_MAX_LENGTH
+    );
+    assert.ok(list.tags.length <= 3);
+    const keys = list.items.map((item) => item.book ?? item.series);
+    assert.equal(
+      new Set(keys).size,
+      keys.length,
+      'a work appears once per list'
+    );
+    for (const item of list.items) {
+      assert.ok(item.book === null || item.book.status !== 'draft');
+      assert.ok(item.series === null || shownSeries.has(item.series));
+    }
+    const account = plan.accounts[list.accountIndex];
+    assert.ok(account && list.createdAt >= account.createdAt);
+    assert.ok(list.updatedAt >= list.createdAt);
+  }
+  for (const index of readerIndexes) {
+    assert.ok([1, 2].includes(owned(index).length));
+  }
+  assert.ok(plan.readingLists.some((l) => l.items.some((i) => i.book)));
+  assert.ok(plan.readingLists.some((l) => l.items.some((i) => i.series)));
+  assert.equal(
+    new Set(
+      plan.readingLists.map((l) => `${String(l.accountIndex)}:${l.title}`)
+    ).size,
+    plan.readingLists.length
+  );
+});
+
+test('leaves every earlier draw as it was when Reading lists are added', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  assert.ok(plan.library.length > 0 && plan.favorites.length > 0);
 });
 
 test('gives every reader a few favorites the API would accept, and nobody else any', () => {

@@ -22,6 +22,8 @@ import { Genre } from '../../models/Genre.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
+import { ReadingList } from '../../models/ReadingList.ts';
+import { ReadingListItem } from '../../models/ReadingListItem.ts';
 import { Series } from '../../models/Series.ts';
 import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
 import { User } from '../../models/User.ts';
@@ -39,10 +41,12 @@ const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
-// The eleven tables the seed deletes from under --force. Listed again here
+// The tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  ReadingListItem,
+  ReadingList,
   Favorite,
   LibraryEntry,
   Like,
@@ -318,6 +322,32 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
         `SELECT e.id FROM library_entries e
          JOIN books b ON b.id = e.bookId
          WHERE b.status = 'draft'`
+      ),
+      []
+    );
+  });
+
+  test('writes the planned Reading lists, none holding a Draft Book or a hidden Series', async () => {
+    const plan = buildPlan(createRng(RNG_SEED));
+    assert.equal(await ReadingList.count(), plan.readingLists.length);
+    assert.equal(
+      await ReadingListItem.count(),
+      plan.readingLists.reduce((sum, list) => sum + list.items.length, 0)
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT i.id FROM reading_list_items i
+         LEFT JOIN books b ON b.id = i.bookId
+         WHERE b.status = 'draft'
+            OR (i.seriesId IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM books s WHERE s.seriesId = i.seriesId AND s.status <> 'draft'))`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT listId, COUNT(*) AS n, MAX(position) AS top FROM reading_list_items
+         GROUP BY listId HAVING top <> n - 1`
       ),
       []
     );

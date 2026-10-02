@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the eleven
+// Destructive by design: with --force it deletes every row in the
 // content tables before inserting. Without --force it reports what it found
 // and exits without writing.
 
@@ -33,6 +33,8 @@ import { destroyAllGenres, Genre } from '../../models/Genre.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
+import { ReadingList } from '../../models/ReadingList.ts';
+import { ReadingListItem } from '../../models/ReadingListItem.ts';
 import { Series } from '../../models/Series.ts';
 import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
 import { User } from '../../models/User.ts';
@@ -42,6 +44,7 @@ import { createCommentSchema } from '../../types/comment.ts';
 import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
 import { setReadingStatusSchema } from '../../types/library.ts';
+import { createReadingListSchema } from '../../types/readingList.ts';
 import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
@@ -84,6 +87,8 @@ const INSERT_BATCH = 200;
 // syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  ReadingListItem,
+  ReadingList,
   Favorite,
   LibraryEntry,
   Like,
@@ -591,8 +596,53 @@ async function writeLibrary(
   return rows.length;
 }
 
+async function writeReadingLists(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  seriesIds: Map<PlannedSeries, number>,
+  transaction: Transaction
+): Promise<{ readingLists: number; readingListItems: number }> {
+  const idOf = <T extends { title: string }>(
+    ids: Map<T, number>,
+    work: T
+  ): number => {
+    const id = ids.get(work);
+    if (id === undefined) {
+      throw new Error(`No row was created for "${work.title}"`);
+    }
+    return id;
+  };
+
+  const lists = await ReadingList.bulkCreate(
+    plan.readingLists.map((list) => ({
+      ...createReadingListSchema.parse({
+        title: list.title,
+        description: list.description,
+        tags: list.tags,
+      }),
+      userId: itemAt(accountIds, list.accountIndex, 'account id'),
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+    })),
+    { transaction }
+  );
+
+  // bulkCreate returns the rows in input order, so index i is plan list i.
+  const items = plan.readingLists.flatMap((list, listIndex) =>
+    list.items.map((item, position) => ({
+      listId: itemAt(lists, listIndex, 'reading list').id,
+      bookId: item.book === null ? null : idOf(bookIds, item.book),
+      seriesId: item.series === null ? null : idOf(seriesIds, item.series),
+      position,
+    }))
+  );
+  await ReadingListItem.bulkCreate(items, { transaction });
+  return { readingLists: lists.length, readingListItems: items.length };
+}
+
 /* -------------------------------------------------------------------------- */
-/* Entry point                                                               */
+/* Entry point                                                              */
 /* -------------------------------------------------------------------------- */
 
 async function countExisting(): Promise<Record<string, number>> {
@@ -664,6 +714,13 @@ async function main(): Promise<void> {
         content.bookIds,
         transaction
       );
+      const readingLists = await writeReadingLists(
+        plan,
+        accountIds,
+        content.bookIds,
+        content.seriesIds,
+        transaction
+      );
       const notifications = await writeNotifications(
         plan,
         accountIds,
@@ -681,6 +738,7 @@ async function main(): Promise<void> {
         ...threads,
         favorites,
         library,
+        ...readingLists,
         notifications,
       };
     });

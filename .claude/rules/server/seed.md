@@ -59,11 +59,12 @@ Four" reads as a test run, not a demo.
   `publicationOf`). Each author starts with two unread Notifications
   (`writeNotifications`). Each reader (`user1`…`user5`) holds 2-4 Favorite
   books and one Favorite series (`planFavorites`), drawn after every other
-  draw so adding them changed nothing else.
+  draw so adding them changed nothing else. Each reader also owns 1-2 Reading
+  lists of 3-6 shown works (`planReadingLists`), drawn after the Library.
 
 ## Deleting
 
-- Tables are deleted in an explicit order (`notifications` → `favorites` →
+- Tables are deleted in an explicit order (`notifications` → `reading_list_items` → `reading_lists` → `favorites` →
   `likes` → `comments` → `chapters` → `book_authors` → `books` →
   `series_authors` → `series` → `genres` → `users`), not by leaning on cascades
   that could change.

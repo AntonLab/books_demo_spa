@@ -96,6 +96,19 @@ export interface PlannedLibraryEntry {
   updatedAt: Date;
 }
 
+export interface PlannedReadingList {
+  accountIndex: number;
+  title: string;
+  description: string;
+  tags: string[];
+  // Exactly one of book / series per item, in list order.
+  items: (
+    { book: PlannedBook; series: null } | { book: null; series: PlannedSeries }
+  )[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface PlannedAuthor {
   spec: AuthorSpec;
   createdAt: Date;
@@ -114,6 +127,7 @@ export interface Plan {
   likes: PlannedLike[];
   favorites: PlannedFavorite[];
   library: PlannedLibraryEntry[];
+  readingLists: PlannedReadingList[];
 }
 
 // Lays an author's whole history out over PUBLICATION_WINDOW_DAYS, ending a few
@@ -489,15 +503,8 @@ function planThreads(
   return { comments, tombstones, likes };
 }
 
-// Readers only: each keeps 2-4 books and one series. A reader is never
-// credited, so no Favorite lands on the holder's own work, and the API would
-// answer a reader's Favorite on a Draft book, or on a series with no
-// non-draft book, with a 404, so the seed writes neither.
-function planFavorites(
-  rng: Rng,
-  authors: readonly PlannedAuthor[],
-  accounts: Plan['accounts']
-): PlannedFavorite[] {
+// What a reader can see: Books that are not Drafts, and Series holding one.
+function shownWorks(rng: Rng, authors: readonly PlannedAuthor[]) {
   const now = Date.now();
   const books = authors
     .flatMap((author) => author.books)
@@ -517,6 +524,19 @@ function planFavorites(
         now
       )
     );
+  return { books, series, heldSince, now };
+}
+
+// Readers only: each keeps 2-4 books and one series. A reader is never
+// credited, so no Favorite lands on the holder's own work, and the API would
+// answer a reader's Favorite on a Draft book, or on a series with no
+// non-draft book, with a 404, so the seed writes neither.
+function planFavorites(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedFavorite[] {
+  const { books, series, heldSince } = shownWorks(rng, authors);
 
   return accounts.flatMap((account, accountIndex) => {
     if (account.spec.role !== 'user') return [];
@@ -573,6 +593,80 @@ function planLibrary(
   });
 }
 
+const LIST_TITLES = [
+  'Rainy-day reads',
+  'Next on my shelf',
+  'Worlds worth getting lost in',
+  'Comfort re-reads',
+  'Slow burns',
+  'Weekend binge',
+  'Found by accident',
+  'Recommended to everyone',
+] as const;
+
+const LIST_DESCRIPTIONS = [
+  'Things I keep coming back to.',
+  'A pile I mean to get through this season.',
+  'Picked for mood rather than genre.',
+  'Short on time? Start here.',
+] as const;
+
+const LIST_TAGS = [
+  'cozy',
+  'epic',
+  'slow-burn',
+  'favorites',
+  'to-read',
+] as const;
+
+// Readers only: each curates 1-2 lists of 3-6 shown works, one or two of them
+// Series so most lists mix both kinds.
+function planReadingLists(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedReadingList[] {
+  const { books, series, now, heldSince } = shownWorks(rng, authors);
+
+  return accounts.flatMap((account, accountIndex) => {
+    if (account.spec.role !== 'user') return [];
+
+    return rng
+      .sample(LIST_TITLES, rng.int(1, 2))
+      .map((title): PlannedReadingList => {
+        const size = rng.int(3, 6);
+        const seriesCount = Math.min(rng.int(1, 2), series.length);
+        const items = [
+          ...rng.sample(series, seriesCount).map((entry) => ({
+            book: null,
+            series: entry,
+          })),
+          ...rng.sample(books, size - seriesCount).map((book) => ({
+            book,
+            series: null,
+          })),
+        ];
+        const newest = Math.max(
+          ...items.map((item) => (item.book ?? item.series).createdAt.getTime())
+        );
+        const createdAt = heldSince(account.createdAt, new Date(newest));
+        return {
+          accountIndex,
+          title,
+          description: itemAt(
+            LIST_DESCRIPTIONS,
+            rng.int(0, LIST_DESCRIPTIONS.length - 1),
+            'list description'
+          ),
+          tags: rng.sample(LIST_TAGS, rng.int(0, 3)),
+          items: rng.shuffle(items),
+          createdAt,
+          updatedAt: new Date(rng.float(createdAt.getTime(), now)),
+        };
+      });
+  });
+}
+
 export function buildPlan(rng: Rng): Plan {
   const authors = shareSeries(
     shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
@@ -610,5 +704,8 @@ export function buildPlan(rng: Rng): Plan {
   // Drawn after favorites for the same reason: every earlier draw stays as it was.
   const library = planLibrary(rng, authors, accounts);
 
-  return { accounts, authors, ...threads, favorites, library };
+  // Drawn after the library, so every earlier draw stays as it was.
+  const readingLists = planReadingLists(rng, authors, accounts);
+
+  return { accounts, authors, ...threads, favorites, library, readingLists };
 }
