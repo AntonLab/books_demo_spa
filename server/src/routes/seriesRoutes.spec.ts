@@ -32,7 +32,7 @@ const KNOWN_GENRE_ID = 5;
 const MISSING_GENRE_ID = 999996;
 
 const GENRES = new Map<number, PublicGenre>([
-  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic' }],
+  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic', parent: null }],
 ]);
 
 // Every persona a fake credit can name, so a response's `authors` carries real
@@ -197,6 +197,7 @@ test('POST files a series under a genre, and leaves it without one when genreId 
       assert.deepEqual((await json<PublicSeries>(filed)).genre, {
         id: KNOWN_GENRE_ID,
         name: 'Gothic',
+        parent: null,
       });
       assert.equal((await json<PublicSeries>(without)).genre, null);
     }

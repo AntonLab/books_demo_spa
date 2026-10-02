@@ -1,10 +1,13 @@
 import {
   DataTypes,
+  literal,
   Model,
+  Op,
   type CreationOptional,
   type InferAttributes,
   type InferCreationAttributes,
   type Sequelize,
+  type Transaction,
 } from 'sequelize';
 import type { PublicGenre } from 'shared';
 
@@ -17,6 +20,7 @@ export class Genre extends Model<
 > {
   declare id: CreationOptional<number>;
   declare name: string;
+  declare parentId: CreationOptional<number | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
 }
@@ -36,6 +40,14 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
         type: DataTypes.STRING(50),
         allowNull: false,
       },
+      // The Genre this one is a Subgenre of; null at the top level. RESTRICT:
+      // a parent with a Subgenre cannot be deleted.
+      parentId: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: true,
+        references: { model: 'genres', key: 'id' },
+        onDelete: 'RESTRICT',
+      },
       // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
       // implicit NOT NULL, so it is restated here.
       createdAt: { type: DataTypes.DATE, allowNull: false },
@@ -49,13 +61,15 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
         // Uniqueness belongs in the schema, never a findOne first — that is a
-        // check-then-write race. The column inherits the table's
+        // check-then-write race. A name is unique among its siblings: IFNULL
+        // folds every top-level Genre into one scope (a plain UNIQUE would let
+        // NULL parents repeat). The column inherits the table's
         // utf8mb4_0900_ai_ci collation, so this index refuses "fantasy" beside
         // "Fantasy", and the repository maps its violation to a 409.
         {
-          name: 'genres_name',
+          name: 'genres_parent_name',
           unique: true,
-          fields: ['name'],
+          fields: [literal('(IFNULL(`parentId`, 0))'), 'name'],
         },
       ],
     }
@@ -64,9 +78,22 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
   return Genre;
 }
 
-export function toPublicGenre(genre: Genre): PublicGenre {
+// Deletes Subgenres first: the self-foreign key is RESTRICT, and one bulk
+// DELETE can remove a parent before its child.
+export async function destroyAllGenres(
+  transaction?: Transaction
+): Promise<void> {
+  await Genre.destroy({ where: { parentId: { [Op.ne]: null } }, transaction });
+  await Genre.destroy({ where: {}, transaction });
+}
+
+export function toPublicGenre(
+  genre: Genre,
+  parent: Pick<Genre, 'id' | 'name'> | null
+): PublicGenre {
   return {
     id: genre.id,
     name: genre.name,
+    parent: parent && { id: parent.id, name: parent.name },
   };
 }

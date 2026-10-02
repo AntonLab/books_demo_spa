@@ -14,7 +14,7 @@ import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
@@ -98,7 +98,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     // Children first: the foreign keys forbid clearing users out from under
     // them.
     await Book.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
     await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;

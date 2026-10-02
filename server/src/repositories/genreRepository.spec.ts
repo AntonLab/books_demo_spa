@@ -2,19 +2,24 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import {
+  ForeignKeyConstraintError,
+  UniqueConstraintError,
+  type Sequelize,
+} from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
 import { Series } from '../models/Series.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import {
   assertGenreExists,
   createSequelizeGenreRepository,
+  loadGenres,
 } from './genreRepository.ts';
 import { genreRepositoryContract } from './genreRepository.contract.testkit.ts';
 
@@ -57,7 +62,53 @@ describe('genreRepository against real MySQL', { skip }, () => {
   beforeEach(async () => {
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
+  });
+
+  test('sibling names are unique, case-insensitively, per parent — enforced by the database', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const horror = await Genre.create({ name: 'Horror' });
+    await Genre.create({ name: 'Urban', parentId: fantasy.id });
+
+    await assert.rejects(
+      Genre.create({ name: 'urban', parentId: fantasy.id }),
+      UniqueConstraintError
+    );
+    // Another parent, and the top level, are other scopes.
+    await Genre.create({ name: 'Urban', parentId: horror.id });
+    await Genre.create({ name: 'Urban' });
+    await assert.rejects(
+      Genre.create({ name: 'URBAN' }),
+      UniqueConstraintError
+    );
+    await assert.rejects(
+      Genre.create({ name: 'fantasy' }),
+      UniqueConstraintError
+    );
+  });
+
+  test('the database refuses to delete a Genre that still has a Subgenre', async () => {
+    const parent = await Genre.create({ name: 'Fantasy' });
+    await Genre.create({ name: 'Urban', parentId: parent.id });
+    await assert.rejects(
+      Genre.destroy({ where: { id: parent.id } }),
+      ForeignKeyConstraintError
+    );
+  });
+
+  test('loadGenres embeds the parent of a Subgenre, and null for a top-level Genre', async () => {
+    const parent = await Genre.create({ name: 'Fantasy' });
+    const child = await Genre.create({ name: 'Urban', parentId: parent.id });
+    const map = await loadGenres([parent.id, child.id, null]);
+    assert.deepEqual(map.get(parent.id), {
+      id: parent.id,
+      name: 'Fantasy',
+      parent: null,
+    });
+    assert.deepEqual(map.get(child.id)?.parent, {
+      id: parent.id,
+      name: 'Fantasy',
+    });
   });
 
   // The one rule here that only MySQL can prove: the deletion and the

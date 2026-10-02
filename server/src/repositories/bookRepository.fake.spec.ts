@@ -34,7 +34,7 @@ describe('the fake bookRepository', () => {
       },
       async aGenre() {
         const id = genres.size + 1;
-        genres.set(id, { id, name: `Genre ${id}` });
+        genres.set(id, { id, name: `Genre ${id}`, parent: null });
         return id;
       },
     };

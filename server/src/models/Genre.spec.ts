@@ -61,18 +61,28 @@ test('the table is InnoDB with the case-insensitive utf8mb4 default collation', 
   );
 });
 
-test('the name carries the unique index, not a check-then-write in code', () => {
-  assert.deepEqual(
-    Genre.options.indexes?.map((index) => ({
-      fields: index.fields,
-      unique: index.unique,
-    })),
-    [{ fields: ['name'], unique: true }]
+test('sibling names share one named unique index over IFNULL(parentId, 0) and name', () => {
+  const indexes = Genre.options.indexes ?? [];
+  assert.equal(indexes.length, 1);
+  assert.equal(indexes[0]?.name, 'genres_parent_name');
+  assert.equal(indexes[0]?.unique, true);
+  assert.equal(indexes[0]?.fields?.length, 2);
+});
+
+test('parentId is a nullable UNSIGNED integer whose foreign key restricts deletion', () => {
+  assert.match(createTableSql, /`parentId` INTEGER UNSIGNED(?! NOT NULL)/);
+  assert.match(
+    createTableSql,
+    /FOREIGN KEY \(`parentId`\) REFERENCES `genres` \(`id`\) ON DELETE RESTRICT/
   );
 });
 
-test('toPublicGenre answers the id and the name, and nothing else', () => {
-  const genre = Genre.build({ id: 3, name: 'Hard SF' });
-
-  assert.deepEqual(toPublicGenre(genre), { id: 3, name: 'Hard SF' });
+test('toPublicGenre embeds the parent, or null for a top-level Genre', () => {
+  const genre = Genre.build({ id: 3, name: 'Hard SF', parentId: 1 });
+  assert.deepEqual(toPublicGenre(genre, { id: 1, name: 'Science Fiction' }), {
+    id: 3,
+    name: 'Hard SF',
+    parent: { id: 1, name: 'Science Fiction' },
+  });
+  assert.deepEqual(toPublicGenre(genre, null).parent, null);
 });

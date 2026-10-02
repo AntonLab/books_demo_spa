@@ -70,7 +70,33 @@ export async function loadGenres(
   if (ids.length === 0) return new Map();
 
   const genres = await Genre.findAll({ where: { id: ids }, transaction });
-  return new Map(genres.map((genre) => [genre.id, toPublicGenre(genre)]));
+  const parentIds = [
+    ...new Set(
+      genres.flatMap((genre) =>
+        genre.parentId === null ? [] : [genre.parentId]
+      )
+    ),
+  ];
+  const parents =
+    parentIds.length === 0
+      ? []
+      : await Genre.findAll({
+          where: { id: parentIds },
+          attributes: ['id', 'name'],
+          transaction,
+        });
+  const parentById = new Map(parents.map((parent) => [parent.id, parent]));
+  return new Map(
+    genres.map((genre) => [
+      genre.id,
+      toPublicGenre(
+        genre,
+        genre.parentId === null
+          ? null
+          : (parentById.get(genre.parentId) ?? null)
+      ),
+    ])
+  );
 }
 
 // The Genre a row carries, read out of a map loadGenres filled. null for a row
@@ -102,12 +128,12 @@ export function createSequelizeGenreRepository(): GenreRepository {
           : {},
         order: [['name', 'ASC']],
       });
-      return genres.map(toPublicGenre);
+      return genres.map((genre) => toPublicGenre(genre, null));
     },
 
     async create(input) {
       try {
-        return toPublicGenre(await Genre.create(input));
+        return toPublicGenre(await Genre.create(input), null);
       } catch (error) {
         asConflict(error);
       }
@@ -122,7 +148,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
       } catch (error) {
         asConflict(error);
       }
-      return toPublicGenre(genre);
+      return toPublicGenre(genre, null);
     },
 
     async remove(id) {

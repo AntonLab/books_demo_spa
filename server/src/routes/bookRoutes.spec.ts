@@ -49,7 +49,7 @@ const MISSING_GENRE_ID = 999996;
 // The Genres that exist. A Genre has no Co-authors and no visibility rule, so
 // one map serves every case here.
 const GENRES = new Map<number, PublicGenre>([
-  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic' }],
+  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic', parent: null }],
 ]);
 
 // The series that exist, and who co-authors each.
@@ -376,6 +376,7 @@ test('POST files a book under a genre, and leaves it without one when genreId is
       assert.deepEqual((await json<PublicBook>(filed)).genre, {
         id: KNOWN_GENRE_ID,
         name: 'Gothic',
+        parent: null,
       });
       assert.equal((await json<PublicBook>(without)).genre, null);
     }

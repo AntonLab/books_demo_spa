@@ -53,7 +53,11 @@ export function createFakeGenreRepository(
     async create(input) {
       if (taken(input.name, null)) throw new ConflictError('name');
 
-      const genre: PublicGenre = { id: nextId, name: input.name };
+      const genre: PublicGenre = {
+        id: nextId,
+        name: input.name,
+        parent: null,
+      };
       nextId += 1;
       rows.set(genre.id, genre);
       return { ...genre };

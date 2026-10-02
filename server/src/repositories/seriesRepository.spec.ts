@@ -14,7 +14,7 @@ import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
@@ -85,7 +85,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     // them. Books are cleared by hand, since a series only unlinks its books.
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
   });
