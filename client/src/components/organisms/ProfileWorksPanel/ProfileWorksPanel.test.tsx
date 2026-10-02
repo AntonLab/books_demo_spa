@@ -5,6 +5,7 @@ import { ProfileWorksPanel } from './ProfileWorksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
@@ -190,5 +191,109 @@ describe('ProfileWorksPanel edit modals', () => {
     expect(await within(dialog).findByLabelText('Title')).toHaveValue(
       'The Scale Cycle'
     );
+  });
+});
+
+describe('ProfileWorksPanel Create buttons', () => {
+  it('My works shows the button of the open tab only', async () => {
+    renderPanel('mine');
+
+    expect(
+      await screen.findByRole('button', { name: 'Create book' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create series' })).toBeNull();
+    await userEvent.click(screen.getByRole('tab', { name: 'Series' }));
+    expect(
+      await screen.findByRole('button', { name: 'Create series' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create book' })).toBeNull();
+  });
+
+  it('Favorites shows none', async () => {
+    renderPanel('favorites');
+
+    await screen.findByRole('tab', { name: 'Books' });
+    expect(screen.queryByRole('button', { name: /^Create/ })).toBeNull();
+  });
+
+  it('creates a book in a modal and stays on the list', async () => {
+    mockedBooks.createBook.mockResolvedValue({
+      ...book,
+      id: 9,
+      title: 'New One',
+      status: 'draft',
+    });
+    renderPanel('mine');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create book' })
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Create book' });
+    await userEvent.type(within(dialog).getByLabelText('Title'), 'New One');
+    await userEvent.type(
+      within(dialog).getByLabelText('Description'),
+      'Fresh.'
+    );
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Create book' })
+    );
+
+    expect(await screen.findByText('Book created.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Create book' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Books' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('creates a series in a modal from the Series tab', async () => {
+    mockedSeries.createSeries.mockResolvedValue({ ...series, id: 13 });
+    renderPanel('mine', '/p?tab=series');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create series' })
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Create series' });
+    await userEvent.type(within(dialog).getByLabelText('Title'), 'Saga');
+    await userEvent.type(within(dialog).getByLabelText('Description'), 'Many.');
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Create series' })
+    );
+
+    expect(await screen.findByText('Series created.')).toBeInTheDocument();
+    expect(mockedSeries.createSeries).toHaveBeenCalledWith({
+      title: 'Saga',
+      description: 'Many.',
+      tags: [],
+      genreId: null,
+    });
+  });
+});
+
+// These pin the old panels' texts through the new panel, so they pass before
+// the Create buttons exist; the Create tests above are the ones that fail.
+describe('ProfileWorksPanel empty and error states', () => {
+  it.each([
+    ['mine', '/p', 'You have not written a book yet.'],
+    ['mine', '/p?tab=series', 'You have not started a series yet.'],
+    ['favorites', '/p', 'No book is in your favorites yet.'],
+    ['favorites', '/p?tab=series', 'No series is in your favorites yet.'],
+    ['mine', '/p?q=zzz', 'No books match these filters.'],
+    ['favorites', '/p?tab=series&q=zzz', 'No series match these filters.'],
+  ] as const)('%s at %s says: %s', async (scope, route, text) => {
+    mockedBooks.listBooks.mockResolvedValue(booksPage([]));
+    mockedSeries.listSeries.mockResolvedValue(seriesPage([]));
+
+    renderPanel(scope, route);
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+
+  it('reports a list that will not load with the error message', async () => {
+    mockedBooks.listFavoritedBooks.mockRejectedValue(new ApiError(500, 'boom'));
+
+    renderPanel('favorites');
+
+    expect(await screen.findByText('boom')).toBeInTheDocument();
   });
 });

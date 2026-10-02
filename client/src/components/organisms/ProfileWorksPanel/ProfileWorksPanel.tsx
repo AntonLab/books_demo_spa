@@ -1,6 +1,8 @@
 import { useState, type FC } from 'react';
-import { Tabs } from 'antd';
+import { Button, Tabs } from 'antd';
 import { useSearchParams } from 'react-router';
+import { BookCreateModal } from '@/components/organisms/BookCreateModal/BookCreateModal';
+import { SeriesCreateModal } from '@/components/organisms/SeriesCreateModal/SeriesCreateModal';
 import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import type { ProfileScope } from '@/types/profileScope';
@@ -17,6 +19,7 @@ interface Props {
 
 export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [creating, setCreating] = useState<'book' | 'series' | null>(null);
   const [editing, setEditing] = useState<{
     kind: 'book' | 'series';
     id: number;
@@ -29,10 +32,22 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
   const onChange = (key: string) =>
     setSearchParams(key === 'series' ? { tab: 'series' } : {});
 
+  const tab = profileTabOf(searchParams);
+
   return (
     <>
       <Tabs
-        activeKey={profileTabOf(searchParams)}
+        activeKey={tab}
+        tabBarExtraContent={
+          scope === 'mine' &&
+          (tab === 'series' ? (
+            <Button onClick={() => setCreating('series')}>Create series</Button>
+          ) : (
+            <Button type="primary" onClick={() => setCreating('book')}>
+              Create book
+            </Button>
+          ))
+        }
         onChange={onChange}
         destroyOnHidden
         items={[
@@ -60,6 +75,15 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
           },
         ]}
       />
+      {creating === 'book' && (
+        <BookCreateModal
+          authorId={viewerId}
+          onClose={() => setCreating(null)}
+        />
+      )}
+      {creating === 'series' && (
+        <SeriesCreateModal onClose={() => setCreating(null)} />
+      )}
       {editing?.kind === 'book' && (
         <BookEditDetailsModal
           bookId={editing.id}
