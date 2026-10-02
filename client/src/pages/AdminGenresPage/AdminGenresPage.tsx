@@ -22,9 +22,14 @@ import {
 } from '@/components/organisms/GenreFormModal/GenreFormModal';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
-import { useDeleteGenre, useGenresCounts } from '@/queries/genres';
+import {
+  useDeleteGenre,
+  useGenresCounts,
+  useUpdateGenre,
+} from '@/queries/genres';
 import {
   countsLabel,
+  dropParentOf,
   filterGenreTree,
   totalsOf,
   type UsageFilter,
@@ -68,6 +73,7 @@ export const AdminGenresPage: FC = () => {
 const GenreManager: FC = () => {
   const genres = useGenresCounts();
   const remove = useDeleteGenre();
+  const move = useUpdateGenre();
   const [query, setQuery] = useState('');
   const [usage, setUsage] = useState<UsageFilter>('all');
   const [expanded, setExpanded] = useState<Key[]>([]);
@@ -134,7 +140,10 @@ const GenreManager: FC = () => {
           description="Books and series in this genre will be left without one."
           okText="Yes, delete"
           okButtonProps={{ danger: true }}
-          onConfirm={() => remove.mutate(genre.id)}
+          onConfirm={() => {
+            move.reset();
+            remove.mutate(genre.id);
+          }}
           onOpenChange={(open) => setConfirmingId(open ? genre.id : null)}
         >
           <IconButton
@@ -183,10 +192,10 @@ const GenreManager: FC = () => {
         </IconButton>
       </Flex>
 
-      {remove.error && (
+      {(remove.error ?? move.error) && (
         <Alert
           type="error"
-          title={remove.error.message}
+          title={(remove.error ?? move.error)?.message}
           className={spacing.gapBelow}
         />
       )}
@@ -208,6 +217,26 @@ const GenreManager: FC = () => {
           expandedKeys={expandedKeys}
           onExpand={setExpanded}
           titleRender={renderTitle}
+          draggable={{ icon: false }}
+          allowDrop={({ dragNode, dropNode, dropPosition }) =>
+            dropParentOf(
+              tree,
+              Number(dragNode.key),
+              Number(dropNode.key),
+              dropPosition !== 0
+            ) !== null
+          }
+          onDrop={({ dragNode, node, dropToGap }) => {
+            const target = dropParentOf(
+              tree,
+              Number(dragNode.key),
+              Number(node.key),
+              dropToGap
+            );
+            if (target === null) return;
+            remove.reset();
+            move.mutate({ id: Number(dragNode.key), payload: target });
+          }}
         />
       )}
 

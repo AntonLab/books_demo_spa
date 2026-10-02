@@ -1,9 +1,9 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AdminGenresPage } from './AdminGenresPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { adminGenre } from '@/test/genres';
+import { adminGenre, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
@@ -232,6 +232,73 @@ describe('AdminGenresPage for a moderator', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('In use');
     expect(screen.getByText('Mystery')).toBeInTheDocument();
+  });
+
+  describe('dragging a Genre', () => {
+    const rowOf = (name: string) =>
+      screen.getByText(name).closest<HTMLElement>('.ant-tree-treenode')!;
+
+    // Drops the row `from` on the middle of the row `onto`. jsdom has no
+    // layout, so the target's geometry is stubbed for rc-tree's position maths.
+    const drag = (from: string, onto: string) => {
+      const source = rowOf(from);
+      const target = rowOf(onto);
+      const dataTransfer = { setData: jest.fn(), dropEffect: '' };
+      jest.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+        top: 0,
+        height: 100,
+        left: 0,
+        width: 100,
+        bottom: 100,
+        right: 100,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      });
+      fireEvent.dragStart(source, { dataTransfer });
+      fireEvent.dragEnter(target, { dataTransfer, clientX: 0, clientY: 50 });
+      fireEvent.dragOver(target, { dataTransfer, clientX: 0, clientY: 50 });
+      fireEvent.drop(target, { dataTransfer, clientX: 0, clientY: 50 });
+    };
+
+    it('moves a Genre when it is dropped inside another', async () => {
+      mockedGenres.updateGenre.mockResolvedValue(
+        publicGenre(5, 'Mystery', { id: 1, name: 'Fantasy' })
+      );
+      await renderLoaded();
+
+      drag('Mystery', 'Fantasy');
+
+      await waitFor(() =>
+        expect(mockedGenres.updateGenre).toHaveBeenCalledWith(5, {
+          parentId: 1,
+        })
+      );
+    });
+
+    it('sends nothing for a refused drop', async () => {
+      await renderLoaded();
+
+      drag('Fantasy', 'Mystery');
+
+      expect(mockedGenres.updateGenre).not.toHaveBeenCalled();
+    });
+
+    it('shows the server message on a 409 and leaves the tree as it was', async () => {
+      mockedGenres.updateGenre.mockRejectedValue(
+        new ApiError(409, 'A genre with this name already exists here')
+      );
+      await renderLoaded();
+
+      drag('Mystery', 'Fantasy');
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'A genre with this name already exists here'
+      );
+      expect(
+        rowOf('Mystery').querySelector('.ant-tree-indent-unit')
+      ).toBeNull();
+    });
   });
 
   it('reports a failure to load the list', async () => {

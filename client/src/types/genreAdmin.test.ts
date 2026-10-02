@@ -1,5 +1,6 @@
 import {
   countsLabel,
+  dropParentOf,
   filterGenreTree,
   parentChoices,
   totalsOf,
@@ -39,6 +40,42 @@ describe('parentChoices', () => {
   });
   it('offers every top-level Genre to a Subgenre', () => {
     expect(parentChoices(tree, 2).map((g) => g.id)).toEqual([1, 3, 5, 6]);
+  });
+});
+
+describe('dropParentOf', () => {
+  it('demotes a childless top-level Genre when dropped inside another', () => {
+    expect(dropParentOf(tree, 5, 1, false)).toEqual({ parentId: 1 });
+  });
+  it('moves a Subgenre inside another top-level Genre', () => {
+    expect(dropParentOf(tree, 2, 3, false)).toEqual({ parentId: 3 });
+  });
+  it('promotes a Subgenre dropped beside a top-level Genre', () => {
+    expect(dropParentOf(tree, 2, 5, true)).toEqual({ parentId: null });
+  });
+  it('moves a Subgenre dropped beside a Subgenre of another parent', () => {
+    expect(dropParentOf(tree, 2, 4, true)).toEqual({ parentId: 3 });
+  });
+  it('refuses a drop on itself', () => {
+    expect(dropParentOf(tree, 5, 5, false)).toBeNull();
+  });
+  it('refuses a drop inside the current parent', () => {
+    expect(dropParentOf(tree, 2, 1, false)).toBeNull();
+  });
+  it('refuses a drop inside a Subgenre', () => {
+    expect(dropParentOf(tree, 5, 2, false)).toBeNull();
+  });
+  it('refuses a gap drop that changes nothing', () => {
+    expect(dropParentOf(tree, 2, 7, true)).toBeNull();
+    expect(dropParentOf(tree, 5, 6, true)).toBeNull();
+  });
+  it('refuses to demote a Genre that has Subgenres', () => {
+    expect(dropParentOf(tree, 1, 5, false)).toBeNull();
+    expect(dropParentOf(tree, 1, 4, true)).toBeNull();
+  });
+  it('refuses unknown ids', () => {
+    expect(dropParentOf(tree, 99, 1, false)).toBeNull();
+    expect(dropParentOf(tree, 1, 99, true)).toBeNull();
   });
 });
 

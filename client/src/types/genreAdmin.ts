@@ -62,6 +62,37 @@ export const filterGenreTree = (
   });
 };
 
+// The new parent of a dragged Genre, or null when the drop is refused. Dropped
+// inside a top-level Genre it becomes its Subgenre; dropped into a gap it joins
+// the target's level. The list is sorted by name, so a drop that keeps the
+// parent would only reorder and is refused.
+export const dropParentOf = (
+  nodes: readonly GenreNode<AdminGenreListItem>[],
+  dragId: number,
+  targetId: number,
+  dropToGap: boolean
+): { parentId: number | null } | null => {
+  const items = nodes.flatMap((node) => [node.item, ...node.children]);
+  const drag = items.find((item) => item.id === dragId);
+  const target = items.find((item) => item.id === targetId);
+  if (drag === undefined || target === undefined) return null;
+
+  const parentId = dropToGap ? target.parentId : target.id;
+  const insideSubgenre = !dropToGap && target.parentId !== null;
+  const hasSubgenres = nodes.some(
+    (node) => node.item.id === dragId && node.children.length > 0
+  );
+  if (
+    insideSubgenre ||
+    parentId === dragId ||
+    parentId === drag.parentId ||
+    (hasSubgenres && parentId !== null)
+  ) {
+    return null;
+  }
+  return { parentId };
+};
+
 // A Subgenre cannot have Subgenres, so a Genre that has some can only stay top
 // level, and the edited Genre is never its own parent.
 export const parentChoices = (

@@ -59,7 +59,10 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   there is no rename in place). A top-level row shows its own works plus its
   Subgenres'; the totals and the Delete lock (a Genre with Subgenres cannot be
   deleted) read the unfiltered tree, so a filter never changes them. A typed
-  query expands every shown parent.
+  query expands every shown parent. Rows are draggable (`dropParentOf`, fed the
+  unfiltered tree): a drop that keeps the parent, targets a Subgenre, or
+  demotes a Genre that has Subgenres is refused and sends nothing; no
+  optimistic move, a 409 lands in the page Alert.
 - Pages that gate on Role (`AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
