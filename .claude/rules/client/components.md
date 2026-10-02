@@ -22,7 +22,9 @@ that read like mistakes and are not.
   `/search?genre=<id>`) so a click navigates to its key like every other item,
   and `selectedKeys` compares `pathname + search`: `searchPath` must keep
   writing exactly what the search page's URL holds. The submenu is left out
-  while Genres load, on error and when there are none.
+  while Genres load, on error and when there are none. A Genre with Subgenres
+  is a nested submenu (key `genre-<id>`) whose first entry is the Genre's own
+  link.
 - There is no Register item: the login modal's "Create an account" is the way
   in.
 

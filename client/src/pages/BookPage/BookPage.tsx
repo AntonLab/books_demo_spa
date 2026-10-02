@@ -16,6 +16,7 @@ import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
+import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { TagList } from '@/components/molecules/TagList/TagList';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
@@ -30,7 +31,6 @@ import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
-import { searchPath } from '@/types/bookSearch';
 import { bookCapabilities } from '@/types/capabilities';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
@@ -130,11 +130,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
             {book.series && (
               <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
             )}
-            {book.genre !== null && (
-              <Link to={searchPath({ genre: String(book.genre.id) })}>
-                {book.genre.name}
-              </Link>
-            )}
+            {book.genre !== null && <GenrePath genre={book.genre} />}
             {mayLike && (
               <LikeButton
                 count={book.likeCount}

@@ -79,6 +79,20 @@ describe('Card', () => {
     expect(screen.getByText(props.description)).toBeInTheDocument();
   });
 
+  it('links a Subgenre and its parent', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        genre={publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' })}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Fantasy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
+    ).toBeInTheDocument();
+  });
+
   it('leaves out the description when it is given none', () => {
     renderWithProviders(
       <Card {...props} description={undefined} href="/books/1" tile />

@@ -177,6 +177,22 @@ describe('BookPage', () => {
     ).toHaveAttribute('href', '/series/2');
   });
 
+  it('links a Subgenre and its parent', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      genre: publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' }),
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Fantasy' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
+    ).toBeInTheDocument();
+  });
+
   it('omits the series link on a standalone book', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, series: null });
 

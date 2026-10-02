@@ -5,6 +5,7 @@ import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem } from '@/test/genres';
+import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
@@ -301,6 +302,74 @@ describe('AppHeader genres submenu', () => {
     // role="option".
     expect(await screen.findByRole('menuitem', { name: 'Gothic' })).toHaveClass(
       'ant-menu-item-selected'
+    );
+  });
+
+  it('shows a plain link for a Genre without Subgenres', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [
+        genreItem(1, 'Fantasy'),
+        genreItem(2, 'Urban Fantasy', 1),
+        genreItem(3, 'Horror'),
+      ],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    const horror = await screen.findByRole('menuitem', { name: 'Horror' });
+
+    expect(within(horror).getByRole('link')).toHaveAttribute(
+      'href',
+      searchPath({ genre: '3' })
+    );
+  });
+
+  it('opens a submenu for a Genre with Subgenres, its own link first', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [
+        genreItem(1, 'Fantasy'),
+        genreItem(2, 'Urban Fantasy', 1),
+        genreItem(3, 'Horror'),
+      ],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Fantasy' })
+    );
+    const menus = await screen.findAllByRole('menu');
+    const popup = menus[menus.length - 1] as HTMLElement;
+    const entries = within(popup)
+      .getAllByRole('menuitem')
+      .map((entry) => entry.textContent);
+
+    expect(entries).toEqual(['Fantasy', 'Urban Fantasy']);
+    expect(
+      within(
+        within(popup).getByRole('menuitem', { name: 'Fantasy' })
+      ).getByRole('link')
+    ).toHaveAttribute('href', searchPath({ genre: '1' }));
+  });
+
+  it('lists a Subgenre whose parent is missing as a top-level item', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [genreItem(9, 'Lost', 99)],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    const lost = await screen.findByRole('menuitem', { name: 'Lost' });
+
+    expect(within(lost).getByRole('link')).toHaveAttribute(
+      'href',
+      searchPath({ genre: '9' })
     );
   });
 

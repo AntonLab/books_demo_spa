@@ -5,12 +5,13 @@ import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
 import { queryKeys } from '@/queries/keys';
 import type { LoginReturnState } from '@/hooks/usePageGuard';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useSession } from '@/queries/auth';
 import { isModeratorRole } from 'shared';
 import { useGenresWithBooks } from '@/queries/genres';
 import { searchPath } from '@/types/bookSearch';
+import { buildGenreTree } from '@/types/genreTree';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useSignOut } from '@/store/useUnsavedText';
@@ -55,22 +56,34 @@ export const AppHeader: FC = () => {
   const genres = useGenresWithBooks();
   // Empty covers all three cases the submenu must not appear in: loading,
   // failed, and a genuinely empty list.
-  const genreItems = genres.data?.items ?? [];
+  const genreNodes = buildGenreTree(genres.data?.items ?? []);
   const isModerator = isModeratorRole(user?.role);
+
+  // Keyed by its own target path, so the menu's onClick navigates to the key
+  // like every other item. The label is a real link too, for open-in-new-tab.
+  const genreLeaf = (genre: { id: number; name: string }) => {
+    const path = searchPath({ genre: String(genre.id) });
+    return { key: path, label: <Link to={path}>{genre.name}</Link> };
+  };
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
-    ...(genreItems.length > 0
+    ...(genreNodes.length > 0
       ? [
           {
             key: 'genres',
             label: 'Genres',
-            // Each child is keyed by its own target path, so the menu's
-            // onClick navigates to the key like every other item.
-            children: genreItems.map((genre) => ({
-              key: searchPath({ genre: String(genre.id) }),
-              label: genre.name,
-            })),
+            children: genreNodes.map(({ item, children }) =>
+              children.length === 0
+                ? genreLeaf(item)
+                : {
+                    key: `genre-${item.id}`,
+                    label: item.name,
+                    // The Genre itself stays reachable: its title only opens
+                    // the submenu.
+                    children: [item, ...children].map(genreLeaf),
+                  }
+            ),
           },
         ]
       : []),
@@ -121,7 +134,13 @@ export const AppHeader: FC = () => {
         // pathname + search, so a genre item whose key carries a query string
         // is highlighted on its own page while / keeps working.
         selectedKeys={[`${location.pathname}${location.search}`]}
-        onClick={({ key }) => void navigate(key)}
+        // A click on a genre's own anchor is the Link's to handle (a
+        // modifier-click opens a new tab); a keypress or a click beside the
+        // anchor reaches only the item, so the menu navigates for those.
+        onClick={({ key, domEvent }) => {
+          if ((domEvent.target as Element).closest('a')) return;
+          void navigate(key);
+        }}
         className={styles.nav}
       />
 

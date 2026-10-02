@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { SeriesPage } from './SeriesPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
@@ -109,6 +110,28 @@ describe('SeriesPage', () => {
     });
     expect(
       screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('links the Subgenre of the series and its parent', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      genre: publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' }),
+    });
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 100,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Fantasy' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
     ).toBeInTheDocument();
   });
 
