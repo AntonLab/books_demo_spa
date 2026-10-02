@@ -79,6 +79,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
 
       {/* void: handleFinish reports its own failure in the form. */}
       <Form
+        name="account"
         form={form}
         layout="vertical"
         initialValues={pickFields(user)}

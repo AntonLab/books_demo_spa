@@ -87,6 +87,19 @@ describe('ProfileSettings', () => {
     ).toBeInTheDocument();
   });
 
+  it('gives the two Current password inputs different ids', async () => {
+    renderWithSession(session);
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), '.uk');
+
+    const inputs = document.querySelectorAll('input[type="password"]');
+    const ids = Array.from(inputs)
+      .filter((input) => input.id.endsWith('currentPassword'))
+      .map((input) => input.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
   it('has no Remove button while there is no avatar', () => {
     renderWithSession(session);
 

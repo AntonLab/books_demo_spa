@@ -55,6 +55,7 @@ export const ChangePasswordForm: FC<{ userId: number }> = ({ userId }) => {
 
       {/* void: handleFinish reports its own failure in the form. */}
       <Form
+        name="changePassword"
         form={form}
         layout="vertical"
         onFinish={(values) => void handleFinish(values)}
