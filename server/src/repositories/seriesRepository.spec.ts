@@ -408,6 +408,70 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(await SeriesCover.findByPk(series.id), null);
   });
 
+  test('a second upload replaces the Cover and moves its version', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Replaced',
+      description: '',
+      tags: [],
+    });
+    await repository.setCover(series.id, Buffer.from('first'));
+    const first = await repository.getCoverData(series.id, asModerator);
+    const firstUrl = (await repository.findById(series.id, asModerator))
+      ?.coverUrl;
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await repository.setCover(series.id, Buffer.from('second, longer'));
+    const second = await repository.getCoverData(series.id, asModerator);
+
+    assert.deepEqual(second?.data, Buffer.from('second, longer'));
+    assert.ok(
+      (second?.updatedAt.getTime() ?? 0) > (first?.updatedAt.getTime() ?? 0)
+    );
+    assert.notEqual(
+      (await repository.findById(series.id, asModerator))?.coverUrl,
+      firstUrl
+    );
+  });
+
+  test('a Draft-only series Cover is hidden from a guest, readable to a Co-author and a Moderator', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Hidden',
+      description: '',
+      tags: [],
+    });
+    await createCreditedBook(
+      {
+        title: 'D',
+        description: '',
+        tags: [],
+        seriesId: series.id,
+        status: 'draft',
+      },
+      [ownerId]
+    );
+    await repository.setCover(series.id, Buffer.from('c'));
+
+    assert.equal(await repository.getCoverData(series.id, null), null);
+    assert.ok(
+      await repository.getCoverData(series.id, { id: ownerId, role: 'author' })
+    );
+    assert.ok(await repository.getCoverData(series.id, asModerator));
+
+    await createCreditedBook(
+      {
+        title: 'P',
+        description: '',
+        tags: [],
+        seriesId: series.id,
+        status: 'in_progress',
+      },
+      [ownerId]
+    );
+    assert.ok(await repository.getCoverData(series.id, null));
+  });
+
   test('removing a book from a series unlinks it and leaves the book standing', async () => {
     const created = await repository.create({
       userId: ownerId,

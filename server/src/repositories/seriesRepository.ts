@@ -72,6 +72,17 @@ export interface SeriesRepository {
   // The cheapest question the ownership check can ask: one indexed lookup, no
   // eager loads, no serialisation. null when the series is not there.
   findCoAuthorIds(id: number): Promise<number[] | null>;
+  // The Cover's bytes never ride along with any other read: these three are
+  // the only place series_covers is touched. false/null mean "no such series",
+  // removeCover included, so a caller can tell that from "no Cover to remove",
+  // which is a silent no-op. getCoverData also answers null for a series the
+  // viewer may not see.
+  setCover(seriesId: number, data: Buffer): Promise<boolean>;
+  removeCover(seriesId: number): Promise<boolean>;
+  getCoverData(
+    seriesId: number,
+    viewer: Viewer
+  ): Promise<{ data: Buffer; updatedAt: Date } | null>;
 }
 
 function sequelizeOf(): Sequelize {
@@ -439,6 +450,35 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
 
     async findCoAuthorIds(id) {
       return findSeriesCoAuthorIds(id);
+    },
+
+    async setCover(seriesId, data) {
+      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+      if (!series) return false;
+      await SeriesCover.upsert({ seriesId, data });
+      return true;
+    },
+
+    async removeCover(seriesId) {
+      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+      if (!series) return false;
+      await SeriesCover.destroy({ where: { seriesId } });
+      return true;
+    },
+
+    async getCoverData(seriesId, viewer) {
+      const series = await Series.findOne({
+        where: {
+          [Op.and]: [{ id: seriesId }, await visibleSeriesWhere(viewer)],
+        },
+        attributes: ['id'],
+      });
+      if (!series) return null;
+
+      const cover = await SeriesCover.findByPk(seriesId, {
+        attributes: ['data', 'updatedAt'],
+      });
+      return cover ? { data: cover.data, updatedAt: cover.updatedAt } : null;
     },
   };
 }

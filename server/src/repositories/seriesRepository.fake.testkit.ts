@@ -46,10 +46,21 @@ export function createFakeSeriesRepository(
   const rows = new Map<number, PublicSeries>();
   // seriesId -> co-author ids, in credit order.
   const credits = new Map<number, number[]>();
+  // seriesId -> its stored Cover. Visibility stays the real repository's rule.
+  const covers = new Map<number, { data: Buffer; updatedAt: Date }>();
   let nextId = 1;
+
+  // Mirrors loadCoverUrls in the real repository.
+  const coverUrlOf = (seriesId: number): string | null => {
+    const cover = covers.get(seriesId);
+    return cover
+      ? `/api/series/${seriesId}/cover?v=${cover.updatedAt.getTime()}`
+      : null;
+  };
 
   const withCredits = (series: PublicSeries): PublicSeries => ({
     ...series,
+    coverUrl: coverUrlOf(series.id),
     authors: (credits.get(series.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
@@ -192,6 +203,23 @@ export function createFakeSeriesRepository(
     async findCoAuthorIds(id) {
       const ids = credits.get(id);
       return ids ? [...ids] : null;
+    },
+
+    async setCover(seriesId, data) {
+      if (!rows.has(seriesId)) return false;
+      covers.set(seriesId, { data, updatedAt: new Date() });
+      return true;
+    },
+
+    async removeCover(seriesId) {
+      if (!rows.has(seriesId)) return false;
+      covers.delete(seriesId);
+      return true;
+    },
+
+    async getCoverData(seriesId) {
+      if (!rows.has(seriesId)) return null;
+      return covers.get(seriesId) ?? null;
     },
   };
 }
