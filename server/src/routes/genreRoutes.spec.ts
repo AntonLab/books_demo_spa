@@ -91,13 +91,146 @@ test('GET hands nonEmpty to the repository and refuses a value that is not a boo
         200
       );
       assert.equal((await fetch(`${base}/api/genres`)).status, 200);
+      assert.equal((await fetch(`${base}/api/genres?nonEmpty=1`)).status, 200);
       assert.equal(
         (await fetch(`${base}/api/genres?nonEmpty=maybe`)).status,
         400
       );
     }
   );
-  assert.deepEqual(listCalls, [{ nonEmpty: true }, { nonEmpty: false }]);
+  assert.deepEqual(listCalls, [
+    { nonEmpty: true },
+    { nonEmpty: false },
+    { nonEmpty: true },
+  ]);
+});
+
+const get = (base: string, query: string, cookie: string | null = null) =>
+  fetch(`${base}/api/genres${query}`, { headers: cookie ? { cookie } : {} });
+
+test('POST creates a Subgenre, and a missing, nested or self parent is 400 on parentId', async () => {
+  await withAuthenticatedApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [
+          { id: 1, name: 'Fantasy' },
+          { id: 2, name: 'Urban', parentId: 1 },
+        ],
+      }),
+    },
+    async (base) => {
+      const created = await post(base, { name: 'Epic', parentId: 1 });
+      assert.equal(created.status, 201);
+      assert.deepEqual((await json<PublicGenre>(created)).parent, {
+        id: 1,
+        name: 'Fantasy',
+      });
+
+      for (const parentId of [999, 2]) {
+        const bad = await post(base, { name: 'X', parentId });
+        assert.equal(bad.status, 400);
+        const { details } = await json<{ details: { path: string[] }[] }>(bad);
+        assert.deepEqual(details[0]?.path, ['parentId']);
+      }
+      assert.equal((await post(base, { name: 'X', parentId: 0 })).status, 400);
+      assert.equal(
+        (await post(base, { name: 'X', parentId: 'a' })).status,
+        400
+      );
+    }
+  );
+});
+
+test('PATCH moves and promotes, refuses {} with 400, and a sibling collision is 409 with its message', async () => {
+  await withAuthenticatedApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [
+          { id: 1, name: 'Fantasy' },
+          { id: 2, name: 'Horror' },
+          { id: 3, name: 'Gothic', parentId: 1 },
+          { id: 4, name: 'gothic', parentId: 2 },
+        ],
+      }),
+    },
+    async (base) => {
+      assert.equal((await patch(base, 3, {})).status, 400);
+      const collided = await patch(base, 3, { parentId: 2 });
+      assert.equal(collided.status, 409);
+      const body = await json<{ error: string; details: unknown }>(collided);
+      assert.equal(body.error, 'A genre with this name already exists here.');
+      assert.deepEqual(body.details, { field: 'name' });
+
+      const promoted = await patch(base, 3, { parentId: null });
+      assert.equal(promoted.status, 200);
+      assert.equal((await json<PublicGenre>(promoted)).parent, null);
+      assert.equal((await patch(base, 1, { parentId: 2 })).status, 200);
+    }
+  );
+});
+
+test('DELETE of a Genre with a Subgenre is 409 and says to move or delete the Subgenres first', async () => {
+  await withAuthenticatedApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [
+          { id: 1, name: 'Fantasy' },
+          { id: 2, name: 'Urban', parentId: 1 },
+        ],
+      }),
+    },
+    async (base) => {
+      const refused = await remove(base, 1);
+      assert.equal(refused.status, 409);
+      assert.match(
+        (await json<{ error: string }>(refused)).error,
+        /move or delete its subgenres first/i
+      );
+      assert.equal((await remove(base, 2)).status, 204);
+      assert.equal((await remove(base, 1)).status, 204);
+    }
+  );
+});
+
+test('GET ?counts=1 is for an admin only: guest 401, user and author 403, admin 200 with counts', async () => {
+  await withAuthenticatedApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [{ id: 1, name: 'Fantasy' }],
+        counts: new Map([[1, { bookCount: 2, seriesCount: 1 }]]),
+      }),
+    },
+    async (base) => {
+      assert.equal((await get(base, '?counts=1')).status, 401);
+      assert.equal(
+        (await get(base, '?counts=1', ROLE_COOKIES.user)).status,
+        403
+      );
+      assert.equal(
+        (await get(base, '?counts=1', ROLE_COOKIES.author)).status,
+        403
+      );
+      const ok = await get(base, '?counts=1', ROLE_COOKIES.admin);
+      assert.equal(ok.status, 200);
+      assert.deepEqual((await json<{ items: unknown[] }>(ok)).items, [
+        {
+          id: 1,
+          name: 'Fantasy',
+          parentId: null,
+          bookCount: 2,
+          seriesCount: 1,
+        },
+      ]);
+      assert.equal(
+        (await get(base, '?counts=1', ROLE_COOKIES.superadmin)).status,
+        200
+      );
+      assert.equal(
+        (await get(base, '?counts=maybe', ROLE_COOKIES.admin)).status,
+        400
+      );
+    }
+  );
 });
 
 test('POST adds a genre for an admin and for a superadmin', async () => {

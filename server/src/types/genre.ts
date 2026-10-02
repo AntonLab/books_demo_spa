@@ -33,6 +33,7 @@ export type GenreUpdateInput = z.infer<typeof genreUpdateSchema>;
 // stringbool, not z.coerce.boolean(): coercion turns "false" into true.
 export const listGenresQuerySchema = z.object({
   nonEmpty: z.stringbool().optional(),
+  counts: z.stringbool().optional(),
 });
 
 export type ListGenresQuery = z.infer<typeof listGenresQuerySchema>;
