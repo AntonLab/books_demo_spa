@@ -35,6 +35,10 @@ import {
   type PasswordResetRepository,
 } from './passwordResetRepository.ts';
 import {
+  createSequelizeReadingListRepository,
+  type ReadingListRepository,
+} from './readingListRepository.ts';
+import {
   createSequelizeSeriesRepository,
   type SeriesRepository,
 } from './seriesRepository.ts';
@@ -61,6 +65,7 @@ export interface Repositories {
   notificationRepository: NotificationRepository;
   favoriteRepository: FavoriteRepository;
   libraryRepository: LibraryRepository;
+  readingListRepository: ReadingListRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
 }
@@ -79,6 +84,7 @@ export function createSequelizeRepositories(): Repositories {
     notificationRepository: createSequelizeNotificationRepository(),
     favoriteRepository: createSequelizeFavoriteRepository(),
     libraryRepository: createSequelizeLibraryRepository(),
+    readingListRepository: createSequelizeReadingListRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
   };
