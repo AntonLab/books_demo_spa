@@ -1,10 +1,18 @@
-import type {
-  PublicBook,
-  PublicReadingList,
-  PublicSeries,
-  ReadingListItem,
+import {
+  READING_LIST_MAX_ITEMS,
+  type PublicBook,
+  type PublicReadingList,
+  type PublicSeries,
+  type ReadingListEditItem,
+  type ReadingListItem,
 } from 'shared';
-import { ForbiddenError, NotFoundError } from '../types/errors.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import type {
   Account,
   ReadingListRepository,
@@ -37,6 +45,8 @@ interface ItemRow {
   listId: number;
   bookId: number | null;
   seriesId: number | null;
+  // Order within the list: gaps after a removal are fine.
+  position: number;
 }
 
 // An in-memory ReadingListRepository for the route specs, held to the real one
@@ -54,6 +64,7 @@ export function createFakeReadingListRepository(
   const lists = new Map<number, ListRow>();
   const items = new Map<number, ItemRow>();
   let nextListId = 1;
+  let nextItemId = 1;
   let tick = 0;
   // A distinct, increasing time per write, so ordering never depends on speed.
   const now = () => new Date(Date.UTC(2026, 0, 1) + tick++ * 1000);
@@ -66,21 +77,24 @@ export function createFakeReadingListRepository(
     return list;
   };
 
-  const shownItems = (listId: number): ReadingListItem[] =>
+  const rowsOf = (listId: number): ItemRow[] =>
     [...items.values()]
       .filter((row) => row.listId === listId)
-      .flatMap((row): ReadingListItem[] => {
-        const book =
-          row.bookId !== null && !hiddenBooks.has(row.bookId)
-            ? books.get(row.bookId)
-            : undefined;
-        if (book) return [{ id: row.id, kind: 'book', book }];
-        const found =
-          row.seriesId !== null && !hiddenSeries.has(row.seriesId)
-            ? series.get(row.seriesId)
-            : undefined;
-        return found ? [{ id: row.id, kind: 'series', series: found }] : [];
-      });
+      .sort((a, b) => a.position - b.position);
+
+  const shownItems = (listId: number): ReadingListItem[] =>
+    rowsOf(listId).flatMap((row): ReadingListItem[] => {
+      const book =
+        row.bookId !== null && !hiddenBooks.has(row.bookId)
+          ? books.get(row.bookId)
+          : undefined;
+      if (book) return [{ id: row.id, kind: 'book', book }];
+      const found =
+        row.seriesId !== null && !hiddenSeries.has(row.seriesId)
+          ? series.get(row.seriesId)
+          : undefined;
+      return found ? [{ id: row.id, kind: 'series', series: found }] : [];
+    });
 
   const toPublic = (list: ListRow): PublicReadingList => ({
     id: list.id,
@@ -144,17 +158,79 @@ export function createFakeReadingListRepository(
       }
     },
 
-    async listEditItems() {
-      throw new Error('not implemented: Task 4');
+    async listEditItems(id, account) {
+      ownedBy(id, account);
+      const shown = new Map(shownItems(id).map((item) => [item.id, item]));
+      return rowsOf(id).map(
+        (row): ReadingListEditItem =>
+          shown.get(row.id) ?? { id: row.id, kind: 'unavailable' }
+      );
     },
-    async addItem() {
-      throw new Error('not implemented: Task 4');
+
+    async addItem(id, account, target) {
+      const list = ownedBy(id, account);
+      if (target.bookId !== null) {
+        if (!books.has(target.bookId) || hiddenBooks.has(target.bookId)) {
+          throw new NotFoundError('Book', target.bookId);
+        }
+      } else if (
+        target.seriesId === null ||
+        !series.has(target.seriesId) ||
+        hiddenSeries.has(target.seriesId)
+      ) {
+        throw new NotFoundError('Series', target.seriesId ?? 0);
+      }
+      const rows = rowsOf(id);
+      if (
+        rows.some(
+          (row) =>
+            row.bookId === target.bookId && row.seriesId === target.seriesId
+        )
+      ) {
+        throw new ConflictError('reading list item');
+      }
+      if (rows.length >= READING_LIST_MAX_ITEMS) {
+        throw new BadRequestError(
+          `A reading list holds at most ${READING_LIST_MAX_ITEMS} items`
+        );
+      }
+      const row: ItemRow = {
+        id: nextItemId++,
+        listId: id,
+        bookId: target.bookId,
+        seriesId: target.seriesId,
+        position: Math.max(0, ...rows.map((r) => r.position)) + 1,
+      };
+      items.set(row.id, row);
+      list.updatedAt = now();
+      const added = shownItems(id).find((item) => item.id === row.id);
+      if (!added) throw new Error('added item is not shown');
+      return added;
     },
-    async removeItem() {
-      throw new Error('not implemented: Task 4');
+
+    async removeItem(id, itemId, account) {
+      const list = ownedBy(id, account);
+      if (items.get(itemId)?.listId === id) {
+        items.delete(itemId);
+        list.updatedAt = now();
+      }
     },
-    async reorderItems() {
-      throw new Error('not implemented: Task 4');
+
+    async reorderItems(id, account, itemIds) {
+      const list = ownedBy(id, account);
+      const rows = rowsOf(id);
+      const given = [...itemIds].sort((a, b) => a - b);
+      const held = rows.map((row) => row.id).sort((a, b) => a - b);
+      if (given.join() !== held.join()) {
+        throw new StateConflictError(
+          'The item set does not match the reading list'
+        );
+      }
+      itemIds.forEach((itemId, index) => {
+        const row = items.get(itemId);
+        if (row) row.position = index + 1;
+      });
+      list.updatedAt = now();
     },
     async copy() {
       throw new Error('not implemented: Task 5');
