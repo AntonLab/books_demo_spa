@@ -94,7 +94,7 @@ beforeEach(() => {
 });
 
 describe.each(kinds)('$noun row actions in My works', (kind) => {
-  it('lets a Co-author edit, and delete after a confirmation with the editor page text', async () => {
+  it('lets a Co-author edit, and delete after a confirmation with the same text as the edit modal', async () => {
     kind.remove.mockResolvedValue(undefined);
     const onEdit = jest.fn();
     renderAs(author, kind.ui('mine', onEdit));

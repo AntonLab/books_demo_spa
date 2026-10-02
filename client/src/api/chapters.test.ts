@@ -207,7 +207,7 @@ describe('reorderChapters', () => {
       409
     );
 
-    // The status is what EditBookPage branches on to reload and explain.
+    // The status is what the Book edit modal's Chapters tab branches on to reload and explain.
     await expect(reorderChapters(7, [2, 1])).rejects.toMatchObject({
       name: 'ApiError',
       status: 409,

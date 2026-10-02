@@ -87,7 +87,8 @@ that read like mistakes and are not.
   `notification`: statics skip the ConfigProvider theme. The holder lives in
   `App`, so a toast outlives the modal that fired it.
 - Every modal holding a form uses `DiscardGuardModal`, except
-  `CommentComposerModal` (its text is Unsaved text). Pass `form` only while the
+  `CommentComposerModal` and `ChapterEditorModal` (their text is Unsaved
+  text). Pass `form` only while the
   `Form` is mounted. A successful submit calls `onClose` itself and so skips
   the guard.
 - `BookForm` / `SeriesForm`: the Series select is a `ClearableSelect` and the

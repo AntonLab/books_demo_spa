@@ -11,6 +11,7 @@ import {
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router';
 import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
@@ -39,18 +40,8 @@ const ChapterPage = lazy(() =>
     default: m.ChapterPage,
   }))
 );
-const EditChapterPage = lazy(() =>
-  import('@/pages/EditChapterPage/EditChapterPage').then((m) => ({
-    default: m.EditChapterPage,
-  }))
-);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
-);
-const NewChapterPage = lazy(() =>
-  import('@/pages/NewChapterPage/NewChapterPage').then((m) => ({
-    default: m.NewChapterPage,
-  }))
 );
 const NotFoundPage = lazy(() =>
   import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({
@@ -72,6 +63,11 @@ const SeriesPage = lazy(() =>
     default: m.SeriesPage,
   }))
 );
+
+const BookRedirect: FC = () => {
+  const { bookId } = useParams();
+  return <Navigate to={`/books/${bookId}`} replace />;
+};
 
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
 // test cannot point at an arbitrary path. Route tests wrap this in
@@ -105,14 +101,15 @@ export const AppShell: FC = () => {
                 path="/books/:bookId/chapters/:chapterId"
                 element={<ChapterPage />}
               />
-              {/* The static `new` segment outranks `:chapterId`. */}
+              {/* The static `new` segment outranks `:chapterId`. The old
+                  Chapter pages are gone, and a bookmark lands on the Book. */}
               <Route
                 path="/books/:bookId/chapters/new"
-                element={<NewChapterPage />}
+                element={<BookRedirect />}
               />
               <Route
                 path="/books/:bookId/chapters/:chapterId/edit"
-                element={<EditChapterPage />}
+                element={<BookRedirect />}
               />
               <Route path="/search" element={<SearchPage />} />
               {/* A bare /series stays NotFoundPage. */}

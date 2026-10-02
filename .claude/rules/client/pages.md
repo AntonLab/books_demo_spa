@@ -14,8 +14,8 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   in Series order: one page at `PAGE_SIZE_MAX`, no pagination, drafts left
   out by the server. The books are asked for only once the series loads, so a
   404, like an id that is not a positive integer, shows "This series no
-  longer exists." and nothing else is requested. "Edit series" shows for its
-  Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
+  longer exists." and nothing else is requested. "Edit series" opens the
+  Series edit modal and shows for its Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
   link points here, and old `/search?series=` links are not redirected.
 - `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
   paginated book results. The URL is its only state, read and written through
@@ -69,25 +69,11 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - What the viewer may do with a work comes from `bookCapabilities` /
   `seriesCapabilities` (`types/capabilities.ts`), never from `authors` and the
   Role combined in the page. A Moderator gets a work's form but a read-only
-  byline, and no "Add chapter". `BookPage`'s "Edit" link reads `isCoAuthor`,
-  not `mayEdit`, on purpose.
-- `EditChapterPage` is layout and button wiring; its rules live in
-  `useChapterEdit` beside it and are tested there. It saves against the
-  Unsaved text's `baseUpdatedAt`, the version the typing started from, and
-  against the loaded `updatedAt` only when nothing was typed; otherwise a
-  reload would refetch a Co-author's save and overwrite it with no 409. After
-  a save, the version comes from its response, since `chapter.data` lags until
-  the refetch; a landed save dispatches `saved`, which keeps text typed during
-  it. A loaded version newer than the base (compared as ISO strings), or a
-  409, is the conflict: `takeTheirs` discards the entry and refetches;
-  `keepMine` refetches and rebases the entry, so the next Save is a deliberate
-  overwrite. `formKey` is `updatedAt` plus a reset counter, and the form seeds
-  from the entry. Each edit passes the newest known version as `saved`, so
-  text changed back to it leaves no entry. `save` and `remove` go through
-  `mutateAsync(...).then(...)`, not a per-call `mutate` callback, since
-  TanStack skips that callback once the page has unmounted. Navigation after
-  a delete, and its `mountedRef` guard, stay in the page.
-- A page that finds its place gone (a 404 on the Chapter or Book, or an
+  byline, and no "Add chapter". `BookPage`'s "Edit" button and `SeriesPage`'s
+  "Edit series" read `mayEdit`, so a Moderator opens the edit modals too;
+  "Add chapter" and the co-author picker stay co-author only. After a delete a
+  co-author lands on My works, a Moderator on `/`.
+- A modal that finds its place gone (a 404 on the Chapter or Book, or an
   Account no longer a Co-author) shows the Unsaved text in
   `UnsavedTextNotice`; only Discard removes it.
 - `BookPage` hides the like button from every Co-author and from everyone on a
@@ -148,11 +134,12 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
   and opens the confirm modal over it. The path and key are a contract with
   `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.
-- `EditBookPage` / `EditSeriesPage` are "Manage" pages whose details live in an
-  `Edit details` modal. My books creates in `BookCreateModal` /
-  `SeriesCreateModal` and edits in the same edit modals. `/books/new` and
-  `/series/new` no longer exist, so an old link reaches `BookPage` /
-  `SeriesPage` with the id `new`. Neither asks the server: `BookPage` shows
-  "This book no longer exists." and `SeriesPage` "This series no longer exists.".
-  `EditBookPage` / `EditSeriesPage` split into a guard and a view the same way,
-  so `/books/new/edit` shows the same message and asks nothing.
+- There are no Manage pages. Edit happens in `BookEditDetailsModal` (tabs
+  Details | Chapters, the Chapter editor over it) and `SeriesEditDetailsModal`
+  (Details | Books), opened from `BookPage`, `SeriesPage` and My works.
+  `/books/:id/edit` and `/series/:id/edit` fall to `NotFoundPage`; the Chapter
+  routes (`/books/:id/chapters/new` and `/books/:id/chapters/:chapterId/edit`)
+  redirect with `replace` to the Book page. `/books/new` and `/series/new` keep
+  the "no longer exists" messages through `BookPage` / `SeriesPage`: neither
+  asks the server, `BookPage` shows "This book no longer exists." and
+  `SeriesPage` "This series no longer exists.".

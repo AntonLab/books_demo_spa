@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigationType } from 'react-router';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
@@ -45,9 +45,7 @@ const LAZY_PAGES = [
   'AdminGenresPage',
   'BookPage',
   'ChapterPage',
-  'EditChapterPage',
   'MainPage',
-  'NewChapterPage',
   'NotFoundPage',
   'ProfilePage',
   'SearchPage',
@@ -191,33 +189,6 @@ describe('AppShell routing', () => {
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  it('guards NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/1/chapters/new' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
-    expect(mockedChapters.getChapter).not.toHaveBeenCalled();
-  });
-
-  it('guards EditChapterPage at /books/:bookId/chapters/:chapterId/edit', async () => {
-    mockedChapters.getChapter.mockResolvedValue({
-      id: 9,
-      bookId: 1,
-      title: 'Chapter One',
-      text: 'It was a dark night.',
-      publishedAt: null,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      updatedAt: '2026-09-01T00:00:00.000Z',
-    });
-
-    renderWithProviders(<AppShell />, { route: '/books/1/chapters/9/edit' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
-  });
-
   it('shows "This series no longer exists." at the old /series/new bookmark without asking the server', async () => {
     renderWithProviders(<AppShell />, { route: '/series/new' });
 
@@ -266,6 +237,45 @@ describe('AppShell routing', () => {
     expect(
       await screen.findByRole('heading', { name: 'Page not found' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('removed Chapter pages', () => {
+  it.each([['/books/1/chapters/9/edit'], ['/books/1/chapters/new']])(
+    'redirects %s to the Book page without opening a chapter',
+    async (route) => {
+      renderWithProviders(
+        <>
+          <AppShell />
+          <LocationProbe />
+        </>,
+        { route }
+      );
+
+      expect(
+        await screen.findByRole('heading', { name: 'A Tale of Dragons' })
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/books\/1$/);
+      expect(mockedChapters.getChapter).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Log in' })).toBeNull();
+    }
+  );
+
+  it('replaces the history entry, so Back does not return to the dead route', async () => {
+    const NavigationProbe = () => (
+      <div data-testid="navigation">{useNavigationType()}</div>
+    );
+    renderWithProviders(
+      <>
+        <AppShell />
+        <NavigationProbe />
+      </>,
+      { route: '/books/1/chapters/9/edit' }
+    );
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
   });
 });
 

@@ -1,4 +1,4 @@
-// Shared so the editor pages and the profile rows ask the same question
+// Shared so the edit modals and the profile rows ask the same question
 // before deleting a work.
 export const DELETE_BOOK_CONFIRM = {
   title: 'Delete this book?',
