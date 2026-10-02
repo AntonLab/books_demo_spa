@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createBook,
   deleteBook,
@@ -78,12 +83,25 @@ export const useBook = (id: number) => {
 // failed update must not refetch the form's own data under the user's edits.
 const useBookMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>,
-  { refreshOnError = false }: { refreshOnError?: boolean } = {}
+  {
+    refreshOnError = false,
+    deletedId,
+  }: { refreshOnError?: boolean; deletedId?: number } = {}
 ) => {
   const queryClient = useQueryClient();
-  const refresh = () =>
+  const refresh = (skipDetail?: boolean) =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['books'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['books'],
+        // A delete skips the deleted book's own detail: its page is still
+        // mounted, would refetch into a 404 and redirect with "no longer
+        // exists" before the delete's own landing page takes over.
+        ...(skipDetail &&
+          deletedId !== undefined && {
+            predicate: (query) =>
+              hashKey(query.queryKey) !== hashKey(queryKeys.book(deletedId)),
+          }),
+      }),
       queryClient.invalidateQueries({ queryKey: ['series'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.genres }),
     ]);
@@ -92,8 +110,8 @@ const useBookMutation = <TVariables, TResult>(
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: refresh,
-    ...(refreshOnError && { onError: refresh }),
+    onSuccess: () => refresh(true),
+    ...(refreshOnError && { onError: () => refresh() }),
   });
 };
 
@@ -104,7 +122,10 @@ export const useUpdateBook = (id: number) =>
   useBookMutation((payload: UpdateBookPayload) => updateBook(id, payload));
 
 export const useDeleteBook = (id: number) =>
-  useBookMutation(() => deleteBook(id), { refreshOnError: true });
+  useBookMutation(() => deleteBook(id), {
+    refreshOnError: true,
+    deletedId: id,
+  });
 
 // A Cover change invalidates the books prefix, exactly as every other book
 // mutation does: a PublicBook in any list may carry it.

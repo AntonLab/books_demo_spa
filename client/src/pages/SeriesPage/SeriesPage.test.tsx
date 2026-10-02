@@ -236,11 +236,15 @@ describe('SeriesPage', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete series' })
     );
+    // The server no longer has the series once it is deleted, so any refetch
+    // of it answers 404.
+    mockedSeries.getSeries.mockRejectedValue(new ApiError(404, 'gone'));
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete' })
     );
 
     expect(await screen.findByText(landing)).toBeInTheDocument();
+    expect(screen.queryByText('This series no longer exists.')).toBeNull();
   });
 
   it('offers a moderator the editor too, and nobody else', async () => {

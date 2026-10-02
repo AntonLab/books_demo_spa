@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createSeries,
   deleteSeries,
@@ -73,12 +78,26 @@ export const useSeriesBooks = (id: number, enabled: boolean) => {
 // user's edits.
 const useSeriesMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>,
-  { refreshOnError = false }: { refreshOnError?: boolean } = {}
+  {
+    refreshOnError = false,
+    deletedId,
+  }: { refreshOnError?: boolean; deletedId?: number } = {}
 ) => {
   const queryClient = useQueryClient();
-  const refresh = () =>
+  const refresh = (skipDetail?: boolean) =>
     Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['series'] }),
+      queryClient.invalidateQueries({
+        queryKey: ['series'],
+        // A delete skips the deleted series' own detail: its page is still
+        // mounted, would refetch into a 404 and redirect with "no longer
+        // exists" before the delete's own landing page takes over.
+        ...(skipDetail &&
+          deletedId !== undefined && {
+            predicate: (query) =>
+              hashKey(query.queryKey) !==
+              hashKey(queryKeys.seriesDetail(deletedId)),
+          }),
+      }),
       queryClient.invalidateQueries({ queryKey: ['books'] }),
     ]);
 
@@ -86,8 +105,8 @@ const useSeriesMutation = <TVariables, TResult>(
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: refresh,
-    ...(refreshOnError && { onError: refresh }),
+    onSuccess: () => refresh(true),
+    ...(refreshOnError && { onError: () => refresh() }),
   });
 };
 
@@ -100,7 +119,10 @@ export const useUpdateSeries = (id: number) =>
   );
 
 export const useDeleteSeries = (id: number) =>
-  useSeriesMutation(() => deleteSeries(id), { refreshOnError: true });
+  useSeriesMutation(() => deleteSeries(id), {
+    refreshOnError: true,
+    deletedId: id,
+  });
 
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));

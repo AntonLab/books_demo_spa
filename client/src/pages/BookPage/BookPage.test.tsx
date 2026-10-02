@@ -545,11 +545,15 @@ describe('BookPage Edit button', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete book' })
     );
+    // The server no longer has the book once it is deleted, so any refetch of
+    // it answers 404.
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete' })
     );
 
     expect(await screen.findByText(landing)).toBeInTheDocument();
+    expect(screen.queryByText('This book no longer exists.')).toBeNull();
   });
 });
 

@@ -20,6 +20,7 @@ import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvata
 import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
 import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
 import { NotificationBell } from '@/components/organisms/NotificationBell/NotificationBell';
+// Lives in client/public per the spec; webpack's asset/resource rule emits it as /header.svg.
 import headerImage from '../../../../public/header.svg';
 import styles from './AppHeader.module.css';
 
