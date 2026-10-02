@@ -234,6 +234,37 @@ describe('AdminGenresPage for a moderator', () => {
     expect(screen.getByText('Mystery')).toBeInTheDocument();
   });
 
+  it('drops a stale delete error when a form opens or the filter changes', async () => {
+    mockedGenres.deleteGenre.mockRejectedValue(new ApiError(409, 'In use'));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    const failDelete = async () => {
+      await user.click(screen.getByRole('button', { name: 'Delete Mystery' }));
+      await user.click(
+        await screen.findByRole('button', { name: 'Yes, delete' })
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent('In use');
+    };
+
+    await failDelete();
+    await user.click(screen.getByRole('button', { name: 'Add genre' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Cancel',
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+
+    await failDelete();
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search genres' }),
+      'm'
+    );
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+
   describe('dragging a Genre', () => {
     const rowOf = (name: string) =>
       screen.getByText(name).closest<HTMLElement>('.ant-tree-treenode')!;

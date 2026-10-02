@@ -18,12 +18,12 @@ import {
   Select,
   Spin,
 } from 'antd';
-import { GenreTreeSelect } from '@/components/molecules/GenreTreeSelect/GenreTreeSelect';
 import type { ColProps, FormProps, FormRule } from 'antd';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useNavigate } from 'react-router';
 import { FilterOutlined } from '@ant-design/icons';
 import type { Dayjs } from 'dayjs';
+import { GenreTreeSelect } from '@/components/molecules/GenreTreeSelect/GenreTreeSelect';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { authorLabelOf, useSuggestions } from '@/queries/suggestions';

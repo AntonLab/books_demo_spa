@@ -114,6 +114,13 @@ const GenreManager: FC = () => {
     ? treeData.filter((node) => node.children?.length).map((node) => node.key)
     : expanded;
 
+  // A delete error belongs to the moment it happened: starting anything else
+  // on the page retires it.
+  const openForm = (mode: GenreFormMode) => {
+    remove.reset();
+    setFormMode(mode);
+  };
+
   const renderTitle = ({ genre, counts, hasSubgenres }: GenreTreeData) => (
     <Flex align="center" gap="small">
       <Typography.Text>{genre.name}</Typography.Text>
@@ -125,7 +132,7 @@ const GenreManager: FC = () => {
             type="text"
             icon={<PlusOutlined />}
             label={`Add subgenre to ${genre.name}`}
-            onClick={() => setFormMode({ kind: 'create', parentId: genre.id })}
+            onClick={() => openForm({ kind: 'create', parentId: genre.id })}
           />
         )}
         <IconButton
@@ -133,7 +140,7 @@ const GenreManager: FC = () => {
           type="text"
           icon={<EditOutlined />}
           label={`Edit ${genre.name}`}
-          onClick={() => setFormMode({ kind: 'edit', genre })}
+          onClick={() => openForm({ kind: 'edit', genre })}
         />
         <Popconfirm
           title={`Delete ${genre.name}?`}
@@ -174,19 +181,25 @@ const GenreManager: FC = () => {
           placeholder="Search genres"
           allowClear
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            remove.reset();
+            setQuery(event.target.value);
+          }}
         />
         <Select
           aria-label="Filter genres"
           value={usage}
           options={USAGE_OPTIONS}
-          onChange={setUsage}
+          onChange={(value) => {
+            remove.reset();
+            setUsage(value);
+          }}
         />
         <IconButton
           type="primary"
           icon={<PlusOutlined />}
           label="Add genre"
-          onClick={() => setFormMode({ kind: 'create', parentId: null })}
+          onClick={() => openForm({ kind: 'create', parentId: null })}
         >
           Add genre
         </IconButton>
