@@ -85,9 +85,11 @@ export const useProfileBooks = (
   viewerId: number
 ): ProfileFilters & { sort: BookSort; list: ProfileList<PublicBook> } => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { author, authorId, ...parsed } = parseBookSearch(searchParams);
   // The Author field is hidden in My works, and userId is always the viewer.
-  const search = scope === 'mine' ? parsed : { ...parsed, author, authorId };
+  const search = useMemo(() => {
+    const { author, authorId, ...parsed } = parseBookSearch(searchParams);
+    return scope === 'mine' ? parsed : { ...parsed, author, authorId };
+  }, [searchParams, scope]);
   const { genres, genre, genreId, blocked } = useGenreFilter(search.genre);
   const params = listParamsOf(search, genreId);
 
@@ -108,15 +110,12 @@ export const useProfileBooks = (
     [blocked, query.error]
   );
 
-  const searchKey = searchParams.toString();
   const moveTo = useCallback(
     (last: number) =>
       setSearchParams(toSearchParams({ ...search, page: last }), {
         replace: true,
       }),
-    // `search` is derived from the URL, so its string is the dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [setSearchParams, searchKey, scope]
+    [setSearchParams, search]
   );
   const overshooting = usePageClamp(
     {
