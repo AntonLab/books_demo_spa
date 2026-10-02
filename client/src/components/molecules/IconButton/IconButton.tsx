@@ -12,7 +12,7 @@ export interface IconButtonProps extends Omit<
 }
 
 export const IconButton: FC<IconButtonProps> = ({ label, ...rest }) => (
-  <Tooltip title={label}>
+  <Tooltip title={label} trigger={['hover', 'focus']}>
     <Button aria-label={label} {...rest} />
   </Tooltip>
 );

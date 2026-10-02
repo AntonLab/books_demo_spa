@@ -54,8 +54,7 @@ export const AdminGenresPage: FC = () => {
         ? 'guest'
         : isModeratorRole(session.role)
           ? 'allowed'
-          : 'denied',
-    'Genres are kept by admins.'
+          : 'denied'
   );
 
   return allowed ? <GenreManager /> : <PageSpinner />;

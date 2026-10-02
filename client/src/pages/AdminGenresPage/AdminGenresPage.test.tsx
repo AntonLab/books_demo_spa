@@ -77,7 +77,7 @@ describe('AdminGenresPage for everyone else', () => {
 
     await expectSentHome();
     expect(
-      await screen.findAllByText('Genres are kept by admins.')
+      await screen.findAllByText("You don't have access to this page.")
     ).toHaveLength(1);
     expect(screen.queryByLabelText('Genre name')).toBeNull();
     expect(mockedGenres.listGenres).not.toHaveBeenCalled();

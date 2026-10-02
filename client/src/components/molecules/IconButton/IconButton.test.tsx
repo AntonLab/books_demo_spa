@@ -15,6 +15,12 @@ describe('IconButton', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit');
   });
 
+  it('shows its label as a tooltip on keyboard focus', async () => {
+    render(<IconButton label="Edit" icon={<EditOutlined />} />);
+    await userEvent.tab();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit');
+  });
+
   it('shows the tooltip while disabled', async () => {
     render(<IconButton label="Edit" icon={<EditOutlined />} disabled />);
     await userEvent.hover(screen.getByRole('button', { name: 'Edit' }));
