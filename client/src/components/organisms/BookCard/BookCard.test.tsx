@@ -165,3 +165,48 @@ describe('BookCard', () => {
     expect(screen.getByText(formatDate(book.createdAt))).toBeInTheDocument();
   });
 });
+
+describe('Series line', () => {
+  const inSeries = (position: number | null) => ({
+    ...book,
+    seriesId: 2,
+    series: { id: 2, title: 'The Scale Cycle', position },
+  });
+
+  it('names the series and the place of a Published book, linked to the series page', () => {
+    renderWithProviders(<BookCard book={inSeries(2)} />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 2' })
+    ).toHaveAttribute('href', '/series/2');
+  });
+
+  it('names only the series for a Draft book, which has no place', () => {
+    renderWithProviders(<BookCard book={inSeries(null)} />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle' })
+    ).toHaveAttribute('href', '/series/2');
+    expect(screen.queryByText(/Book \d/)).toBeNull();
+    expect(screen.queryByText(/null/)).toBeNull();
+  });
+
+  it('shows no line for a book in no series', () => {
+    renderWithProviders(<BookCard book={book} />);
+
+    expect(screen.queryByRole('link', { name: /Book \d/ })).toBeNull();
+    expect(
+      screen
+        .getAllByRole('link')
+        .every((link) => !link.getAttribute('href')?.startsWith('/series/'))
+    ).toBe(true);
+  });
+
+  it('shows the line in a grid tile too', () => {
+    renderWithProviders(<BookCard book={inSeries(1)} tile />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 1' })
+    ).toBeInTheDocument();
+  });
+});

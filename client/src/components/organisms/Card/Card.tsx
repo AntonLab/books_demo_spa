@@ -23,6 +23,9 @@ interface CardProps {
   genre: PublicGenre | null;
   tags: string[];
   media?: ReactNode;
+  // A short line about what the work belongs to, under the title. BookCard puts
+  // its Series here.
+  subtitle?: ReactNode;
   footer?: ReactNode;
 }
 
@@ -37,6 +40,7 @@ export const Card: FC<CardProps> = ({
   genre,
   tags,
   media,
+  subtitle,
   footer,
 }) => {
   const { token } = theme.useToken();
@@ -86,6 +90,10 @@ export const Card: FC<CardProps> = ({
             <Typography.Title level={4} className={styles.title}>
               <Link to={href}>{title}</Link>
             </Typography.Title>
+          )}
+
+          {subtitle !== undefined && (
+            <div className={styles.line}>{subtitle}</div>
           )}
 
           <Space size={token.marginXS} wrap className={styles.line}>

@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Space, Tag, theme, Typography } from 'antd';
+import { Link } from 'react-router';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
 import { Card } from '@/components/organisms/Card/Card';
 import { formatDate } from '@/format/date';
@@ -36,6 +37,15 @@ export const BookCard: FC<BookCardProps> = ({ book, tile = false }) => {
           title={book.title}
           fullWidth={tile}
         />
+      }
+      subtitle={
+        book.series === null ? undefined : (
+          <Link to={`/series/${book.series.id}`}>
+            {book.series.position === null
+              ? book.series.title
+              : `${book.series.title} · Book ${book.series.position}`}
+          </Link>
+        )
       }
       footer={
         <Space size={token.marginXS}>
