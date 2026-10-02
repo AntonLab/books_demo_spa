@@ -102,6 +102,16 @@ export function libraryRepositoryContract(
     );
   });
 
+  test('contract: a Moderator can set a status on another Account Draft Book', async () => {
+    const { repository, aDraftBook, anAccount, author } = await arrange(0);
+    const draft = await aDraftBook([author.id]);
+    const moderator: Account = { id: await anAccount(), role: 'admin' };
+    assert.equal(
+      (await repository.set(draft, 'reading', moderator)).status,
+      'reading'
+    );
+  });
+
   test('contract: clear removes the status; clearing nothing or a missing Book resolves', async () => {
     const { repository, me, books } = await arrange();
     await repository.set(books[0]!, 'read', me);

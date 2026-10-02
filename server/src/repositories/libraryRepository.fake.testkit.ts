@@ -1,5 +1,5 @@
 import { NotFoundError } from '../types/errors.ts';
-import type { PublicBook, ReadingStatus } from 'shared';
+import { isModeratorRole, type PublicBook, type ReadingStatus } from 'shared';
 import { aPublicBook } from './favoriteRepository.fake.testkit.ts';
 import type { LibraryRepository } from './libraryRepository.ts';
 
@@ -57,6 +57,7 @@ export function createFakeLibraryRepository(
       const mayRead =
         book &&
         (book.status !== 'draft' ||
+          isModeratorRole(account.role) ||
           book.authors.some((author) => author.id === account.id));
       if (!mayRead) throw new NotFoundError('Book', bookId);
       // Stands in for the foreign key on userId.
