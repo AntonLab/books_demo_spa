@@ -1,0 +1,10 @@
+/* A full-width card beside its status select must shrink with the row; a
+   flex item defaults to min-width: auto and would widen the page on a phone. */
+.card {
+  flex: 1;
+  min-width: 0;
+}
+
+.pagination {
+  margin-top: var(--ant-margin-lg);
+}
