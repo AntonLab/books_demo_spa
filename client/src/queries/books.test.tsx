@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import {
   useBookSearch,
   useDeleteBookCover,
+  useFavoritedBooks,
   useSortedBooks,
   useUploadBookCover,
 } from './books';
@@ -203,5 +204,30 @@ describe('useDeleteBookCover', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
+  });
+});
+
+describe('useFavoritedBooks', () => {
+  const page = {
+    items: [{ ...book, favoriteId: 11 }],
+    total: 1,
+    current: 1,
+    pageSize: 20,
+  };
+
+  it('asks the favorited list, cached apart from the same search over all books', async () => {
+    mockedBooks.listFavoritedBooks.mockResolvedValue(page);
+    const client = createTestQueryClient();
+
+    const { result } = renderHook(() => useFavoritedBooks({ q: 'x' }, true), {
+      wrapper: wrapper(client),
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledWith({ q: 'x' });
+    expect(client.getQueryData(['books', { q: 'x' }])).toBeUndefined();
+    expect(
+      client.getQueryData(['books', { q: 'x', favoritedBy: 'me' }])
+    ).toEqual(page);
   });
 });

@@ -5,6 +5,7 @@ import {
   deleteBookCover,
   getBook,
   listBooks,
+  listFavoritedBooks,
   updateBook,
   uploadBookCover,
   type ListBooksParams,
@@ -32,6 +33,19 @@ export const useBookSearch = (params: ListBooksParams, enabled: boolean) => {
   return useQuery({
     queryKey: queryKeys.books(params),
     queryFn: () => listBooks(params),
+    enabled,
+  });
+};
+
+// The key carries `favoritedBy` so a favorited list never shares a cache entry
+// with the same search over all works.
+export const useFavoritedBooks = (
+  params: ListBooksParams,
+  enabled: boolean
+) => {
+  return useQuery({
+    queryKey: queryKeys.books({ ...params, favoritedBy: 'me' }),
+    queryFn: () => listFavoritedBooks(params),
     enabled,
   });
 };

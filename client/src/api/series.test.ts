@@ -3,6 +3,7 @@ import {
   createSeries,
   deleteSeries,
   getSeries,
+  listFavoritedSeries,
   listSeries,
   listSeriesBooks,
   removeBookFromSeries,
@@ -338,5 +339,34 @@ describe('removeBookFromSeries', () => {
     expect(init.method).toBe('DELETE');
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({ 'X-XSRF-Token': 'tok-123' });
+  });
+});
+
+describe('listSeries paging, tag and favorites', () => {
+  it('encodes tag and offset, keeping an offset of 0', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({ tag: 'epic', limit: 20, offset: 0 });
+
+    const url = new URL(callOf(fetchMock)[0], 'http://x');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      tag: 'epic',
+      limit: '20',
+      offset: '0',
+    });
+  });
+
+  it('listFavoritedSeries sends favoritedBy=me beside the other filters', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listFavoritedSeries({ genreId: 4, limit: 50, offset: 50 });
+
+    const url = new URL(callOf(fetchMock)[0], 'http://x');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      genreId: '4',
+      limit: '50',
+      offset: '50',
+      favoritedBy: 'me',
+    });
   });
 });

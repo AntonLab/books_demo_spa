@@ -3,11 +3,13 @@ import {
   createSeries,
   deleteSeries,
   getSeries,
+  listFavoritedSeries,
   listSeries,
   listSeriesBooks,
   removeBookFromSeries,
   reorderSeriesBooks,
   updateSeries,
+  type ListSeriesParams,
 } from '../api/series';
 import type { SeriesPayload } from 'shared';
 import type { SeriesBookSummary } from '../types/api';
@@ -21,6 +23,27 @@ export const useMySeries = (userId: number | undefined) => {
     queryKey: queryKeys.series({ userId, limit: 100 }),
     queryFn: () => listSeries({ userId, limit: 100 }),
     enabled: userId !== undefined,
+  });
+};
+
+export const useSeriesList = (params: ListSeriesParams, enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.series(params),
+    queryFn: () => listSeries(params),
+    enabled,
+  });
+};
+
+// The key carries `favoritedBy` so a favorited list never shares a cache entry
+// with the same search over all works.
+export const useFavoritedSeries = (
+  params: ListSeriesParams,
+  enabled: boolean
+) => {
+  return useQuery({
+    queryKey: queryKeys.series({ ...params, favoritedBy: 'me' }),
+    queryFn: () => listFavoritedSeries(params),
+    enabled,
   });
 };
 

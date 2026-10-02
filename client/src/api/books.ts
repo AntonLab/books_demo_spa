@@ -5,6 +5,7 @@ import type {
   CreateBookPayload,
   SearchableBookStatus,
   UpdateBookPayload,
+  WithFavoriteId,
 } from 'shared';
 import type { BookDetail, PublicBook } from '../types/book';
 
@@ -31,6 +32,8 @@ export interface ListBooksParams {
   // antd Pagination's names: the 1-based page and its size.
   current?: number;
   pageSize?: number;
+  // Only the caller's own Favorites; see listFavoritedBooks.
+  favoritedBy?: 'me';
 }
 
 // Every filter combines with the others by AND. Written in the order the
@@ -52,6 +55,15 @@ export const listBooks = (
     query ? `/books?${query}` : '/books'
   );
 };
+
+// The server adds `favoriteId` to each item exactly when `favoritedBy=me`, so
+// the cast holds.
+export const listFavoritedBooks = (
+  params: ListBooksParams = {}
+): Promise<PagedResponse<WithFavoriteId<PublicBook>>> =>
+  listBooks({ ...params, favoritedBy: 'me' }) as Promise<
+    PagedResponse<WithFavoriteId<PublicBook>>
+  >;
 
 // Returns BookDetail, not PublicBook: the detail endpoint adds
 // the series name and the like state, neither of which the list carries.
