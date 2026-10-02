@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FC } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
+import { queryKeys } from '@/queries/keys';
+import type { LoginReturnState } from '@/hooks/usePageGuard';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useSession } from '@/queries/auth';
@@ -28,6 +32,25 @@ export const AppHeader: FC = () => {
   const user = session.data;
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.devicePreferences.theme);
+  const queryClient = useQueryClient();
+  // Where usePageGuard's Guest was headed; kept until Log in resolves.
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  // Read once per navigation, not per render: the router state outlives the
+  // modal and must not reopen it each time the session changes. Any navigation,
+  // the return trip included, also forgets the previous page.
+  const [seenKey, setSeenKey] = useState(location.key);
+  if (seenKey !== location.key) {
+    setSeenKey(location.key);
+    const loginReturnTo = (location.state as Partial<LoginReturnState> | null)
+      ?.loginReturnTo;
+    setReturnTo(loginReturnTo ?? null);
+    if (loginReturnTo) setAuthModal('login');
+  }
+
+  useEffect(() => {
+    if (user && returnTo) void navigate(returnTo, { replace: true });
+  }, [user, returnTo, navigate]);
 
   const genres = useGenresWithBooks();
   // Empty covers all three cases the submenu must not appear in: loading,
@@ -107,17 +130,17 @@ export const AppHeader: FC = () => {
       {/* Offered to everyone, Guests included: a Device preference belongs
           to the device, not to an Account. The header itself stays dark in
           both themes. */}
-      <Button
+      <IconButton
         type="text"
         className={styles.onDark}
-        aria-label={
+        label={
           theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'
         }
         onClick={() => dispatch(devicePreferences.themeToggled())}
       >
         {/* The label carries the meaning, so the glyph is decorative. */}
         <span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>
-      </Button>
+      </IconButton>
 
       {session.isPending ? (
         // Not "Log in": showing it here would flash a logged-out header at a
@@ -180,7 +203,12 @@ export const AppHeader: FC = () => {
       <AuthModals
         modal={authModal}
         onOpen={setAuthModal}
-        onClose={() => setAuthModal(null)}
+        onClose={() => {
+          setAuthModal(null);
+          // A successful Log in closes the modal after the session is set;
+          // only a close with nobody signed in abandons the page.
+          if (!queryClient.getQueryData(queryKeys.session)) setReturnTo(null);
+        }}
       />
     </Layout.Header>
   );

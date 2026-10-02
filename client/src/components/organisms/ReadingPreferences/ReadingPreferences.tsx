@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FC, ReactNode } from 'react';
 import { Button, Flex, Popover, Segmented, theme, Typography } from 'antd';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import {
   MinusOutlined,
   PlusOutlined,
@@ -92,15 +93,15 @@ export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
       </Field>
       <Field label="Font size">
         <Flex align="center" gap={token.marginSM}>
-          <Button
-            aria-label="Smaller text"
+          <IconButton
+            label="Smaller text"
             icon={<MinusOutlined />}
             disabled={reading.fontSize <= min}
             onClick={() => change({ fontSize: reading.fontSize - step })}
           />
           <Typography.Text>{reading.fontSize}</Typography.Text>
-          <Button
-            aria-label="Larger text"
+          <IconButton
+            label="Larger text"
             icon={<PlusOutlined />}
             disabled={reading.fontSize >= max}
             onClick={() => change({ fontSize: reading.fontSize + step })}
@@ -145,7 +146,11 @@ export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
       open={open}
       onOpenChange={setOpen}
     >
-      <Button aria-label="Reading preferences" icon={<SettingOutlined />} />
+      <IconButton
+        label="Reading preferences"
+        icon={<SettingOutlined />}
+        tooltipHidden={open}
+      />
     </Popover>
   );
 };

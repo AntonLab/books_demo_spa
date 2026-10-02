@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Button } from 'antd';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 
 interface LikeButtonProps {
   count: number;
@@ -20,17 +20,17 @@ export const LikeButton: FC<LikeButtonProps> = ({
   const liked = likedId !== null;
 
   return (
-    <Button
+    <IconButton
       type="text"
       size="small"
       disabled={disabled}
       aria-pressed={liked}
-      aria-label={liked ? 'Unlike' : 'Like'}
+      label={liked ? 'Unlike' : 'Like'}
       onClick={() => onToggle(likedId)}
     >
       {/* aria-pressed and the label carry the state for a screen reader, so
           the glyph is decorative. */}
       <span aria-hidden="true">{liked ? '♥' : '♡'}</span> {count}
-    </Button>
+    </IconButton>
   );
 };

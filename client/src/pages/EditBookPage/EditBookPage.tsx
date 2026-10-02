@@ -18,6 +18,8 @@ import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModa
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import { bookCapabilities } from '@/types/capabilities';
 import { useBook, useDeleteBook } from '@/queries/books';
@@ -36,10 +38,24 @@ export const EditBookPage: FC = () => {
 const EditBookView: FC<{ bookId: number }> = ({ bookId }) => {
   const navigate = useNavigate();
 
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
   const [editing, setEditing] = useState(false);
   const remove = useDeleteBook(bookId);
+
+  // The server refuses anyone but a co-author or Moderator with a 403:
+  // offering the form would only collect edits it cannot save.
+  const allowed = usePageGuard(
+    sessionPending
+      ? 'pending'
+      : !session
+        ? 'guest'
+        : !book
+          ? 'pending'
+          : bookCapabilities(book, session).mayEdit
+            ? 'allowed'
+            : 'denied'
+  );
 
   if (isError) {
     return (
@@ -56,18 +72,11 @@ const EditBookView: FC<{ bookId: number }> = ({ bookId }) => {
     );
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
+  if (!allowed || !session) return <PageSpinner />;
 
   // A Moderator may edit and delete any book, but never change its byline —
   // CoAuthorManager stays read-only for one.
-  const { isCoAuthor, mayEdit } = bookCapabilities(book, session);
-
-  // The server refuses anyone else with a 403: offering the form would only
-  // collect edits it cannot save.
-  if (!session || !mayEdit) {
-    return (
-      <Alert type="warning" title="Only its co-authors can edit this book." />
-    );
-  }
+  const { isCoAuthor } = bookCapabilities(book, session);
 
   const handleDelete = () => {
     remove.mutate(undefined, {

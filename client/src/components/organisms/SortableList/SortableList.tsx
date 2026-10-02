@@ -18,7 +18,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Alert, Button, Empty, Flex, Skeleton, theme } from 'antd';
+import { Alert, Empty, Flex, Skeleton, theme } from 'antd';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import styles from './SortableList.module.css';
 
 export interface SortableListItem {
@@ -66,17 +67,17 @@ const SortableRow: FC<{ item: SortableListItem }> = ({ item }) => {
       <Flex align="center" gap={token.marginXS}>
         {/* The handle alone starts a drag, so the links and buttons in the row
             keep working. */}
-        <Button
+        <IconButton
           ref={setActivatorNodeRef}
           type="text"
           size="small"
-          aria-label={`Reorder ${item.label}`}
+          label={`Reorder ${item.label}`}
           className={styles.handle}
           {...attributes}
           {...listeners}
         >
           ⠿
-        </Button>
+        </IconButton>
         <div className={styles.content}>{item.content}</div>
       </Flex>
     </li>

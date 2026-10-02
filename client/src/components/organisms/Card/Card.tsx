@@ -1,7 +1,8 @@
 import type { FC, ReactNode } from 'react';
-import { Card as AntCard, Flex, Space, Tag, theme, Typography } from 'antd';
+import { Card as AntCard, Flex, Space, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { TagList } from '@/components/molecules/TagList/TagList';
 import type { PublicGenre } from 'shared';
 import type { AuthorSummary } from '@/types/api';
 import { searchPath } from '@/types/bookSearch';
@@ -122,11 +123,9 @@ export const Card: FC<CardProps> = ({
           )}
 
           {!tile && tags.length > 0 && (
-            <Space wrap size={[0, token.marginXS]} className={styles.line}>
-              {tags.map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
-              ))}
-            </Space>
+            <div className={styles.line}>
+              <TagList tags={tags} />
+            </div>
           )}
 
           {footer}

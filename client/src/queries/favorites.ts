@@ -9,11 +9,9 @@ import {
 import type { CreateFavoritePayload } from 'shared';
 import { queryKeys } from './keys';
 
-export const FAVORITES_PAGE_SIZE = 20;
-
-const pageParams = (page: number) => ({
-  limit: FAVORITES_PAGE_SIZE,
-  offset: (page - 1) * FAVORITES_PAGE_SIZE,
+const pageParams = (page: number, pageSize: number) => ({
+  limit: pageSize,
+  offset: (page - 1) * pageSize,
 });
 
 // One hook for both directions, as useToggleLike: `existingId` is the
@@ -45,17 +43,17 @@ export const useToggleFavorite = (invalidates: QueryKey) => {
 };
 
 // `page` is 1-based, as antd's Pagination counts.
-export const useFavoriteBooks = (page: number) => {
+export const useFavoriteBooks = (page: number, pageSize: number) => {
   return useQuery({
-    queryKey: queryKeys.favoriteBooks(page),
-    queryFn: () => listFavoriteBooks(pageParams(page)),
+    queryKey: queryKeys.favoriteBooks(page, pageSize),
+    queryFn: () => listFavoriteBooks(pageParams(page, pageSize)),
   });
 };
 
-export const useFavoriteSeries = (page: number) => {
+export const useFavoriteSeries = (page: number, pageSize: number) => {
   return useQuery({
-    queryKey: queryKeys.favoriteSeries(page),
-    queryFn: () => listFavoriteSeries(pageParams(page)),
+    queryKey: queryKeys.favoriteSeries(page, pageSize),
+    queryFn: () => listFavoriteSeries(pageParams(page, pageSize)),
   });
 };
 

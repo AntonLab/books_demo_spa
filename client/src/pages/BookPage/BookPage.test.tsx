@@ -408,6 +408,51 @@ describe('BookPage edit link', () => {
   });
 });
 
+describe('BookPage Unsaved text', () => {
+  const stateWith = (key: string, accountId: number): Partial<RootState> => ({
+    unsavedText: {
+      accountId,
+      entries: {
+        [key]: {
+          title: 'Chapter nine',
+          text: 'Draft of the ninth chapter',
+          savedAt: '2026-09-23T10:00:00.000Z',
+        },
+      },
+    },
+  });
+
+  it('offers the text of a book the Account may no longer edit', async () => {
+    const user = userEvent.setup();
+    renderPage(reader, stateWith('book:1:chapterNew', 9));
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Chapter nine\n\nDraft of the ninth chapter');
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+
+    expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
+  });
+
+  it('shows nothing to a Co-author, who reaches it in the editor', async () => {
+    renderPage(
+      { ...reader, id: 4, role: 'author' },
+      stateWith('book:1:chapterNew', 4)
+    );
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
+  });
+
+  it('shows nothing for another book', async () => {
+    renderPage(reader, stateWith('book:2:chapterNew', 9));
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
+  });
+});
+
 describe('BookPage tabs', () => {
   const chapter: ChapterSummary = {
     id: 21,

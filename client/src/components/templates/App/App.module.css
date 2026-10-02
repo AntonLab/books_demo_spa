@@ -9,8 +9,3 @@
   padding: var(--ant-padding-lg)
     max(var(--ant-padding-lg), calc((100% - var(--ant-app-page-width)) / 2));
 }
-
-.fallback {
-  display: block;
-  margin: var(--ant-margin-xxl) 0;
-}

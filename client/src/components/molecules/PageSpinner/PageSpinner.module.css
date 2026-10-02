@@ -1,0 +1,10 @@
+.box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Viewport minus App's header and the vertical padding of `.content`, so the
+     spinner centres in the visible content area without touching its layout. */
+  min-height: calc(
+    100vh - var(--ant-layout-header-height, 64px) - 2 * var(--ant-padding-lg)
+  );
+}

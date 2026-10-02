@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import type { FC } from 'react';
 import { StyleProvider } from '@ant-design/cssinjs';
-import { App as AntdApp, Layout, Spin } from 'antd';
+import { App as AntdApp, Layout } from 'antd';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Provider } from 'react-redux';
@@ -16,6 +16,7 @@ import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { AppHeader } from '@/components/organisms/AppHeader/AppHeader';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary/ErrorBoundary';
 import { ThemedConfigProvider } from '@/components/organisms/ThemedConfigProvider/ThemedConfigProvider';
@@ -103,9 +104,7 @@ export const AppShell: FC = () => {
             that throws or a chunk still in flight. Keyed by pathname so a
             caught error clears on the next navigation. */}
         <ErrorBoundary key={boundaryKey}>
-          <Suspense
-            fallback={<Spin size="large" className={styles.fallback} />}
-          >
+          <Suspense fallback={<PageSpinner />}>
             <Routes>
               <Route path="/" element={<MainPage />} />
               {/* The emailed reset link lands here; AuthModals reads its

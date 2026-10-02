@@ -14,6 +14,7 @@ import {
   useMarkNotificationsRead,
   useNotifications,
 } from '@/queries/notifications';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { useNotificationStream } from '@/queries/notificationStream';
 import { formatDateTime } from '@/format/date';
 import type { CreditNotification, PublicNotification } from '@/types/api';
@@ -216,7 +217,6 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
     const dismiss = () => toasts.destroy(key);
     toasts.open({
       key,
-      title: 'New notification',
       description: describe(item, dismiss),
       actions: href !== null && (
         <Button
@@ -306,15 +306,16 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
         <Badge count={unread} size="small">
           {/* The count is in the name as well as the badge, which a screen
               reader does not announce. */}
-          <Button
+          <IconButton
             type="text"
-            aria-label={
+            label={
               unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
             }
+            tooltipHidden={open}
             className={styles.bell}
           >
             🔔
-          </Button>
+          </IconButton>
         </Badge>
       </Popover>
     </>

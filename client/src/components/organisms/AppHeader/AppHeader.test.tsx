@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -460,6 +460,69 @@ describe('AppHeader account menu', () => {
   });
 });
 
+const Jump = () => {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  return (
+    <>
+      <span data-testid="path">{pathname}</span>
+      <button
+        onClick={() =>
+          void navigate('/', { state: { loginReturnTo: '/profile' } })
+        }
+      >
+        jump
+      </button>
+    </>
+  );
+};
+
+describe('AppHeader returning a Guest after Log in', () => {
+  // The session query reads a Guest as `null`; the API type has no such case.
+  beforeEach(() => mockedAuth.me.mockResolvedValue(null as never));
+
+  const renderJumped = async () => {
+    const result = renderWithProviders(
+      <>
+        <AppHeader />
+        <Jump />
+      </>,
+      { route: '/profile' }
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'jump' }));
+    return result;
+  };
+
+  it('opens Log in when the guard sends a Guest home', async () => {
+    await renderJumped();
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+
+  it('goes to the page asked for once signed in', async () => {
+    const { queryClient } = await renderJumped();
+    await screen.findByRole('dialog', { name: 'Log in' });
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, user);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('path')).toHaveTextContent('/profile')
+    );
+  });
+
+  it('forgets the page once Log in is closed without signing in', async () => {
+    const { queryClient } = await renderJumped();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, user);
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/)
+    );
+  });
+});
+
 describe('AppHeader theme button', () => {
   it('toggles the theme and names what it will do next', async () => {
     const { store } = await renderHeader(<AppHeader />, withSession(null));
@@ -529,7 +592,9 @@ describe('AppHeader notification stream', () => {
     act(() => {
       first.emit(NOTIFICATION_STREAM_EVENT, pushed);
     });
-    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Open' })
+    ).toBeInTheDocument();
 
     act(() => {
       queryClient.setQueryData(queryKeys.session, {
@@ -543,7 +608,7 @@ describe('AppHeader notification stream', () => {
     expect(first.readyState).toBe(FakeEventSource.CLOSED);
     expect(FakeEventSource.latest()).not.toBe(first);
     await waitFor(() =>
-      expect(screen.queryByText('New notification')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Open' })).toBeNull()
     );
   });
 });

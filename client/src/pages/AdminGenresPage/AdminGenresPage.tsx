@@ -14,6 +14,8 @@ import {
   Typography,
 } from 'antd';
 import { ApiError } from '@/api/client';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import {
   useCreateGenre,
@@ -41,22 +43,21 @@ interface AddValues {
 }
 
 // Keeping the Genre list is an Admin's (or Superadmin's) job (ADR-0008).
-// Every other Role gets the heading and an explanation — and, because the
-// manager below is a separate component, no request at all.
+// Every other Role is sent home — and, because the manager below is a separate
+// component, makes no request at all.
 export const AdminGenresPage: FC = () => {
-  const { data: session } = useSession();
-  const isModerator = isModeratorRole(session?.role);
+  const { data: session, isPending } = useSession();
+  const allowed = usePageGuard(
+    isPending
+      ? 'pending'
+      : !session
+        ? 'guest'
+        : isModeratorRole(session.role)
+          ? 'allowed'
+          : 'denied'
+  );
 
-  if (!isModerator) {
-    return (
-      <>
-        <Typography.Title level={2}>Genres</Typography.Title>
-        <Alert type="info" title="Genres are kept by admins." />
-      </>
-    );
-  }
-
-  return <GenreManager />;
+  return allowed ? <GenreManager /> : <PageSpinner />;
 };
 
 const GenreManager: FC = () => {

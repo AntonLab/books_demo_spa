@@ -83,6 +83,7 @@ const renderPage = (
     <Routes>
       <Route path="/books/:bookId/chapters/new" element={<NewChapterPage />} />
       <Route path="/books/:id/edit" element={<p>Book editor</p>} />
+      <Route path="/" element={<p>Home page</p>} />
     </Routes>,
     { route: '/books/1/chapters/new', queryClient, preloadedState }
   );
@@ -180,14 +181,15 @@ describe('NewChapterPage', () => {
     expect(screen.getByLabelText('Text')).toHaveValue('It was a dark night.');
   });
 
-  it('turns away an account that does not co-author the book', async () => {
+  it('sends an account that does not co-author the book home with one popup', async () => {
     renderPage(account({ id: 99, login: 'other' }));
 
+    expect(await screen.findByText('Home page')).toBeInTheDocument();
     expect(
-      await screen.findByText(
+      await screen.findAllByText(
         'Only its co-authors can add chapters to this book.'
       )
-    ).toBeInTheDocument();
+    ).toHaveLength(1);
     expect(screen.queryByLabelText('Title')).toBeNull();
   });
 
@@ -258,12 +260,13 @@ describe('NewChapterPage', () => {
     expect(screen.queryByText('Book editor')).toBeNull();
   });
 
-  it('offers the text to an Account that no longer co-authors the book', async () => {
+  it('sends an Account that no longer co-authors the book home, keeping the text', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, authors: [] });
-    renderPage(account(), typedBefore);
+    const { store } = renderPage(account(), typedBefore);
 
-    expect(
-      await screen.findByRole('textbox', { name: 'Unsaved text' })
-    ).toHaveValue('Draft title\n\nDraft text');
+    expect(await screen.findByText('Home page')).toBeInTheDocument();
+    expect(store.getState().unsavedText.entries).toHaveProperty(
+      'book:1:chapterNew'
+    );
   });
 });

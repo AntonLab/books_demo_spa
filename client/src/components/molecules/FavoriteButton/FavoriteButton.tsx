@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Button } from 'antd';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
 
 interface FavoriteButtonProps {
@@ -21,12 +21,12 @@ export const FavoriteButton: FC<FavoriteButtonProps> = ({
   const isFavorite = favoriteId !== null;
 
   return (
-    <Button
+    <IconButton
       type="text"
       size="small"
       disabled={disabled}
       aria-pressed={isFavorite}
-      aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+      label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
       icon={
         // The label and aria-pressed carry the state; the star beside the
         // count is decorative (ADR-0012).
@@ -35,6 +35,6 @@ export const FavoriteButton: FC<FavoriteButtonProps> = ({
       onClick={() => onToggle(favoriteId)}
     >
       {count}
-    </Button>
+    </IconButton>
   );
 };

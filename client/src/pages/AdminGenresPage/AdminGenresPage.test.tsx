@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router';
 import { AdminGenresPage } from './AdminGenresPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -26,15 +27,30 @@ const admin: PublicUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const LocationProbe = () => (
+  <div data-testid="location">{useLocation().pathname}</div>
+);
+
+const expectSentHome = () =>
+  waitFor(() =>
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+  );
+
 // Seeds the session cache so the page renders a settled state without waiting
 // on a request.
 const renderPage = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
-  return renderWithProviders(<AdminGenresPage />, {
-    queryClient,
-    route: '/admin/genres',
-  });
+  return renderWithProviders(
+    <>
+      <AdminGenresPage />
+      <LocationProbe />
+    </>,
+    {
+      queryClient,
+      route: '/admin/genres',
+    }
+  );
 };
 
 beforeEach(() => {
@@ -48,18 +64,21 @@ beforeEach(() => {
 });
 
 describe('AdminGenresPage for everyone else', () => {
-  it('explains itself to an anonymous visitor and asks for no genres', () => {
+  it('sends an anonymous visitor home and asks for no genres', async () => {
     renderPage(null);
 
-    expect(screen.getByRole('heading', { name: 'Genres' })).toBeInTheDocument();
-    expect(screen.getByText('Genres are kept by admins.')).toBeInTheDocument();
+    await expectSentHome();
+    expect(screen.queryByRole('heading', { name: 'Genres' })).toBeNull();
     expect(mockedGenres.listGenres).not.toHaveBeenCalled();
   });
 
-  it('explains itself to an author, who keeps books rather than genres', () => {
+  it('sends an author, who keeps books rather than genres, home with a popup', async () => {
     renderPage({ ...admin, role: 'author' });
 
-    expect(screen.getByText('Genres are kept by admins.')).toBeInTheDocument();
+    await expectSentHome();
+    expect(
+      await screen.findAllByText("You don't have access to this page.")
+    ).toHaveLength(1);
     expect(screen.queryByLabelText('Genre name')).toBeNull();
     expect(mockedGenres.listGenres).not.toHaveBeenCalled();
   });

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ReadingPreferences } from './ReadingPreferences';
 import {
@@ -25,6 +25,21 @@ describe('ReadingPreferences', () => {
 
     expect(screen.getByText('Background')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset' })).toBeInTheDocument();
+  });
+
+  it('hides its tooltip while the form is open', async () => {
+    renderWith();
+    await userEvent.hover(
+      screen.getByRole('button', { name: 'Reading preferences' })
+    );
+    await open();
+
+    expect(screen.getByText('Background')).toBeVisible();
+    await waitFor(() =>
+      expect(
+        document.querySelector('.ant-tooltip:not(.ant-tooltip-hidden)')
+      ).toBeNull()
+    );
   });
 
   it('stores each choice as a Device preference', async () => {

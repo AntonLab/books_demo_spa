@@ -6,15 +6,15 @@ import {
   Empty,
   Flex,
   Listy,
-  Pagination,
   Skeleton,
   Space,
   Tabs,
   Typography,
 } from 'antd';
 import { Link } from 'react-router';
+import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
+import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import {
-  FAVORITES_PAGE_SIZE,
   useFavoriteBooks,
   useFavoriteSeries,
   useRemoveFavorite,
@@ -35,7 +35,8 @@ interface FavoriteListProps {
   isPending: boolean;
   isError: boolean;
   page: number;
-  onPageChange: (page: number) => void;
+  pageSize: number;
+  onPageChange: (page: number, pageSize: number) => void;
   emptyText: string;
   errorText: string;
 }
@@ -46,6 +47,7 @@ const FavoriteList: FC<FavoriteListProps> = ({
   isPending,
   isError,
   page,
+  pageSize,
   onPageChange,
   emptyText,
   errorText,
@@ -90,30 +92,33 @@ const FavoriteList: FC<FavoriteListProps> = ({
           </Flex>
         )}
       />
-      <Pagination
-        align="center"
+      <ListPagination
         current={page}
-        pageSize={FAVORITES_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
-        showSizeChanger={false}
-        hideOnSinglePage
         onChange={onPageChange}
       />
     </Flex>
   );
 };
 
-const lastPageOf = (total: number) =>
-  Math.max(1, Math.ceil(total / FAVORITES_PAGE_SIZE));
+const lastPageOf = (total: number, pageSize: number) =>
+  Math.max(1, Math.ceil(total / pageSize));
 
 // Each tab clamps its page while rendering, not in an effect, so the empty
 // page a removal leaves behind (its only row gone) never paints. While a
 // new page loads, data is undefined and nothing is clamped.
 const FavoriteBooksTab: FC = () => {
-  const [page, setPage] = useState(1);
-  const books = useFavoriteBooks(page);
-  if (books.data !== undefined && page > lastPageOf(books.data.total)) {
-    setPage(lastPageOf(books.data.total));
+  const [{ page, pageSize }, setPaging] = useState({
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+  const books = useFavoriteBooks(page, pageSize);
+  if (
+    books.data !== undefined &&
+    page > lastPageOf(books.data.total, pageSize)
+  ) {
+    setPaging({ page: lastPageOf(books.data.total, pageSize), pageSize });
   }
 
   return (
@@ -128,7 +133,10 @@ const FavoriteBooksTab: FC = () => {
       isPending={books.isPending}
       isError={books.isError}
       page={page}
-      onPageChange={setPage}
+      pageSize={pageSize}
+      onPageChange={(nextPage, nextSize) =>
+        setPaging({ page: nextPage, pageSize: nextSize })
+      }
       emptyText="No book is in your favorites yet."
       errorText="Could not load your favorite books."
     />
@@ -136,10 +144,16 @@ const FavoriteBooksTab: FC = () => {
 };
 
 const FavoriteSeriesTab: FC = () => {
-  const [page, setPage] = useState(1);
-  const series = useFavoriteSeries(page);
-  if (series.data !== undefined && page > lastPageOf(series.data.total)) {
-    setPage(lastPageOf(series.data.total));
+  const [{ page, pageSize }, setPaging] = useState({
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+  const series = useFavoriteSeries(page, pageSize);
+  if (
+    series.data !== undefined &&
+    page > lastPageOf(series.data.total, pageSize)
+  ) {
+    setPaging({ page: lastPageOf(series.data.total, pageSize), pageSize });
   }
 
   return (
@@ -154,7 +168,10 @@ const FavoriteSeriesTab: FC = () => {
       isPending={series.isPending}
       isError={series.isError}
       page={page}
-      onPageChange={setPage}
+      pageSize={pageSize}
+      onPageChange={(nextPage, nextSize) =>
+        setPaging({ page: nextPage, pageSize: nextSize })
+      }
       emptyText="No series is in your favorites yet."
       errorText="Could not load your favorite series."
     />

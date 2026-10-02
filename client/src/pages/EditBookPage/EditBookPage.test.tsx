@@ -91,6 +91,7 @@ const renderPage = (
     <Routes>
       <Route path="/books/:id/edit" element={<EditBookPage />} />
       <Route path="/profile/my-books" element={<p>My books list</p>} />
+      <Route path="/" element={<p>Home page</p>} />
     </Routes>,
     { route, queryClient, preloadedState }
   );
@@ -170,13 +171,20 @@ describe('EditBookPage', () => {
     expect(await screen.findByText('My books list')).toBeInTheDocument();
   });
 
-  it('turns away an account that does not co-author the book', async () => {
+  it('sends an account that does not co-author the book home with one popup', async () => {
     renderPage(account({ id: 99, login: 'reader', role: 'user' }));
 
+    expect(await screen.findByText('Home page')).toBeInTheDocument();
     expect(
-      await screen.findByText('Only its co-authors can edit this book.')
-    ).toBeInTheDocument();
+      await screen.findAllByText("You don't have access to this page.")
+    ).toHaveLength(1);
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+
+  it('sends a Guest home', async () => {
+    renderPage(null);
+
+    expect(await screen.findByText('Home page')).toBeInTheDocument();
   });
 
   it('lets a moderator edit the book but not its byline', async () => {
