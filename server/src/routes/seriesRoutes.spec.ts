@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import sharp from 'sharp';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
@@ -789,4 +790,240 @@ test('series credit changes and deletes are made as the signed-in caller', async
       ]);
     }
   );
+});
+
+// --- A Series Cover, uploaded, replaced, removed and served. ---
+
+const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
+  sharp({ create: { width, height, channels: 3, background: '#336699' } })
+    .webp()
+    .toBuffer();
+
+const putCover = (
+  base: string,
+  id: number,
+  body: Buffer | string,
+  contentType = 'image/webp',
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/series/${id}/cover`, {
+    method: 'PUT',
+    headers: {
+      'content-type': contentType,
+      ...(cookie ? { cookie } : {}),
+    },
+    body,
+  });
+
+const deleteCover = (
+  base: string,
+  id: number,
+  cookie: string | null = ROLE_COOKIES.author
+) =>
+  fetch(`${base}/api/series/${id}/cover`, {
+    method: 'DELETE',
+    headers: cookie ? { cookie } : {},
+  });
+
+test('PUT /api/series/:id/cover replaces the cover and answers with the updated series, its coverUrl version changing', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const put = (image: Buffer) => putCover(base, created.id, image);
+    const first = await json<PublicSeries>(await put(await aWebpImage()));
+    assert.match(
+      first.coverUrl ?? '',
+      new RegExp(`^/api/series/${created.id}/cover\\?v=\\d+$`)
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const second = await json<PublicSeries>(
+      await put(await aWebpImage(200, 300))
+    );
+    assert.notEqual(second.coverUrl, first.coverUrl);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 401 with no session', async () => {
+  await withApp({ seriesRepository: createFakeRepository() }, async (base) => {
+    const response = await putCover(
+      base,
+      1,
+      await aWebpImage(),
+      undefined,
+      null
+    );
+    assert.equal(response.status, 401);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 404 before 403 for a series that does not exist', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const response = await putCover(base, 999999, await aWebpImage());
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test('PUT /api/series/:id/cover answers 403 for a signed-in author who does not co-author the series', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({
+    userId: USER_IDS.otherAuthor,
+    ...valid,
+  });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(base, created.id, await aWebpImage());
+    assert.equal(response.status, 403);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 413 for a body over 2 MiB', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(
+      base,
+      created.id,
+      Buffer.alloc(2 * 1024 * 1024 + 1)
+    );
+    assert.equal(response.status, 413);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 415 for an unaccepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(
+      base,
+      created.id,
+      'not an image',
+      'text/plain'
+    );
+    assert.equal(response.status, 415);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 400 for bytes that are not a real image, even under an accepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(
+      base,
+      created.id,
+      Buffer.from('not a real png'),
+      'image/png'
+    );
+    assert.equal(response.status, 400);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 400 for an empty body, even under an accepted content type', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(
+      base,
+      created.id,
+      Buffer.alloc(0),
+      'image/png'
+    );
+    assert.equal(response.status, 400);
+  });
+});
+
+test('PUT /api/series/:id/cover answers 404 for a missing series under `any` scope (a Moderator) before reading the image', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      // Bytes sharp refuses with a 400, so a 404 proves the Series was looked
+      // up before processCoverImage ran.
+      const response = await putCover(
+        base,
+        999999,
+        Buffer.from('not a real png'),
+        'image/png',
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test('PUT /api/series/:id/cover answers 200 for a Moderator on a series they do not co-author', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    const response = await putCover(
+      base,
+      created.id,
+      await aWebpImage(),
+      'image/webp',
+      ROLE_COOKIES.admin
+    );
+    assert.equal(response.status, 200);
+  });
+});
+
+test('DELETE /api/series/:id/cover answers 401, then 404, then 403, in that order, and 204 on success — including with no cover', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  const strangers = await repository.create({
+    userId: USER_IDS.otherAuthor,
+    ...valid,
+  });
+
+  await withApp({ seriesRepository: repository }, async (base) => {
+    assert.equal((await deleteCover(base, created.id, null)).status, 401);
+  });
+
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    assert.equal((await deleteCover(base, 999999)).status, 404);
+    assert.equal((await deleteCover(base, strangers.id)).status, 403);
+    assert.equal((await deleteCover(base, created.id)).status, 204);
+
+    await putCover(base, created.id, await aWebpImage());
+    assert.equal((await deleteCover(base, created.id)).status, 204);
+  });
+});
+
+test('DELETE /api/series/:id/cover answers 404 for a missing series even under `any` scope (a Moderator)', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      const response = await deleteCover(base, 999999, ROLE_COOKIES.admin);
+      assert.equal(response.status, 404);
+    }
+  );
+});
+
+test('GET /api/series/:id/cover answers 404 for a series with no cover, and for a missing series', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withApp({ seriesRepository: repository }, async (base) => {
+    assert.equal(
+      (await fetch(`${base}/api/series/${created.id}/cover`)).status,
+      404
+    );
+    assert.equal((await fetch(`${base}/api/series/999999/cover`)).status, 404);
+  });
+});
+
+test('GET /api/series/:id/cover serves the WebP bytes with the versioned cache headers, publicly (a guest included)', async () => {
+  const repository = createFakeRepository();
+  const created = await repository.create({ userId: KNOWN_USER_ID, ...valid });
+  await withAuthenticatedApp({ seriesRepository: repository }, async (base) => {
+    await putCover(base, created.id, await aWebpImage());
+  });
+  await withApp({ seriesRepository: repository }, async (base) => {
+    const response = await fetch(`${base}/api/series/${created.id}/cover`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(
+      response.headers.get('cache-control'),
+      'private, max-age=31536000, immutable'
+    );
+  });
 });

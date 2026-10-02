@@ -7,6 +7,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import { sendCover } from './coverResponse.ts';
 import { creditHandlers } from './creditHandlers.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
@@ -196,16 +197,7 @@ export function createBookController(repository: BookRepository) {
       const { id } = validatedParams<{ id: number }>(req);
       const cover = await repository.getCoverData(id, viewerOf(req.user));
       if (!cover) throw new NotFoundError('Book', id);
-
-      res
-        .status(200)
-        .set({
-          'Content-Type': 'image/webp',
-          'X-Content-Type-Options': 'nosniff',
-          // Versioned by the URL's own ?v=, so immutable is safe.
-          'Cache-Control': 'private, max-age=31536000, immutable',
-        })
-        .send(cover.data);
+      sendCover(res, cover);
     },
   } satisfies Record<string, RequestHandler>;
 }

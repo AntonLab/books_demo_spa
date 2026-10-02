@@ -1,14 +1,20 @@
 import type { RequestHandler } from 'express';
+import { processCoverImage } from '../images.ts';
 import {
   validatedBody,
   validatedParams,
   validatedQuery,
 } from '../middleware/validate.ts';
 import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import { sendCover } from './coverResponse.ts';
 import { creditHandlers } from './creditHandlers.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { actorOf, viewerOf } from '../repositories/visibility.ts';
-import { NotFoundError, UnauthorizedError } from '../types/errors.ts';
+import {
+  NotFoundError,
+  UnauthorizedError,
+  UnsupportedMediaTypeError,
+} from '../types/errors.ts';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -96,6 +102,42 @@ export function createSeriesController(repository: SeriesRepository) {
       const removed = await repository.removeBook(id, bookId);
       if (!removed) throw new NotFoundError('Series', id);
       res.status(204).end();
+    },
+
+    // Series x update, then the same Co-author check PATCH uses.
+    uploadCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      if (!Buffer.isBuffer(req.body)) {
+        throw new UnsupportedMediaTypeError();
+      }
+      await assertMayChange(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
+
+      const processed = await processCoverImage(req.body);
+      const found = await repository.setCover(id, processed);
+      if (!found) throw new NotFoundError('Series', id);
+
+      const series = await repository.findById(id, viewerOf(req.user));
+      if (!series) throw new NotFoundError('Series', id);
+      res.json(series);
+    },
+
+    // 204 whether or not a Cover existed, 404 for a missing Series.
+    removeCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChange(req, seriesTarget(id), MAY_ONLY_CHANGE_OWN);
+
+      const found = await repository.removeCover(id);
+      if (!found) throw new NotFoundError('Series', id);
+      res.status(204).end();
+    },
+
+    // Rides on series x read, which a guest holds; a Series the viewer may not
+    // see is the same 404 as a missing one.
+    getCover: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const cover = await repository.getCoverData(id, viewerOf(req.user));
+      if (!cover) throw new NotFoundError('Series', id);
+      sendCover(res, cover);
     },
   } satisfies Record<string, RequestHandler>;
 }
