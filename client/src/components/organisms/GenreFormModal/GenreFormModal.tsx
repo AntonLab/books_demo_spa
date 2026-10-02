@@ -111,7 +111,19 @@ export const GenreFormModal: FC<GenreFormModalProps> = ({
       }
       form={form}
       onClose={onClose}
-      footer={null}
+      footer={(_, { CancelBtn }) => (
+        <Space>
+          <CancelBtn />
+          <Button
+            type="primary"
+            loading={mutation.isPending}
+            disabled={isUnchanged}
+            onClick={() => form.submit()}
+          >
+            Save
+          </Button>
+        </Space>
+      )}
     >
       <Form
         form={form}
@@ -138,17 +150,6 @@ export const GenreFormModal: FC<GenreFormModalProps> = ({
             style={{ marginBottom: 16 }}
           />
         )}
-        <Space>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={mutation.isPending}
-            disabled={isUnchanged}
-          >
-            Save
-          </Button>
-        </Space>
       </Form>
     </DiscardGuardModal>
   );

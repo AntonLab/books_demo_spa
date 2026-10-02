@@ -126,6 +126,29 @@ describe('GenreFormModal', () => {
     expect(screen.queryByTitle('Horror')).not.toBeInTheDocument();
   });
 
+  it('asks before Cancel discards typed input', async () => {
+    const user = userEvent.setup();
+    renderModal({ kind: 'create', parentId: null });
+
+    await user.type(screen.getByLabelText('Genre name'), 'Noir');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('closes at once on Cancel when nothing was typed', async () => {
+    const user = userEvent.setup();
+    renderModal({ kind: 'create', parentId: null });
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it('shows a 409 under the name and stays open', async () => {
     const user = userEvent.setup();
     mockedGenres.createGenre.mockRejectedValue(
