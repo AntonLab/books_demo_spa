@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -50,6 +51,8 @@ const bookDetail: BookDetail = {
   wordCount: 0,
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 

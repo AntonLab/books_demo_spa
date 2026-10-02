@@ -6,6 +6,7 @@ import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
 import {
   assertGenreExists,
   genreFamilyIds,
@@ -34,7 +35,9 @@ import type {
   BookDetail,
   BookSeriesRef,
   BookSort,
+  LibraryCounts,
   PublicBook,
+  ReadingStatus,
   SeriesBookSummary,
 } from 'shared';
 import type {
@@ -464,6 +467,25 @@ function buildWhere(
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
 }
 
+// Not interested is never read, so it can never reach a reader.
+function toLibraryCounts(
+  rows: { status?: unknown; count: number }[]
+): LibraryCounts {
+  const of = (status: ReadingStatus) =>
+    rows.find((row) => row.status === status)?.count ?? 0;
+  const [reading, planToRead, read] = [
+    of('reading'),
+    of('plan_to_read'),
+    of('read'),
+  ];
+  return {
+    reading,
+    planToRead,
+    read,
+    inLibraries: reading + planToRead + read,
+  };
+}
+
 export function createSequelizeBookRepository(): BookRepository {
   return {
     async create(input) {
@@ -590,6 +612,8 @@ export function createSequelizeBookRepository(): BookRepository {
         wordCount,
         favoriteCount,
         viewerFavorite,
+        statusRows,
+        viewerEntry,
       ] = await Promise.all([
         Like.count({ where: { bookId: id, isLike: true } }),
         viewerId === null
@@ -609,6 +633,17 @@ export function createSequelizeBookRepository(): BookRepository {
               where: { bookId: id, userId: viewerId },
               attributes: ['id'],
             }),
+        // Like a Draft's Favorites, its Library entries are kept but not
+        // counted; the viewer's own entry is still named.
+        book.status === 'draft'
+          ? []
+          : LibraryEntry.count({ where: { bookId: id }, group: ['status'] }),
+        viewerId === null
+          ? null
+          : LibraryEntry.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['status'],
+            }),
       ]);
 
       return {
@@ -619,6 +654,8 @@ export function createSequelizeBookRepository(): BookRepository {
         wordCount: wordCount ?? 0,
         favoriteCount,
         viewerFavoriteId: viewerFavorite?.id ?? null,
+        viewerReadingStatus: viewerEntry?.status ?? null,
+        libraryCounts: toLibraryCounts(statusRows),
       };
     },
 

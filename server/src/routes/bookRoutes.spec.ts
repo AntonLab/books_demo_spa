@@ -568,6 +568,34 @@ test('GET by id reports the viewer own like when signed in', async () => {
   );
 });
 
+test('GET by id carries the Library counts for all, the Reading status for the viewer, and the list neither', async () => {
+  const counts = { reading: 2, planToRead: 1, read: 4, inLibraries: 7 };
+  const bookRepository = createFakeBookRepository({
+    accounts: SUMMARIES,
+    series: SERIES,
+    genres: GENRES,
+    library: { counts, viewerStatus: 'read' },
+  });
+  await withAuthenticatedApp({ bookRepository }, async (base) => {
+    await post(base, valid);
+
+    const signedIn = await json<BookDetail>(
+      await fetch(`${base}/api/books/1`, { headers: { cookie: AUTH_COOKIE } })
+    );
+    const guest = await json<BookDetail>(await fetch(`${base}/api/books/1`));
+    const list = await json<{ items: object[] }>(
+      await fetch(`${base}/api/books`)
+    );
+
+    assert.equal(signedIn.viewerReadingStatus, 'read');
+    assert.deepEqual(signedIn.libraryCounts, counts);
+    assert.equal(guest.viewerReadingStatus, null);
+    assert.deepEqual(guest.libraryCounts, counts);
+    assert.equal('viewerReadingStatus' in (list.items[0] ?? {}), false);
+    assert.equal('libraryCounts' in (list.items[0] ?? {}), false);
+  });
+});
+
 test('GET by id returns 404 for a missing record', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },

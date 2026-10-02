@@ -1,4 +1,5 @@
 import type { PublicGenre } from './genre.ts';
+import type { LibraryCounts, ReadingStatus } from './library.ts';
 import type { AuthorSummary } from './user.ts';
 
 // The Book status (CONTEXT.md): only `draft` keeps a book from readers;
@@ -76,6 +77,12 @@ export interface BookDetail extends PublicBook {
   // for a Guest and for an account without one. Reported on a Draft too, so
   // the button a Co-author sees matches the row that exists.
   viewerFavoriteId: number | null;
+  // The viewer's own Reading status for this book (CONTEXT.md, Library); null
+  // for a Guest and for an account with no entry. Reported on a Draft too.
+  viewerReadingStatus: ReadingStatus | null;
+  // How many Accounts hold the book in a Library (CONTEXT.md, Library), never
+  // counting Not interested. All zero while the book is a Draft.
+  libraryCounts: LibraryCounts;
 }
 
 // The Book statuses a search may ask for: a Draft book never appears in one.

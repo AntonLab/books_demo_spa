@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { NotFoundError } from '../types/errors.ts';
 import type { CreateBookInput } from '../types/book.ts';
 import type { BookRepository } from './bookRepository.ts';
@@ -263,6 +264,8 @@ export function bookRepositoryContract(
     assert.equal(detail?.wordCount, 0);
     assert.equal(detail?.favoriteCount, 0);
     assert.equal(detail?.viewerFavoriteId, null);
+    assert.equal(detail?.viewerReadingStatus, null);
+    assert.deepEqual(detail?.libraryCounts, EMPTY_LIBRARY_COUNTS);
   });
 
   test('contract: a removed book is gone, credits and all', async () => {

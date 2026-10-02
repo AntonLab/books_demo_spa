@@ -1,4 +1,5 @@
 import { fireEvent, screen, within } from '@testing-library/react';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { ChapterPage } from './ChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -51,6 +52,8 @@ const book: BookDetail = {
   wordCount: 0,
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 

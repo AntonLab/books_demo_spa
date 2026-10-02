@@ -1,7 +1,10 @@
 import { NotFoundError } from '../types/errors.ts';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import type {
   BookDetail,
   BookSeriesRef,
+  LibraryCounts,
+  ReadingStatus,
   PublicBook,
   PublicGenre,
   AuthorSummary,
@@ -36,6 +39,9 @@ export interface FakeBookRepositoryOptions {
   // repository: the count, and the id of a signed-in viewer's own Favorite.
   // Whether a Draft book counts is the real repository's rule, proven on MySQL.
   favorites?: { count: number; viewerFavoriteId: number | null };
+  // What a book's detail reports about its Libraries, which live in another
+  // repository: the counts, and a signed-in viewer's own Reading status.
+  library?: { counts: LibraryCounts; viewerStatus: ReadingStatus | null };
   // What a book's detail reports from its comments and chapters, which live in
   // other repositories. Which comments and chapters count is the real
   // repository's rule, proven on MySQL.
@@ -63,6 +69,7 @@ export function createFakeBookRepository(
     genres = new Map(),
     likes = { count: 0, viewerLikeId: null },
     favorites = { count: 0, viewerFavoriteId: null },
+    library = { counts: EMPTY_LIBRARY_COUNTS, viewerStatus: null },
     tallies = { commentCount: 0, wordCount: 0 },
     viewers = [],
     reorders = [],
@@ -235,6 +242,8 @@ export function createFakeBookRepository(
         wordCount: tallies.wordCount,
         favoriteCount: favorites.count,
         viewerFavoriteId: viewer === null ? null : favorites.viewerFavoriteId,
+        viewerReadingStatus: viewer === null ? null : library.viewerStatus,
+        libraryCounts: library.counts,
       };
     },
 

@@ -15,6 +15,7 @@ import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../models/Genre.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
@@ -982,6 +983,82 @@ describe('bookRepository against real MySQL', { skip }, () => {
         [2, null]
       );
       assert.equal(asCoAuthor?.viewerFavoriteId, null);
+    });
+
+    test('libraryCounts count each status, leave Not interested out, and viewerReadingStatus is the viewer own', async () => {
+      const reading = await aFan();
+      const planned = await aFan();
+      const finished = await aFan();
+      const skipped = await aFan();
+      const book = await publishedBook('Shelved');
+      await LibraryEntry.create({
+        userId: reading.id,
+        bookId: book.id,
+        status: 'reading',
+      });
+      await LibraryEntry.create({
+        userId: planned.id,
+        bookId: book.id,
+        status: 'plan_to_read',
+      });
+      await LibraryEntry.create({
+        userId: finished.id,
+        bookId: book.id,
+        status: 'read',
+      });
+      await LibraryEntry.create({
+        userId: skipped.id,
+        bookId: book.id,
+        status: 'not_interested',
+      });
+
+      const asReading = await repository.findDetailById(book.id, {
+        id: reading.id,
+        role: 'user',
+      });
+      const asSkipped = await repository.findDetailById(book.id, {
+        id: skipped.id,
+        role: 'user',
+      });
+      const asGuest = await repository.findDetailById(book.id, null);
+
+      const counts = { reading: 1, planToRead: 1, read: 1, inLibraries: 3 };
+      assert.deepEqual(asReading?.libraryCounts, counts);
+      assert.deepEqual(asGuest?.libraryCounts, counts);
+      assert.deepEqual(asSkipped?.libraryCounts, counts);
+      assert.deepEqual(
+        [
+          asReading?.viewerReadingStatus,
+          asSkipped?.viewerReadingStatus,
+          asGuest?.viewerReadingStatus,
+        ],
+        ['reading', 'not_interested', null]
+      );
+    });
+
+    test('a Draft Book counts no Library, but its Co-author still sees their own status', async () => {
+      const draft = await repository.create({
+        userId: ownerId,
+        seriesId: null,
+        title: 'Hidden',
+        description: 'Hidden',
+        tags: [],
+      });
+      await LibraryEntry.create({
+        userId: ownerId,
+        bookId: draft.id,
+        status: 'reading',
+      });
+
+      const detail = await repository.findDetailById(draft.id, asOwner());
+
+      assert.deepEqual(detail?.libraryCounts, {
+        reading: 0,
+        planToRead: 0,
+        read: 0,
+        inLibraries: 0,
+      });
+      assert.equal(detail?.viewerReadingStatus, 'reading');
     });
 
     test('favoritedBy=me lists only the viewer own Favorites, each with its favoriteId', async () => {

@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation, useNavigationType } from 'react-router';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
@@ -116,6 +117,8 @@ beforeEach(() => {
     wordCount: 0,
     favoriteCount: 0,
     viewerFavoriteId: null,
+    viewerReadingStatus: null,
+    libraryCounts: EMPTY_LIBRARY_COUNTS,
     viewerLikeId: null,
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);

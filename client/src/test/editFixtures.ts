@@ -1,3 +1,4 @@
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import type { BookDetail } from '@/types/book';
 import type { PublicChapter } from '@/types/chapter';
 import type { PublicUser } from '@/types/api';
@@ -35,6 +36,8 @@ export const editorBook: BookDetail = {
   wordCount: 0,
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 

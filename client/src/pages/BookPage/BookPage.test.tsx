@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useNavigationType } from 'react-router';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
@@ -70,6 +71,8 @@ const book: BookDetail = {
   wordCount: 0,
   favoriteCount: 2,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 
