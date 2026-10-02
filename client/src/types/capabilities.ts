@@ -45,5 +45,8 @@ export const bookCapabilities = (
     // The server keeps a Draft's Favorites but counts and lists none of
     // them, so a star on a Draft would show a count that means nothing.
     mayFavorite: session != null && !isDraft,
+    // Any signed-in Account, a Co-author and a Draft included: the server
+    // allows both, since the Library is private to its Account.
+    mayKeepInLibrary: session != null,
   };
 };

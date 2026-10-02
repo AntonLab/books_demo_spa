@@ -1,4 +1,5 @@
 import type { ListBooksParams } from '../api/books';
+import type { ListLibraryParams } from '../api/library';
 import type { ListSeriesParams } from '../api/series';
 
 // One place where every cache key is spelled, so no two call sites can
@@ -35,6 +36,9 @@ export const queryKeys = {
   allNotifications: ['notifications'] as const,
   // The prefix a Favorite toggle or removal invalidates.
   allFavorites: ['favorites'] as const,
+  library: (params: ListLibraryParams) => ['library', params] as const,
+  // The prefix a Reading status change invalidates.
+  allLibrary: ['library'] as const,
   // Not keyed by Account, unlike notifications: the answer is always the
   // session's, so watchSession's refetch on an Account change is correct.
   notificationSettings: ['notificationSettings'] as const,

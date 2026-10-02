@@ -46,7 +46,8 @@ describe('bookCapabilities', () => {
       mayRead,
       mayFavorite
     ) => {
-      expect(bookCapabilities(book(status), session)).toEqual({
+      // toMatchObject: mayKeepInLibrary has its own table below.
+      expect(bookCapabilities(book(status), session)).toMatchObject({
         isCoAuthor,
         mayEdit,
         mayLike,
@@ -58,6 +59,19 @@ describe('bookCapabilities', () => {
 
   it('treats a session still loading as a Guest', () => {
     expect(bookCapabilities(book('complete'), undefined).mayLike).toBe(false);
+  });
+});
+
+describe('bookCapabilities mayKeepInLibrary', () => {
+  it.each([
+    ['a Guest', null, 'draft', false],
+    ['a stranger on a complete book', STRANGER, 'complete', true],
+    ['a Co-author on a draft', COAUTHOR, 'draft', true],
+    ['an admin', ADMIN, 'complete', true],
+  ] as const)('is as expected for %s', (_who, session, status, expected) => {
+    expect(bookCapabilities(book(status), session).mayKeepInLibrary).toBe(
+      expected
+    );
   });
 });
 
