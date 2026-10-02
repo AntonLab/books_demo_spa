@@ -15,6 +15,7 @@ import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
+import * as libraryApi from '@/api/library';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
@@ -27,6 +28,7 @@ jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/favorites');
 jest.mock('@/api/genres');
+jest.mock('@/api/library');
 jest.mock('@/api/series');
 jest.mock('@/api/authors');
 
@@ -36,6 +38,7 @@ const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
 const mockedGenres = jest.mocked(genresApi);
+const mockedLibrary = jest.mocked(libraryApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const book: BookDetail = {
@@ -460,6 +463,88 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('Library', () => {
+  it('shows the counts to a Guest, without the dropdown', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      libraryCounts: { reading: 1, planToRead: 1, read: 1, inLibraries: 3 },
+    });
+    renderPage();
+    expect(await screen.findByText('In 3 libraries')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Reading status' })
+    ).toBeNull();
+  });
+
+  it('shows the reader’s own status in the dropdown', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      viewerReadingStatus: 'reading',
+    });
+    renderPage(reader);
+    const select = await screen.findByRole('combobox', {
+      name: 'Reading status',
+    });
+    expect(
+      within(select.closest('.ant-select') as HTMLElement).getByText('Reading')
+    ).toBeInTheDocument();
+  });
+
+  it('sets a status and refetches the book', async () => {
+    mockedLibrary.setReadingStatus.mockResolvedValue({
+      bookId: 1,
+      status: 'reading',
+      updatedAt: '2026-10-02T10:00:00.000Z',
+    });
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Reading'));
+    expect(mockedLibrary.setReadingStatus).toHaveBeenCalledWith(1, 'reading');
+    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
+  });
+
+  it('removes the book from the Library', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      viewerReadingStatus: 'read',
+    });
+    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Remove from library'));
+    expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(1);
+  });
+
+  it('toasts a failed change and refetches the book', async () => {
+    mockedLibrary.setReadingStatus.mockRejectedValue(
+      new ApiError(404, 'Book 1 not found')
+    );
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Read'));
+    expect(await screen.findByText('Book 1 not found')).toBeInTheDocument();
+    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
+  });
+
+  it('disables the dropdown while a change is in flight', async () => {
+    mockedLibrary.setReadingStatus.mockReturnValue(new Promise(() => {}));
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Read'));
+    expect(
+      screen.getByRole('combobox', { name: 'Reading status' })
+    ).toBeDisabled();
   });
 });
 

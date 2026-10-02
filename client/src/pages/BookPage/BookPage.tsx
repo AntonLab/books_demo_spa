@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { FC } from 'react';
 import {
   Alert,
+  App,
   Button,
   Divider,
   Empty,
@@ -18,6 +19,8 @@ import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
+import { ReadingStatusSelect } from '@/components/molecules/ReadingStatusSelect/ReadingStatusSelect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
@@ -32,6 +35,7 @@ import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
 import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
+import { useSetReadingStatus } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
@@ -66,6 +70,9 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const chapters = useChapters(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
   const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
+  const setStatus = useSetReadingStatus();
+  const { message } = App.useApp();
+  const toastError = (error: Error) => void message.error(error.message);
 
   const unsavedEntries = useOwnUnsavedEntries();
   const hasUnsavedText = entriesOfBook(unsavedEntries, bookId).length > 0;
@@ -90,10 +97,8 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
   // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
-  const { isCoAuthor, mayEdit, mayLike, mayFavorite } = bookCapabilities(
-    book,
-    session
-  );
+  const { isCoAuthor, mayEdit, mayLike, mayFavorite, mayKeepInLibrary } =
+    bookCapabilities(book, session);
   // The public list: only what is out, even for a Co-author, who manages the
   // rest from the Edit modal. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
@@ -175,7 +180,25 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
                 }
               />
             )}
+            {mayKeepInLibrary && (
+              <ReadingStatusSelect
+                // Its own id: rc-component's generated ids all read `test-id`
+                // under Jest, and this select would then name any modal whose
+                // title is labelled by that id.
+                id="book-reading-status"
+                value={book.viewerReadingStatus}
+                disabled={setStatus.isPending}
+                onChange={(status) =>
+                  setStatus.mutate(
+                    { bookId: book.id, status },
+                    { onError: toastError }
+                  )
+                }
+              />
+            )}
           </Space>
+
+          <BookLibraryCounts counts={book.libraryCounts} />
 
           {book.tags.length > 0 && (
             <div className={styles.tags}>

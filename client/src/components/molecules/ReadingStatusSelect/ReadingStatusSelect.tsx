@@ -21,6 +21,7 @@ type Props = {
   onChange: (status: ReadingStatus | null) => void;
   disabled?: boolean;
   className?: string;
+  id?: string;
 };
 
 // Removal is an option, not allowClear: a keyboard user finds it in the list.
@@ -29,8 +30,10 @@ export const ReadingStatusSelect: FC<Props> = ({
   onChange,
   disabled,
   className,
+  id,
 }) => (
   <Select
+    id={id}
     aria-label="Reading status"
     placeholder="Add to library"
     className={className}
