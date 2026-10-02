@@ -230,8 +230,8 @@ async function writeContent(
 
   for (const author of plan.authors) {
     // Every Book and Series drawn from this author's bank is filed under the
-    // bank's Subgenre or, for every other one, its parent Genre, so both levels
-    // hold work. Counted from position, not drawn, to leave the seed's RNG
+    // bank's Subgenre (the odd-numbered works: first, third, …) or its parent
+    // Genre (the even-numbered ones), so both levels hold work. Counted from position, not drawn, to leave the seed's RNG
     // sequence alone. A co-authored work keeps the Genre of the author it was
     // planned under — the only author whose bank it came from.
     const subgenre = author.spec.bank.genreName;

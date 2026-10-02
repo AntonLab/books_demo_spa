@@ -108,6 +108,37 @@ test('GET hands nonEmpty to the repository and refuses a value that is not a boo
 const get = (base: string, query: string, cookie: string | null = null) =>
   fetch(`${base}/api/genres${query}`, { headers: cookie ? { cookie } : {} });
 
+test('GET with both ?counts=1 and ?nonEmpty=1 answers with counts and never asks for nonEmpty', async () => {
+  const listCalls: { nonEmpty: boolean }[] = [];
+  await withAuthenticatedApp(
+    {
+      genreRepository: createFakeGenreRepository({
+        seeds: [{ id: 1, name: 'Fantasy' }],
+        counts: new Map([[1, { bookCount: 2, seriesCount: 1 }]]),
+        listCalls,
+      }),
+    },
+    async (base) => {
+      const response = await get(
+        base,
+        '?counts=1&nonEmpty=1',
+        ROLE_COOKIES.admin
+      );
+      assert.equal(response.status, 200);
+      assert.deepEqual((await json<{ items: unknown[] }>(response)).items, [
+        {
+          id: 1,
+          name: 'Fantasy',
+          parentId: null,
+          bookCount: 2,
+          seriesCount: 1,
+        },
+      ]);
+    }
+  );
+  assert.deepEqual(listCalls, []);
+});
+
 test('POST creates a Subgenre, and a missing, nested or self parent is 400 on parentId', async () => {
   await withAuthenticatedApp(
     {

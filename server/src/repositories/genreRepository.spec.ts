@@ -229,6 +229,18 @@ describe('genreRepository against real MySQL', { skip }, () => {
     assert.equal(items.find((g) => g.name === 'Urban')?.parentId, fantasy.id);
   });
 
+  test('nonEmpty lists a parent holding its own Book once, beside its qualifying Subgenre', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    await makeBook(fantasy.id, 'complete');
+    await makeBook(urban.id, 'in_progress');
+
+    assert.deepEqual(
+      (await repository.list({ nonEmpty: true })).map((g) => g.name),
+      ['Fantasy', 'Urban']
+    );
+  });
+
   test('listWithCounts counts a Genre’s own Books and Series, Drafts included, with no roll-up', async () => {
     const fantasy = await Genre.create({ name: 'Fantasy' });
     const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
