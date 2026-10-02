@@ -210,6 +210,19 @@ describe('useSearchPage resolving the genre', () => {
     expect(page().form.key).toBe('genre=4|4');
   });
 
+  it('resolves ?genre=<id> of a parent whose works sit only in a Subgenre', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [genreItem(1, 'Fantasy'), genreItem(2, 'Urban Fantasy', 1)],
+    });
+    const { page } = renderSearchPage('/search?genre=1');
+
+    await whenLoaded(page);
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ genreId: 1 })
+    );
+    expect(page().form.initialValues.genre).toBe(1);
+  });
+
   it('waits for the genre list before asking for books', () => {
     mockedGenres.listGenres.mockReturnValue(new Promise<never>(() => {}));
 

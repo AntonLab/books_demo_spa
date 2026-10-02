@@ -2,7 +2,7 @@ import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
 import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
 import type { GenreListItem } from 'shared';
-import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
+import { GenreTreeSelect } from '@/components/molecules/GenreTreeSelect/GenreTreeSelect';
 
 interface Props {
   genreOptions: GenreListItem[];
@@ -40,13 +40,10 @@ export const WorkFields: FC<Props> = ({ genreOptions, children }) => (
     {children}
 
     <Form.Item name="genreId" label="Genre">
-      <ClearableSelect
+      <GenreTreeSelect
         aria-label="Genre"
         placeholder="No genre"
-        options={genreOptions.map((genre) => ({
-          value: genre.id,
-          label: genre.name,
-        }))}
+        genres={genreOptions}
       />
     </Form.Item>
   </>

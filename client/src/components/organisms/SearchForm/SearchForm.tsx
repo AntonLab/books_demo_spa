@@ -18,6 +18,7 @@ import {
   Select,
   Spin,
 } from 'antd';
+import { GenreTreeSelect } from '@/components/molecules/GenreTreeSelect/GenreTreeSelect';
 import type { ColProps, FormProps, FormRule } from 'antd';
 import type { DefaultOptionType } from 'antd/es/select';
 import { useNavigate } from 'react-router';
@@ -274,14 +275,7 @@ export const SearchForm: FC<SearchFormProps> = ({
           </Col>
           <Col {...FIELD_COLUMNS}>
             <Form.Item name="genre" label="Genre">
-              <Select
-                allowClear
-                placeholder="Any"
-                options={genres.map((genre) => ({
-                  value: genre.id,
-                  label: genre.name,
-                }))}
-              />
+              <GenreTreeSelect placeholder="Any" genres={genres} />
             </Form.Item>
           </Col>
           <Col {...FIELD_COLUMNS}>

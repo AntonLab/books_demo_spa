@@ -251,6 +251,20 @@ describe('SearchForm', () => {
     );
   });
 
+  it('submits a top-level parent Genre by its id', async () => {
+    const { onSearch } = renderForm({
+      genres: [genreItem(1, 'Fantasy'), genreItem(2, 'Urban Fantasy', 1)],
+    });
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Genre' }));
+    await userEvent.click(await screen.findByText('Fantasy'));
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ genre: 1 })
+    );
+  });
+
   it('resets through its caller', async () => {
     const { onReset } = renderForm();
 

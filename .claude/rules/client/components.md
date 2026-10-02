@@ -90,9 +90,11 @@ that read like mistakes and are not.
   `CommentComposerModal` (its text is Unsaved text). Pass `form` only while the
   `Form` is mounted. A successful submit calls `onClose` itself and so skips
   the guard.
-- `BookForm` / `SeriesForm`: the Series and Genre selects are `ClearableSelect`
-  (`allowClear`; antd shows the icon only on hover and it takes no focus, so it
-  keeps the icon visible and clears on Delete or Backspace while closed),
+- `BookForm` / `SeriesForm`: the Series select is a `ClearableSelect` and the
+  Genre select a `GenreTreeSelect` (a tree of Genres and Subgenres, any node
+  choosable). Both are `allowClear`; antd shows the icon only on hover and it
+  takes no focus, so each keeps the icon visible and clears on Delete or
+  Backspace while closed,
   with "No series" / "No genre" as placeholders, not options. An empty or
   cleared select is `undefined` inside the form and leaves as an explicit
   `null` (the server accepts `null` for both). A stored `null` is seeded as
