@@ -70,6 +70,7 @@ export function defaultDeps(): AppDeps {
     likeRepository: createUnusedRepository('like'),
     notificationRepository: createUnusedRepository('notification'),
     favoriteRepository: createUnusedRepository('favorite'),
+    libraryRepository: createUnusedRepository('library'),
     sessionRepository: createUnusedRepository('session'),
     passwordResetRepository: createUnusedRepository('passwordReset'),
     mailDelivery: createUnusedRepository('mailDelivery'),

@@ -19,6 +19,10 @@ import {
   type FavoriteRepository,
 } from './favoriteRepository.ts';
 import {
+  createSequelizeLibraryRepository,
+  type LibraryRepository,
+} from './libraryRepository.ts';
+import {
   createSequelizeLikeRepository,
   type LikeRepository,
 } from './likeRepository.ts';
@@ -56,6 +60,7 @@ export interface Repositories {
   likeRepository: LikeRepository;
   notificationRepository: NotificationRepository;
   favoriteRepository: FavoriteRepository;
+  libraryRepository: LibraryRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
 }
@@ -73,6 +78,7 @@ export function createSequelizeRepositories(): Repositories {
     likeRepository: createSequelizeLikeRepository(),
     notificationRepository: createSequelizeNotificationRepository(),
     favoriteRepository: createSequelizeFavoriteRepository(),
+    libraryRepository: createSequelizeLibraryRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
   };
