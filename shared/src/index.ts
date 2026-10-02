@@ -12,6 +12,7 @@ export * from './genre.ts';
 export * from './library.ts';
 export * from './like.ts';
 export * from './notification.ts';
+export * from './readingList.ts';
 export * from './role.ts';
 export * from './series.ts';
 export * from './user.ts';

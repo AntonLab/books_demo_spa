@@ -8,12 +8,15 @@
 // default), but never send a key the schema does not know or omit one the
 // schema requires.
 import type {
+  AddReadingListItemPayload,
   CreateBookPayload,
   CreateChapterPayload,
   CreateCommentPayload,
   CreateFavoritePayload,
   CreateLikePayload,
   GenrePayload,
+  ReadingListPayload,
+  ReorderReadingListItemsPayload,
   SeriesPayload,
   SetReadingStatusPayload,
   UpdateBookPayload,
@@ -27,6 +30,12 @@ import type { createFavoriteSchema } from './favorite.ts';
 import type { genreBodySchema } from './genre.ts';
 import type { setReadingStatusSchema } from './library.ts';
 import type { createLikeSchema } from './like.ts';
+import type {
+  addReadingListItemSchema,
+  createReadingListSchema,
+  reorderReadingListItemsSchema,
+  updateReadingListSchema,
+} from './readingList.ts';
 import type { createSeriesSchema, updateSeriesSchema } from './series.ts';
 
 type Expect<T extends true> = T;
@@ -52,4 +61,10 @@ export type PayloadAssertions = [
   Expect<Fits<CreateLikePayload, typeof createLikeSchema>>,
   Expect<Fits<CreateFavoritePayload, typeof createFavoriteSchema>>,
   Expect<Fits<SetReadingStatusPayload, typeof setReadingStatusSchema>>,
+  Expect<Fits<ReadingListPayload, typeof createReadingListSchema>>,
+  Expect<Fits<Partial<ReadingListPayload>, typeof updateReadingListSchema>>,
+  Expect<Fits<AddReadingListItemPayload, typeof addReadingListItemSchema>>,
+  Expect<
+    Fits<ReorderReadingListItemsPayload, typeof reorderReadingListItemsSchema>
+  >,
 ];
