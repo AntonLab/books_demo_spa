@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ConflictError } from '../types/errors.ts';
-import type { GenreRepository } from './genreRepository.ts';
+import {
+  hasSubgenres,
+  parentError,
+  siblingNameTaken,
+  type GenreRepository,
+} from './genreRepository.ts';
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;
@@ -51,11 +55,11 @@ export function genreRepositoryContract(
 
     await assert.rejects(
       repository.create({ name: 'Gothic' }),
-      new ConflictError('name')
+      siblingNameTaken()
     );
     await assert.rejects(
       repository.create({ name: 'gothic' }),
-      new ConflictError('name')
+      siblingNameTaken()
     );
   });
 
@@ -80,7 +84,7 @@ export function genreRepositoryContract(
 
     await assert.rejects(
       repository.update(other.id, { name: 'gothic' }),
-      new ConflictError('name')
+      siblingNameTaken()
     );
     // Nothing was written: the list still holds both names as they were.
     assert.deepEqual(
@@ -103,5 +107,134 @@ export function genreRepositoryContract(
     assert.equal(await repository.remove(created.id), true);
     assert.deepEqual(await repository.list(), []);
     assert.equal(await repository.remove(created.id), false);
+  });
+
+  test('contract: a Subgenre is created under a top-level Genre and answers its parent', async () => {
+    const { repository } = await setUp();
+    const fantasy = await repository.create({ name: 'Fantasy' });
+    const urban = await repository.create({
+      name: 'Urban',
+      parentId: fantasy.id,
+    });
+    assert.equal(fantasy.parent, null);
+    assert.deepEqual(urban.parent, { id: fantasy.id, name: 'Fantasy' });
+    assert.deepEqual(await repository.list(), [
+      { id: fantasy.id, name: 'Fantasy', parentId: null },
+      { id: urban.id, name: 'Urban', parentId: fantasy.id },
+    ]);
+  });
+
+  test('contract: siblings collide in any case; other parents and the top level are other scopes', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const b = await repository.create({ name: 'Horror' });
+    await repository.create({ name: 'Urban', parentId: a.id });
+    await assert.rejects(
+      repository.create({ name: 'urban', parentId: a.id }),
+      siblingNameTaken()
+    );
+    await repository.create({ name: 'Urban', parentId: b.id });
+    await repository.create({ name: 'Urban' });
+    await assert.rejects(
+      repository.create({ name: 'URBAN' }),
+      siblingNameTaken()
+    );
+  });
+
+  test('contract: a bad parentId is a validation error on parentId', async () => {
+    const { repository } = await setUp();
+    const top = await repository.create({ name: 'Fantasy' });
+    const sub = await repository.create({ name: 'Urban', parentId: top.id });
+    await assert.rejects(
+      repository.create({ name: 'X', parentId: MISSING_ID }),
+      parentError('missing')
+    );
+    await assert.rejects(
+      repository.create({ name: 'X', parentId: sub.id }),
+      parentError('notTopLevel')
+    );
+    await assert.rejects(
+      repository.update(top.id, { parentId: top.id }),
+      parentError('self')
+    );
+    await assert.rejects(
+      repository.update(sub.id, { parentId: sub.id }),
+      parentError('self')
+    );
+  });
+
+  test('contract: a Subgenre moves, is promoted, and a childless Genre is demoted', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const b = await repository.create({ name: 'Horror' });
+    const sub = await repository.create({ name: 'Urban', parentId: a.id });
+    assert.equal(
+      (await repository.update(sub.id, { parentId: b.id }))?.parent?.id,
+      b.id
+    );
+    assert.equal(
+      (await repository.update(sub.id, { parentId: null }))?.parent,
+      null
+    );
+    assert.equal(
+      (await repository.update(sub.id, { parentId: a.id }))?.parent?.id,
+      a.id
+    );
+    const demoted = await repository.update(b.id, { parentId: a.id });
+    assert.equal(demoted?.parent?.id, a.id);
+  });
+
+  test('contract: a Genre with Subgenres cannot be demoted', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const b = await repository.create({ name: 'Horror' });
+    await repository.create({ name: 'Urban', parentId: a.id });
+    await assert.rejects(
+      repository.update(a.id, { parentId: b.id }),
+      parentError('hasSubgenres')
+    );
+  });
+
+  test('contract: a move or promotion onto a sibling name is a conflict and changes nothing', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const b = await repository.create({ name: 'Horror' });
+    const sub = await repository.create({ name: 'Gothic', parentId: a.id });
+    await repository.create({ name: 'gothic', parentId: b.id });
+    await repository.create({ name: 'Gothic' });
+    await assert.rejects(
+      repository.update(sub.id, { parentId: b.id }),
+      siblingNameTaken()
+    );
+    await assert.rejects(
+      repository.update(sub.id, { parentId: null }),
+      siblingNameTaken()
+    );
+    await assert.rejects(
+      repository.update(sub.id, { name: 'GOTHIC', parentId: b.id }),
+      siblingNameTaken()
+    );
+    const kept = (await repository.list()).find((g) => g.id === sub.id);
+    assert.deepEqual(kept, { id: sub.id, name: 'Gothic', parentId: a.id });
+  });
+
+  test('contract: a Genre keeps its own name in another case beside an equal name elsewhere', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const sub = await repository.create({ name: 'Urban', parentId: a.id });
+    await repository.create({ name: 'urban' });
+    assert.equal(
+      (await repository.update(sub.id, { name: 'URBAN' }))?.name,
+      'URBAN'
+    );
+  });
+
+  test('contract: a Genre with a Subgenre cannot be deleted until the Subgenre is gone', async () => {
+    const { repository } = await setUp();
+    const a = await repository.create({ name: 'Fantasy' });
+    const sub = await repository.create({ name: 'Urban', parentId: a.id });
+    await assert.rejects(repository.remove(a.id), hasSubgenres());
+    assert.equal(await repository.remove(sub.id), true);
+    assert.equal(await repository.remove(a.id), true);
   });
 }

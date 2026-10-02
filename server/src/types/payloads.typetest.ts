@@ -46,7 +46,7 @@ export type PayloadAssertions = [
   Expect<Fits<CreateChapterPayload, typeof createChapterSchema>>,
   Expect<Fits<UpdateChapterPayload, typeof updateChapterSchema>>,
   Expect<Fits<CreateCommentPayload, typeof createCommentSchema>>,
-  Expect<Fits<Pick<GenrePayload, 'name'>, typeof genreBodySchema>>,
+  Expect<Fits<GenrePayload, typeof genreBodySchema>>,
   Expect<Fits<CreateLikePayload, typeof createLikeSchema>>,
   Expect<Fits<CreateFavoritePayload, typeof createFavoriteSchema>>,
 ];

@@ -56,8 +56,8 @@ test('GET is open to a guest and lists every genre alphabetically', async () => 
     {
       genreRepository: createFakeGenreRepository({
         seeds: [
-          { id: 1, name: 'Horror', parent: null },
-          { id: 2, name: 'gothic', parent: null },
+          { id: 1, name: 'Horror' },
+          { id: 2, name: 'gothic' },
         ],
       }),
     },
@@ -81,7 +81,7 @@ test('GET hands nonEmpty to the repository and refuses a value that is not a boo
   await withApp(
     {
       genreRepository: createFakeGenreRepository({
-        seeds: [{ id: 1, name: 'Horror', parent: null }],
+        seeds: [{ id: 1, name: 'Horror' }],
         listCalls,
       }),
     },
@@ -123,7 +123,7 @@ test('a write with no session is 401, and one from a user or an author 403', asy
   await withAuthenticatedApp(
     {
       genreRepository: createFakeGenreRepository({
-        seeds: [{ id: 1, name: 'Gothic', parent: null }],
+        seeds: [{ id: 1, name: 'Gothic' }],
       }),
     },
     async (base) => {
@@ -144,7 +144,7 @@ test('POST refuses a name already taken in any case with 409', async () => {
   await withAuthenticatedApp(
     {
       genreRepository: createFakeGenreRepository({
-        seeds: [{ id: 1, name: 'Gothic', parent: null }],
+        seeds: [{ id: 1, name: 'Gothic' }],
       }),
     },
     async (base) => {
@@ -180,7 +180,7 @@ test('PATCH renames a genre, and answers 404 for an unknown id', async () => {
   await withAuthenticatedApp(
     {
       genreRepository: createFakeGenreRepository({
-        seeds: [{ id: 1, name: 'Hard SF', parent: null }],
+        seeds: [{ id: 1, name: 'Hard SF' }],
       }),
     },
     async (base) => {
@@ -197,7 +197,7 @@ test('DELETE answers 204, and 404 for an unknown id', async () => {
   await withAuthenticatedApp(
     {
       genreRepository: createFakeGenreRepository({
-        seeds: [{ id: 1, name: 'Gothic', parent: null }],
+        seeds: [{ id: 1, name: 'Gothic' }],
       }),
     },
     async (base) => {

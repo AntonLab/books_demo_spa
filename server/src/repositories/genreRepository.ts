@@ -1,30 +1,79 @@
-import { literal, Op, UniqueConstraintError } from 'sequelize';
-import type { Transaction } from 'sequelize';
+import {
+  ForeignKeyConstraintError,
+  literal,
+  Op,
+  UniqueConstraintError,
+} from 'sequelize';
+import type { Sequelize, Transaction } from 'sequelize';
 import { Genre, toPublicGenre } from '../models/Genre.ts';
-import { BadRequestError, ConflictError } from '../types/errors.ts';
-import type { PublicGenre } from 'shared';
-import type { GenreInput } from '../types/genre.ts';
+import {
+  BadRequestError,
+  ConflictError,
+  StateConflictError,
+  ValidationError,
+} from '../types/errors.ts';
+import type { GenreListItem, PublicGenre } from 'shared';
+import type { GenreInput, GenreUpdateInput } from '../types/genre.ts';
 
 export interface GenreRepository {
   // Every Genre, alphabetically. No paging envelope, unlike the books and
   // series lists: the list is short, and the header shows it whole.
   // `nonEmpty` keeps only Genres holding a Book in progress or complete, so a
   // Draft book never reveals its Genre.
-  list(options?: { nonEmpty?: boolean }): Promise<PublicGenre[]>;
+  list(options?: { nonEmpty?: boolean }): Promise<GenreListItem[]>;
   create(input: GenreInput): Promise<PublicGenre>;
   // null when no Genre has that id, the way every other repository reports a
   // missing row.
-  update(id: number, input: GenreInput): Promise<PublicGenre | null>;
+  update(id: number, input: GenreUpdateInput): Promise<PublicGenre | null>;
   remove(id: number): Promise<boolean>;
 }
 
-// The unique index on `genres.name` is the only constraint here, so there is
-// nothing to disambiguate: a violation is always the name.
+export const SIBLING_NAME_TAKEN = 'A genre with this name already exists here.';
+
+// The unique index on (parent, name) is the only unique constraint here, so a
+// violation is always the name among its siblings.
+export function siblingNameTaken(): ConflictError {
+  return new ConflictError('name', SIBLING_NAME_TAKEN);
+}
+
 function asConflict(error: unknown): never {
-  if (error instanceof UniqueConstraintError) {
-    throw new ConflictError('name');
-  }
+  if (error instanceof UniqueConstraintError) throw siblingNameTaken();
   throw error;
+}
+
+export type ParentFault = 'missing' | 'notTopLevel' | 'self' | 'hasSubgenres';
+
+const PARENT_FAULTS: Record<ParentFault, string> = {
+  missing: 'Parent genre does not exist.',
+  notTopLevel: 'A genre can only sit under a top-level genre.',
+  self: 'A genre cannot be its own parent.',
+  hasSubgenres: 'A genre with subgenres cannot move under another genre.',
+};
+
+// Shaped like the zod issues validate() raises, so the client reads a refused
+// parent exactly as it reads any other field error.
+export function parentError(fault: ParentFault): ValidationError {
+  return new ValidationError([
+    { path: ['parentId'], message: PARENT_FAULTS[fault] },
+  ]);
+}
+
+export function hasSubgenres(): StateConflictError {
+  return new StateConflictError(
+    'This genre has subgenres. Move or delete its subgenres first.'
+  );
+}
+
+function sequelizeOf(): Sequelize {
+  const sequelize = Genre.sequelize;
+  if (!sequelize) throw new Error('Genre model is not initialised');
+  return sequelize;
+}
+
+function assertTopLevelParent(parent: Genre | null | undefined): Genre {
+  if (!parent) throw parentError('missing');
+  if (parent.parentId !== null) throw parentError('notTopLevel');
+  return parent;
 }
 
 // Both the real repository and the fakes answer a genreId that names no Genre
@@ -128,34 +177,94 @@ export function createSequelizeGenreRepository(): GenreRepository {
           : {},
         order: [['name', 'ASC']],
       });
-      return genres.map((genre) => toPublicGenre(genre, null));
+      return genres.map(({ id, name, parentId }) => ({ id, name, parentId }));
     },
 
     async create(input) {
       try {
-        return toPublicGenre(await Genre.create(input), null);
+        return await sequelizeOf().transaction(async (transaction) => {
+          const parent =
+            typeof input.parentId === 'number'
+              ? assertTopLevelParent(
+                  await Genre.findByPk(input.parentId, {
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                  })
+                )
+              : null;
+          const genre = await Genre.create(input, { transaction });
+          return toPublicGenre(genre, parent);
+        });
       } catch (error) {
         asConflict(error);
       }
     },
 
     async update(id, input) {
-      const genre = await Genre.findByPk(id);
-      if (!genre) return null;
-
       try {
-        await genre.update(input);
+        return await sequelizeOf().transaction(async (transaction) => {
+          const { parentId } = input;
+          const wanted = typeof parentId === 'number' ? parentId : null;
+          // The lower id is locked first, so two moves between the same pair
+          // of rows cannot wait on each other.
+          const locked = await Genre.findAll({
+            where: { id: wanted === null ? id : [id, wanted] },
+            order: [['id', 'ASC']],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          const genre = locked.find((row) => row.id === id);
+          if (!genre) return null;
+
+          if (wanted !== null) {
+            if (wanted === id) throw parentError('self');
+            assertTopLevelParent(locked.find((row) => row.id === wanted));
+            const subgenres = await Genre.count({
+              where: { parentId: id },
+              transaction,
+            });
+            if (subgenres > 0) throw parentError('hasSubgenres');
+          }
+
+          if (Object.keys(input).length > 0) {
+            await genre.update(input, { transaction });
+          }
+          const parent =
+            genre.parentId === null
+              ? null
+              : await Genre.findByPk(genre.parentId, {
+                  attributes: ['id', 'name'],
+                  transaction,
+                });
+          return toPublicGenre(genre, parent);
+        });
       } catch (error) {
         asConflict(error);
       }
-      return toPublicGenre(genre, null);
     },
 
     async remove(id) {
       // The foreign keys do the rest: books.genreId and series.genreId are
-      // ON DELETE SET NULL, so this one statement also leaves every Book and
-      // Series in the Genre without one.
-      return (await Genre.destroy({ where: { id } })) > 0;
+      // ON DELETE SET NULL, so the delete also leaves every Book and Series in
+      // the Genre without one. genres.parentId is RESTRICT, which backs the
+      // count below against a Subgenre inserted while this runs.
+      try {
+        return await sequelizeOf().transaction(async (transaction) => {
+          const genre = await Genre.findByPk(id, {
+            attributes: ['id'],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          });
+          if (!genre) return false;
+          if ((await Genre.count({ where: { parentId: id }, transaction })) > 0)
+            throw hasSubgenres();
+          await genre.destroy({ transaction });
+          return true;
+        });
+      } catch (error) {
+        if (error instanceof ForeignKeyConstraintError) throw hasSubgenres();
+        throw error;
+      }
     },
   };
 }
