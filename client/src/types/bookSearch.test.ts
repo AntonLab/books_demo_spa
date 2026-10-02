@@ -1,4 +1,5 @@
 import {
+  genreIdOf,
   parseBookSearch,
   searchPath,
   toSearchParams,
@@ -140,5 +141,14 @@ describe('searchPath', () => {
       '/search?q=dragon%20riders'
     );
     expect(searchPath({ q: 'a+b' })).toBe('/search?q=a%2Bb');
+  });
+});
+
+describe('genreIdOf', () => {
+  it('reads a canonical positive id and nothing else', () => {
+    expect(genreIdOf('4')).toBe(4);
+    for (const bad of [undefined, '', 'abc', '0', '04', '-1', '4.5']) {
+      expect(genreIdOf(bad)).toBeUndefined();
+    }
   });
 });
