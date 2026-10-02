@@ -46,9 +46,11 @@ Four" reads as a test run, not a demo.
   a series with no non-draft book, no activity before an account's
   `createdAt`, no Notification that contradicts a byline.
 - A content bank (`ContentBank`: `GOTHIC`, `HARD_SF`, `URBAN_FANTASY`) supplies
-  each author's titles, tags and prose. A bank's `genreName` is typed as the
-  union of `GENRE_NAMES`, so it cannot name a Genre the seed never creates.
-  Horror and Romance stay empty on purpose, to demo an empty Genre.
+  each author's titles, tags and prose. The seed writes a two-level Genre tree
+  (`GENRE_TREE`). A bank's `genreName` is typed `SubgenreName`, so it cannot
+  name a Genre the seed never creates; even-numbered works (counted per author,
+  no RNG draw) sit under that Subgenre, odd-numbered ones under its parent.
+  Mystery and most Subgenres stay empty on purpose, to demo an empty Genre.
 - Demo shape: two standalone books and one series are co-authored
   (`shareBooks`, `shareSeries`), and the tags `mystery` and `slow-burn` span
   two banks each, so `?tag=` returns more than one author. Each author's newest

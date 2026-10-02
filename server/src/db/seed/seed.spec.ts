@@ -324,56 +324,72 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
-  test('creates the five genres, and only those', async () => {
-    const names = (await Genre.findAll({ order: [['name', 'ASC']] })).map(
-      (row) => row.name
-    );
-
-    assert.deepEqual(names, [
-      'Gothic',
-      'Hard SF',
+  test('creates the Genre tree: five top-level Genres, their Subgenres, and only those', async () => {
+    const rows = await Genre.findAll({ order: [['name', 'ASC']] });
+    const nameOf = new Map(rows.map((row) => [row.id, row.name]));
+    const tree = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.parentId === null) tree.set(row.name, tree.get(row.name) ?? []);
+    }
+    for (const row of rows) {
+      if (row.parentId !== null) {
+        tree.get(nameOf.get(row.parentId) ?? '')?.push(row.name);
+      }
+    }
+    assert.deepEqual([...tree.keys()].sort(), [
+      'Fantasy',
       'Horror',
+      'Mystery',
       'Romance',
+      'Science Fiction',
+    ]);
+    assert.deepEqual(tree.get('Horror'), ['Gothic']);
+    assert.deepEqual(tree.get('Science Fiction')?.sort(), [
+      'Cyberpunk',
+      'Dystopia',
+      'Hard SF',
+      'Space Opera',
+    ]);
+    assert.deepEqual(tree.get('Fantasy')?.sort(), [
+      'Dark Fantasy',
+      'Epic Fantasy',
+      'Fairy Tale',
+      'Sword and Sorcery',
       'Urban Fantasy',
     ]);
+    assert.deepEqual(tree.get('Mystery'), []);
+    for (const subgenres of tree.values()) assert.ok(subgenres.length <= 10);
   });
 
-  test('files every book and series under its author’s genre, and leaves two genres empty', async () => {
+  test('files every book and series under a Genre at both levels, and leaves some Genres empty', async () => {
     assert.deepEqual(
-      await offending('SELECT id, title FROM books WHERE genreId IS NULL'),
+      await offending('SELECT id FROM books WHERE genreId IS NULL'),
       []
     );
     assert.deepEqual(
-      await offending('SELECT id, title FROM series WHERE genreId IS NULL'),
+      await offending('SELECT id FROM series WHERE genreId IS NULL'),
       []
     );
-
-    // Three content banks, three genres in use: no two authors share one.
-    assert.equal(
-      (await offending('SELECT DISTINCT genreId FROM books')).length,
-      3
-    );
-
-    // Every other genre holds both books and series...
+    for (const table of ['books', 'series']) {
+      const atTop = await offending(
+        `SELECT t.id FROM ${table} t JOIN genres g ON g.id = t.genreId
+         WHERE g.parentId IS NULL AND EXISTS (SELECT 1 FROM genres c WHERE c.parentId = g.id)`
+      );
+      const atSub = await offending(
+        `SELECT t.id FROM ${table} t JOIN genres g ON g.id = t.genreId WHERE g.parentId IS NOT NULL`
+      );
+      assert.ok(
+        atTop.length > 0,
+        `${table} point at a top-level Genre with Subgenres`
+      );
+      assert.ok(atSub.length > 0, `${table} point at a Subgenre`);
+    }
+    // Mystery has no Subgenre and no work: the empty state the demo shows.
     assert.deepEqual(
       await offending(
-        `SELECT g.name FROM genres g
-         LEFT JOIN books b ON b.genreId = g.id
+        `SELECT g.id FROM genres g LEFT JOIN books b ON b.genreId = g.id
          LEFT JOIN series s ON s.genreId = g.id
-         WHERE b.id IS NULL AND s.id IS NULL
-           AND g.name NOT IN ('Horror', 'Romance')`
-      ),
-      []
-    );
-    // ...and these two hold neither, on purpose: a demo with no empty genre
-    // never shows what one looks like.
-    assert.deepEqual(
-      await offending(
-        `SELECT g.name FROM genres g
-         LEFT JOIN books b ON b.genreId = g.id
-         LEFT JOIN series s ON s.genreId = g.id
-         WHERE g.name IN ('Horror', 'Romance')
-           AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
+         WHERE g.name = 'Mystery' AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
       ),
       []
     );

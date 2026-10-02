@@ -29,7 +29,7 @@ import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Favorite } from '../../models/Favorite.ts';
-import { Genre } from '../../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../../models/Genre.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
 import { Series } from '../../models/Series.ts';
@@ -44,7 +44,7 @@ import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
-import { GENRE_NAMES } from './content.ts';
+import { GENRE_TREE, parentGenreOf } from './content.ts';
 import {
   DAY_MS,
   buildPlan,
@@ -141,18 +141,26 @@ async function writeAccounts(
 // under one. Returned as a name → id map, which is how a content bank's
 // genreName becomes a genreId.
 //
-// create() in a loop rather than bulkCreate: five rows are nothing, and the ids
-// have to come back — a loop gets them without depending on MySQL back-filling
-// them from the insert's first id (see writeThreads, where that assumption does
-// live and is checked).
+// create() in a loop rather than bulkCreate: a dozen rows are nothing, and the
+// ids have to come back — a loop gets them without depending on MySQL
+// back-filling them from the insert's first id (see writeThreads, where that
+// assumption does live and is checked). A parent is written before its
+// Subgenres, which need its id.
 async function writeGenres(
   transaction: Transaction
 ): Promise<Map<string, number>> {
   const ids = new Map<string, number>();
 
-  for (const name of GENRE_NAMES) {
-    const row = await Genre.create({ name }, { transaction });
-    ids.set(name, row.id);
+  for (const { name, subgenres } of GENRE_TREE) {
+    const parent = await Genre.create({ name }, { transaction });
+    ids.set(name, parent.id);
+    for (const subgenre of subgenres) {
+      const row = await Genre.create(
+        { name: subgenre, parentId: parent.id },
+        { transaction }
+      );
+      ids.set(subgenre, row.id);
+    }
   }
 
   return ids;
@@ -222,11 +230,16 @@ async function writeContent(
 
   for (const author of plan.authors) {
     // Every Book and Series drawn from this author's bank is filed under the
-    // bank's Genre. A co-authored work keeps the Genre of the author it was
+    // bank's Subgenre or, for every other one, its parent Genre, so both levels
+    // hold work. Counted from position, not drawn, to leave the seed's RNG
+    // sequence alone. A co-authored work keeps the Genre of the author it was
     // planned under — the only author whose bank it came from.
-    const genreId = genreIdOf(author.spec.bank.genreName);
+    const subgenre = author.spec.bank.genreName;
+    const genreIdAt = (position: number): number =>
+      genreIdOf(position % 2 === 0 ? subgenre : parentGenreOf(subgenre));
     const seriesIds: number[] = [];
-    for (const entry of author.series) {
+    for (const [seriesPosition, entry] of author.series.entries()) {
+      const genreId = genreIdAt(seriesPosition);
       const fields = createSeriesSchema.parse({ ...entry, genreId });
       const row = await Series.create(
         { ...fields, createdAt: entry.createdAt, updatedAt: entry.createdAt },
@@ -247,10 +260,10 @@ async function writeContent(
     // Each series' books take their places in the order the plan lists them,
     // as bookRepository would append them one by one.
     const filedSoFar = new Map<number, number>();
-    for (const book of author.books) {
+    for (const [bookPosition, book] of author.books.entries()) {
       const fields = createBookSchema.parse({
         ...book,
-        genreId,
+        genreId: genreIdAt(bookPosition),
         seriesId:
           book.seriesIndex === null
             ? null
@@ -592,7 +605,8 @@ async function main(): Promise<void> {
     // worse than no demo, and a failure here leaves the previous one intact.
     const totals = await sequelize.transaction(async (transaction) => {
       for (const model of CONTENT_MODELS) {
-        await model.destroy({ where: {}, transaction });
+        if (model === Genre) await destroyAllGenres(transaction);
+        else await model.destroy({ where: {}, transaction });
       }
 
       const accountIds = await writeAccounts(plan, transaction);

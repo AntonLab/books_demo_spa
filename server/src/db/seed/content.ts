@@ -1,23 +1,51 @@
 import type { Rng } from './rng.ts';
 
-// The Genre list the demo is browsed by, in the alphabetical order every list
-// shows it in anyway. Three of the five are a content bank's; Horror and
-// Romance are nobody's on purpose — a demo with no empty Genre never shows what
-// one looks like in the header's submenu or on /search?genre=.
-export const GENRE_NAMES = [
-  'Gothic',
-  'Hard SF',
-  'Horror',
-  'Romance',
-  'Urban Fantasy',
+// The two-level Genre tree the demo is browsed by. Three Subgenres are a
+// content bank's; the rest, and Mystery with no Subgenre at all, hold no work on
+// purpose — a demo with no empty Genre never shows what one looks like in the
+// header's submenu or on /search?genre=. Names are unique across the tree.
+export const GENRE_TREE = [
+  {
+    name: 'Fantasy',
+    subgenres: [
+      'Dark Fantasy',
+      'Epic Fantasy',
+      'Fairy Tale',
+      'Sword and Sorcery',
+      'Urban Fantasy',
+    ],
+  },
+  {
+    name: 'Science Fiction',
+    subgenres: ['Cyberpunk', 'Dystopia', 'Hard SF', 'Space Opera'],
+  },
+  { name: 'Horror', subgenres: ['Gothic'] },
+  {
+    name: 'Romance',
+    subgenres: ['Contemporary Romance', 'Historical Romance'],
+  },
+  { name: 'Mystery', subgenres: [] },
 ] as const;
 
+export type SubgenreName = (typeof GENRE_TREE)[number]['subgenres'][number];
+
+export function parentGenreOf(
+  subgenre: SubgenreName
+): (typeof GENRE_TREE)[number]['name'] {
+  const parent = GENRE_TREE.find((genre) =>
+    (genre.subgenres as readonly string[]).includes(subgenre)
+  );
+  if (parent === undefined) throw new Error(`No parent Genre for ${subgenre}`);
+  return parent.name;
+}
+
 export interface ContentBank {
-  // The Genre every Book and Series drawn from this bank is filed under. A name
-  // rather than an id: the rows do not exist while the plan is being built, so
-  // writeContent resolves it through the map writeGenres returns. Typed as the
-  // union, so a bank cannot name a Genre the seed never creates.
-  genreName: (typeof GENRE_NAMES)[number];
+  // The Subgenre every Book and Series drawn from this bank is filed under (or
+  // its parent, see writeContent). A name rather than an id: the rows do not
+  // exist while the plan is being built, so writeContent resolves it through
+  // the map writeGenres returns. Typed as the union, so a bank cannot name a
+  // Genre the seed never creates.
+  genreName: SubgenreName;
   // A pool; each book and series takes 3-5. Two tags appear in more than one
   // bank on purpose, so ?tag= returns more than one author's work.
   tags: readonly string[];
