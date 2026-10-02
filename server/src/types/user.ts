@@ -1,4 +1,14 @@
-import { AUTHOR_SEARCH_MAX_LENGTH, USER_ROLES, USER_STATUSES } from 'shared';
+import {
+  AUTHOR_SEARCH_MAX_LENGTH,
+  EMAIL_MAX_LENGTH,
+  LOGIN_MAX_LENGTH,
+  LOGIN_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USER_ROLES,
+  USER_STATUSES,
+} from 'shared';
 import { z } from 'zod';
 
 // No `role` here, and none in updateUserSchema below, which is derived from
@@ -8,11 +18,11 @@ import { z } from 'zod';
 // PATCH /api/users/:id/role, never through a body that also carries other
 // fields.
 export const createUserSchema = z.object({
-  login: z.string().min(3).max(64),
-  email: z.email().max(255),
-  password: z.string().min(8).max(128),
-  firstName: z.string().min(1).max(64),
-  lastName: z.string().min(1).max(64),
+  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  email: z.email().max(EMAIL_MAX_LENGTH),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  firstName: z.string().min(1).max(NAME_MAX_LENGTH),
+  lastName: z.string().min(1).max(NAME_MAX_LENGTH),
   status: z.enum(USER_STATUSES).optional(),
 });
 
@@ -21,7 +31,7 @@ export const updateUserSchema = createUserSchema
   .extend({
     // Proof of identity for changing your own password or email. Never
     // stored: the controller strips it before the repository sees the body.
-    currentPassword: z.string().min(1).max(128).optional(),
+    currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH).optional(),
   })
   .refine(
     (value) => Object.keys(value).some((key) => key !== 'currentPassword'),

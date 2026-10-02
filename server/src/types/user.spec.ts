@@ -1,6 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AUTHOR_SEARCH_MAX_LENGTH, USER_STATUSES } from 'shared';
+import {
+  AUTHOR_SEARCH_MAX_LENGTH,
+  EMAIL_MAX_LENGTH,
+  LOGIN_MAX_LENGTH,
+  LOGIN_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  USER_STATUSES,
+} from 'shared';
 import {
   createUserSchema,
   listAuthorsQuerySchema,
@@ -118,4 +127,37 @@ test('a role in an update body is dropped too', () => {
   const parsed = updateUserSchema.parse({ role: 'superadmin', login: 'x123' });
 
   assert.equal('role' in parsed, false);
+});
+
+test('accepts the shared field limits exactly and refuses one past them', () => {
+  const atMin = {
+    login: 'a'.repeat(LOGIN_MIN_LENGTH),
+    email: 'a@example.com',
+    password: 'p'.repeat(PASSWORD_MIN_LENGTH),
+    firstName: 'F',
+    lastName: 'L',
+  };
+
+  assert.ok(createUserSchema.safeParse(atMin).success);
+  assert.ok(
+    createUserSchema.safeParse({
+      ...atMin,
+      login: 'a'.repeat(LOGIN_MAX_LENGTH),
+      firstName: 'f'.repeat(NAME_MAX_LENGTH),
+      password: 'p'.repeat(PASSWORD_MAX_LENGTH),
+    }).success
+  );
+  for (const bad of [
+    { login: 'a'.repeat(LOGIN_MIN_LENGTH - 1) },
+    { login: 'a'.repeat(LOGIN_MAX_LENGTH + 1) },
+    { lastName: 'l'.repeat(NAME_MAX_LENGTH + 1) },
+    { password: 'p'.repeat(PASSWORD_MIN_LENGTH - 1) },
+    { password: 'p'.repeat(PASSWORD_MAX_LENGTH + 1) },
+    { email: `${'e'.repeat(EMAIL_MAX_LENGTH)}@example.com` },
+  ]) {
+    assert.equal(
+      createUserSchema.safeParse({ ...atMin, ...bad }).success,
+      false
+    );
+  }
 });

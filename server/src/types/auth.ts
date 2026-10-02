@@ -1,15 +1,23 @@
 import { z } from 'zod';
-import { REGISTRABLE_ROLES } from 'shared';
+import {
+  EMAIL_MAX_LENGTH,
+  LOGIN_MAX_LENGTH,
+  LOGIN_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  REGISTRABLE_ROLES,
+} from 'shared';
 
 // The field rules match createUserSchema in ./user.ts, minus `status`: a
 // registrant does not get to choose their own account state, so the key is
 // absent here and set by the controller.
 export const registerSchema = z.object({
-  login: z.string().min(3).max(64),
-  email: z.email().max(255),
-  password: z.string().min(8).max(128),
-  firstName: z.string().min(1).max(64),
-  lastName: z.string().min(1).max(64),
+  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  email: z.email().max(EMAIL_MAX_LENGTH),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+  firstName: z.string().min(1).max(NAME_MAX_LENGTH),
+  lastName: z.string().min(1).max(NAME_MAX_LENGTH),
   // The only place a role is accepted from a public body, and it is narrowed to
   // the two that are a statement of intent rather than a privilege. admin and
   // superadmin are unreachable here by construction — see types/user.ts for
@@ -27,12 +35,12 @@ export const loginSchema = z.object({
 });
 
 export const resetRequestSchema = z.object({
-  email: z.email().max(255),
+  email: z.email().max(EMAIL_MAX_LENGTH),
 });
 
 export const resetConfirmSchema = z.object({
   token: z.string().min(1).max(255),
-  password: z.string().min(8).max(128),
+  password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

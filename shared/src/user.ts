@@ -28,6 +28,18 @@ export const PASSWORD_RESET_PATH = '/reset-password';
 // "No authors found" for a search that never ran.
 export const AUTHOR_SEARCH_MAX_LENGTH = 64;
 
+// The account fields' length limits. The server's zod schemas and the client's
+// forms read these same numbers, so a limit changes in one place and a form
+// never accepts what the API would refuse. A name's minimum is 1 and stays in
+// the schemas.
+export const LOGIN_MIN_LENGTH = 3;
+export const LOGIN_MAX_LENGTH = 64;
+export const NAME_MAX_LENGTH = 64;
+// The column width of `users.email`.
+export const EMAIL_MAX_LENGTH = 255;
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MAX_LENGTH = 128;
+
 // PublicUser minus the email address. That single omission is what makes an
 // author safe to embed in a public response: the email is the whole reason
 // /api/users is guarded, so a shape without one carries nothing that guard
