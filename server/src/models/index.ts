@@ -6,6 +6,7 @@ import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initFavoriteModel, Favorite } from './Favorite.ts';
 import { initGenreModel, Genre } from './Genre.ts';
+import { initLibraryEntryModel, LibraryEntry } from './LibraryEntry.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
 import {
@@ -41,6 +42,7 @@ function initEachModel(sequelize: Sequelize): void {
   initCommentModel(sequelize);
   initLikeModel(sequelize);
   initFavoriteModel(sequelize);
+  initLibraryEntryModel(sequelize);
   initNotificationModel(sequelize);
   initSessionModel(sequelize);
   initPasswordResetTokenModel(sequelize);
@@ -291,6 +293,24 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   Favorite.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
+
+  // A Library entry is the Account's own and about one Book, so both sides
+  // cascade: deleting either takes the entry with it.
+  User.hasMany(LibraryEntry, {
+    as: 'libraryEntries',
+    foreignKey: 'userId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  LibraryEntry.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  Book.hasMany(LibraryEntry, {
+    as: 'libraryEntries',
+    foreignKey: 'bookId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  LibraryEntry.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
   // CASCADE, matching every other user-owned association above: a session
   // belonging to a deleted user answers to nobody. There is no recursion
