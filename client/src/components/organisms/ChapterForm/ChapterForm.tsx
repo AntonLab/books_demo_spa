@@ -106,6 +106,9 @@ export const ChapterForm: FC<ChapterFormProps> = ({
       )}
 
       <Form<FieldValues>
+        // Prefixes the field ids: this form opens over the Book form, whose
+        // `title` input would otherwise share its id.
+        name="chapter"
         form={form}
         layout="vertical"
         initialValues={{

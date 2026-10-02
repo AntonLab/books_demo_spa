@@ -1,9 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
+import { editorChapter } from '@/test/editFixtures';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
@@ -236,6 +237,78 @@ describe('BookEditDetailsModal', () => {
       await screen.findByText('Only its co-authors can edit this book.')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+});
+
+const summary = {
+  id: 9,
+  bookId: 1,
+  title: 'One',
+  publishedAt: null,
+  createdAt: '2026-09-10T00:00:00.000Z',
+  updatedAt: '2026-09-10T08:15:30.123Z',
+};
+const toChapters = async () => {
+  await userEvent.click(await screen.findByRole('tab', { name: 'Chapters' }));
+  return screen.findByRole('button', { name: 'Edit One' });
+};
+
+// Under Jest every antd modal's aria-labelledby reads `test-id`, so with two
+// open they share one accessible name; find each by its title instead.
+const dialogTitled = async (title: string) => {
+  const heading = await screen.findByText(title, {
+    selector: '.ant-modal-title',
+  });
+  return heading.closest('[role="dialog"]') as HTMLElement;
+};
+
+describe('BookEditDetailsModal Chapter editor', () => {
+  beforeEach(() => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedChapters.listChapters.mockResolvedValue({
+      items: [summary],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedChapters.getChapter.mockResolvedValue(editorChapter);
+  });
+
+  // Escape is not exercised: antd's Escape stack keys modals by useId, which
+  // reads `test-id` for every modal under Jest, so a second modal never joins it.
+  it('opens the Chapter modal over the Book modal, and closing it leaves the Book modal open', async () => {
+    renderModal();
+    await userEvent.click(await toChapters());
+    const chapter = await dialogTitled('Edit chapter');
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
+    await userEvent.click(
+      within(chapter).getByRole('button', { name: 'Close' })
+    );
+
+    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Edit One' })).toBeVisible();
+  });
+
+  it('opens a new chapter from Add chapter', async () => {
+    renderModal();
+    await toChapters();
+    await userEvent.click(screen.getByRole('button', { name: 'Add chapter' }));
+    expect(await dialogTitled('New chapter')).toBeInTheDocument();
+  });
+
+  it('closes silently with typed text and then marks the row', async () => {
+    renderModal();
+    await userEvent.click(await toChapters());
+    const chapter = await dialogTitled('Edit chapter');
+    await userEvent.type(await within(chapter).findByLabelText('Title'), '!');
+    await userEvent.click(
+      within(chapter).getByRole('button', { name: 'Close' })
+    );
+    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    expect(screen.queryByText('Discard changes?')).toBeNull();
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
   });
 });
 

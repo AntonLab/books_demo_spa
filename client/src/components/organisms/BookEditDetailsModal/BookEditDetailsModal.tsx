@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import { Alert, App, Form, Skeleton, Tabs } from 'antd';
+import { ChapterEditorModal } from '@/components/organisms/ChapterEditorModal/ChapterEditorModal';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ReadingOrderList } from '@/components/organisms/ReadingOrderList/ReadingOrderList';
 import { BookDetailsExtras } from './BookDetailsExtras';
@@ -38,6 +40,9 @@ export const BookEditDetailsModal: FC<BookEditDetailsModalProps> = ({
   );
   const genres = useGenres();
   const update = useUpdateBook(bookId);
+  const [chapterEditor, setChapterEditor] = useState<{
+    chapterId: number | null;
+  } | null>(null);
 
   const showsForm =
     book !== undefined &&
@@ -125,6 +130,8 @@ export const BookEditDetailsModal: FC<BookEditDetailsModalProps> = ({
               <ReadingOrderList
                 bookId={bookId}
                 isCoAuthor={bookCapabilities(book, session).isCoAuthor}
+                onAdd={() => setChapterEditor({ chapterId: null })}
+                onEdit={(chapterId) => setChapterEditor({ chapterId })}
               />
             ),
           },
@@ -133,14 +140,25 @@ export const BookEditDetailsModal: FC<BookEditDetailsModalProps> = ({
     );
   };
 
+  // The Chapter modal is a sibling, not a child, so Escape and its close icon
+  // reach only the top modal.
   return (
-    <DiscardGuardModal
-      title="Edit book"
-      form={showsForm ? form : undefined}
-      onClose={onClose}
-      footer={null}
-    >
-      {renderBody()}
-    </DiscardGuardModal>
+    <>
+      <DiscardGuardModal
+        title="Edit book"
+        form={showsForm ? form : undefined}
+        onClose={onClose}
+        footer={null}
+      >
+        {renderBody()}
+      </DiscardGuardModal>
+      {chapterEditor && (
+        <ChapterEditorModal
+          bookId={bookId}
+          chapterId={chapterEditor.chapterId}
+          onClose={() => setChapterEditor(null)}
+        />
+      )}
+    </>
   );
 };
