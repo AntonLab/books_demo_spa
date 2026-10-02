@@ -191,6 +191,16 @@ describe('ProfilePage tabs', () => {
     );
   });
 
+  it('unmounts the Favorites panel when another tab is opened', async () => {
+    renderWithSession(session, '/profile/favorites');
+    await screen.findByText('No book is in your favorites yet.');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Account' }));
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(screen.queryByText('No book is in your favorites yet.')).toBeNull();
+  });
+
   it('lists the author’s own works with the viewer as userId', async () => {
     renderWithSession(author, '/profile/my-books');
 

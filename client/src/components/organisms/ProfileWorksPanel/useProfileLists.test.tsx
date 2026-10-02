@@ -204,6 +204,20 @@ describe('page clamp', () => {
     ).toEqual([]);
   });
 
+  it('Books: does not redirect a page past the end while a genre blocks the list', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [row],
+      total: 41,
+      current: 3,
+      pageSize: 20,
+    });
+    const { result } = setup('mine', '/p?genre=abc&page=9');
+
+    await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+    expect(result.current.location.search).toBe('?genre=abc&page=9');
+    expect(result.current.navType).not.toBe('REPLACE');
+  });
+
   // The refetch after a removal or delete answers with a lower total, so the
   // page the viewer stood on no longer exists.
   it('Books: steps back a page when the last row of the last page goes', async () => {
