@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import type { BookSort, GenreListItem } from 'shared';
 import { useBookSearch, useFavoritedBooks } from '@/queries/books';
@@ -58,12 +58,36 @@ export const useGenreFilter = (raw: string | undefined) => {
   };
 };
 
+export const profileTabOf = (params: URLSearchParams) =>
+  params.get('tab') === 'series' ? 'series' : 'books';
+
+// The list is hidden while the page overshoots: a Series page past the end is
+// empty, and a Books page past the end is the last page's rows under the wrong
+// page number. Callers wrap `moveTo` in `useCallback`.
+export const usePageClamp = (
+  {
+    page,
+    pageSize,
+    total,
+  }: { page: number; pageSize: number; total: number | undefined },
+  moveTo: (lastPage: number) => void
+): boolean => {
+  const lastPage = Math.max(1, Math.ceil((total ?? 0) / pageSize));
+  const overshooting = total !== undefined && page > lastPage;
+  useEffect(() => {
+    if (overshooting) moveTo(lastPage);
+  }, [overshooting, lastPage, moveTo]);
+  return overshooting;
+};
+
 export const useProfileBooks = (
   scope: ProfileScope,
   viewerId: number
 ): ProfileFilters & { sort: BookSort; list: ProfileList<PublicBook> } => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const search = parseBookSearch(searchParams);
+  const { author, authorId, ...parsed } = parseBookSearch(searchParams);
+  // The Author field is hidden in My works, and userId is always the viewer.
+  const search = scope === 'mine' ? parsed : { ...parsed, author, authorId };
   const { genres, genre, genreId, blocked } = useGenreFilter(search.genre);
   const params = listParamsOf(search, genreId);
 
@@ -82,6 +106,25 @@ export const useProfileBooks = (
   const fieldErrors = useMemo(
     () => fieldErrorsOf(blocked ? null : query.error),
     [blocked, query.error]
+  );
+
+  const searchKey = searchParams.toString();
+  const moveTo = useCallback(
+    (last: number) =>
+      setSearchParams(toSearchParams({ ...search, page: last }), {
+        replace: true,
+      }),
+    // `search` is derived from the URL, so its string is the dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [setSearchParams, searchKey, scope]
+  );
+  const overshooting = usePageClamp(
+    {
+      page: search.page,
+      pageSize: search.pageSize,
+      total: blocked ? undefined : query.data?.total,
+    },
+    moveTo
   );
 
   return {
@@ -104,7 +147,7 @@ export const useProfileBooks = (
       total: blocked ? 0 : (query.data?.total ?? 0),
       page: search.page,
       pageSize: search.pageSize,
-      isPending: !blocked && query.isPending,
+      isPending: (!blocked && query.isPending) || overshooting,
       error: blocked ? null : query.error,
       filtered: filterCount(search) > 0,
       goToPage: (page, pageSize) =>

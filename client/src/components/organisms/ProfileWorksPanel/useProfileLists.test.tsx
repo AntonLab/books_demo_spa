@@ -1,6 +1,6 @@
 import { act, waitFor } from '@testing-library/react';
 import { useLocation, useNavigationType } from 'react-router';
-import { useProfileBooks } from './useProfileLists';
+import { profileTabOf, useProfileBooks } from './useProfileLists';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { genreItem } from '@/test/genres';
 import * as booksApi from '@/api/books';
@@ -42,6 +42,13 @@ beforeEach(() => {
 
 describe('useProfileBooks', () => {
   it('My works asks for the URL search as the viewer, and the picked author cannot replace the viewer', async () => {
+    // total 1 would make page 2 overshoot and clamp back to 1
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [row],
+      total: 100,
+      current: 2,
+      pageSize: 50,
+    });
     const { result } = setup(
       'mine',
       '/p?q=dragon&status=complete&page=2&pageSize=50&sort=new&author=ann&authorId=9'
@@ -112,5 +119,100 @@ describe('useProfileBooks', () => {
     expect(result.current.navType).toBe('PUSH');
     act(() => result.current.state.form.onReset());
     expect(result.current.location.search).toBe('');
+  });
+});
+
+// Every render's page and pending flag, to prove a past-the-end page is never
+// painted as ready.
+const recording = <S extends { list: { page: number; isPending: boolean } }>(
+  use: () => S,
+  route: string
+) => {
+  const seen: { page: number; isPending: boolean }[] = [];
+  const view = renderHookWithProviders(
+    () => {
+      const state = use();
+      seen.push({ page: state.list.page, isPending: state.list.isPending });
+      return { state, location: useLocation(), navType: useNavigationType() };
+    },
+    { route }
+  );
+  return { ...view, seen };
+};
+
+describe('profileTabOf', () => {
+  it('is series only for tab=series', () => {
+    expect(profileTabOf(new URLSearchParams('tab=series&q=x'))).toBe('series');
+    expect(profileTabOf(new URLSearchParams('tab=bogus'))).toBe('books');
+    expect(profileTabOf(new URLSearchParams(''))).toBe('books');
+  });
+});
+
+describe('useProfileBooks in My works without Author', () => {
+  it('ignores a typed author: not asked, not counted, not in the form', async () => {
+    const { result } = setup('mine', '/p?author=ann&authorId=9&q=x');
+
+    await waitFor(() => expect(rowsOf(result)).toHaveLength(1));
+    const asked = mockedBooks.listBooks.mock.calls[0]?.[0];
+    expect(asked).toMatchObject({ q: 'x', userId: 3 });
+    expect(asked?.author).toBeUndefined();
+    expect(result.current.state.filterCount).toBe(1);
+    expect(result.current.state.form.initialValues.author).toBeUndefined();
+  });
+
+  it('Favorites keeps the author filter', async () => {
+    const { result } = setup('favorites', '/p?author=ann');
+
+    await waitFor(() => expect(rowsOf(result)).toHaveLength(1));
+    expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ author: 'ann' })
+    );
+    expect(result.current.state.filterCount).toBe(1);
+  });
+});
+
+describe('page clamp', () => {
+  it('Books: replaces a page past the end with the last one, never shown as ready', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [row],
+      total: 41,
+      current: 3,
+      pageSize: 20,
+    });
+    const { result, seen } = recording(
+      () => useProfileBooks('mine', 3),
+      '/p?q=x&page=9'
+    );
+
+    await waitFor(() =>
+      expect(result.current.location.search).toBe('?q=x&page=3')
+    );
+    expect(result.current.navType).toBe('REPLACE');
+    await waitFor(() =>
+      expect(result.current.state.list.isPending).toBe(false)
+    );
+    expect(
+      seen.filter((entry) => entry.page === 9 && !entry.isPending)
+    ).toEqual([]);
+  });
+
+  // The refetch after a removal or delete answers with a lower total, so the
+  // page the viewer stood on no longer exists.
+  it('Books: steps back a page when the last row of the last page goes', async () => {
+    mockedBooks.listFavoritedBooks
+      .mockResolvedValueOnce({
+        items: [row],
+        total: 41,
+        current: 3,
+        pageSize: 20,
+      })
+      .mockResolvedValue({ items: [row], total: 40, current: 2, pageSize: 20 });
+    const { result, queryClient } = setup('favorites', '/p?page=3');
+
+    await waitFor(() => expect(rowsOf(result)).toHaveLength(1));
+    await act(() => queryClient.invalidateQueries({ queryKey: ['books'] }));
+
+    await waitFor(() => expect(result.current.location.search).toBe('?page=2'));
+    expect(result.current.navType).toBe('REPLACE');
   });
 });
