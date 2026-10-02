@@ -7,7 +7,6 @@ import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
-import * as favoritesApi from '@/api/favorites';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as genresApi from '@/api/genres';
@@ -18,16 +17,15 @@ jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
-jest.mock('@/api/favorites');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
+jest.mock('@/api/favorites');
 jest.mock('@/api/genres');
 
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
-const mockedFavorites = jest.mocked(favoritesApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
@@ -341,7 +339,12 @@ describe('AppShell Profile routing', () => {
     mockedNotifications.getNotificationSettings.mockResolvedValue({
       emailNotifications: true,
     });
-    mockedFavorites.listFavoriteBooks.mockResolvedValue(emptyEnvelope);
+    mockedBooks.listFavoritedBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
 
     renderWithProviders(<AppShell />, { route: '/profile' });
     await screen.findByRole('button', { name: 'Upload avatar' });

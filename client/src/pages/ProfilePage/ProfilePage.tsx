@@ -3,8 +3,7 @@ import { Alert, Tabs, Typography } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { usePageGuard } from '@/hooks/usePageGuard';
-import { FavoritesPanel } from '@/components/organisms/FavoritesPanel/FavoritesPanel';
-import { MyBooksPanel } from '@/components/organisms/MyBooksPanel/MyBooksPanel';
+import { ProfileWorksPanel } from '@/components/organisms/ProfileWorksPanel/ProfileWorksPanel';
 import { ProfileSettings } from '@/components/organisms/ProfileSettings/ProfileSettings';
 import { useSession } from '@/queries/auth';
 
@@ -12,7 +11,7 @@ import { useSession } from '@/queries/auth';
 // book and series editors must open a given tab. The key is the path, so a
 // tab change navigates to its key.
 const ACCOUNT_TAB = '/profile';
-const MY_BOOKS_TAB = '/profile/my-books';
+const MY_WORKS_TAB = '/profile/my-books';
 
 export const ProfilePage: FC = () => {
   const { pathname } = useLocation();
@@ -22,14 +21,14 @@ export const ProfilePage: FC = () => {
 
   // While the session is still resolving, a guest redirect would bounce a
   // signed-in user who loaded /profile directly, and a non-author redirect
-  // would bounce an author reloading My Books. A failed fetch stays 'pending'
+  // would bounce an author reloading My works. A failed fetch stays 'pending'
   // so the error Alert below shows instead of a redirect.
   const allowed = usePageGuard(
     isPending || isError
       ? 'pending'
       : session === null
         ? 'guest'
-        : pathname === MY_BOOKS_TAB && session.role !== 'author'
+        : pathname === MY_WORKS_TAB && session.role !== 'author'
           ? 'denied'
           : 'allowed'
   );
@@ -47,7 +46,7 @@ export const ProfilePage: FC = () => {
     );
   }
 
-  // A non-author reaches My Books only by a typed or old link.
+  // A non-author reaches My works only by a typed or old link.
   if (!allowed || !session) return <PageSpinner />;
 
   const isAuthor = session.role === 'author';
@@ -55,6 +54,10 @@ export const ProfilePage: FC = () => {
   return (
     <>
       {title}
+      {/* antd keeps a visited tab mounted; a hidden works panel would keep its
+          list query and URL-driven state alive on a path where ?tab and the
+          filters mean nothing. Account stays mounted so its form state
+          survives a tab switch. */}
       <Tabs
         activeKey={pathname}
         onChange={(key) => void navigate(key)}
@@ -63,14 +66,20 @@ export const ProfilePage: FC = () => {
           {
             key: '/profile/favorites',
             label: 'Favorites',
-            children: <FavoritesPanel />,
+            destroyOnHidden: true,
+            children: (
+              <ProfileWorksPanel scope="favorites" viewerId={session.id} />
+            ),
           },
           ...(isAuthor
             ? [
                 {
-                  key: MY_BOOKS_TAB,
-                  label: 'My Books',
-                  children: <MyBooksPanel authorId={session.id} />,
+                  key: MY_WORKS_TAB,
+                  label: 'My works',
+                  destroyOnHidden: true,
+                  children: (
+                    <ProfileWorksPanel scope="mine" viewerId={session.id} />
+                  ),
                 },
               ]
             : []),

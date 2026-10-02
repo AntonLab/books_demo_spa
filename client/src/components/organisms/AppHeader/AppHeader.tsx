@@ -95,7 +95,7 @@ export const AppHeader: FC = () => {
     // Only for an account holding the author Role: that is who can be credited
     // on a book, so nobody else has anything to find there.
     ...(user?.role === 'author'
-      ? [{ key: '/profile/my-books', label: 'My Books' }]
+      ? [{ key: '/profile/my-books', label: 'My works' }]
       : []),
     // Keeping the Genre list is an Admin's (or Superadmin's) job; no other
     // Role is offered it.

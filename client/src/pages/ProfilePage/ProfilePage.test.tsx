@@ -8,19 +8,19 @@ import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
-import * as favoritesApi from '@/api/favorites';
+import * as genresApi from '@/api/genres';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
-jest.mock('@/api/favorites');
+jest.mock('@/api/genres');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
-const mockedFavorites = jest.mocked(favoritesApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 const mockedSeries = jest.mocked(seriesApi);
 
@@ -41,7 +41,9 @@ const author: PublicUser = { ...session, role: 'author' };
 
 const LocationProbe = () => {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname}</div>;
+  return (
+    <div data-testid="location">{location.pathname + location.search}</div>
+  );
 };
 
 // Seeds the session cache directly, so a test settles without waiting on
@@ -65,24 +67,13 @@ beforeEach(() => {
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
   });
-  mockedFavorites.listFavoriteBooks.mockResolvedValue({
-    items: [],
-    total: 0,
-    limit: 20,
-    offset: 0,
-  });
-  mockedBooks.listBooks.mockResolvedValue({
-    items: [],
-    total: 0,
-    current: 1,
-    pageSize: 100,
-  });
-  mockedSeries.listSeries.mockResolvedValue({
-    items: [],
-    total: 0,
-    limit: 100,
-    offset: 0,
-  });
+  const bookPage = { items: [], total: 0, current: 1, pageSize: 20 };
+  const seriesPage = { items: [], total: 0, limit: 20, offset: 0 };
+  mockedBooks.listFavoritedBooks.mockResolvedValue(bookPage);
+  mockedBooks.listBooks.mockResolvedValue(bookPage);
+  mockedSeries.listSeries.mockResolvedValue(seriesPage);
+  mockedSeries.listFavoritedSeries.mockResolvedValue(seriesPage);
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
 });
 
 describe('ProfilePage while the session is loading', () => {
@@ -167,12 +158,47 @@ describe('ProfilePage tabs', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the My Books tab at /profile/my-books for an author', async () => {
+  it('opens the My works tab at /profile/my-books for an author', async () => {
     renderWithSession(author, '/profile/my-books');
 
     expect(
       await screen.findByRole('button', { name: 'Create book' })
     ).toBeInTheDocument();
+  });
+
+  it('does not fetch Favorites while the Account tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+    expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+  });
+
+  it('leaves My works with no filters when the Favorites tab is clicked', async () => {
+    renderWithSession(author, '/profile/my-books?tab=series&q=x&page=2');
+    await screen.findByRole('button', { name: 'Create series' });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Favorites' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      /^\/profile\/favorites$/
+    );
+    await waitFor(() =>
+      expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledTimes(1)
+    );
+    expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledWith(
+      expect.not.objectContaining({ q: 'x' })
+    );
+  });
+
+  it('lists the author’s own works with the viewer as userId', async () => {
+    renderWithSession(author, '/profile/my-books');
+
+    await waitFor(() =>
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1 })
+      )
+    );
   });
 
   it('navigates to a tab’s path when it is clicked', async () => {
@@ -185,17 +211,17 @@ describe('ProfilePage tabs', () => {
     );
   });
 
-  it('shows My Books to an author', () => {
+  it('shows My works to an author', () => {
     renderWithSession(author);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Account',
       'Favorites',
-      'My Books',
+      'My works',
     ]);
   });
 
-  it('hides My Books from every other role', () => {
+  it('hides My works from every other role', () => {
     renderWithSession(session);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([

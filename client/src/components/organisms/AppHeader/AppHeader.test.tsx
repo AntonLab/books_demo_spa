@@ -98,10 +98,10 @@ describe('AppHeader navigation', () => {
     expect(screen.queryByRole('menuitem', { name: 'Series' })).toBeNull();
   });
 
-  it('never shows My Books in the nav, not even for an author', async () => {
+  it('never shows My works in the nav, not even for an author', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
-    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'My works' })).toBeNull();
   });
 });
 
@@ -450,11 +450,11 @@ describe('AppHeader account menu', () => {
     expect(screen.queryByText('Manage genres')).toBeNull();
   });
 
-  it('offers My Books to an author, between Favorites and the divider', async () => {
+  it('offers My works to an author, between Favorites and the divider', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     await userEvent.click(screen.getByText('bob'));
-    await screen.findByText('My Books');
+    await screen.findByText('My works');
 
     const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
     if (!dropdown) {
@@ -465,21 +465,21 @@ describe('AppHeader account menu', () => {
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
       'Favorites',
-      'My Books',
+      'My works',
       'Log out',
     ]);
   });
 
-  it('hides My Books from every other role', async () => {
+  it('hides My works from every other role', async () => {
     await renderHeader(<AppHeader />, withSession(user));
 
     await userEvent.click(screen.getByText('bob'));
     await screen.findByText('Profile');
 
-    expect(screen.queryByText('My Books')).toBeNull();
+    expect(screen.queryByText('My works')).toBeNull();
   });
 
-  it('opens the My Books tab from the menu', async () => {
+  it('opens the My works tab from the menu', async () => {
     await renderHeader(
       <>
         <AppHeader />
@@ -489,7 +489,7 @@ describe('AppHeader account menu', () => {
     );
 
     await userEvent.click(screen.getByText('bob'));
-    await userEvent.click(await screen.findByText('My Books'));
+    await userEvent.click(await screen.findByText('My works'));
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/profile/my-books'
