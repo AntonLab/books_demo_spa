@@ -9,6 +9,18 @@
   );
 }
 
+.logo {
+  height: 32px;
+  width: auto;
+  flex: none;
+}
+
+@media (max-width: 575px) {
+  .logo {
+    height: 24px;
+  }
+}
+
 .nav {
   flex: 1;
   min-width: 0;

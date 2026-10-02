@@ -20,6 +20,7 @@ import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvata
 import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
 import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
 import { NotificationBell } from '@/components/organisms/NotificationBell/NotificationBell';
+import headerImage from '../../../../public/header.svg';
 import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {
@@ -114,6 +115,7 @@ export const AppHeader: FC = () => {
 
   return (
     <Layout.Header className={styles.header}>
+      <img src={headerImage} alt="" className={styles.logo} />
       {/* Two props the submenu needs:
           - `disabledOverflow`: rc-menu puts every child past the first into an
             overflowDisabled context unless this is set, and such a SubMenu

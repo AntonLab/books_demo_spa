@@ -68,5 +68,15 @@ export const buildLoaders = ({
     use: [styleLoader, 'css-loader'],
   };
 
-  return [swcLoader, cssModulesLoader, cssLoader];
+  // webpack has no static folder (buildPlugins.ts, buildDevServer.ts), so an
+  // imported image is how a file reaches `build/`. The fixed name keeps the URL
+  // `/header.svg` in production and in the dev server, which serves webpack
+  // output.
+  const svgLoader: RuleSetRule = {
+    test: /\.svg$/,
+    type: 'asset/resource',
+    generator: { filename: '[name][ext]' },
+  };
+
+  return [swcLoader, cssModulesLoader, cssLoader, svgLoader];
 };

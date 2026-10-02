@@ -103,6 +103,16 @@ describe('AppHeader navigation', () => {
 
     expect(screen.queryByRole('menuitem', { name: 'My works' })).toBeNull();
   });
+
+  it('shows a decorative header image before the navigation', async () => {
+    const { container } = await renderHeader(<AppHeader />, withSession(null));
+    const image = container.querySelector('header img');
+    expect(image).toHaveAttribute('alt', '');
+    expect(image?.getAttribute('src')).toMatch(/header\.svg$/);
+    expect(image?.nextElementSibling).toBe(
+      container.querySelector('header .ant-menu')
+    );
+  });
 });
 
 describe('AppHeader when logged out', () => {
@@ -178,16 +188,16 @@ describe('AppHeader when logged in', () => {
   it('shows the avatar image once the account has one', async () => {
     // Not getByRole('img'): antd's Input.Search and Menu render their own
     // icons as SVGs with role="img", so an actual <img> tag is the
-    // unambiguous query here.
+    // unambiguous query here; the header's own decorative image shares the
+    // page, so the query names the avatar's URL.
     const { container } = await renderHeader(
       <AppHeader />,
       withSession({ ...user, avatarUrl: '/api/users/1/avatar?v=1' })
     );
 
-    expect(container.querySelector('img')).toHaveAttribute(
-      'src',
-      '/api/users/1/avatar?v=1'
-    );
+    expect(
+      container.querySelector('img[src="/api/users/1/avatar?v=1"]')
+    ).toBeInTheDocument();
   });
 
   it('logs out through the dropdown, discarding the Unsaved text', async () => {
