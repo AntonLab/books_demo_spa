@@ -279,6 +279,24 @@ describe('watchSession', () => {
     );
   });
 
+  it("drops the last Account's Library and Favorites, and keeps them while the Account stays", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const libraryKey = [...queryKeys.allLibrary, { page: 1 }];
+    const favoritesKey = [...queryKeys.allFavorites, { page: 1 }];
+    client.setQueryData(libraryKey, { items: [] });
+    client.setQueryData(favoritesKey, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    expect(client.getQueryState(libraryKey)).toBeDefined();
+    expect(client.getQueryState(favoritesKey)).toBeDefined();
+
+    client.setQueryData(queryKeys.session, null);
+    expect(client.getQueryState(libraryKey)).toBe(undefined);
+    expect(client.getQueryState(favoritesKey)).toBe(undefined);
+  });
+
   describe('a failed request', () => {
     const failQuery = (client: QueryClient, error: ApiError) =>
       client

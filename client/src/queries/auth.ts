@@ -73,8 +73,11 @@ export const watchSession = (
     if (accountId !== undefined && next !== accountId) {
       // Removed, not invalidated: they belong to the Account that left, and a
       // refetch while the bell is still mounted would ask as the next one (a
-      // Guest's 401 on Sign out).
+      // Guest's 401 on Sign out). Library and Favorites are private too: the
+      // next Account must not see the last one's lists while the refetch lands.
       client.removeQueries({ queryKey: queryKeys.allNotifications });
+      client.removeQueries({ queryKey: queryKeys.allLibrary });
+      client.removeQueries({ queryKey: queryKeys.allFavorites });
       void client.invalidateQueries({
         predicate: (query) => query.queryHash !== sessionHash,
       });
