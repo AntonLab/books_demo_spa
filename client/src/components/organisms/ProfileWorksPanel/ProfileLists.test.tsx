@@ -3,6 +3,7 @@ import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { ProfileBooksList } from './ProfileBooksList';
+import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
@@ -10,12 +11,15 @@ import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
-import type { PublicUser } from '@/types/api';
+import * as seriesApi from '@/api/series';
+import type { PublicSeries, PublicUser } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 
 jest.mock('@/api/books');
 jest.mock('@/api/favorites');
 jest.mock('@/api/genres');
+jest.mock('@/api/series');
+const mockedSeries = jest.mocked(seriesApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedFavorites = jest.mocked(favoritesApi);
 const mockedGenres = jest.mocked(genresApi);
@@ -189,5 +193,71 @@ describe('ProfileBooksList in Favorites', () => {
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41)
     );
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfileSeriesList', () => {
+  const series = {
+    id: 12,
+    title: 'The Scale Cycle',
+    authors: [ann],
+    description: 'Dragons.',
+    tags: [],
+    genre: null,
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  } as PublicSeries;
+  const seriesPage = (items: PublicSeries[]) => ({
+    items,
+    total: items.length,
+    limit: 20,
+    offset: 0,
+  });
+
+  it('My works: a row links to the series page, with Edit and Delete, and no Sort order or Author', async () => {
+    mockedSeries.listSeries.mockResolvedValue(seriesPage([series]));
+    const onEdit = jest.fn();
+    renderAs(
+      <ProfileSeriesList scope="mine" viewerId={3} onEdit={onEdit} />,
+      '/p?tab=series'
+    );
+
+    expect(
+      await screen.findByRole('link', { name: 'The Scale Cycle' })
+    ).toHaveAttribute('href', '/series/12');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit The Scale Cycle' })
+    );
+    expect(onEdit).toHaveBeenCalledWith(12);
+    expect(
+      screen.getByRole('button', { name: 'Delete The Scale Cycle' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Tag')).toBeInTheDocument();
+    for (const label of ['Author', 'Status'])
+      expect(screen.queryByLabelText(label)).toBeNull();
+    expect(screen.queryByRole('radiogroup', { name: 'Sort by' })).toBeNull();
+  });
+
+  it('Favorites: removes by favorite id', async () => {
+    mockedSeries.listFavoritedSeries.mockResolvedValue(
+      seriesPage([{ ...series, favoriteId: 60 } as PublicSeries]) as Awaited<
+        ReturnType<typeof seriesApi.listFavoritedSeries>
+      >
+    );
+    mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
+    renderAs(
+      <ProfileSeriesList scope="favorites" viewerId={3} onEdit={jest.fn()} />,
+      '/p?tab=series'
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Remove The Scale Cycle from favorites',
+      })
+    );
+
+    await waitFor(() =>
+      expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(60)
+    );
   });
 });
