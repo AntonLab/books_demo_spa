@@ -213,7 +213,7 @@ describe('SeriesEditDetailsModal tabs', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Books' }));
 
     expect(
-      await screen.findByText(/No books in this series yet/)
+      await screen.findByText(/No books yet\. Add a book to this series/)
     ).toBeInTheDocument();
     expect(mockedSeries.listSeriesBooks).toHaveBeenCalledWith(12);
   });
