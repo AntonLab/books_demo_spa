@@ -19,6 +19,7 @@ import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
+import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
 import { Series } from '../../models/Series.ts';
@@ -28,6 +29,8 @@ import { parseConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
 import { createSequelize } from '../sequelize.ts';
+import { buildPlan } from './plan.ts';
+import { RNG_SEED, createRng } from './rng.ts';
 
 // seed.ts is a script with a top-level `await main()`, so it cannot be imported
 // without seeding. These tests run it the way `npm run seed` does, as a child
@@ -41,6 +44,7 @@ const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
   Favorite,
+  LibraryEntry,
   Like,
   Comment,
   Chapter,
@@ -301,6 +305,19 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
              SELECT 1 FROM books b
              WHERE b.seriesId = f.seriesId AND b.status <> 'draft'
            )`
+      ),
+      []
+    );
+  });
+
+  test('writes the planned Library, none of it on a Draft book', async () => {
+    const plan = buildPlan(createRng(RNG_SEED));
+    assert.equal(await LibraryEntry.count(), plan.library.length);
+    assert.deepEqual(
+      await offending(
+        `SELECT e.id FROM library_entries e
+         JOIN books b ON b.id = e.bookId
+         WHERE b.status = 'draft'`
       ),
       []
     );

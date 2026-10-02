@@ -30,6 +30,7 @@ import { Chapter } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../../models/Genre.ts';
+import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
 import { Series } from '../../models/Series.ts';
@@ -40,6 +41,7 @@ import { createChapterSchema } from '../../types/chapter.ts';
 import { createCommentSchema } from '../../types/comment.ts';
 import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
+import { setReadingStatusSchema } from '../../types/library.ts';
 import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
@@ -83,6 +85,7 @@ const INSERT_BATCH = 200;
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
   Favorite,
+  LibraryEntry,
   Like,
   Comment,
   Chapter,
@@ -563,8 +566,33 @@ async function writeFavorites(
   return rows.length;
 }
 
+async function writeLibrary(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  transaction: Transaction
+): Promise<number> {
+  const rows = plan.library.map((entry) => {
+    const bookId = bookIds.get(entry.book);
+    if (bookId === undefined) {
+      throw new Error(`No row was created for "${entry.book.title}"`);
+    }
+    return {
+      ...setReadingStatusSchema.parse({ status: entry.status }),
+      userId: itemAt(accountIds, entry.accountIndex, 'account id'),
+      bookId,
+      createdAt: entry.updatedAt,
+      updatedAt: entry.updatedAt,
+    };
+  });
+
+  // About 25 rows: far below INSERT_BATCH, so one insert.
+  await LibraryEntry.bulkCreate(rows, { transaction });
+  return rows.length;
+}
+
 /* -------------------------------------------------------------------------- */
-/* Entry point                                                                */
+/* Entry point                                                               */
 /* -------------------------------------------------------------------------- */
 
 async function countExisting(): Promise<Record<string, number>> {
@@ -630,6 +658,12 @@ async function main(): Promise<void> {
         content.seriesIds,
         transaction
       );
+      const library = await writeLibrary(
+        plan,
+        accountIds,
+        content.bookIds,
+        transaction
+      );
       const notifications = await writeNotifications(
         plan,
         accountIds,
@@ -646,6 +680,7 @@ async function main(): Promise<void> {
         chapters: content.chapters,
         ...threads,
         favorites,
+        library,
         notifications,
       };
     });

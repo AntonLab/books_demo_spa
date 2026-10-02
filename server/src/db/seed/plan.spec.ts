@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RNG_SEED, createRng } from './rng.ts';
+import { READING_STATUSES } from 'shared';
 import { buildPlan, type Plan } from './plan.ts';
 
 // Everything about the plan except its dates, which are anchored to the moment
@@ -120,6 +121,40 @@ test('dates nothing before it could have happened, and only tombstones a comment
     assert.ok(
       plan.comments.some((comment) => comment.parent === tombstoned),
       'a tombstone only earns its place by keeping replies in their thread'
+    );
+  }
+});
+
+test('gives every reader a Library of Published books, one status each, every status held', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const readerIndexes = plan.accounts.flatMap((account, index) =>
+    account.spec.role === 'user' ? [index] : []
+  );
+  const seen = new Set<string>();
+
+  for (const entry of plan.library) {
+    assert.ok(
+      readerIndexes.includes(entry.accountIndex),
+      'only readers hold a Library'
+    );
+    assert.notEqual(entry.book.status, 'draft');
+    const key = `${String(entry.accountIndex)}:${entry.book.title}`;
+    assert.ok(!seen.has(key), 'one status per Account and Book');
+    seen.add(key);
+    assert.ok(READING_STATUSES.includes(entry.status));
+    const account = plan.accounts[entry.accountIndex];
+    assert.ok(account && entry.updatedAt >= account.createdAt);
+    assert.ok(entry.updatedAt >= entry.book.createdAt);
+  }
+  for (const index of readerIndexes) {
+    assert.ok(
+      plan.library.filter((entry) => entry.accountIndex === index).length >= 4
+    );
+  }
+  for (const status of READING_STATUSES) {
+    assert.ok(
+      plan.library.some((entry) => entry.status === status),
+      `${status} is held`
     );
   }
 });

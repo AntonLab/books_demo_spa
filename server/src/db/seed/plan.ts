@@ -13,7 +13,12 @@ import {
   type AuthorSpec,
 } from './personas.ts';
 import { itemAt, type Rng } from './rng.ts';
-import type { BookStatus, Tombstone } from 'shared';
+import {
+  READING_STATUSES,
+  type BookStatus,
+  type ReadingStatus,
+  type Tombstone,
+} from 'shared';
 
 // The span each author's back catalogue is stretched over, ending a few days
 // ago. The chapter cadence is *derived* from this rather than fixed: an author
@@ -84,6 +89,13 @@ interface PlannedFavorite {
   createdAt: Date;
 }
 
+export interface PlannedLibraryEntry {
+  book: PlannedBook;
+  accountIndex: number;
+  status: ReadingStatus;
+  updatedAt: Date;
+}
+
 export interface PlannedAuthor {
   spec: AuthorSpec;
   createdAt: Date;
@@ -101,6 +113,7 @@ export interface Plan {
   tombstones: Map<PlannedComment, Tombstone>;
   likes: PlannedLike[];
   favorites: PlannedFavorite[];
+  library: PlannedLibraryEntry[];
 }
 
 // Lays an author's whole history out over PUBLICATION_WINDOW_DAYS, ending a few
@@ -526,6 +539,40 @@ function planFavorites(
   });
 }
 
+// Readers only: each shelves 4-6 Published books. The statuses rotate from a
+// random start, so a reader with four or more books holds every status.
+function planLibrary(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedLibraryEntry[] {
+  const now = Date.now();
+  const books = authors
+    .flatMap((author) => author.books)
+    .filter((book) => book.status !== 'draft');
+
+  return accounts.flatMap((account, accountIndex) => {
+    if (account.spec.role !== 'user') return [];
+
+    const start = rng.int(0, READING_STATUSES.length - 1);
+    return rng.sample(books, rng.int(4, 6)).map((book, position) => ({
+      book,
+      accountIndex,
+      status: itemAt(
+        READING_STATUSES,
+        (start + position) % READING_STATUSES.length,
+        'reading status'
+      ),
+      updatedAt: new Date(
+        rng.float(
+          Math.max(account.createdAt.getTime(), book.createdAt.getTime()),
+          now
+        )
+      ),
+    }));
+  });
+}
+
 export function buildPlan(rng: Rng): Plan {
   const authors = shareSeries(
     shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
@@ -560,5 +607,8 @@ export function buildPlan(rng: Rng): Plan {
   // the chapters, comments and likes of the demo as they were.
   const favorites = planFavorites(rng, authors, accounts);
 
-  return { accounts, authors, ...threads, favorites };
+  // Drawn after favorites for the same reason: every earlier draw stays as it was.
+  const library = planLibrary(rng, authors, accounts);
+
+  return { accounts, authors, ...threads, favorites, library };
 }
