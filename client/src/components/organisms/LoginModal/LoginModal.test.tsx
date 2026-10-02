@@ -117,15 +117,13 @@ describe('LoginModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('asks before discarding typed input, and closes on confirm', async () => {
+  it('closes at once, whatever was typed, without asking', async () => {
     renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
 
     await userEvent.type(screen.getByLabelText('Login'), 'bob');
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
-    expect(onClose).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument();
   });
 });
