@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router';
 import type { BookSort, GenreListItem } from 'shared';
 import { useBookSearch, useFavoritedBooks } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
+import { useFavoritedSeries, useSeriesList } from '@/queries/series';
+import type { PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import {
   fieldErrorsOf,
@@ -17,6 +19,14 @@ import {
   type SearchFieldError,
 } from '@/types/bookSearch';
 import type { ProfileScope } from '@/types/profileScope';
+import {
+  parseSeriesSearch,
+  seriesFilterCount,
+  seriesFormValuesOf,
+  seriesListParamsOf,
+  seriesSearchOf,
+  toSeriesSearchParams,
+} from '@/types/seriesSearch';
 
 export type ProfileRow<T> = T & { favoriteId?: number };
 
@@ -151,6 +161,76 @@ export const useProfileBooks = (
       filtered: filterCount(search) > 0,
       goToPage: (page, pageSize) =>
         setSearchParams(toSearchParams({ ...search, page, pageSize })),
+    },
+  };
+};
+
+export const useProfileSeries = (
+  scope: ProfileScope,
+  viewerId: number
+): ProfileFilters & { list: ProfileList<PublicSeries> } => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = useMemo(() => parseSeriesSearch(searchParams), [searchParams]);
+  const { genres, genre, genreId, blocked } = useGenreFilter(search.genre);
+  const params = seriesListParamsOf(search, genreId);
+
+  const mine = useSeriesList(
+    { ...params, userId: viewerId },
+    scope === 'mine' && !blocked
+  );
+  const favorites = useFavoritedSeries(
+    params,
+    scope === 'favorites' && !blocked
+  );
+  const query = scope === 'mine' ? mine : favorites;
+
+  const fieldErrors = useMemo(
+    () => fieldErrorsOf(blocked ? null : query.error),
+    [blocked, query.error]
+  );
+
+  const moveTo = useCallback(
+    (last: number) =>
+      setSearchParams(toSeriesSearchParams({ ...search, page: last }), {
+        replace: true,
+      }),
+    [setSearchParams, search]
+  );
+  const overshooting = usePageClamp(
+    {
+      page: search.page,
+      pageSize: search.pageSize,
+      total: blocked ? undefined : query.data?.total,
+    },
+    moveTo
+  );
+
+  return {
+    filterCount: seriesFilterCount(search),
+    genres,
+    form: {
+      key: `${searchParams.toString()}|${genre?.id ?? ''}`,
+      initialValues: seriesFormValuesOf(search, genre?.id),
+      fieldErrors,
+      onSearch: (values) =>
+        setSearchParams(
+          toSeriesSearchParams({
+            ...seriesSearchOf(values),
+            pageSize: search.pageSize,
+          })
+        ),
+      onReset: () => setSearchParams({ tab: 'series' }),
+    },
+    list: {
+      items: blocked ? [] : (query.data?.items ?? []),
+      total: blocked ? 0 : (query.data?.total ?? 0),
+      page: search.page,
+      pageSize: search.pageSize,
+      isPending: (!blocked && query.isPending) || overshooting,
+      error: blocked ? null : query.error,
+      filtered: seriesFilterCount(search) > 0,
+      goToPage: (page, pageSize) =>
+        setSearchParams(toSeriesSearchParams({ ...search, page, pageSize })),
     },
   };
 };

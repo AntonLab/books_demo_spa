@@ -1,15 +1,23 @@
 import { act, waitFor } from '@testing-library/react';
 import { useLocation, useNavigationType } from 'react-router';
-import { profileTabOf, useProfileBooks } from './useProfileLists';
+import {
+  profileTabOf,
+  useProfileBooks,
+  useProfileSeries,
+} from './useProfileLists';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { genreItem } from '@/test/genres';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
+import * as seriesApi from '@/api/series';
+import type { PublicSeries } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import type { ProfileScope } from '@/types/profileScope';
 
 jest.mock('@/api/books');
 jest.mock('@/api/genres');
+jest.mock('@/api/series');
+const mockedSeries = jest.mocked(seriesApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 
@@ -213,6 +221,146 @@ describe('page clamp', () => {
     await act(() => queryClient.invalidateQueries({ queryKey: ['books'] }));
 
     await waitFor(() => expect(result.current.location.search).toBe('?page=2'));
+    expect(result.current.navType).toBe('REPLACE');
+  });
+});
+
+const seriesRow = {
+  id: 5,
+  title: 'Series 5',
+  favoriteId: 61,
+} as unknown as PublicSeries & { favoriteId: number };
+const seriesBody = { items: [seriesRow], total: 1, limit: 20, offset: 0 };
+const setupSeries = (scope: ProfileScope, route: string) =>
+  renderHookWithProviders(
+    () => ({
+      state: useProfileSeries(scope, 3),
+      location: useLocation(),
+      navType: useNavigationType(),
+    }),
+    { route }
+  );
+
+describe('useProfileSeries', () => {
+  beforeEach(() => {
+    mockedSeries.listSeries.mockResolvedValue(seriesBody);
+    mockedSeries.listFavoritedSeries.mockResolvedValue(seriesBody);
+  });
+
+  it('My works asks for the URL search as the viewer, offset from page and size', async () => {
+    const { result } = setupSeries(
+      'mine',
+      '/p?tab=series&q=saga&genre=4&tag=epic&page=3&pageSize=50'
+    );
+
+    await waitFor(() =>
+      expect(result.current.state.list.items).toHaveLength(1)
+    );
+    expect(mockedSeries.listSeries).toHaveBeenCalledWith({
+      q: 'saga',
+      genreId: 4,
+      tag: 'epic',
+      limit: 50,
+      offset: 100,
+      userId: 3,
+    });
+    expect(result.current.state.filterCount).toBe(3);
+  });
+
+  it('Favorites asks the favorited list only, and keeps each favorite id', async () => {
+    const { result } = setupSeries('favorites', '/p?tab=series&tag=x');
+
+    await waitFor(() =>
+      expect(result.current.state.list.items[0]?.favoriteId).toBe(61)
+    );
+    expect(mockedSeries.listFavoritedSeries).toHaveBeenCalledWith(
+      expect.objectContaining({ tag: 'x' })
+    );
+    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+  });
+
+  it('shows an empty list, asking nothing, for a genre that is no id', async () => {
+    const { result } = setupSeries('mine', '/p?tab=series&genre=abc');
+
+    await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+    expect(result.current.state.list).toMatchObject({
+      items: [],
+      isPending: false,
+      filtered: true,
+    });
+  });
+
+  it('Search keeps the tab and size and resets the page, Reset keeps only the tab', () => {
+    const { result } = setupSeries('mine', '/p?tab=series&page=3&pageSize=50');
+
+    act(() =>
+      result.current.state.form.onSearch({
+        q: ' saga ',
+        tag: 'epic',
+        sort: 'popular',
+      })
+    );
+    expect(result.current.location.search).toBe(
+      '?tab=series&q=saga&tag=epic&pageSize=50'
+    );
+    act(() => result.current.state.list.goToPage(2, 20));
+    expect(result.current.location.search).toBe(
+      '?tab=series&q=saga&tag=epic&page=2'
+    );
+    expect(result.current.navType).toBe('PUSH');
+    act(() => result.current.state.form.onReset());
+    expect(result.current.location.search).toBe('?tab=series');
+  });
+
+  it('replaces an empty page past the end with the last one, never shown as ready', async () => {
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [],
+      total: 41,
+      limit: 20,
+      offset: 160,
+    });
+    const { result, seen } = recording(
+      () => useProfileSeries('mine', 3),
+      '/p?tab=series&page=9'
+    );
+
+    await waitFor(() =>
+      expect(result.current.location.search).toBe('?tab=series&page=3')
+    );
+    expect(result.current.navType).toBe('REPLACE');
+    expect(
+      seen.filter((entry) => entry.page === 9 && !entry.isPending)
+    ).toEqual([]);
+  });
+
+  it('steps back a page when the last row of the last page goes', async () => {
+    mockedSeries.listFavoritedSeries
+      .mockResolvedValueOnce({
+        items: [seriesRow],
+        total: 41,
+        limit: 20,
+        offset: 40,
+      })
+      .mockResolvedValue({
+        items: [seriesRow],
+        total: 40,
+        limit: 20,
+        offset: 20,
+      });
+    const { result, queryClient } = setupSeries(
+      'favorites',
+      '/p?tab=series&page=3'
+    );
+
+    await waitFor(() =>
+      expect(result.current.state.list.items).toHaveLength(1)
+    );
+    await act(() => queryClient.invalidateQueries({ queryKey: ['series'] }));
+
+    await waitFor(() =>
+      expect(result.current.location.search).toBe('?tab=series&page=2')
+    );
     expect(result.current.navType).toBe('REPLACE');
   });
 });
