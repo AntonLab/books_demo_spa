@@ -186,26 +186,26 @@ describe('AppShell routing', () => {
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  it('renders EditBookPage at /books/:id/edit', async () => {
+  // A Guest on a guarded page is sent home with Log in open, which only the
+  // page's own guard can cause.
+  it('guards EditBookPage at /books/:id/edit', async () => {
     renderWithProviders(<AppShell />, { route: '/books/1/edit' });
 
     expect(
-      await screen.findByText('Only its co-authors can edit this book.')
+      await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 
-  it('renders NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {
+  it('guards NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {
     renderWithProviders(<AppShell />, { route: '/books/1/chapters/new' });
 
     expect(
-      await screen.findByText(
-        'Only its co-authors can add chapters to this book.'
-      )
+      await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
     expect(mockedChapters.getChapter).not.toHaveBeenCalled();
   });
 
-  it('renders EditChapterPage at /books/:bookId/chapters/:chapterId/edit', async () => {
+  it('guards EditChapterPage at /books/:bookId/chapters/:chapterId/edit', async () => {
     mockedChapters.getChapter.mockResolvedValue({
       id: 9,
       bookId: 1,
@@ -219,7 +219,7 @@ describe('AppShell routing', () => {
     renderWithProviders(<AppShell />, { route: '/books/1/chapters/9/edit' });
 
     expect(
-      await screen.findByText('Only its co-authors can edit this chapter.')
+      await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 
@@ -232,11 +232,11 @@ describe('AppShell routing', () => {
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('renders EditSeriesPage at /series/:id/edit', async () => {
+  it('guards EditSeriesPage at /series/:id/edit', async () => {
     renderWithProviders(<AppShell />, { route: '/series/12/edit' });
 
     expect(
-      await screen.findByText('Only its co-authors can edit this series.')
+      await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 
@@ -256,12 +256,11 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders AdminGenresPage at /admin/genres', async () => {
+  it('guards AdminGenresPage at /admin/genres', async () => {
     renderWithProviders(<AppShell />, { route: '/admin/genres' });
 
-    // An anonymous visitor: the page explains itself instead of the manager.
     expect(
-      await screen.findByText('Genres are kept by admins.')
+      await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
   });
 
@@ -276,12 +275,12 @@ describe('AppShell routing', () => {
 
 describe('AppShell Profile routing', () => {
   it.each(['/profile', '/profile/favorites', '/profile/my-books'])(
-    'renders ProfilePage at %s',
+    'guards ProfilePage at %s',
     async (route) => {
       renderWithProviders(<AppShell />, { route });
 
       expect(
-        await screen.findByRole('heading', { name: 'Profile' })
+        await screen.findByRole('dialog', { name: 'Log in' })
       ).toBeInTheDocument();
     }
   );

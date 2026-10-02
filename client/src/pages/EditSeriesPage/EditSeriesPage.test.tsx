@@ -193,12 +193,13 @@ describe('EditSeriesPage', () => {
     expect(await screen.findByText('My books list')).toBeInTheDocument();
   });
 
-  it('turns away an account that does not co-author the series', async () => {
+  it('sends an account that does not co-author the series home with one popup', async () => {
     renderPage(account({ id: 99, login: 'reader', role: 'user' }));
 
+    expect(await screen.findByText('Main page')).toBeInTheDocument();
     expect(
-      await screen.findByText('Only its co-authors can edit this series.')
-    ).toBeInTheDocument();
+      await screen.findAllByText("You don't have access to this page.")
+    ).toHaveLength(1);
     expect(screen.queryByLabelText('Title')).toBeNull();
     expect(mockedSeries.listSeriesBooks).not.toHaveBeenCalled();
   });

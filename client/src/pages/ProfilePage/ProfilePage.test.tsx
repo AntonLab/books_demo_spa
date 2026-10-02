@@ -86,16 +86,20 @@ beforeEach(() => {
 });
 
 describe('ProfilePage while the session is loading', () => {
-  it('shows only the heading', () => {
+  it('shows only a spinner and redirects nowhere', () => {
     // Never resolves, so the session query stays pending for the assertion.
     mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
 
-    renderWithProviders(<ProfilePage />);
+    renderWithProviders(
+      <>
+        <ProfilePage />
+        <LocationProbe />
+      </>,
+      { route: '/profile' }
+    );
 
-    expect(
-      screen.getByRole('heading', { name: 'Profile' })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Log in to see your profile.')).toBeNull();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/profile$/);
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
@@ -111,16 +115,17 @@ describe('ProfilePage when the session fails to load', () => {
     expect(
       await screen.findByText('Could not load your profile.')
     ).toBeInTheDocument();
-    expect(screen.queryByText('Log in to see your profile.')).toBeNull();
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
 
 describe('ProfilePage, signed out', () => {
-  it('asks the visitor to log in and shows no tabs', () => {
+  it('sends the visitor home and shows no tabs', async () => {
     renderWithSession(null);
 
-    expect(screen.getByText('Log in to see your profile.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
     expect(screen.queryByRole('tablist')).toBeNull();
   });
 
@@ -199,12 +204,15 @@ describe('ProfilePage tabs', () => {
     ]);
   });
 
-  it('sends a non-author at /profile/my-books to /profile, asking for no books', async () => {
+  it('sends a non-author at /profile/my-books home with one access popup, asking for no books', async () => {
     renderWithSession(session, '/profile/my-books');
 
     await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent(/^\/profile$/)
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
     );
+    expect(
+      await screen.findAllByText("You don't have access to this page.")
+    ).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Create book' })).toBeNull();
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });

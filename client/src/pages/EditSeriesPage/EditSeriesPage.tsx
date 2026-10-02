@@ -15,6 +15,8 @@ import { useNavigate, useParams } from 'react-router';
 import { CoAuthorManager } from '@/components/organisms/CoAuthorManager/CoAuthorManager';
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
 import { useDeleteSeries, useSeries } from '@/queries/series';
@@ -32,10 +34,23 @@ export const EditSeriesPage: FC = () => {
 const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   const navigate = useNavigate();
 
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
   const { data: series, isPending, isError } = useSeries(seriesId);
   const [editing, setEditing] = useState(false);
   const remove = useDeleteSeries(seriesId);
+
+  // The server refuses anyone but a co-author or Moderator with a 403.
+  const allowed = usePageGuard(
+    sessionPending
+      ? 'pending'
+      : !session
+        ? 'guest'
+        : !series
+          ? 'pending'
+          : seriesCapabilities(series, session).mayEdit
+            ? 'allowed'
+            : 'denied'
+  );
 
   if (isError) {
     return <Alert type="error" title="Could not load this series." />;
@@ -44,13 +59,8 @@ const EditSeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
 
   // A Moderator may edit and delete any series, and order its books, but never
   // change its byline — CoAuthorManager stays read-only for one.
+  if (!allowed || !session) return <PageSpinner />;
   const { isCoAuthor, mayEdit } = seriesCapabilities(series, session);
-  // The server refuses anyone else with a 403.
-  if (!session || !mayEdit) {
-    return (
-      <Alert type="warning" title="Only its co-authors can edit this series." />
-    );
-  }
 
   const handleDelete = () => {
     remove.mutate(undefined, {

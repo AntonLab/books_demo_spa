@@ -12,6 +12,8 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
 import { bookCapabilities } from '@/types/capabilities';
 import { useBook } from '@/queries/books';
@@ -26,7 +28,7 @@ export const EditChapterPage: FC = () => {
   const bookId = Number(params.bookId);
   const chapterId = Number(params.chapterId);
 
-  const { data: session } = useSession();
+  const { data: session, isPending: sessionPending } = useSession();
   const book = useBook(bookId);
   const edit = useChapterEdit(bookId, chapterId);
   // A delete can land after the Account has already moved to an unrelated
@@ -52,6 +54,18 @@ export const EditChapterPage: FC = () => {
       />
     ) : null;
 
+  const allowed = usePageGuard(
+    sessionPending
+      ? 'pending'
+      : !session
+        ? 'guest'
+        : !book.data
+          ? 'pending'
+          : bookCapabilities(book.data, session).mayEdit
+            ? 'allowed'
+            : 'denied'
+  );
+
   if (edit.status === 'error' || edit.status === 'gone' || book.isError) {
     return (
       <>
@@ -68,18 +82,7 @@ export const EditChapterPage: FC = () => {
     return <Skeleton active paragraph={{ rows: 10 }} />;
   }
 
-  if (!bookCapabilities(book.data, session).mayEdit) {
-    return (
-      <>
-        <Alert
-          type="warning"
-          title="Only its co-authors can edit this chapter."
-          className={spacing.gapBelow}
-        />
-        {notice}
-      </>
-    );
-  }
+  if (!allowed) return <PageSpinner />;
 
   // Unreachable: the two guards above already excluded 'pending', 'error'
   // and 'gone'. TypeScript does not eliminate a union member whose

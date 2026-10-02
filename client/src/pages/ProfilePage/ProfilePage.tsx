@@ -1,6 +1,8 @@
 import type { FC } from 'react';
-import { Alert, Empty, Tabs, Typography } from 'antd';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Alert, Tabs, Typography } from 'antd';
+import { useLocation, useNavigate } from 'react-router';
+import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { usePageGuard } from '@/hooks/usePageGuard';
 import { FavoritesPanel } from '@/components/organisms/FavoritesPanel/FavoritesPanel';
 import { MyBooksPanel } from '@/components/organisms/MyBooksPanel/MyBooksPanel';
 import { ProfileSettings } from '@/components/organisms/ProfileSettings/ProfileSettings';
@@ -18,10 +20,20 @@ export const ProfilePage: FC = () => {
   const { data: session, isPending, isError } = useSession();
   const title = <Typography.Title level={2}>Profile</Typography.Title>;
 
-  // While the session is still resolving, showing the Empty state would
-  // flash a log-in prompt at a signed-in user who loaded /profile directly,
-  // and a non-author redirect would bounce an author reloading My Books.
-  if (isPending) return title;
+  // While the session is still resolving, a guest redirect would bounce a
+  // signed-in user who loaded /profile directly, and a non-author redirect
+  // would bounce an author reloading My Books. A failed fetch stays 'pending'
+  // so the error Alert below shows instead of a redirect.
+  const allowed = usePageGuard(
+    isPending || isError
+      ? 'pending'
+      : session === null
+        ? 'guest'
+        : pathname === MY_BOOKS_TAB && session.role !== 'author'
+          ? 'denied'
+          : 'allowed'
+  );
+  if (isPending) return <PageSpinner />;
 
   // A failed session fetch — a 5xx or a network error, distinct from the
   // ordinary "nobody is signed in" 401, which the query already turns into
@@ -35,20 +47,10 @@ export const ProfilePage: FC = () => {
     );
   }
 
-  if (session === null) {
-    return (
-      <>
-        {title}
-        <Empty description="Log in to see your profile." />
-      </>
-    );
-  }
+  // A non-author reaches My Books only by a typed or old link.
+  if (!allowed || !session) return <PageSpinner />;
 
   const isAuthor = session.role === 'author';
-  // Reached only by a typed or old link: no tab leads here for a non-author.
-  if (pathname === MY_BOOKS_TAB && !isAuthor) {
-    return <Navigate replace to={ACCOUNT_TAB} />;
-  }
 
   return (
     <>
