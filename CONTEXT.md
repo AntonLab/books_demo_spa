@@ -17,10 +17,17 @@ Someone with no session: an anonymous visitor.
 _Avoid_: Anonymous user
 
 **Profile**:
-An Account's own page: its avatar, its email-notification setting, its
-Favorites and, for an Author, the works it is a Co-author of. Only the Account
-itself sees it; there is no public Profile of another Account.
+An Account's own private page: its details, avatar, email-notification setting,
+Favorites, Library, Reading lists and, for an Author, the works it is a
+Co-author of. Only the Account itself sees it; what others see is its Public
+profile.
 _Avoid_: Settings, Account page, Cabinet
+
+**Public profile**:
+The page anyone, Guests included, sees for an Account: its Avatar, name, About
+text, when it was last Online (unless it hides that), totals across its
+Published works, and its Published Series and Books.
+_Avoid_: Profile (that one is private), author page
 
 **Role**:
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
@@ -61,7 +68,7 @@ _Avoid_: Author (for a comment's writer), creator
 
 **Moderator**:
 An Admin or Superadmin acting on content they do not own. A hat worn for one
-action, not a Role.
+action, not a Role. A Moderator never acts on Reports of its own Comment.
 _Avoid_: treating Moderator as a Role
 
 **Blocked**:
@@ -102,8 +109,9 @@ about. It may be empty.
 _Avoid_: Annotation, summary, blurb
 
 **Cover**:
-The one optional picture that stands for a Book. A Book without one is shown
-with a placeholder bearing its title.
+The one optional picture that stands for a Book or a Series. One without it is
+shown with a placeholder bearing its title; a Series never borrows a Cover from
+its Books.
 _Avoid_: Image, thumbnail, poster
 
 **Book status**:
@@ -166,8 +174,16 @@ Book was created or filed into it.
 **Genre**:
 A category of the catalogue, from a list Admins and Superadmins keep. A Book
 has at most one. A Series may carry its own, set independently of its Books':
-a Book never takes its Genre from its Series.
+a Book never takes its Genre from its Series. Genres form exactly two levels:
+a top-level Genre and the Subgenres beneath it. A Genre's name is unique
+among its siblings only, so a Genre is told apart by its path ("Fantasy /
+Urban"). Searching by a top-level Genre also finds its Subgenres' Books.
 _Avoid_: Category, Tag (for a Genre)
+
+**Subgenre**:
+A Genre that sits beneath one top-level Genre. A Subgenre has no Subgenres of
+its own. A top-level Genre cannot be deleted while it has Subgenres.
+_Avoid_: Child genre, sub-category
 
 **Tag**:
 A free-form label a Book's or Series' Co-authors attach to it, any number of
@@ -228,6 +244,25 @@ _Avoid_: Removed comment (that one a Moderator made)
 A Tombstone a Moderator made. A Moderator can restore it; nobody can edit it.
 _Avoid_: Deleted comment (that one its Owner made)
 
+**Report**:
+An Account's flag on someone else's Comment for Moderators to look at, with a
+reason: Spam, Harassment, Spoilers, or Other with a required explanation. An
+Account reports a Comment at most once and cannot withdraw it; a Tombstone
+cannot be reported. Its reporter is never told the outcome.
+_Avoid_: Complaint, flag (as a noun), abuse report
+
+**Report status**:
+Where a Report stands: **New** (no Moderator has taken it), **In review** (a
+Moderator has taken it), **Upheld** (its Comment became a Removed comment) or
+**Dismissed**. A Moderator acts on every Open report of a Comment at once, and
+a settled Report is kept with its outcome.
+_Avoid_: Banned, Not banned (Banning is about Accounts, not Reports)
+
+**Open report**:
+A New or In review Report. While a Comment has one, everyone sees it marked as
+under review and nobody can report it again. When a Dismissed Comment's text is
+later changed beyond small corrections, a New Report is opened on it again.
+
 ### Notifications
 
 **Notification**:
@@ -275,8 +310,37 @@ _Avoid_: Vote, favorite, upvote
 
 **Popularity**:
 How many Likes a Book has received, all time. Dislikes and Likes on its
-Comments do not count.
+Comments do not count. A Series is not Liked itself: its Popularity is the sum
+of its Published Books'.
 _Avoid_: Rating, trending
+
+### Library and Reading lists
+
+**Library**:
+The Books an Account keeps track of, each with one Reading status. Private to
+the Account; a Book shows only how many Libraries hold it in each status. It is
+separate from Favorites: it brings no Notifications.
+_Avoid_: Favorites, bookshelf
+
+**Reading status**:
+Where an Account stands with a Book in its Library: **Reading**, **Plan to
+read**, **Read** or **Not interested**. A Book with any status but Not
+interested counts as in that Account's Library.
+_Avoid_: Shelf
+
+**Reading list**:
+A named list of Published Books and Series an Account puts together, with a
+Description and Tags. Anyone may read one; only an Account may make one. A Book
+or Series that stops being Published stays on it but is not shown or counted
+until it is Published again. Copying someone's Reading list makes an
+independent list of one's own, with no tie back to the original.
+_Avoid_: Collection (that is not a Series either), selection, shelf
+
+**Recently viewed**:
+The last six Books whose page or Chapter was opened on one device. Like a
+Device preference, the server never sees it. A Guest's views carry over to the
+Account that signs in; it is cleared only when a different Account from the
+last one signs in on that device.
 
 ### Discovery
 
