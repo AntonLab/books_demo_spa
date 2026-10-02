@@ -118,6 +118,12 @@ const GenreManager: FC = () => {
   // on the page retires it.
   const openForm = (mode: GenreFormMode) => {
     remove.reset();
+    // The button's Tooltip opens on focus and closes on blur through flushSync.
+    // Left focused, the button blurs when the dialog takes focus inside React's
+    // commit phase, where flushSync logs an error.
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     setFormMode(mode);
   };
 
