@@ -20,7 +20,7 @@ import { useBook } from '@/queries/books';
 import { isBlank } from '@/store/unsavedTextSlice';
 import spacing from '@/theme/spacing.module.css';
 import styles from './EditChapterPage.module.css';
-import { useChapterEdit } from './useChapterEdit';
+import { useChapterEdit } from '@/components/organisms/ChapterEditorModal/useChapterEdit';
 
 export const EditChapterPage: FC = () => {
   const navigate = useNavigate();

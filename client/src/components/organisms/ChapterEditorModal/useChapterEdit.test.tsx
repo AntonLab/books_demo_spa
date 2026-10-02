@@ -59,13 +59,19 @@ const typedAgainst = (
   },
 });
 
-const renderEdit = async (preloadedState?: Partial<RootState>) => {
+const renderEdit = async (
+  preloadedState?: Partial<RootState>,
+  onSaved?: () => void
+) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, viewer);
-  const rendered = renderHookWithProviders(() => useChapterEdit(1, 9), {
-    queryClient,
-    preloadedState,
-  });
+  const rendered = renderHookWithProviders(
+    () => useChapterEdit(1, 9, onSaved),
+    {
+      queryClient,
+      preloadedState,
+    }
+  );
   await waitFor(() => expect(rendered.result.current.status).toBe('ready'));
   return rendered;
 };
@@ -361,5 +367,25 @@ describe('useChapterEdit', () => {
 
     expect(mockedChapters.deleteChapter).toHaveBeenCalledWith(9);
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('calls onSaved once a save lands, not when it is refused', async () => {
+    const onSaved = jest.fn();
+    mockedChapters.updateChapter
+      .mockRejectedValueOnce(
+        new ApiError(409, 'This chapter was changed since you loaded it')
+      )
+      .mockResolvedValueOnce({ ...chapter, updatedAt: newer });
+    const { result } = await renderEdit(undefined, onSaved);
+    const values = { title: chapter.title, text: 'Changed', publishedAt: null };
+
+    act(() => ready(result.current).save(values));
+    await waitFor(() =>
+      expect(mockedChapters.updateChapter).toHaveBeenCalledTimes(1)
+    );
+    expect(onSaved).not.toHaveBeenCalled();
+
+    act(() => ready(result.current).save(values));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
   });
 });

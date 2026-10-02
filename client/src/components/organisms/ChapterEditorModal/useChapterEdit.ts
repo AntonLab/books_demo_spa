@@ -52,7 +52,8 @@ const newest = (a: string, b: string | undefined): string =>
 // (.claude/rules/client/pages.md). The page only lays them out.
 export const useChapterEdit = (
   bookId: number,
-  chapterId: number
+  chapterId: number,
+  onSaved?: () => void
 ): ChapterEdit => {
   const key = unsavedTextKeys.chapter(bookId, chapterId);
   const dispatch = useAppDispatch();
@@ -146,6 +147,7 @@ export const useChapterEdit = (
                 updatedAt: landed.updatedAt,
               })
             );
+            onSaved?.();
           },
           // A rejection is already surfaced through `saveError` or
           // `conflict`; this handler exists only so the rejection is not
