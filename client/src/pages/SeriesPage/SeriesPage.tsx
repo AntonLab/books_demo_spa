@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Alert, Button, Empty, Flex, Skeleton } from 'antd';
+import { Alert, Button, Flex, Skeleton } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import {
   RESULTS_COLUMNS,
@@ -29,7 +30,7 @@ export const SeriesPage: FC = () => {
   return Number.isInteger(seriesId) && seriesId > 0 ? (
     <SeriesView seriesId={seriesId} />
   ) : (
-    <Empty description={SERIES_GONE} />
+    <GoneRedirect message={SERIES_GONE} />
   );
 };
 
@@ -43,7 +44,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   if (series.isError) {
     // A link from a book page outlives the series it names.
     return series.error instanceof ApiError && series.error.status === 404 ? (
-      <Empty description={SERIES_GONE} />
+      <GoneRedirect message={SERIES_GONE} />
     ) : (
       <Alert type="error" title="Could not load this series." />
     );

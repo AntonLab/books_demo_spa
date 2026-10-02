@@ -41,7 +41,7 @@ const NavigationProbe = () => (
   <div data-testid="navigation">{useNavigationType()}</div>
 );
 
-const expectGoneHome = async (route: string) => {
+const expectGoneHome = async (route: string, notice = 'Page not found.') => {
   renderWithProviders(
     <>
       <AppShell />
@@ -51,8 +51,10 @@ const expectGoneHome = async (route: string) => {
     { route }
   );
 
-  expect(await screen.findAllByText('Page not found.')).toHaveLength(1);
-  expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+  expect(await screen.findAllByText(notice)).toHaveLength(1);
+  await waitFor(() =>
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+  );
   expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
 };
 
@@ -189,12 +191,8 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows "This book no longer exists." at the old /books/new bookmark without asking the server', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/new' });
-
-    expect(
-      await screen.findByText('This book no longer exists.')
-    ).toBeInTheDocument();
+  it('sends the old /books/new bookmark Home with a message, asking the server nothing', async () => {
+    await expectGoneHome('/books/new', 'This book no longer exists.');
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
@@ -203,12 +201,8 @@ describe('AppShell routing', () => {
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  it('shows "This series no longer exists." at the old /series/new bookmark without asking the server', async () => {
-    renderWithProviders(<AppShell />, { route: '/series/new' });
-
-    expect(
-      await screen.findByText('This series no longer exists.')
-    ).toBeInTheDocument();
+  it('sends the old /series/new bookmark Home with a message, asking the server nothing', async () => {
+    await expectGoneHome('/series/new', 'This series no longer exists.');
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 

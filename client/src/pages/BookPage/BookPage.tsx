@@ -16,6 +16,7 @@ import {
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
@@ -35,8 +36,12 @@ import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
 import { bookCapabilities } from '@/types/capabilities';
+import { entriesOfBook } from '@/store/unsavedTextSlice';
+import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
+
+const BOOK_GONE = 'This book no longer exists.';
 
 export const BookPage: FC = () => {
   const bookId = Number(useParams().id);
@@ -45,7 +50,7 @@ export const BookPage: FC = () => {
   return Number.isInteger(bookId) && bookId > 0 ? (
     <BookView bookId={bookId} />
   ) : (
-    <Empty description="This book no longer exists." />
+    <GoneRedirect message={BOOK_GONE} />
   );
 };
 
@@ -62,7 +67,14 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const toggleLike = useToggleLike(queryKeys.book(bookId));
   const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
 
+  const unsavedEntries = useOwnUnsavedEntries();
+  const hasUnsavedText = entriesOfBook(unsavedEntries, bookId).length > 0;
+
   if (isError) {
+    const isGone = error instanceof ApiError && error.status === 404;
+    // Its Unsaved text keeps the page open: the notices are the only way to
+    // copy it out.
+    if (isGone && !hasUnsavedText) return <GoneRedirect message={BOOK_GONE} />;
     return (
       <>
         <Alert
@@ -70,9 +82,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           title="Could not load this book."
           className={spacing.gapBelow}
         />
-        {error instanceof ApiError && error.status === 404 && (
-          <BookUnsavedTextNotices bookId={bookId} />
-        )}
+        {isGone && <BookUnsavedTextNotices bookId={bookId} />}
       </>
     );
   }

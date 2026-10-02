@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigationType } from 'react-router';
 import { SeriesPage } from './SeriesPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
@@ -70,6 +70,8 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   ...overrides,
 });
 
+const HomeProbe = () => <p>{`Home|${useNavigationType()}`}</p>;
+
 const renderPage = (
   route = '/series/12',
   session: PublicUser | null = null
@@ -79,7 +81,7 @@ const renderPage = (
   return renderWithProviders(
     <Routes>
       <Route path="/series/:id" element={<SeriesPage />} />
-      <Route path="/" element={<p>Home</p>} />
+      <Route path="/" element={<HomeProbe />} />
       <Route path="/profile/my-books" element={<p>My works</p>} />
     </Routes>,
     { route, queryClient }
@@ -158,16 +160,17 @@ describe('SeriesPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('says the series is gone on a 404 and asks for no books', async () => {
+  it('replaces to Home on a 404 and asks for no books', async () => {
     mockedSeries.getSeries.mockRejectedValue(
       new ApiError(404, 'Series not found')
     );
 
     renderPage('/series/99');
 
+    expect(await screen.findByText('Home|REPLACE')).toBeInTheDocument();
     expect(
-      await screen.findByText('This series no longer exists.')
-    ).toBeInTheDocument();
+      await screen.findAllByText('This series no longer exists.')
+    ).toHaveLength(1);
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
@@ -183,12 +186,13 @@ describe('SeriesPage', () => {
     );
   });
 
-  it('asks the server nothing for an id that is not one', () => {
+  it('replaces to Home, asking the server nothing, for an id that is not one', async () => {
     renderPage('/series/abc');
 
+    expect(await screen.findByText('Home|REPLACE')).toBeInTheDocument();
     expect(
-      screen.getByText('This series no longer exists.')
-    ).toBeInTheDocument();
+      await screen.findAllByText('This series no longer exists.')
+    ).toHaveLength(1);
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
@@ -214,7 +218,7 @@ describe('SeriesPage', () => {
 
   it.each([
     ['a co-author goes to My works', account(), 'My works'],
-    ['a moderator goes home', account({ id: 50, role: 'admin' }), 'Home'],
+    ['a moderator goes home', account({ id: 50, role: 'admin' }), 'Home|PUSH'],
   ])('after delete, %s', async (_name, session, landing) => {
     mockedSeries.getSeries.mockResolvedValue(series);
     mockedSeries.deleteSeries.mockResolvedValue(undefined);

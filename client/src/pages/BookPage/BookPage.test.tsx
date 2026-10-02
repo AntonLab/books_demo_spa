@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation, useNavigationType } from 'react-router';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
@@ -101,6 +101,41 @@ const renderPage = (
     preloadedState,
   });
 };
+
+const Probe = () => {
+  const { pathname } = useLocation();
+  return <p>{`${pathname}|${useNavigationType()}`}</p>;
+};
+
+const renderWithHome = (
+  id: string,
+  {
+    session,
+    preloadedState,
+  }: { session?: PublicUser; preloadedState?: Partial<RootState> } = {}
+) => {
+  const queryClient = createTestQueryClient();
+  if (session) queryClient.setQueryData(queryKeys.session, session);
+
+  return renderWithProviders(
+    <Routes>
+      <Route path="/books/:id" element={<BookPage />} />
+      <Route path="/" element={<Probe />} />
+    </Routes>,
+    { route: `/books/${id}`, queryClient, preloadedState }
+  );
+};
+
+const unsavedFor = (
+  accountId: number,
+  key: string,
+  text: string
+): Partial<RootState> => ({
+  unsavedText: {
+    accountId,
+    entries: { [key]: { text, savedAt: '2026-09-23T10:00:00.000Z' } },
+  },
+});
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -235,13 +270,36 @@ describe('BookPage', () => {
     expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
   });
 
-  it('does not ask the server for an id that is not a book id', async () => {
-    renderPage(undefined, undefined, 'new');
+  it('replaces to Home when the id is not a book id, asking nothing', async () => {
+    renderWithHome('new');
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+    expect(
+      await screen.findAllByText('This book no longer exists.')
+    ).toHaveLength(1);
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
+  });
+
+  it('replaces to Home on a 404', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+
+    renderWithHome('1');
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+    expect(
+      await screen.findAllByText('This book no longer exists.')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the Alert on a 500, with no redirect', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(500, 'boom'));
+
+    renderWithHome('1');
 
     expect(
-      await screen.findByText('This book no longer exists.')
+      await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
-    expect(mockedBooks.getBook).not.toHaveBeenCalled();
+    expect(screen.queryByText('/|REPLACE')).not.toBeInTheDocument();
   });
 
   it('reports a book that will not load', async () => {
@@ -254,23 +312,41 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers the Unsaved text of a book that no longer exists', async () => {
+  it('stays and offers the Unsaved text of a book that is gone', async () => {
     mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'Book not found'));
-    renderPage(reader, {
-      unsavedText: {
-        accountId: 9,
-        entries: {
-          'book:1:comment': {
-            text: 'About that ending',
-            savedAt: '2026-09-23T10:00:00.000Z',
-          },
-        },
-      },
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(
+        reader.id,
+        'book:1:comment',
+        'About that ending'
+      ),
     });
 
     expect(
       await screen.findByRole('textbox', { name: 'Unsaved text' })
     ).toHaveValue('About that ending');
+    expect(screen.queryByText('/|REPLACE')).not.toBeInTheDocument();
+  });
+
+  it('redirects when the only Unsaved text is blank', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(reader.id, 'book:1:comment', '   '),
+    });
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+  });
+
+  it('redirects when another Account owns the Unsaved text', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(77, 'book:1:comment', 'theirs'),
+    });
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
   });
 
   it('hides the like button from an anonymous visitor', async () => {
