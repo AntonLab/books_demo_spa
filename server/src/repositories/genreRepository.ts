@@ -151,6 +151,16 @@ export async function loadGenres(
   );
 }
 
+// A Genre's id plus every Subgenre's: what a search by that Genre matches. A
+// Subgenre has no children, so it answers only itself; an unknown id, nothing.
+export async function genreFamilyIds(genreId: number): Promise<number[]> {
+  const family = await Genre.findAll({
+    attributes: ['id'],
+    where: { [Op.or]: [{ id: genreId }, { parentId: genreId }] },
+  });
+  return family.map((genre) => genre.id);
+}
+
 // The Genre a row carries, read out of a map loadGenres filled. null for a row
 // with no Genre, and — defensively — for one whose Genre was not in the batch.
 export function genreOf(

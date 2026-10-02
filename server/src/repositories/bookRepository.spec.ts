@@ -678,6 +678,48 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(inMissing.total, 0);
   });
 
+  test('the genre filter on a top-level Genre also returns its Subgenres’ books; a Subgenre matches only itself', async () => {
+    const fantasy = await Genre.create({ name: 'Family Fantasy' });
+    const urban = await Genre.create({
+      name: 'Family Urban',
+      parentId: fantasy.id,
+    });
+    const horror = await Genre.create({ name: 'Family Horror' });
+    const make = (title: string, genreId: number) =>
+      createPublished({
+        userId: ownerId,
+        seriesId: null,
+        title,
+        description: 'x',
+        tags: [],
+        genreId,
+      });
+    const top = await make('Top', fantasy.id);
+    const sub = await make('Sub', urban.id);
+    await make('Elsewhere', horror.id);
+
+    const byTop = await listAsGuest({
+      current: 1,
+      pageSize: 20,
+      genreId: fantasy.id,
+    });
+    const bySub = await listAsGuest({
+      current: 1,
+      pageSize: 20,
+      genreId: urban.id,
+    });
+
+    assert.deepEqual(
+      byTop.items.map((item) => item.id).sort(),
+      [top.id, sub.id].sort()
+    );
+    assert.deepEqual(
+      bySub.items.map((item) => item.id),
+      [sub.id]
+    );
+    assert.equal(bySub.items[0]?.genre?.parent?.name, 'Family Fantasy');
+  });
+
   test('list finds a book by its title', async () => {
     await createPublished({
       userId: ownerId,

@@ -13,7 +13,12 @@ import {
   removeCoAuthor,
   type CreditTable,
 } from './coAuthors.ts';
-import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import {
+  assertGenreExists,
+  genreFamilyIds,
+  genreOf,
+  loadGenres,
+} from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type { ListResponse, PublicSeries, SeriesDetail } from 'shared';
 import type {
@@ -135,7 +140,8 @@ export async function findSeriesCoAuthorIds(
 // LIMIT keeps paging over series rather than credit rows.
 function buildWhere(
   query: ListSeriesQuery,
-  creditedSeriesIds: number[] | undefined
+  creditedSeriesIds: number[] | undefined,
+  genreIds: number[] | undefined
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
 
@@ -144,10 +150,11 @@ function buildWhere(
     clauses.push({ id: creditedSeriesIds });
   }
 
-  // ANDed with the other filters. An id that names no Genre matches
-  // nothing and yields an empty list, as an unknown `?tag=` does.
-  if (query.genreId !== undefined) {
-    clauses.push({ genreId: query.genreId });
+  // genreIds is the Genre `?genreId=` names plus its Subgenres, looked up
+  // beforehand. ANDed with the other filters. An empty list (an id that names
+  // no Genre) matches nothing, as an unknown `?tag=` does.
+  if (genreIds !== undefined) {
+    clauses.push({ genreId: genreIds });
   }
 
   if (query.tag) {
@@ -208,10 +215,15 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
               })
             ).map((credit) => credit.seriesId);
 
+      const genreIds =
+        query.genreId === undefined
+          ? undefined
+          : await genreFamilyIds(query.genreId);
+
       const { rows, count } = await Series.findAndCountAll({
         where: {
           [Op.and]: [
-            buildWhere(query, creditedSeriesIds),
+            buildWhere(query, creditedSeriesIds, genreIds),
             await visibleSeriesWhere(viewer),
           ],
         },

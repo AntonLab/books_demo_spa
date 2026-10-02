@@ -100,7 +100,9 @@ export function createFakeSeriesRepository(
           (query.userId === undefined ||
             (credits.get(row.id) ?? []).includes(query.userId)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
-          (query.genreId === undefined || row.genre?.id === query.genreId) &&
+          (query.genreId === undefined ||
+            row.genre?.id === query.genreId ||
+            row.genre?.parent?.id === query.genreId) &&
           (!query.q || row.description.includes(query.q))
       );
       return {

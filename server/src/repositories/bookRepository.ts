@@ -6,7 +6,12 @@ import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import {
+  assertGenreExists,
+  genreFamilyIds,
+  genreOf,
+  loadGenres,
+} from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
   listedBookWhere,
@@ -297,7 +302,8 @@ function buildWhere(
   query: ListBooksQuery,
   lookups: IdLookups,
   viewer: Viewer,
-  rank: Utils.Literal | undefined
+  rank: Utils.Literal | undefined,
+  genreIds: number[] | undefined
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
 
@@ -347,10 +353,12 @@ function buildWhere(
     clauses.push({ seriesId: query.seriesId });
   }
 
-  // Combined with the other filters by AND. An id that names no Genre
-  // matches nothing and yields an empty list, as an unknown `?tag=` does.
-  if (query.genreId !== undefined) {
-    clauses.push({ genreId: query.genreId });
+  // genreIds is the Genre `?genreId=` names plus its Subgenres, looked up
+  // beforehand. Combined with the other filters by AND. An empty list (an id
+  // that names no Genre) becomes `IN (NULL)`, matching nothing, as an unknown
+  // `?tag=` does.
+  if (genreIds !== undefined) {
+    clauses.push({ genreId: genreIds });
   }
 
   if (query.tag) {
@@ -429,7 +437,11 @@ export function createSequelizeBookRepository(): BookRepository {
       };
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);
-      const where = buildWhere(query, lookups, viewer, rank);
+      const genreIds =
+        query.genreId === undefined
+          ? undefined
+          : await genreFamilyIds(query.genreId);
+      const where = buildWhere(query, lookups, viewer, rank, genreIds);
       // Counted first, so a page past the end can be served as the last
       // non-empty one (page 1 when nothing matches) rather than as an empty
       // page the client would have to page back from.

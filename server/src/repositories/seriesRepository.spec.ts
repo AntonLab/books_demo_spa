@@ -535,6 +535,44 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(inMissing.total, 0);
   });
 
+  test('the genre filter on a top-level Genre also returns its Subgenres’ series; a Subgenre matches only itself', async () => {
+    const fantasy = await Genre.create({ name: 'Family Fantasy' });
+    const urban = await Genre.create({
+      name: 'Family Urban',
+      parentId: fantasy.id,
+    });
+    const horror = await Genre.create({ name: 'Family Horror' });
+    const make = (title: string, genreId: number) =>
+      repository.create({
+        userId: ownerId,
+        title,
+        description: 'x',
+        tags: [],
+        genreId,
+      });
+    const top = await make('Top', fantasy.id);
+    const sub = await make('Sub', urban.id);
+    await make('Elsewhere', horror.id);
+
+    const byTop = await repository.list(
+      { limit: 20, offset: 0, genreId: fantasy.id },
+      asModerator
+    );
+    const bySub = await repository.list(
+      { limit: 20, offset: 0, genreId: urban.id },
+      asModerator
+    );
+
+    assert.deepEqual(
+      byTop.items.map((item) => item.id).sort(),
+      [top.id, sub.id].sort()
+    );
+    assert.deepEqual(
+      bySub.items.map((item) => item.id),
+      [sub.id]
+    );
+  });
+
   test('the co-author filter and paging envelope agree on the total', async () => {
     const otherId = (
       await User.create({
