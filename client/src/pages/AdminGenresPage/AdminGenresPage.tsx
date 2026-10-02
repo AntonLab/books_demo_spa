@@ -1,46 +1,51 @@
 import { useState } from 'react';
-import type { FC } from 'react';
+import type { FC, Key } from 'react';
 import {
   Alert,
-  Button,
   Empty,
-  Form,
+  Flex,
   Input,
-  Listy,
   Popconfirm,
+  Select,
   Skeleton,
-  Space,
-  theme,
+  Tree,
   Typography,
 } from 'antd';
-import { ApiError } from '@/api/client';
+import type { TreeDataNode } from 'antd';
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
+import type { AdminGenreListItem } from 'shared';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import {
+  GenreFormModal,
+  type GenreFormMode,
+} from '@/components/organisms/GenreFormModal/GenreFormModal';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { useSession } from '@/queries/auth';
+import { useDeleteGenre, useGenresCounts } from '@/queries/genres';
 import {
-  useCreateGenre,
-  useDeleteGenre,
-  useGenres,
-  useRenameGenre,
-} from '@/queries/genres';
-import {
-  GENRE_NAME_MAX_LENGTH,
-  type GenreListItem,
-  isModeratorRole,
-} from 'shared';
+  countsLabel,
+  filterGenreTree,
+  totalsOf,
+  type UsageFilter,
+} from '@/types/genreAdmin';
+import { buildGenreTree } from '@/types/genreTree';
+import { isModeratorRole } from 'shared';
 import spacing from '@/theme/spacing.module.css';
-import styles from './AdminGenresPage.module.css';
 
-// The one refusal the fields explain themselves, rather than an Alert over the
-// whole page: the name is what the server objected to.
-const TAKEN = 'A genre with that name already exists.';
-
-const isTaken = (error: unknown): boolean =>
-  error instanceof ApiError && error.status === 409;
-
-interface AddValues {
-  name: string;
+interface GenreTreeData extends TreeDataNode {
+  genre: AdminGenreListItem;
+  counts: { bookCount: number; seriesCount: number };
+  hasSubgenres: boolean;
+  children?: GenreTreeData[];
 }
+
+const USAGE_OPTIONS: { value: UsageFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'books', label: 'Has books' },
+  { value: 'series', label: 'Has series' },
+  { value: 'unused', label: 'Unused' },
+];
 
 // Keeping the Genre list is an Admin's (or Superadmin's) job (ADR-0008).
 // Every other Role is sent home — and, because the manager below is a separate
@@ -61,165 +66,158 @@ export const AdminGenresPage: FC = () => {
 };
 
 const GenreManager: FC = () => {
-  const [form] = Form.useForm<AddValues>();
-  const genres = useGenres();
-  const create = useCreateGenre();
+  const genres = useGenresCounts();
+  const remove = useDeleteGenre();
+  const [query, setQuery] = useState('');
+  const [usage, setUsage] = useState<UsageFilter>('all');
+  const [expanded, setExpanded] = useState<Key[]>([]);
+  const [formMode, setFormMode] = useState<GenreFormMode | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
-  const handleAdd = ({ name }: AddValues) => {
-    create.mutate(
-      { name: name.trim() },
-      {
-        onSuccess: () => form.resetFields(),
-        onError: (error) => {
-          if (isTaken(error)) {
-            form.setFields([{ name: 'name', errors: [TAKEN] }]);
-          }
-        },
-      }
-    );
-  };
+  const items = genres.data?.items ?? [];
+  const tree = buildGenreTree(items);
+  const shownChildren = new Map(
+    filterGenreTree(tree, { query, usage }).map((node) => [
+      node.item.id,
+      node.children,
+    ])
+  );
+  // Walks the whole tree, not the filtered one: the totals and the Delete lock
+  // must count Subgenres a filter hides.
+  const treeData: GenreTreeData[] = tree.flatMap((node) => {
+    const children = shownChildren.get(node.item.id);
+    return children === undefined
+      ? []
+      : [
+          {
+            key: node.item.id,
+            genre: node.item,
+            counts: totalsOf(node),
+            hasSubgenres: node.children.length > 0,
+            children: children.map((child) => ({
+              key: child.id,
+              genre: child,
+              counts: child,
+              hasSubgenres: false,
+            })),
+          },
+        ];
+  });
+  const searching = query.trim() !== '';
+  const expandedKeys = searching
+    ? treeData.filter((node) => node.children?.length).map((node) => node.key)
+    : expanded;
+
+  const renderTitle = ({ genre, counts, hasSubgenres }: GenreTreeData) => (
+    <Flex align="center" gap="small">
+      <Typography.Text>{genre.name}</Typography.Text>
+      <Typography.Text type="secondary">{countsLabel(counts)}</Typography.Text>
+      <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+        {genre.parentId === null && (
+          <IconButton
+            size="small"
+            type="text"
+            icon={<PlusOutlined />}
+            label={`Add subgenre to ${genre.name}`}
+            onClick={() => setFormMode({ kind: 'create', parentId: genre.id })}
+          />
+        )}
+        <IconButton
+          size="small"
+          type="text"
+          icon={<EditOutlined />}
+          label={`Edit ${genre.name}`}
+          onClick={() => setFormMode({ kind: 'edit', genre })}
+        />
+        <Popconfirm
+          title={`Delete ${genre.name}?`}
+          description="Books and series in this genre will be left without one."
+          okText="Yes, delete"
+          okButtonProps={{ danger: true }}
+          onConfirm={() => remove.mutate(genre.id)}
+          onOpenChange={(open) => setConfirmingId(open ? genre.id : null)}
+        >
+          <IconButton
+            size="small"
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={hasSubgenres}
+            tooltipHidden={confirmingId === genre.id}
+            label={
+              hasSubgenres
+                ? `Cannot delete ${genre.name}: it has subgenres`
+                : `Delete ${genre.name}`
+            }
+          />
+        </Popconfirm>
+      </Flex>
+    </Flex>
+  );
 
   return (
     <>
       <Typography.Title level={2}>Genres</Typography.Title>
 
-      {/* Anything but the 409, which the field itself already explains. */}
-      {create.error && !isTaken(create.error) && (
+      <Flex wrap gap="small" className={spacing.gapBelow}>
+        <Input
+          aria-label="Search genres"
+          placeholder="Search genres"
+          allowClear
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <Select
+          aria-label="Filter genres"
+          value={usage}
+          options={USAGE_OPTIONS}
+          onChange={setUsage}
+        />
+        <IconButton
+          type="primary"
+          icon={<PlusOutlined />}
+          label="Add genre"
+          onClick={() => setFormMode({ kind: 'create', parentId: null })}
+        >
+          Add genre
+        </IconButton>
+      </Flex>
+
+      {remove.error && (
         <Alert
           type="error"
-          title={create.error.message}
+          title={remove.error.message}
           className={spacing.gapBelow}
         />
       )}
 
-      <Form<AddValues> form={form} layout="inline" onFinish={handleAdd}>
-        <Form.Item
-          name="name"
-          label="Genre name"
-          rules={[
-            { required: true, whitespace: true, message: 'Enter a name' },
-          ]}
-        >
-          {/* The server's own ceiling, imported rather than re-spelled. */}
-          <Input maxLength={GENRE_NAME_MAX_LENGTH} />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={create.isPending}>
-            Add genre
-          </Button>
-        </Form.Item>
-      </Form>
-
-      {/* Alphabetical with no sort here: GET /api/genres returns the list
-          sorted by name, and the client never reorders what a server ordered. */}
       {genres.isError ? (
         <Alert type="error" title="Could not load the genres." />
       ) : genres.isPending ? (
         <Skeleton active paragraph={{ rows: 4 }} />
-      ) : genres.data.items.length === 0 ? (
+      ) : items.length === 0 ? (
         <Empty description="No genres yet." />
+      ) : treeData.length === 0 ? (
+        <Empty description="No genres match." />
       ) : (
-        <Listy
-          items={genres.data.items}
-          rowKey="id"
-          itemRender={(genre) => <GenreRow genre={genre} />}
+        <Tree<GenreTreeData>
+          virtual={false}
+          blockNode
+          selectable={false}
+          treeData={treeData}
+          expandedKeys={expandedKeys}
+          onExpand={setExpanded}
+          titleRender={renderTitle}
+        />
+      )}
+
+      {formMode && (
+        <GenreFormModal
+          mode={formMode}
+          genres={items}
+          onClose={() => setFormMode(null)}
         />
       )}
     </>
-  );
-};
-
-// One row, with its own rename state: `draft` is null while the name is only
-// being shown, and the string being typed once Rename opens the editor.
-const GenreRow: FC<{ genre: GenreListItem }> = ({ genre }) => {
-  const { token } = theme.useToken();
-  const [draft, setDraft] = useState<string | null>(null);
-  const rename = useRenameGenre(genre.id);
-  const remove = useDeleteGenre(genre.id);
-  const renameTaken = rename.error !== null && isTaken(rename.error);
-  const renameErrorId = `genre-${genre.id}-rename-error`;
-
-  // Opening the editor, or backing out of it, leaves this row's mutations
-  // behind: without resetting them here, a 409 from a previous Save (or a
-  // failed Delete) would keep rendering under a row nobody is editing.
-  const handleRename = () => {
-    rename.reset();
-    remove.reset();
-    setDraft(genre.name);
-  };
-
-  const handleCancel = () => {
-    rename.reset();
-    remove.reset();
-    setDraft(null);
-  };
-
-  const handleSave = () => {
-    const name = (draft ?? '').trim();
-    if (name.length === 0 || name === genre.name) return;
-    rename.mutate({ name }, { onSuccess: () => setDraft(null) });
-  };
-
-  // `orientation`, not the deprecated `direction`, which antd 6 still accepts
-  // but warns about.
-  return (
-    <Space
-      orientation="vertical"
-      size={token.marginXXS}
-      className={styles.list}
-    >
-      {draft === null ? (
-        <Space wrap>
-          <Typography.Text>{genre.name}</Typography.Text>
-          <Button size="small" onClick={handleRename}>
-            Rename
-          </Button>
-          <Popconfirm
-            title={`Delete ${genre.name}?`}
-            description="Books and series in this genre will be left without one."
-            okText="Yes, delete"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => remove.mutate()}
-          >
-            <Button size="small" danger loading={remove.isPending}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </Space>
-      ) : (
-        <Space wrap>
-          <Input
-            aria-label={`New name for ${genre.name}`}
-            aria-invalid={renameTaken}
-            aria-describedby={renameTaken ? renameErrorId : undefined}
-            value={draft}
-            maxLength={GENRE_NAME_MAX_LENGTH}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <Button
-            type="primary"
-            size="small"
-            disabled={draft.trim().length === 0 || draft.trim() === genre.name}
-            loading={rename.isPending}
-            onClick={handleSave}
-          >
-            Save
-          </Button>
-          <Button size="small" onClick={handleCancel}>
-            Cancel
-          </Button>
-        </Space>
-      )}
-
-      {renameTaken && (
-        <Typography.Text id={renameErrorId} type="danger" role="alert">
-          {TAKEN}
-        </Typography.Text>
-      )}
-      {rename.error && !renameTaken && (
-        <Alert type="error" title={rename.error.message} />
-      )}
-      {remove.error && <Alert type="error" title={remove.error.message} />}
-    </Space>
   );
 };

@@ -3,7 +3,6 @@ import {
   deleteGenre,
   listGenreCounts,
   listGenres,
-  renameGenre,
   updateGenre,
 } from './genres';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
@@ -113,32 +112,6 @@ describe('createGenre', () => {
       name: 'ApiError',
       status: 409,
       message: 'A genre with that name already exists',
-    });
-  });
-});
-
-describe('renameGenre', () => {
-  it('patches the one genre named by the id', async () => {
-    const fetchMock = mockFetch({ id: 1, name: 'Gothic Revival' });
-
-    await expect(renameGenre(1, { name: 'Gothic Revival' })).resolves.toEqual({
-      id: 1,
-      name: 'Gothic Revival',
-    });
-
-    const [url, init] = callOf(fetchMock);
-    expect(url).toBe('/api/genres/1');
-    expect(init.method).toBe('PATCH');
-    expect(init.body).toBe('{"name":"Gothic Revival"}');
-    expect(init.headers).toEqual(jsonWrite);
-  });
-
-  it('rejects with the 404 of a genre that is gone', async () => {
-    mockFetch({ error: 'Genre 9 not found' }, 404);
-
-    await expect(renameGenre(9, { name: 'Horror' })).rejects.toMatchObject({
-      status: 404,
-      message: 'Genre 9 not found',
     });
   });
 });

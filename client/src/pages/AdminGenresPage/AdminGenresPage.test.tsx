@@ -1,9 +1,9 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AdminGenresPage } from './AdminGenresPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { genreItem, publicGenre } from '@/test/genres';
+import { adminGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
@@ -54,10 +54,22 @@ const renderPage = (session: PublicUser | null) => {
   );
 };
 
+const renderLoaded = async () => {
+  const view = renderPage(admin);
+  await screen.findByText('Mystery');
+  return view;
+};
+
 beforeEach(() => {
   jest.resetAllMocks();
-  mockedGenres.listGenres.mockResolvedValue({
-    items: [genreItem(1, 'Gothic'), genreItem(2, 'Hard SF')],
+  mockedGenres.listGenreCounts.mockResolvedValue({
+    items: [
+      adminGenre(1, 'Fantasy'),
+      adminGenre(2, 'Urban Fantasy', 1, 3, 1),
+      adminGenre(7, 'Epic', 1),
+      adminGenre(5, 'Mystery'),
+      adminGenre(6, 'Romance', null, 0, 4),
+    ],
   });
 });
 
@@ -67,7 +79,7 @@ describe('AdminGenresPage for everyone else', () => {
 
     await expectSentHome();
     expect(screen.queryByRole('heading', { name: 'Genres' })).toBeNull();
-    expect(mockedGenres.listGenres).not.toHaveBeenCalled();
+    expect(mockedGenres.listGenreCounts).not.toHaveBeenCalled();
   });
 
   it('sends an author, who keeps books rather than genres, home with a popup', async () => {
@@ -77,209 +89,153 @@ describe('AdminGenresPage for everyone else', () => {
     expect(
       await screen.findAllByText("You don't have access to this page.")
     ).toHaveLength(1);
-    expect(screen.queryByLabelText('Genre name')).toBeNull();
-    expect(mockedGenres.listGenres).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox', { name: 'Search genres' })).toBeNull();
+    expect(mockedGenres.listGenreCounts).not.toHaveBeenCalled();
   });
 });
 
 describe('AdminGenresPage for a moderator', () => {
-  it('lists every genre in the order the server sent', async () => {
-    renderPage(admin);
-
-    expect(await screen.findByText('Gothic')).toBeInTheDocument();
-    expect(screen.getByText('Hard SF')).toBeInTheDocument();
-  });
-
   it('serves a superadmin the same page', async () => {
     renderPage({ ...admin, role: 'superadmin' });
 
-    expect(await screen.findByText('Gothic')).toBeInTheDocument();
+    expect(await screen.findByText('Mystery')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Add genre' })
     ).toBeInTheDocument();
   });
 
-  it('adds a genre by name', async () => {
-    mockedGenres.createGenre.mockResolvedValue(publicGenre(5, 'Romance'));
-    renderPage(admin);
-
-    await userEvent.type(await screen.findByLabelText('Genre name'), 'Romance');
-    await userEvent.click(screen.getByRole('button', { name: 'Add genre' }));
-
-    await waitFor(() =>
-      expect(mockedGenres.createGenre).toHaveBeenCalledWith({
-        name: 'Romance',
-      })
+  it('shows each Genre with its counts, a parent with totals', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+    await user.click(
+      document.querySelector<HTMLElement>('.ant-tree-switcher')!
     );
+
+    expect(await screen.findByText('Urban Fantasy')).toBeInTheDocument();
+    expect(screen.getAllByText('3 books, 1 series')).toHaveLength(2);
+    expect(screen.getByText('Mystery')).toBeInTheDocument();
+    expect(screen.getAllByText('No works')).toHaveLength(2);
   });
 
-  it('refuses to add a blank name without asking the server', async () => {
-    renderPage(admin);
+  it('filters by the search box and shows the empty state', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
 
-    await screen.findByLabelText('Genre name');
-    await userEvent.click(screen.getByRole('button', { name: 'Add genre' }));
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search genres' }),
+      'zzz'
+    );
 
-    expect(await screen.findByText('Enter a name')).toBeInTheDocument();
-    expect(mockedGenres.createGenre).not.toHaveBeenCalled();
+    expect(await screen.findByText('No genres match.')).toBeInTheDocument();
   });
 
-  it('caps the name at the length the server accepts', async () => {
-    renderPage(admin);
+  it('expands matching parents while a query is typed', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
 
-    expect(await screen.findByLabelText('Genre name')).toHaveAttribute(
-      'maxlength',
-      '50'
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search genres' }),
+      'urban'
     );
+
+    expect(await screen.findByText('Urban Fantasy')).toBeInTheDocument();
+    expect(screen.queryByText('Epic')).toBeNull();
   });
 
-  it('shows a 409 beside the field that caused it', async () => {
-    mockedGenres.createGenre.mockRejectedValue(
-      new ApiError(409, 'A genre with that name already exists')
-    );
-    renderPage(admin);
+  it('filters by usage through the select', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
 
-    await userEvent.type(await screen.findByLabelText('Genre name'), 'gothic');
-    await userEvent.click(screen.getByRole('button', { name: 'Add genre' }));
+    await user.click(screen.getByRole('combobox', { name: 'Filter genres' }));
+    await user.click(await screen.findByTitle('Has series'));
+
+    await waitFor(() => expect(screen.queryByText('Mystery')).toBeNull());
+    expect(screen.getByText('Romance')).toBeInTheDocument();
+    expect(screen.getByText('Fantasy')).toBeInTheDocument();
+  });
+
+  it('opens the create form from the toolbar and from a top-level row', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+    await user.click(
+      document.querySelector<HTMLElement>('.ant-tree-switcher')!
+    );
+    await screen.findByText('Urban Fantasy');
 
     expect(
-      await screen.findByText('A genre with that name already exists.')
-    ).toBeInTheDocument();
-  });
-
-  it('renames a genre in place', async () => {
-    mockedGenres.renameGenre.mockResolvedValue(
-      publicGenre(1, 'Gothic Revival')
-    );
-    renderPage(admin);
-
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Rename' })[0]!
-    );
-
-    const input = screen.getByLabelText('New name for Gothic');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Gothic Revival');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() =>
-      expect(mockedGenres.renameGenre).toHaveBeenCalledWith(1, {
-        name: 'Gothic Revival',
-      })
-    );
-  });
-
-  it('cancels a rename without saving it', async () => {
-    renderPage(admin);
-
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Rename' })[0]!
-    );
-    const input = screen.getByLabelText('New name for Gothic');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Something else');
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(screen.getByText('Gothic')).toBeInTheDocument();
-    expect(screen.queryByLabelText('New name for Gothic')).toBeNull();
-    expect(mockedGenres.renameGenre).not.toHaveBeenCalled();
-  });
-
-  it('shows a rename 409 beside the field that caused it', async () => {
-    mockedGenres.renameGenre.mockRejectedValue(
-      new ApiError(409, 'A genre with that name already exists')
-    );
-    renderPage(admin);
-
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Rename' })[0]!
-    );
-    const input = screen.getByLabelText('New name for Gothic');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Hard SF');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(
-      await screen.findByText('A genre with that name already exists.')
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText('New name for Gothic')).toHaveValue('Hard SF');
-  });
-
-  it('clears a stale rename error on cancel and on reopening the editor', async () => {
-    mockedGenres.renameGenre.mockRejectedValue(
-      new ApiError(409, 'A genre with that name already exists')
-    );
-    renderPage(admin);
-
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Rename' })[0]!
-    );
-    const input = screen.getByLabelText('New name for Gothic');
-    await userEvent.clear(input);
-    await userEvent.type(input, 'Hard SF');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await screen.findByText('A genre with that name already exists.');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(
-      screen.queryByText('A genre with that name already exists.')
+      screen.queryByRole('button', { name: 'Add subgenre to Urban Fantasy' })
     ).toBeNull();
 
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Rename' })[0]!
-    );
+    await user.click(screen.getByRole('button', { name: 'Add genre' }));
+    // The Select on the page and the one in the dialog share antd's test id,
+    // so the dialog's accessible name does not resolve: match its title text.
+    let dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Add genre')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
-    expect(
-      screen.queryByText('A genre with that name already exists.')
-    ).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: 'Add subgenre to Fantasy' })
+    );
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Add subgenre')).toBeInTheDocument();
+    expect(within(dialog).getByText('Fantasy')).toBeInTheDocument();
   });
 
-  it('deletes behind a confirmation that warns about the works', async () => {
+  it('opens the edit form with the Genre filled', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByRole('button', { name: 'Edit Mystery' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Edit genre')).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('textbox', { name: 'Genre name' })
+    ).toHaveValue('Mystery');
+  });
+
+  it('deletes after the confirm', async () => {
     mockedGenres.deleteGenre.mockResolvedValue(undefined);
-    renderPage(admin);
+    const user = userEvent.setup();
+    await renderLoaded();
 
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Delete' })[0]!
+    await user.click(screen.getByRole('button', { name: 'Delete Mystery' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Yes, delete' })
     );
 
-    expect(
-      await screen.findByText(
-        'Books and series in this genre will be left without one.'
-      )
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
-
     await waitFor(() =>
-      expect(mockedGenres.deleteGenre).toHaveBeenCalledWith(1)
+      expect(mockedGenres.deleteGenre).toHaveBeenCalledWith(5)
     );
   });
 
-  it('reports a failure to delete', async () => {
-    mockedGenres.deleteGenre.mockRejectedValue(
-      new ApiError(500, 'Internal Server Error')
-    );
-    renderPage(admin);
+  it('disables Delete for a Genre with Subgenres', async () => {
+    await renderLoaded();
 
-    await screen.findByText('Gothic');
-    await userEvent.click(
-      screen.getAllByRole('button', { name: 'Delete' })[0]!
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Yes, delete' }));
+    expect(
+      screen.getByRole('button', {
+        name: 'Cannot delete Fantasy: it has subgenres',
+      })
+    ).toBeDisabled();
+  });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Internal Server Error'
+  it('shows a delete error in an Alert and keeps the row', async () => {
+    mockedGenres.deleteGenre.mockRejectedValue(new ApiError(409, 'In use'));
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByRole('button', { name: 'Delete Mystery' }));
+    await user.click(
+      await screen.findByRole('button', { name: 'Yes, delete' })
     );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('In use');
+    expect(screen.getByText('Mystery')).toBeInTheDocument();
   });
 
   it('reports a failure to load the list', async () => {
-    mockedGenres.listGenres.mockRejectedValue(new Error('Network down'));
+    mockedGenres.listGenreCounts.mockRejectedValue(new Error('Network down'));
     renderPage(admin);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -288,7 +244,7 @@ describe('AdminGenresPage for a moderator', () => {
   });
 
   it('shows an empty state when there are no genres yet', async () => {
-    mockedGenres.listGenres.mockResolvedValue({ items: [] });
+    mockedGenres.listGenreCounts.mockResolvedValue({ items: [] });
     renderPage(admin);
 
     expect(await screen.findByText('No genres yet.')).toBeInTheDocument();

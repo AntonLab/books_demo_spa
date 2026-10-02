@@ -4,7 +4,6 @@ import {
   deleteGenre,
   listGenreCounts,
   listGenres,
-  renameGenre,
   updateGenre,
 } from '../api/genres';
 import type { GenrePayload, GenreUpdatePayload } from 'shared';
@@ -59,16 +58,11 @@ const useGenreMutation = <TVariables, TResult>(
 export const useCreateGenre = () =>
   useGenreMutation((payload: GenrePayload) => createGenre(payload));
 
-export const useRenameGenre = (id: number) =>
-  useGenreMutation((payload: GenrePayload) => renameGenre(id, payload));
-
 export const useUpdateGenre = () =>
   useGenreMutation(
     ({ id, payload }: { id: number; payload: GenreUpdatePayload }) =>
       updateGenre(id, payload)
   );
 
-// Explicitly `<void, void>` so the caller writes `mutate()` rather than
-// `mutate(undefined)`: there is nothing to send.
-export const useDeleteGenre = (id: number) =>
-  useGenreMutation<void, void>(() => deleteGenre(id));
+export const useDeleteGenre = () =>
+  useGenreMutation((id: number) => deleteGenre(id));

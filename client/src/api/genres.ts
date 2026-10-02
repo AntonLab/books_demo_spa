@@ -31,18 +31,6 @@ export const createGenre = (payload: GenrePayload): Promise<PublicGenre> => {
   return request<PublicGenre>('/genres', { method: 'POST', body: payload });
 };
 
-// A rename is the only update a Genre has: the server answers 409 when another
-// Genre already holds the name, case-insensitively.
-export const renameGenre = (
-  id: number,
-  payload: GenrePayload
-): Promise<PublicGenre> => {
-  return request<PublicGenre>(`/genres/${id}`, {
-    method: 'PATCH',
-    body: payload,
-  });
-};
-
 // Renames, moves, promotes (`parentId: null`) or demotes a Genre; the body
 // carries only the fields that change. The server answers 409 when a sibling
 // already holds the name, case-insensitively.

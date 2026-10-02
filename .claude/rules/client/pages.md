@@ -54,6 +54,12 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
   the section has loaded more than six.
+- `AdminGenresPage` is a two-level `Tree` of the counts list, with a search box,
+  a usage filter and per-row Add subgenre / Edit / Delete (`GenreFormModal`;
+  there is no rename in place). A top-level row shows its own works plus its
+  Subgenres'; the totals and the Delete lock (a Genre with Subgenres cannot be
+  deleted) read the unfiltered tree, so a filter never changes them. A typed
+  query expands every shown parent.
 - Pages that gate on Role (`AdminGenresPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.

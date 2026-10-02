@@ -7,7 +7,6 @@ import {
   useGenres,
   useGenresCounts,
   useGenresWithBooks,
-  useRenameGenre,
   useUpdateGenre,
 } from './genres';
 import { queryKeys } from './keys';
@@ -140,41 +139,16 @@ describe('useCreateGenre', () => {
   });
 });
 
-describe('useRenameGenre', () => {
-  it('renames the one id and invalidates all three caches', async () => {
-    mockedGenres.renameGenre.mockResolvedValue(
-      publicGenre(1, 'Gothic Revival')
-    );
-    const client = createTestQueryClient();
-    const invalidate = jest.spyOn(client, 'invalidateQueries');
-
-    const { result } = renderHook(() => useRenameGenre(1), {
-      wrapper: wrapper(client),
-    });
-    result.current.mutate({ name: 'Gothic Revival' });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedGenres.renameGenre).toHaveBeenCalledWith(1, {
-      name: 'Gothic Revival',
-    });
-    // A rename changes the `genre` embedded in every book and series a list
-    // already holds, which is why books and series go too.
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['genres'] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
-  });
-});
-
 describe('useDeleteGenre', () => {
-  it('deletes the one id and invalidates all three caches', async () => {
+  it('deletes the id it is given and invalidates all three caches', async () => {
     mockedGenres.deleteGenre.mockResolvedValue(undefined);
     const client = createTestQueryClient();
     const invalidate = jest.spyOn(client, 'invalidateQueries');
 
-    const { result } = renderHook(() => useDeleteGenre(1), {
+    const { result } = renderHook(() => useDeleteGenre(), {
       wrapper: wrapper(client),
     });
-    result.current.mutate();
+    result.current.mutate(1);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedGenres.deleteGenre).toHaveBeenCalledWith(1);
