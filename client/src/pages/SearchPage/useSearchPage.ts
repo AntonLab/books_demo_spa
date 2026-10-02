@@ -23,7 +23,11 @@ export type SearchBooks = ReturnType<typeof useBookSearch>;
 // therefore carry no `books` at all.
 export type SearchResults =
   | { status: 'genre-loading' | 'genre-error' | 'genre-gone' }
-  | { status: 'ready'; books: SearchBooks; goToPage: (page: number) => void };
+  | {
+      status: 'ready';
+      books: SearchBooks;
+      goToPage: (page: number, pageSize: number) => void;
+    };
 
 export interface SearchPageState {
   filterCount: number;
@@ -81,8 +85,8 @@ export const useSearchPage = (): SearchPageState => {
     ? {
         status: 'ready',
         books,
-        goToPage: (page) =>
-          setSearchParams(toSearchParams({ ...search, page })),
+        goToPage: (page, pageSize) =>
+          setSearchParams(toSearchParams({ ...search, page, pageSize })),
       }
     : genres.isPending
       ? { status: 'genre-loading' }
@@ -98,7 +102,13 @@ export const useSearchPage = (): SearchPageState => {
       key: `${searchParams.toString()}|${genre?.id ?? ''}`,
       initialValues: formValuesOf(search, genre?.id),
       fieldErrors,
-      onSearch: (values) => setSearchParams(toSearchParams(searchOf(values))),
+      onSearch: (values) =>
+        setSearchParams(
+          toSearchParams({
+            ...searchOf(values),
+            pageSize: search.pageSize,
+          })
+        ),
       onReset: () => setSearchParams({}),
     },
     results,

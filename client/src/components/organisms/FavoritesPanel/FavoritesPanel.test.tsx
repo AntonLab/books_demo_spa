@@ -163,6 +163,25 @@ describe('FavoritesPanel', () => {
     );
   });
 
+  it('asks for the new size, from the first page, when the size changes', async () => {
+    mockedFavorites.listFavoriteBooks.mockResolvedValue(
+      page([favoriteBook(50, book(1, 'A Tale of Dragons'))], 145)
+    );
+
+    renderPage();
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+    await userEvent.click(screen.getByTitle('3'));
+    await userEvent.click(screen.getByRole('combobox'));
+    await userEvent.click(await screen.findByTitle('50 / page'));
+
+    await waitFor(() =>
+      expect(mockedFavorites.listFavoriteBooks).toHaveBeenLastCalledWith({
+        limit: 50,
+        offset: 0,
+      })
+    );
+  });
+
   it('steps back a page when the last row of the last page is removed', async () => {
     const lonely = favoriteBook(90, book(41, 'The Last One'));
     const secondPage = page(

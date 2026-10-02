@@ -4,7 +4,7 @@ import type { ListBooksParams } from '../api/books';
 import type { BookSort, SearchableBookStatus } from 'shared';
 import { BOOK_SORTS, SEARCHABLE_BOOK_STATUSES } from 'shared';
 
-const SEARCH_PAGE_SIZE = 20;
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../constants/pagination';
 
 const TEXT_KEYS = ['q', 'author', 'seriesTitle'] as const;
 // A picked suggestion's id beside the text it filled in: the server filters by
@@ -38,6 +38,7 @@ export interface BookSearch {
   updatedTo?: string;
   sort: BookSort;
   page: number;
+  pageSize: number;
 }
 
 // What the antd form holds: pickers take Dayjs, the Genre select an id.
@@ -80,7 +81,11 @@ const idOf = (value: string | null): number | undefined =>
 // day, a page below 2, an id without its text — reads as empty. `?series=` is
 // not read at all.
 export const parseBookSearch = (params: URLSearchParams): BookSearch => {
-  const search: BookSearch = { sort: 'popular', page: 1 };
+  const search: BookSearch = {
+    sort: 'popular',
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  };
   for (const key of TEXT_KEYS) {
     const value = params.get(key)?.trim();
     if (value) search[key] = value;
@@ -103,6 +108,10 @@ export const parseBookSearch = (params: URLSearchParams): BookSearch => {
   if (isOneOf(BOOK_SORTS, sort)) search.sort = sort;
   const page = Number(params.get('page'));
   if (Number.isInteger(page) && page > 1) search.page = page;
+  const pageSize = Number(params.get('pageSize'));
+  if ((PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)) {
+    search.pageSize = pageSize;
+  }
   return search;
 };
 
@@ -120,6 +129,9 @@ export const toSearchParams = (search: BookSearch): URLSearchParams => {
   }
   if (search.sort !== 'popular') params.set('sort', search.sort);
   if (search.page > 1) params.set('page', String(search.page));
+  if (search.pageSize !== DEFAULT_PAGE_SIZE) {
+    params.set('pageSize', String(search.pageSize));
+  }
   return params;
 };
 
@@ -131,6 +143,7 @@ export const searchPath = (search: Partial<BookSearch>): string => {
     ...search,
     sort: search.sort ?? 'popular',
     page: search.page ?? 1,
+    pageSize: search.pageSize ?? DEFAULT_PAGE_SIZE,
   })
     .toString()
     .replace(/\+/g, '%20');
@@ -142,7 +155,11 @@ export const searchPath = (search: Partial<BookSearch>): string => {
 // searchPath. Tested through that hook.
 // Every Search starts at page 1.
 export const searchOf = (values: BookSearchFormValues): BookSearch => {
-  const search: BookSearch = { sort: values.sort, page: 1 };
+  const search: BookSearch = {
+    sort: values.sort,
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  };
   for (const key of TEXT_KEYS) {
     const value = values[key]?.trim();
     if (value) search[key] = value;
@@ -213,7 +230,7 @@ export const listParamsOf = (
   updatedTo: endOf(search.updatedTo),
   sort: search.sort,
   current: search.page,
-  pageSize: SEARCH_PAGE_SIZE,
+  pageSize: search.pageSize,
 });
 
 // The filters set, for the collapsed form's header. A range counts once,

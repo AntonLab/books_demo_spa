@@ -1,5 +1,6 @@
 import { useRef, useState, type FC } from 'react';
-import { Alert, Empty, Flex, Pagination, Skeleton, Typography } from 'antd';
+import { Alert, Empty, Flex, Skeleton, Typography } from 'antd';
+import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { SortOrderSwitch } from '@/components/molecules/SortOrderSwitch/SortOrderSwitch';
@@ -94,14 +95,11 @@ export const SearchPage: FC = () => {
             emptyText="No books match this search."
           />
           {results.books.data !== undefined && (
-            <Pagination
+            <ListPagination
               className={styles.pagination}
-              align="center"
               current={results.books.data.current}
               pageSize={results.books.data.pageSize}
               total={results.books.data.total}
-              showSizeChanger={false}
-              hideOnSinglePage
               onChange={results.goToPage}
             />
           )}

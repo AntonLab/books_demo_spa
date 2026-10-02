@@ -13,7 +13,7 @@ const parse = (query: string) => parseBookSearch(new URLSearchParams(query));
 
 describe('parseBookSearch', () => {
   it('starts from the whole catalogue: popular, page 1', () => {
-    expect(parse('')).toEqual({ sort: 'popular', page: 1 });
+    expect(parse('')).toEqual({ sort: 'popular', page: 1, pageSize: 20 });
   });
 
   it('reads every field, trimming text and dropping blanks', () => {
@@ -34,6 +34,7 @@ describe('parseBookSearch', () => {
       updatedTo: '2026-02-02',
       sort: 'new',
       page: 3,
+      pageSize: 20,
     });
   });
 
@@ -42,13 +43,17 @@ describe('parseBookSearch', () => {
       parse(
         'status=draft&sort=oldest&releasedFrom=2026-02-30&updatedTo=yesterday&page=0'
       )
-    ).toEqual({ sort: 'popular', page: 1 });
+    ).toEqual({ sort: 'popular', page: 1, pageSize: 20 });
     expect(parse('page=abc').page).toBe(1);
     expect(parse('page=2.5').page).toBe(1);
   });
 
   it('ignores ?series=', () => {
-    expect(parse('series=12')).toEqual({ sort: 'popular', page: 1 });
+    expect(parse('series=12')).toEqual({
+      sort: 'popular',
+      page: 1,
+      pageSize: 20,
+    });
   });
 });
 
@@ -75,6 +80,7 @@ describe('picked author and series ids', () => {
       seriesId: 2,
       sort: 'popular',
       page: 1,
+      pageSize: 50,
     };
 
     expect(parseBookSearch(toSearchParams(search))).toEqual(search);
@@ -83,7 +89,9 @@ describe('picked author and series ids', () => {
 
 describe('toSearchParams', () => {
   it('writes only what is set, leaving out the default sort and page 1', () => {
-    expect(toSearchParams({ sort: 'popular', page: 1 }).toString()).toBe('');
+    expect(
+      toSearchParams({ sort: 'popular', page: 1, pageSize: 20 }).toString()
+    ).toBe('');
     expect(
       toSearchParams({
         q: 'dragon',
@@ -92,6 +100,7 @@ describe('toSearchParams', () => {
         releasedFrom: '2026-01-05',
         sort: 'updated',
         page: 2,
+        pageSize: 20,
       }).toString()
     ).toBe(
       'q=dragon&author=ann&genre=4&releasedFrom=2026-01-05&sort=updated&page=2'
@@ -106,6 +115,7 @@ describe('toSearchParams', () => {
       updatedTo: '2026-03-01',
       sort: 'new',
       page: 4,
+      pageSize: 100,
     };
     expect(parseBookSearch(toSearchParams(search))).toEqual(search);
   });

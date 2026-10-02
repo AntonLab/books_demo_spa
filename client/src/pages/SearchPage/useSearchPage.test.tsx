@@ -98,6 +98,26 @@ describe('useSearchPage reading the URL', () => {
     );
   });
 
+  it('asks for the page size the URL names', async () => {
+    const { page } = renderSearchPage('/search?pageSize=50');
+    await whenLoaded(page);
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      sort: 'popular',
+      current: 1,
+      pageSize: 50,
+    });
+  });
+
+  it('treats a page size outside the options as 20', async () => {
+    const { page } = renderSearchPage('/search?pageSize=7');
+    await whenLoaded(page);
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      sort: 'popular',
+      current: 1,
+      pageSize: 20,
+    });
+  });
+
   it('fills the form and the request from every field, days as instants', async () => {
     const { page } = renderSearchPage(
       '/search?q=dragon&status=complete&author=ann&seriesTitle=ash' +
@@ -307,9 +327,18 @@ describe('useSearchPage writing the URL', () => {
     const { page, location } = renderSearchPage('/search?q=dragon');
     await whenLoaded(page);
 
-    act(() => ready(page().results).goToPage(2));
+    act(() => ready(page().results).goToPage(2, 20));
 
     expect(location()).toBe('/search?q=dragon&page=2');
+  });
+
+  it('writes a changed page size to the URL', async () => {
+    const { page, location } = renderSearchPage('/search?q=dragon&page=3');
+    await whenLoaded(page);
+
+    act(() => ready(page().results).goToPage(1, 50));
+
+    expect(location()).toBe('/search?q=dragon&pageSize=50');
   });
 });
 

@@ -78,7 +78,7 @@ describe('useToggleFavorite', () => {
 });
 
 describe('useFavoriteBooks', () => {
-  it('asks for the page it is given, twenty at a time', async () => {
+  it('asks for the page and size it is given', async () => {
     mockedFavorites.listFavoriteBooks.mockResolvedValue({
       items: [],
       total: 41,
@@ -86,7 +86,7 @@ describe('useFavoriteBooks', () => {
       offset: 40,
     });
 
-    const { result } = renderHookWithProviders(() => useFavoriteBooks(3));
+    const { result } = renderHookWithProviders(() => useFavoriteBooks(3, 20));
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedFavorites.listFavoriteBooks).toHaveBeenCalledWith({
