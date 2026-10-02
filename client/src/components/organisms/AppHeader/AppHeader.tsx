@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FC } from 'react';
 import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useSession } from '@/queries/auth';
@@ -107,17 +108,17 @@ export const AppHeader: FC = () => {
       {/* Offered to everyone, Guests included: a Device preference belongs
           to the device, not to an Account. The header itself stays dark in
           both themes. */}
-      <Button
+      <IconButton
         type="text"
         className={styles.onDark}
-        aria-label={
+        label={
           theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme'
         }
         onClick={() => dispatch(devicePreferences.themeToggled())}
       >
         {/* The label carries the meaning, so the glyph is decorative. */}
         <span aria-hidden="true">{theme === 'light' ? '☾' : '☀'}</span>
-      </Button>
+      </IconButton>
 
       {session.isPending ? (
         // Not "Log in": showing it here would flash a logged-out header at a

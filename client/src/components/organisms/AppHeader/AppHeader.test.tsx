@@ -529,7 +529,9 @@ describe('AppHeader notification stream', () => {
     act(() => {
       first.emit(NOTIFICATION_STREAM_EVENT, pushed);
     });
-    expect(await screen.findByText('New notification')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Open' })
+    ).toBeInTheDocument();
 
     act(() => {
       queryClient.setQueryData(queryKeys.session, {
@@ -543,7 +545,7 @@ describe('AppHeader notification stream', () => {
     expect(first.readyState).toBe(FakeEventSource.CLOSED);
     expect(FakeEventSource.latest()).not.toBe(first);
     await waitFor(() =>
-      expect(screen.queryByText('New notification')).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Open' })).toBeNull()
     );
   });
 });

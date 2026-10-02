@@ -1,7 +1,8 @@
 import type { FC, ReactNode } from 'react';
-import { Button, Space, Tooltip } from 'antd';
+import { Space } from 'antd';
 import type { ColProps } from 'antd';
 import { AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { TILE_COLUMNS } from '@/components/organisms/CardList/CardList';
 import {
   devicePreferences,
@@ -32,17 +33,16 @@ export const ResultsLayoutSwitch: FC = () => {
   return (
     <Space.Compact role="group" aria-label="Results layout">
       {OPTIONS.map(({ value, label, icon }) => (
-        <Tooltip key={value} title={label}>
-          <Button
-            aria-label={label}
-            aria-pressed={layout === value}
-            type={layout === value ? 'primary' : 'default'}
-            icon={icon}
-            onClick={() =>
-              dispatch(devicePreferences.resultsLayoutChanged(value))
-            }
-          />
-        </Tooltip>
+        <IconButton
+          key={value}
+          label={label}
+          aria-pressed={layout === value}
+          type={layout === value ? 'primary' : 'default'}
+          icon={icon}
+          onClick={() =>
+            dispatch(devicePreferences.resultsLayoutChanged(value))
+          }
+        />
       ))}
     </Space.Compact>
   );

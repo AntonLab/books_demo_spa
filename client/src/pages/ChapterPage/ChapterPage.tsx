@@ -8,7 +8,6 @@ import {
   Flex,
   Skeleton,
   theme,
-  Tooltip,
   Typography,
 } from 'antd';
 import type { ThemeConfig } from 'antd';
@@ -20,6 +19,7 @@ import {
   ReadOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
 import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
 import { useBook } from '@/queries/books';
@@ -82,8 +82,8 @@ const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
 
   if (target === undefined) {
     return (
-      <Button
-        aria-label={label}
+      <IconButton
+        label={label}
         icon={ARROW_ICONS[direction]}
         size={size}
         disabled
@@ -92,8 +92,8 @@ const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
   }
   const href = chapterPath(target);
   return (
-    <Button
-      aria-label={label}
+    <IconButton
+      label={label}
       icon={ARROW_ICONS[direction]}
       size={size}
       href={href}
@@ -219,8 +219,8 @@ export const ChapterPage: FC = () => {
     }
     const turnsPage = hasPage(direction);
     return (
-      <Button
-        aria-label={arrowLabel(direction, turnsPage, target)}
+      <IconButton
+        label={arrowLabel(direction, turnsPage, target)}
         icon={ARROW_ICONS[direction]}
         size={size}
         disabled={!turnsPage && target === undefined}
@@ -243,19 +243,17 @@ export const ChapterPage: FC = () => {
             Contents
           </Button>
           {/* The icon shows the layout the button switches to. */}
-          <Tooltip title={toggleLabel}>
-            <Button
-              aria-label={toggleLabel}
-              icon={pagesOn ? <ColumnHeightOutlined /> : <ReadOutlined />}
-              onClick={() =>
-                dispatch(
-                  devicePreferences.readingChanged({
-                    layout: pagesOn ? 'scroll' : 'pages',
-                  })
-                )
-              }
-            />
-          </Tooltip>
+          <IconButton
+            label={toggleLabel}
+            icon={pagesOn ? <ColumnHeightOutlined /> : <ReadOutlined />}
+            onClick={() =>
+              dispatch(
+                devicePreferences.readingChanged({
+                  layout: pagesOn ? 'scroll' : 'pages',
+                })
+              )
+            }
+          />
           <ReadingPreferences onOpenChange={setPreferencesOpen} />
         </Flex>
         {arrow('next')}

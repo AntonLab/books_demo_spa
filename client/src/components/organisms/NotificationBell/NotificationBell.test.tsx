@@ -569,10 +569,14 @@ describe('NotificationBell live toasts', () => {
 
     push(newChapter({}));
 
-    expect(await screen.findByText('New notification')).toBeInTheDocument();
-    expect(
-      sentence('New chapter in the book “The Glass Harbour”: “The Tide Bell”.')
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        sentence(
+          'New chapter in the book “The Glass Harbour”: “The Tide Bell”.'
+        )
+      ).toBeInTheDocument()
+    );
+    expect(screen.queryByText('New notification')).toBeNull();
     // The badge learns of it at once, not at the next 60 s poll.
     await waitFor(() =>
       expect(mockedNotifications.listNotifications).toHaveBeenCalledTimes(2)
@@ -588,7 +592,7 @@ describe('NotificationBell live toasts', () => {
   it('updates the one toast when a New chapter grows, instead of stacking another', async () => {
     renderWithProviders(<NotificationBell userId={3} />);
     push(newChapter({}));
-    await screen.findByText('New notification');
+    await screen.findByRole('button', { name: 'Open' });
 
     // The pass merges a second Chapter into the same unread Notification and
     // pushes it again under the same id.
@@ -601,7 +605,7 @@ describe('NotificationBell live toasts', () => {
         )
       ).toBeInTheDocument()
     );
-    expect(screen.getAllByText('New notification')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1);
   });
 
   it('toasts the credit kinds too, and offers no Open for a work that is gone', async () => {
@@ -609,19 +613,22 @@ describe('NotificationBell live toasts', () => {
 
     push(notification({}));
 
-    expect(await screen.findByText('New notification')).toBeInTheDocument();
-    expect(
-      sentence(
-        'Margaret Hale added you as a co-author of the book “The Glass Harbour”.'
-      )
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        sentence(
+          'Margaret Hale added you as a co-author of the book “The Glass Harbour”.'
+        )
+      ).toBeInTheDocument()
+    );
 
     push(
       notification({ id: 2, work: { type: 'book', id: null, title: 'Gone' } })
     );
 
     await waitFor(() =>
-      expect(screen.getAllByText('New notification')).toHaveLength(2)
+      expect(
+        sentence('Margaret Hale added you as a co-author of the book “Gone”.')
+      ).toBeInTheDocument()
     );
     expect(screen.getAllByRole('button', { name: 'Open' })).toHaveLength(1);
   });
