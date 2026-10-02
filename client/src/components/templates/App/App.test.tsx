@@ -46,7 +46,6 @@ const LAZY_PAGES = [
   'BookPage',
   'ChapterPage',
   'EditChapterPage',
-  'EditSeriesPage',
   'MainPage',
   'NewChapterPage',
   'NotFoundPage',
@@ -228,12 +227,13 @@ describe('AppShell routing', () => {
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('guards EditSeriesPage at /series/:id/edit', async () => {
+  it('renders the not-found page at the removed /series/:id/edit', async () => {
     renderWithProviders(<AppShell />, { route: '/series/12/edit' });
 
     expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
+      await screen.findByRole('heading', { name: 'Page not found' })
     ).toBeInTheDocument();
+    expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
   it('renders the not-found page at a bare /series', async () => {

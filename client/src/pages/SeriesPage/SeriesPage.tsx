@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import { Alert, Button, Empty, Flex, Skeleton } from 'antd';
 import { useNavigate, useParams } from 'react-router';
@@ -10,6 +11,7 @@ import {
   ResultsLayoutSwitch,
 } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
+import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import { useSession } from '@/queries/auth';
 import { seriesCapabilities } from '@/types/capabilities';
 import { useBooksInSeries } from '@/queries/books';
@@ -36,6 +38,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   const series = useSeries(seriesId);
   const { data: session } = useSession();
   const toggleFavorite = useToggleFavorite(queryKeys.seriesDetail(seriesId));
+  const [editing, setEditing] = useState(false);
 
   if (series.isError) {
     // A link from a book page outlives the series it names.
@@ -48,7 +51,10 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
-  const { mayEdit, mayFavorite } = seriesCapabilities(series.data, session);
+  const { isCoAuthor, mayEdit, mayFavorite } = seriesCapabilities(
+    series.data,
+    session
+  );
 
   return (
     <>
@@ -70,12 +76,17 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
           />
         )}
         {mayEdit && (
-          <Button onClick={() => void navigate(`/series/${seriesId}/edit`)}>
-            Edit series
-          </Button>
+          <Button onClick={() => setEditing(true)}>Edit series</Button>
         )}
         <ResultsLayoutSwitch />
       </Flex>
+      {editing && (
+        <SeriesEditDetailsModal
+          seriesId={seriesId}
+          onClose={() => setEditing(false)}
+          onGone={() => void navigate(isCoAuthor ? '/profile/my-books' : '/')}
+        />
+      )}
       {/* Mounted only once the series has loaded, so a missing one asks for
           no books. */}
       <SeriesBooks seriesId={seriesId} />

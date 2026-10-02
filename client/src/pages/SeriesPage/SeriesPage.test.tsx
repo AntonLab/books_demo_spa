@@ -7,17 +7,21 @@ import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import * as favoritesApi from '@/api/favorites';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
+jest.mock('@/api/authors');
 jest.mock('@/api/books');
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 jest.mock('@/api/favorites');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
 
@@ -75,7 +79,8 @@ const renderPage = (
   return renderWithProviders(
     <Routes>
       <Route path="/series/:id" element={<SeriesPage />} />
-      <Route path="/series/:id/edit" element={<p>Series editor</p>} />
+      <Route path="/" element={<p>Home</p>} />
+      <Route path="/profile/my-books" element={<p>My works</p>} />
     </Routes>,
     { route, queryClient }
   );
@@ -83,6 +88,8 @@ const renderPage = (
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
+  mockedSeries.listSeriesBooks.mockResolvedValue({ items: [] });
 });
 
 describe('SeriesPage', () => {
@@ -186,7 +193,7 @@ describe('SeriesPage', () => {
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
-  it('offers a co-author the editor', async () => {
+  it('opens the Series edit modal for a co-author, over the page', async () => {
     mockedSeries.getSeries.mockResolvedValue(series);
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
@@ -194,13 +201,42 @@ describe('SeriesPage', () => {
       current: 1,
       pageSize: 100,
     });
-
     renderPage('/series/12', account());
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Edit series' })
     );
-    expect(await screen.findByText('Series editor')).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit series' })
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['a co-author goes to My works', account(), 'My works'],
+    ['a moderator goes home', account({ id: 50, role: 'admin' }), 'Home'],
+  ])('after delete, %s', async (_name, session, landing) => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+    mockedSeries.deleteSeries.mockResolvedValue(undefined);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 100,
+    });
+    renderPage('/series/12', session);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit series' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete series' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(await screen.findByText(landing)).toBeInTheDocument();
   });
 
   it('offers a moderator the editor too, and nobody else', async () => {

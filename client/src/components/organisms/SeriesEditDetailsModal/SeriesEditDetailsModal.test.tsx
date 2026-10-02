@@ -9,6 +9,7 @@ import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
+jest.mock('@/api/authors');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
@@ -50,12 +51,13 @@ const author: PublicUser = {
 };
 
 const onClose = jest.fn();
+const onGone = jest.fn();
 
 const renderModal = (session: PublicUser = author) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
   return renderWithProviders(
-    <SeriesEditDetailsModal seriesId={12} onClose={onClose} />,
+    <SeriesEditDetailsModal seriesId={12} onClose={onClose} onGone={onGone} />,
     { queryClient }
   );
 };
@@ -65,6 +67,7 @@ beforeEach(() => {
   mockedGenres.listGenres.mockResolvedValue({
     items: [genreItem(4, 'Gothic')],
   });
+  mockedSeries.listSeriesBooks.mockResolvedValue({ items: [] });
 });
 
 describe('SeriesEditDetailsModal', () => {
@@ -179,5 +182,96 @@ describe('SeriesEditDetailsModal', () => {
       await screen.findByText('Only its co-authors can edit this series.')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+});
+
+describe('SeriesEditDetailsModal tabs', () => {
+  beforeEach(() => mockedSeries.getSeries.mockResolvedValue(series));
+
+  it('opens on Details with the form, Co-authors and Delete series', async () => {
+    renderModal();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit series' })
+    ).toBeInTheDocument();
+    expect(
+      (await screen.findAllByRole('tab')).map((tab) => tab.textContent)
+    ).toEqual(['Details', 'Books']);
+    expect(await screen.findByLabelText('Title')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Co-authors' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Add a co-author')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete series' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the Series order on the Books tab', async () => {
+    renderModal();
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Books' }));
+
+    expect(
+      await screen.findByText(/No books in this series yet/)
+    ).toBeInTheDocument();
+    expect(mockedSeries.listSeriesBooks).toHaveBeenCalledWith(12);
+  });
+
+  it('keeps typed Details values over a Books tab round trip', async () => {
+    renderModal();
+
+    await userEvent.type(await screen.findByLabelText('Title'), '!');
+    await userEvent.click(screen.getByRole('tab', { name: 'Books' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+
+    expect(screen.getByLabelText('Title')).toHaveValue('The Scale Cycle!');
+  });
+
+  it('gives a Moderator the form and Delete series but no co-author picker', async () => {
+    renderModal({ ...author, id: 99, role: 'admin' });
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete series' })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add a co-author')).toBeNull();
+  });
+
+  it('deletes the series once confirmed, closes and reports it gone', async () => {
+    mockedSeries.deleteSeries.mockResolvedValue(undefined);
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete series' })
+    );
+    expect(mockedSeries.deleteSeries).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    await waitFor(() => expect(onGone).toHaveBeenCalledTimes(1));
+    expect(mockedSeries.deleteSeries).toHaveBeenCalledWith(12);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays open with the server message when the delete is refused', async () => {
+    mockedSeries.deleteSeries.mockRejectedValue(
+      new Error('You may not delete this series')
+    );
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete series' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(
+      await screen.findByText('You may not delete this series')
+    ).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onGone).not.toHaveBeenCalled();
   });
 });

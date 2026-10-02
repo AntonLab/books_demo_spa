@@ -44,11 +44,6 @@ const EditChapterPage = lazy(() =>
     default: m.EditChapterPage,
   }))
 );
-const EditSeriesPage = lazy(() =>
-  import('@/pages/EditSeriesPage/EditSeriesPage').then((m) => ({
-    default: m.EditSeriesPage,
-  }))
-);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
 );
@@ -122,7 +117,6 @@ export const AppShell: FC = () => {
               <Route path="/search" element={<SearchPage />} />
               {/* A bare /series stays NotFoundPage. */}
               <Route path="/series/:id" element={<SeriesPage />} />
-              <Route path="/series/:id/edit" element={<EditSeriesPage />} />
               {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/favorites" element={<ProfilePage />} />

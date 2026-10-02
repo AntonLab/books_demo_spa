@@ -187,7 +187,7 @@ describe('ProfileWorksPanel edit modals', () => {
     );
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Edit series details')).toBeInTheDocument();
+    expect(within(dialog).getByText('Edit series')).toBeInTheDocument();
     expect(await within(dialog).findByLabelText('Title')).toHaveValue(
       'The Scale Cycle'
     );
