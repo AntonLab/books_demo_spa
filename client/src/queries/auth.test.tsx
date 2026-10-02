@@ -297,6 +297,20 @@ describe('watchSession', () => {
     expect(client.getQueryState(favoritesKey)).toBe(undefined);
   });
 
+  it("drops the last Account's own Reading lists, and keeps them while the Account stays", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const key = queryKeys.myListsForWork({ bookId: 7 });
+    client.setQueryData(key, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    expect(client.getQueryState(key)).toBeDefined();
+
+    client.setQueryData(queryKeys.session, null);
+    expect(client.getQueryState(key)).toBe(undefined);
+  });
+
   describe('a failed request', () => {
     const failQuery = (client: QueryClient, error: ApiError) =>
       client

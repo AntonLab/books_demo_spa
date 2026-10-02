@@ -78,6 +78,7 @@ export const watchSession = (
       client.removeQueries({ queryKey: queryKeys.allNotifications });
       client.removeQueries({ queryKey: queryKeys.allLibrary });
       client.removeQueries({ queryKey: queryKeys.allFavorites });
+      client.removeQueries({ queryKey: queryKeys.allMyReadingLists });
       void client.invalidateQueries({
         predicate: (query) => query.queryHash !== sessionHash,
       });
