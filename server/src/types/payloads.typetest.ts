@@ -15,6 +15,7 @@ import type {
   CreateLikePayload,
   GenrePayload,
   SeriesPayload,
+  SetReadingStatusPayload,
   UpdateBookPayload,
   UpdateChapterPayload,
 } from 'shared';
@@ -24,6 +25,7 @@ import type { createChapterSchema, updateChapterSchema } from './chapter.ts';
 import type { createCommentSchema } from './comment.ts';
 import type { createFavoriteSchema } from './favorite.ts';
 import type { genreBodySchema } from './genre.ts';
+import type { setReadingStatusSchema } from './library.ts';
 import type { createLikeSchema } from './like.ts';
 import type { createSeriesSchema, updateSeriesSchema } from './series.ts';
 
@@ -49,4 +51,5 @@ export type PayloadAssertions = [
   Expect<Fits<GenrePayload, typeof genreBodySchema>>,
   Expect<Fits<CreateLikePayload, typeof createLikeSchema>>,
   Expect<Fits<CreateFavoritePayload, typeof createFavoriteSchema>>,
+  Expect<Fits<SetReadingStatusPayload, typeof setReadingStatusSchema>>,
 ];
