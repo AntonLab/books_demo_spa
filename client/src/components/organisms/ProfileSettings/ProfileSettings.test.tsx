@@ -64,6 +64,29 @@ describe('ProfileSettings', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the account details form prefilled with the session', () => {
+    renderWithSession(session);
+
+    expect(screen.getByRole('textbox', { name: 'Login' })).toHaveValue('bob');
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue(
+      'bob@example.com'
+    );
+  });
+
+  it('shows the Change password and This device sections', () => {
+    renderWithSession(session);
+
+    expect(
+      screen.getByRole('button', { name: 'Change password' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reset theme' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reset reading settings' })
+    ).toBeInTheDocument();
+  });
+
   it('has no Remove button while there is no avatar', () => {
     renderWithSession(session);
 

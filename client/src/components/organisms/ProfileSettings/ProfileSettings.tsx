@@ -4,10 +4,14 @@ import { Alert, Button, Popconfirm, Space, theme } from 'antd';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { ImageUploadButton } from '@/components/molecules/ImageUploadButton/ImageUploadButton';
 import { EmailNotificationsSetting } from '@/components/organisms/EmailNotificationsSetting/EmailNotificationsSetting';
+import { AccountDetailsForm } from '@/components/organisms/AccountDetailsForm/AccountDetailsForm';
+import { ChangePasswordForm } from '@/components/organisms/ChangePasswordForm/ChangePasswordForm';
+import { DevicePreferencesReset } from '@/components/organisms/DevicePreferencesReset/DevicePreferencesReset';
 import { useSession } from '@/queries/auth';
 import { useDeleteAvatar, useUploadAvatar } from '@/queries/users';
 
-// The signed-in Account's avatar and email setting. ProfilePage renders it
+// The signed-in Account's avatar, details, password, email setting and device
+// resets. ProfilePage renders it
 // only once the session holds a PublicUser.
 export const ProfileSettings: FC = () => {
   const { token } = theme.useToken();
@@ -65,6 +69,17 @@ export const ProfileSettings: FC = () => {
         )}
       </Space>
       <EmailNotificationsSetting />
+      <div style={{ maxWidth: token.controlHeightLG * 10 }}>
+        <Space
+          orientation="vertical"
+          size={token.marginLG}
+          style={{ width: '100%' }}
+        >
+          <AccountDetailsForm user={session} />
+          <ChangePasswordForm userId={session.id} />
+          <DevicePreferencesReset />
+        </Space>
+      </div>
     </Space>
   );
 };

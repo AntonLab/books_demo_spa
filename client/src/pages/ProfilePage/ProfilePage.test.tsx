@@ -11,8 +11,10 @@ import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
+import * as usersApi from '@/api/users';
 import type { PublicUser } from '@/types/api';
 
+jest.mock('@/api/users');
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/genres');
@@ -23,6 +25,7 @@ const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 const mockedSeries = jest.mocked(seriesApi);
+const mockedUsers = jest.mocked(usersApi);
 
 const session: PublicUser = {
   id: 1,
@@ -125,6 +128,27 @@ describe('ProfilePage, signed out', () => {
 
     expect(screen.queryByRole('switch')).toBeNull();
     expect(mockedNotifications.getNotificationSettings).not.toHaveBeenCalled();
+  });
+});
+
+describe('ProfilePage after a password change', () => {
+  it('sends the user home, which ends the session', async () => {
+    mockedUsers.updateUser.mockResolvedValue(session);
+    const user = userEvent.setup();
+    renderWithSession(session);
+
+    await user.type(screen.getByLabelText('Current password'), 'old-secret1');
+    await user.type(screen.getByLabelText('New password'), 'new-secret1');
+    await user.type(screen.getByLabelText('Confirm password'), 'new-secret1');
+    await user.click(screen.getByRole('button', { name: 'Change password' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(
+      screen.getByText('Password changed. Sign in with your new password.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
   });
 });
 

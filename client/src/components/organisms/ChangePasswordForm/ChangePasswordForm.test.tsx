@@ -75,9 +75,11 @@ describe('ChangePasswordForm', () => {
     await submitValid(user);
 
     await waitFor(() => expect(mockedUsers.updateUser).toHaveBeenCalled());
-    expect(Object.keys(mockedUsers.updateUser.mock.calls[0][1]).sort()).toEqual(
-      ['currentPassword', 'password']
-    );
+    const [, body] = mockedUsers.updateUser.mock.calls[0] ?? [];
+    expect(Object.keys(body ?? {}).sort()).toEqual([
+      'currentPassword',
+      'password',
+    ]);
   });
 
   it('keeps the session and shows the field error on a wrong current password', async () => {

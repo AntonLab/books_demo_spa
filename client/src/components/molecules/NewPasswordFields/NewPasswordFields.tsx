@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Form, Input } from 'antd';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from 'shared';
 
 interface Props {
   label: string;
@@ -15,7 +16,11 @@ export const NewPasswordFields: FC<Props> = ({ label }) => (
       label={label}
       rules={[
         { required: true, message: 'Enter a password' },
-        { min: 8, max: 128, message: 'Password must be 8 to 128 characters' },
+        {
+          min: PASSWORD_MIN_LENGTH,
+          max: PASSWORD_MAX_LENGTH,
+          message: `Password must be ${PASSWORD_MIN_LENGTH} to ${PASSWORD_MAX_LENGTH} characters`,
+        },
       ]}
     >
       <Input.Password autoComplete="new-password" />
