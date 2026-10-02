@@ -257,6 +257,8 @@ interface IdLookups {
   creditedBookIds?: number[];
   authorBookIds?: number[];
   seriesIds?: number[];
+  // bookId to the viewer's Favorite id, set by `?favoritedBy=me`.
+  favorites?: Map<number, number>;
 }
 
 // The books any of whose Co-authors matches by login, first or last name.
@@ -298,6 +300,15 @@ async function seriesTitled(title: string): Promise<number[]> {
   return series.map((entry) => entry.id);
 }
 
+async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
+  if (viewer === null) return new Map();
+  const rows = await Favorite.findAll({
+    where: { userId: viewer.id, bookId: { [Op.ne]: null } },
+    attributes: ['id', 'bookId'],
+  });
+  return new Map(rows.map((row) => [row.bookId as number, row.id]));
+}
+
 function buildWhere(
   query: ListBooksQuery,
   lookups: IdLookups,
@@ -322,6 +333,9 @@ function buildWhere(
   }
   if (lookups.seriesIds !== undefined) {
     clauses.push({ seriesId: lookups.seriesIds });
+  }
+  if (lookups.favorites !== undefined) {
+    clauses.push({ id: [...lookups.favorites.keys()] });
   }
 
   if (query.status !== undefined) {
@@ -434,6 +448,10 @@ export function createSequelizeBookRepository(): BookRepository {
           query.seriesTitle === undefined
             ? undefined
             : await seriesTitled(query.seriesTitle),
+        favorites:
+          query.favoritedBy === undefined
+            ? undefined
+            : await favoritesOf(viewer),
       };
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);
@@ -470,7 +488,19 @@ export function createSequelizeBookRepository(): BookRepository {
                 ],
       });
 
-      return { items: await publicBooksOf(rows), total, current };
+      const items = await publicBooksOf(rows);
+      const { favorites } = lookups;
+      return {
+        items:
+          favorites === undefined
+            ? items
+            : items.map((item) => ({
+                ...item,
+                favoriteId: favorites.get(item.id),
+              })),
+        total,
+        current,
+      };
     },
 
     async findById(id) {

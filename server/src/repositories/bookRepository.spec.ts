@@ -27,6 +27,7 @@ import {
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import { bookRepositoryContract } from './bookRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
+import type { PublicBook, WithFavoriteId } from 'shared';
 
 // A schema of its own rather than the users' or series' suite: node:test runs
 // spec files in parallel processes, and two suites calling sync({ force: true })
@@ -981,6 +982,119 @@ describe('bookRepository against real MySQL', { skip }, () => {
         [2, null]
       );
       assert.equal(asCoAuthor?.viewerFavoriteId, null);
+    });
+
+    test('favoritedBy=me lists only the viewer own Favorites, each with its favoriteId', async () => {
+      const mine = await publishedBook('Mine');
+      const theirs = await publishedBook('Theirs');
+      await publishedBook('Nobody');
+      const fan = await aFan();
+      const other = await aFan();
+      const row = await Favorite.create({ userId: fan.id, bookId: mine.id });
+      await Favorite.create({ userId: other.id, bookId: theirs.id });
+      await Favorite.create({ userId: other.id, bookId: mine.id });
+
+      const page = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+
+      assert.deepEqual(
+        page.items.map((item) => item.id),
+        [mine.id]
+      );
+      assert.equal(page.total, 1);
+      assert.equal(
+        (page.items[0] as WithFavoriteId<PublicBook>).favoriteId,
+        row.id
+      );
+    });
+
+    test('favoritedBy=me with no Favorites, or with no viewer, matches nothing', async () => {
+      await publishedBook('Unloved');
+      const fan = await aFan();
+
+      const none = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+      const guest = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        null
+      );
+
+      assert.deepEqual([none.total, guest.total], [0, 0]);
+    });
+
+    test('favoritedBy=me combines by AND with q, the genre filter and paging', async () => {
+      const genre = await Genre.create({ name: 'Favorites Genre' });
+      const make = (title: string, genreId?: number) =>
+        createPublished({
+          userId: ownerId,
+          seriesId: null,
+          title,
+          description: title,
+          tags: [],
+          genreId,
+        });
+      const alpha = await make('Dragon Alpha', genre.id);
+      const beta = await make('Dragon Beta');
+      const gamma = await make('Quiet Gamma', genre.id);
+      await make('Dragon Delta', genre.id);
+      const fan = await aFan();
+      const viewer = { id: fan.id, role: 'user' } as const;
+      for (const book of [alpha, beta, gamma]) {
+        await Favorite.create({ userId: fan.id, bookId: book.id });
+      }
+      const base = { current: 1, pageSize: 20, favoritedBy: 'me' } as const;
+
+      const byText = await repository.list({ ...base, q: 'Dragon' }, viewer);
+      const byBoth = await repository.list(
+        { ...base, q: 'Dragon', genreId: genre.id },
+        viewer
+      );
+      const paged = await repository.list(
+        { ...base, q: 'Dragon', pageSize: 1 },
+        viewer
+      );
+
+      assert.deepEqual(
+        byText.items.map((item) => item.id).sort(),
+        [alpha.id, beta.id].sort()
+      );
+      assert.deepEqual(
+        byBoth.items.map((item) => item.id),
+        [alpha.id]
+      );
+      assert.deepEqual([paged.total, paged.items.length], [2, 1]);
+    });
+
+    test('a favorited book turned Draft leaves the reader list; its own Co-author still sees it with userId', async () => {
+      const book = await publishedBook('Withdrawn');
+      const fan = await aFan();
+      await Favorite.create({ userId: fan.id, bookId: book.id });
+      await Favorite.create({ userId: ownerId, bookId: book.id });
+      await repository.update(book.id, { status: 'draft' });
+
+      const asFan = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+      const asOwnerAlone = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        asOwner()
+      );
+      const asOwnerOwn = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me', userId: ownerId },
+        asOwner()
+      );
+
+      assert.equal(asFan.total, 0);
+      assert.equal(asOwnerAlone.total, 0);
+      assert.deepEqual(
+        asOwnerOwn.items.map((item) => item.id),
+        [book.id]
+      );
     });
 
     test('a Draft book counts no favorites, yet names the viewer own, and republishing counts them again', async () => {
