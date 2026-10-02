@@ -1,0 +1,13 @@
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ant-margin-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* antd's Tag carries its own right margin; the gap does the spacing here. */
+.list :global(.ant-tag) {
+  margin-inline-end: 0;
+}

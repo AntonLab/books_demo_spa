@@ -17,6 +17,7 @@ import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvata
 import { BookCover } from '@/components/molecules/BookCover/BookCover';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { TagList } from '@/components/molecules/TagList/TagList';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
 import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
@@ -159,9 +160,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
           {book.tags.length > 0 && (
             <div className={styles.tags}>
-              {book.tags.map((tag) => (
-                <Tag key={tag}>{tag}</Tag>
-              ))}
+              <TagList tags={book.tags} />
             </div>
           )}
         </div>
