@@ -17,7 +17,8 @@ export interface LoginReturnState {
 // <PageSpinner />: the redirect happens in an effect, one render later.
 export const usePageGuard = (
   access: PageAccess,
-  deniedMessage?: string
+  deniedMessage?: string,
+  deniedTo = '/'
 ): boolean => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -29,12 +30,12 @@ export const usePageGuard = (
         content: deniedMessage ?? ACCESS_DENIED_MESSAGE,
         key: 'page-guard',
       });
-      void navigate('/', { replace: true });
+      void navigate(deniedTo, { replace: true });
     } else if (access === 'guest') {
       const state: LoginReturnState = { loginReturnTo: pathname + search };
       void navigate('/', { replace: true, state });
     }
-  }, [access, deniedMessage, message, navigate, pathname, search]);
+  }, [access, deniedMessage, deniedTo, message, navigate, pathname, search]);
 
   return access === 'allowed';
 };

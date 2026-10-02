@@ -7,6 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Provider } from 'react-redux';
 import {
   BrowserRouter,
+  Link,
   Navigate,
   Route,
   Routes,
@@ -17,6 +18,7 @@ import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { AppHeader } from '@/components/organisms/AppHeader/AppHeader';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary/ErrorBoundary';
@@ -42,11 +44,6 @@ const ChapterPage = lazy(() =>
 );
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
-);
-const NotFoundPage = lazy(() =>
-  import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({
-    default: m.NotFoundPage,
-  }))
 );
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage/ProfilePage').then((m) => ({
@@ -112,7 +109,6 @@ export const AppShell: FC = () => {
                 element={<BookRedirect />}
               />
               <Route path="/search" element={<SearchPage />} />
-              {/* A bare /series stays NotFoundPage. */}
               <Route path="/series/:id" element={<SeriesPage />} />
               {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
@@ -128,11 +124,18 @@ export const AppShell: FC = () => {
                 element={<Navigate replace to="/profile/my-books" />}
               />
               <Route path="/admin/genres" element={<AdminGenresPage />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route
+                path="*"
+                element={<GoneRedirect message="Page not found." />}
+              />
             </Routes>
           </Suspense>
         </ErrorBoundary>
       </Layout.Content>
+      <Layout.Footer className={styles.footer}>
+        <span>© 2026 Books Demo</span>
+        <Link to="/search">Search</Link>
+      </Layout.Footer>
     </Layout>
   );
 };

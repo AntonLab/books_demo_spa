@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation, useNavigationType } from 'react-router';
 import { App, AppShell } from './App';
@@ -37,6 +37,25 @@ const LocationProbe = () => {
   return <div data-testid="location">{location.pathname}</div>;
 };
 
+const NavigationProbe = () => (
+  <div data-testid="navigation">{useNavigationType()}</div>
+);
+
+const expectGoneHome = async (route: string) => {
+  renderWithProviders(
+    <>
+      <AppShell />
+      <LocationProbe />
+      <NavigationProbe />
+    </>,
+    { route }
+  );
+
+  expect(await screen.findAllByText('Page not found.')).toHaveLength(1);
+  expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+  expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
+};
+
 // Every page App.tsx loads lazily. A page's first import transforms and
 // evaluates its whole module graph, which in a loaded parallel run outlasts
 // findBy*'s 1 s; loading them here leaves each route test waiting only for
@@ -46,7 +65,6 @@ const LAZY_PAGES = [
   'BookPage',
   'ChapterPage',
   'MainPage',
-  'NotFoundPage',
   'ProfilePage',
   'SearchPage',
   'SeriesPage',
@@ -180,12 +198,8 @@ describe('AppShell routing', () => {
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  it('renders the not-found page at the removed /books/:id/edit', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/1/edit' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
+  it('sends the removed /books/:id/edit Home with a message', async () => {
+    await expectGoneHome('/books/1/edit');
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
@@ -198,21 +212,13 @@ describe('AppShell routing', () => {
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('renders the not-found page at the removed /series/:id/edit', async () => {
-    renderWithProviders(<AppShell />, { route: '/series/12/edit' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
+  it('sends the removed /series/:id/edit Home with a message', async () => {
+    await expectGoneHome('/series/12/edit');
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('renders the not-found page at a bare /series', async () => {
-    renderWithProviders(<AppShell />, { route: '/series' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
+  it('sends a bare /series Home with a message', async () => {
+    await expectGoneHome('/series');
   });
 
   it('renders SeriesPage at /series/:id', async () => {
@@ -231,12 +237,24 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders the not-found page for an unknown route', async () => {
-    renderWithProviders(<AppShell />, { route: '/nowhere' });
+  it('sends an unknown route Home with a message', async () => {
+    await expectGoneHome('/nowhere');
+  });
 
+  it('sends a deep unknown route with a query Home with a message', async () => {
+    await expectGoneHome('/nowhere/deeper?x=1');
+  });
+});
+
+describe('AppShell footer', () => {
+  it.each(['/', '/search'])('shows the footer at %s', async (route) => {
+    renderWithProviders(<AppShell />, { route });
+
+    const footer = await screen.findByRole('contentinfo');
+    expect(footer).toHaveTextContent('© 2026 Books Demo');
     expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
+      within(footer).getByRole('link', { name: 'Search' })
+    ).toHaveAttribute('href', '/search');
   });
 });
 
