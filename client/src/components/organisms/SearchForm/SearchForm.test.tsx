@@ -473,3 +473,36 @@ describe('SearchForm in series mode', () => {
     expect(screen.queryByLabelText('Tag')).toBeNull();
   });
 });
+
+describe('SearchForm with the Author field hidden', () => {
+  it('shows every other books field and no Author', () => {
+    renderForm({ hideAuthor: true });
+
+    expect(screen.queryByLabelText('Author')).toBeNull();
+    for (const label of ['Text', 'Series', 'Status']) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText('Genre')).toBeInTheDocument();
+  });
+
+  it('searches without an author and asks for no suggestions', async () => {
+    const { onSearch } = renderForm({
+      hideAuthor: true,
+      initialValues: { q: 'dragon', sort: 'popular' },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'dragon' })
+    );
+    expect(onSearch.mock.calls[0][0]).not.toHaveProperty('author');
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+
+  it('still shows Author by default', () => {
+    renderForm();
+
+    expect(screen.getByLabelText('Author')).toBeInTheDocument();
+  });
+});

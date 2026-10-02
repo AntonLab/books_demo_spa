@@ -68,6 +68,10 @@ interface SearchFormProps {
   onReset: () => void;
   // Series mode offers Text, Genre and Tag, and suggests no books.
   mode?: 'books' | 'series';
+  // A caller whose list is already fixed to one author (My works) has nothing
+  // for the field to do. The suggestion hooks keep running; the typed author
+  // stays empty, so they ask for nothing. Series mode has no Author anyway.
+  hideAuthor?: boolean;
   ref?: Ref<SearchFormHandle>;
 }
 
@@ -162,6 +166,7 @@ export const SearchForm: FC<SearchFormProps> = ({
   onSearch,
   onReset,
   mode = 'books',
+  hideAuthor = false,
   ref,
 }) => {
   const isBooks = mode === 'books';
@@ -239,29 +244,31 @@ export const SearchForm: FC<SearchFormProps> = ({
           </Col>
           {isBooks && (
             <>
-              <Col {...FIELD_COLUMNS}>
-                <Form.Item name="author" label="Author" rules={[textRule]}>
-                  <AutoComplete<string, IdOption>
-                    placeholder="Login or name"
-                    allowClear
-                    // A clear is not a keystroke, so the typing handler misses it.
-                    onClear={() => {
-                      setTypedAuthor('');
-                      form.setFieldValue('authorId', undefined);
-                    }}
-                    showSearch={suggestOn((text) => {
-                      setTypedAuthor(text);
-                      form.setFieldValue('authorId', undefined);
-                    })}
-                    notFoundContent={pendingOf(authors.isFetching)}
-                    options={authorOptions(authors.items)}
-                    onSelect={(_login, option) =>
-                      form.setFieldValue('authorId', option.id)
-                    }
-                  />
-                </Form.Item>
-                <Form.Item name="authorId" hidden noStyle />
-              </Col>
+              {!hideAuthor && (
+                <Col {...FIELD_COLUMNS}>
+                  <Form.Item name="author" label="Author" rules={[textRule]}>
+                    <AutoComplete<string, IdOption>
+                      placeholder="Login or name"
+                      allowClear
+                      // A clear is not a keystroke, so the typing handler misses it.
+                      onClear={() => {
+                        setTypedAuthor('');
+                        form.setFieldValue('authorId', undefined);
+                      }}
+                      showSearch={suggestOn((text) => {
+                        setTypedAuthor(text);
+                        form.setFieldValue('authorId', undefined);
+                      })}
+                      notFoundContent={pendingOf(authors.isFetching)}
+                      options={authorOptions(authors.items)}
+                      onSelect={(_login, option) =>
+                        form.setFieldValue('authorId', option.id)
+                      }
+                    />
+                  </Form.Item>
+                  <Form.Item name="authorId" hidden noStyle />
+                </Col>
+              )}
               <Col {...FIELD_COLUMNS}>
                 <Form.Item name="seriesTitle" label="Series" rules={[textRule]}>
                   <AutoComplete<string, IdOption>
