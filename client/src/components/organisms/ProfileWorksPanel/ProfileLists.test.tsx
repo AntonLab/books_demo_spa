@@ -202,7 +202,7 @@ describe('ProfileSeriesList', () => {
     id: 12,
     title: 'The Scale Cycle',
     coverUrl: null,
-    bookCount: 0,
+    bookCount: 1,
     authors: [ann],
     description: 'Dragons.',
     tags: [],
@@ -228,6 +228,7 @@ describe('ProfileSeriesList', () => {
     expect(
       await screen.findByRole('link', { name: 'The Scale Cycle' })
     ).toHaveAttribute('href', '/series/12');
+    expect(screen.getByText('1 book')).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole('button', { name: 'Edit The Scale Cycle' })
     );

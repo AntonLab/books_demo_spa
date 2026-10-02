@@ -36,7 +36,7 @@ const coAuthor = {
 const series: SeriesDetail = {
   id: 12,
   coverUrl: null,
-  bookCount: 0,
+  bookCount: 2,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor that should have stayed shut.',
@@ -115,6 +115,13 @@ describe('SeriesPage', () => {
     expect(
       await screen.findByRole('link', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
+    expect(screen.getByText('2 books')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', {
+        level: 2,
+        name: 'The Ashgrove Chronicles',
+      })
+    ).toHaveLength(1);
     expect(mockedSeries.getSeries).toHaveBeenCalledWith(12);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       seriesId: 12,

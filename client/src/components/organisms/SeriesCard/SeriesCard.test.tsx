@@ -106,6 +106,34 @@ describe('SeriesCard', () => {
   });
 });
 
+it('shows the title as a placeholder while the series has no cover', () => {
+  const { container } = renderWithProviders(<SeriesCard series={series} />);
+
+  expect(container.querySelector('img')).toBeNull();
+  // BookCover's placeholder is aria-hidden, so only the heading names the series.
+  expect(screen.getAllByText('The Ashgrove Chronicles')).toHaveLength(2);
+});
+
+it('shows the cover image once the series has one', () => {
+  const { container } = renderWithProviders(
+    <SeriesCard series={{ ...series, coverUrl: '/api/series/12/cover?v=1' }} />
+  );
+
+  expect(
+    container.querySelector('img[src="/api/series/12/cover?v=1"]')
+  ).toBeInTheDocument();
+});
+
+it.each([
+  [0, '0 books'],
+  [1, '1 book'],
+  [3, '3 books'],
+])('says %i Published books as "%s"', (bookCount, text) => {
+  renderWithProviders(<SeriesCard series={{ ...series, bookCount }} />);
+
+  expect(screen.getByText(text)).toBeInTheDocument();
+});
+
 it('links its title to href when given one, as a list row', () => {
   renderWithProviders(<SeriesCard series={series} href="/series/12" />);
 
