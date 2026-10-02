@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { SeriesCard } from './SeriesCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import type { PublicSeries } from '@/types/api';
 
 const series: PublicSeries = {
@@ -24,7 +25,7 @@ const series: PublicSeries = {
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor that should have stayed shut.',
   tags: ['gothic', 'mystery'],
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };

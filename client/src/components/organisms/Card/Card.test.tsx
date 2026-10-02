@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Card } from './Card';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 
 const props = {
   title: 'The Ashgrove Chronicles',
@@ -68,7 +69,7 @@ describe('Card', () => {
         {...props}
         href="/books/1"
         tile
-        genre={{ id: 4, name: 'Gothic' }}
+        genre={publicGenre(4, 'Gothic')}
         tags={['epic']}
       />
     );

@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
@@ -52,10 +53,7 @@ beforeEach(() => {
     offset: 0,
   });
   mockedGenres.listGenres.mockResolvedValue({
-    items: [
-      { id: 3, name: 'Gothic' },
-      { id: 4, name: 'Hard SF' },
-    ],
+    items: [genreItem(3, 'Gothic'), genreItem(4, 'Hard SF')],
   });
 });
 

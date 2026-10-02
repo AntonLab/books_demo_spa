@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
@@ -51,7 +52,7 @@ const book: BookDetail = {
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   status: 'in_progress',
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',

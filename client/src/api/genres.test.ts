@@ -1,5 +1,13 @@
-import { createGenre, deleteGenre, listGenres, renameGenre } from './genres';
+import {
+  createGenre,
+  deleteGenre,
+  listGenreCounts,
+  listGenres,
+  renameGenre,
+  updateGenre,
+} from './genres';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
+import { genreItem } from '../test/genres';
 
 // A 204 carries no body, so it gets the fixture whose json() rejects.
 const mockFetch = (body: unknown, status = 200): jest.Mock => {
@@ -42,7 +50,7 @@ describe('listGenres', () => {
   });
 
   it('returns the items wrapper as sent, with no paging fields', async () => {
-    const page = { items: [{ id: 1, name: 'Gothic' }] };
+    const page = { items: [genreItem(1, 'Gothic')] };
     mockFetch(page);
 
     await expect(listGenres()).resolves.toEqual(page);
@@ -53,7 +61,32 @@ describe('listGenres', () => {
 
     await listGenres({ nonEmpty: true });
 
-    expect(callOf(fetchMock)[0]).toBe('/api/genres?nonEmpty=true');
+    expect(callOf(fetchMock)[0]).toBe('/api/genres?nonEmpty=1');
+  });
+});
+
+describe('listGenreCounts', () => {
+  it('gets the admin list with the counts flag', async () => {
+    const fetchMock = mockFetch({ items: [] });
+
+    await listGenreCounts();
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/genres?counts=1');
+    expect(init).toMatchObject({ method: 'GET' });
+  });
+});
+
+describe('updateGenre', () => {
+  it('patches only the fields it is given, a null parent included', async () => {
+    const fetchMock = mockFetch({ id: 7, name: 'Gothic', parent: null });
+
+    await updateGenre(7, { parentId: null });
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/genres/7');
+    expect(init).toMatchObject({ method: 'PATCH', headers: jsonWrite });
+    expect(JSON.parse(init.body as string)).toEqual({ parentId: null });
   });
 });
 

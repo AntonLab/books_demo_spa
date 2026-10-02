@@ -9,6 +9,7 @@ import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import { queryKeys } from '@/queries/keys';
 import { createTestQueryClient } from '@/test/queryClient';
+import { genreItem } from '@/test/genres';
 import type { PublicBook } from '@/types/book';
 import {
   useSearchPage,
@@ -73,7 +74,7 @@ const whenLoaded = (page: () => SearchPageState) =>
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
   serve();
 });
@@ -94,7 +95,7 @@ describe('useSearchPage reading the URL', () => {
       genre: undefined,
     });
     await waitFor(() =>
-      expect(page().genres).toEqual([{ id: 4, name: 'Gothic' }])
+      expect(page().genres).toEqual([genreItem(4, 'Gothic')])
     );
   });
 

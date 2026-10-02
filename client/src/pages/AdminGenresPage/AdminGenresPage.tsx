@@ -25,7 +25,7 @@ import {
 } from '@/queries/genres';
 import {
   GENRE_NAME_MAX_LENGTH,
-  type PublicGenre,
+  type GenreListItem,
   isModeratorRole,
 } from 'shared';
 import spacing from '@/theme/spacing.module.css';
@@ -131,7 +131,7 @@ const GenreManager: FC = () => {
 
 // One row, with its own rename state: `draft` is null while the name is only
 // being shown, and the string being typed once Rename opens the editor.
-const GenreRow: FC<{ genre: PublicGenre }> = ({ genre }) => {
+const GenreRow: FC<{ genre: GenreListItem }> = ({ genre }) => {
   const { token } = theme.useToken();
   const [draft, setDraft] = useState<string | null>(null);
   const rename = useRenameGenre(genre.id);

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { EditSeriesPage } from './EditSeriesPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { queryKeys } from '@/queries/keys';
@@ -119,7 +120,7 @@ beforeEach(() => {
   });
   mockedAuthors.searchAuthors.mockResolvedValue([]);
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
 });
 

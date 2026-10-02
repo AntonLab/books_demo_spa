@@ -3,8 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { Button, Form } from 'antd';
 import { WorkFields } from './WorkFields';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 
-const GENRES = [{ id: 3, name: 'Fantasy' }];
+const GENRES = [genreItem(3, 'Fantasy')];
 
 describe('WorkFields', () => {
   it('renders the shared fields with the extra ones between tags and Genre', () => {

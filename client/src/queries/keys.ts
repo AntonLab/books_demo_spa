@@ -16,6 +16,8 @@ export const queryKeys = {
   genres: ['genres'] as const,
   // Under the `genres` prefix, so a Genre write invalidates it too.
   genresWithBooks: ['genres', { nonEmpty: true }] as const,
+  // The admin-only list with counts; under `genres` too, so a write refreshes it.
+  genresCounts: ['genres', { counts: true }] as const,
   books: (params: ListBooksParams) => ['books', params] as const,
   // Keyed by a bare id, so it cannot collide with `books`, which is always
   // keyed by a params object.

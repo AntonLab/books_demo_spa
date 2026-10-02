@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SeriesEditDetailsModal } from './SeriesEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as genresApi from '@/api/genres';
@@ -62,7 +63,7 @@ const renderModal = (session: PublicUser = author) => {
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
 });
 
@@ -91,7 +92,7 @@ describe('SeriesEditDetailsModal', () => {
   it('shows the series’ own genre in the select', async () => {
     mockedSeries.getSeries.mockResolvedValue({
       ...series,
-      genre: { id: 4, name: 'Gothic' },
+      genre: publicGenre(4, 'Gothic'),
     });
     renderModal();
 
@@ -102,7 +103,7 @@ describe('SeriesEditDetailsModal', () => {
   it('keeps an existing genre on an unrelated save', async () => {
     mockedSeries.getSeries.mockResolvedValue({
       ...series,
-      genre: { id: 4, name: 'Gothic' },
+      genre: publicGenre(4, 'Gothic'),
     });
     mockedSeries.updateSeries.mockResolvedValue(series);
     renderModal();

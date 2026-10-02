@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
@@ -80,7 +81,7 @@ beforeEach(() => {
     offset: 0,
   });
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
 });
 
@@ -127,7 +128,7 @@ describe('BookEditDetailsModal', () => {
   it('keeps an existing genre on an unrelated save', async () => {
     mockedBooks.getBook.mockResolvedValue({
       ...bookDetail,
-      genre: { id: 4, name: 'Gothic' },
+      genre: publicGenre(4, 'Gothic'),
     });
     mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderModal();

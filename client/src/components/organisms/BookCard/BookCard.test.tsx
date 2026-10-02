@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { BookCard } from './BookCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { formatDate } from '@/format/date';
 import type { PublicBook } from '@/types/book';
 
@@ -27,7 +28,7 @@ const book: PublicBook = {
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
   status: 'in_progress',
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',

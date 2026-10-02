@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { EditBookPage } from './EditBookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 import { formatDate } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -114,7 +115,7 @@ beforeEach(() => {
     offset: 0,
   });
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
 });
 

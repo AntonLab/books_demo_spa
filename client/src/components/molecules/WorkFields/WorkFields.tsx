@@ -1,11 +1,11 @@
 import type { FC, ReactNode } from 'react';
 import { Form, Input, Select } from 'antd';
 import { WORK_DESCRIPTION_MAX_LENGTH, WORK_TITLE_MAX_LENGTH } from 'shared';
-import type { PublicGenre } from 'shared';
+import type { GenreListItem } from 'shared';
 import { ClearableSelect } from '@/components/molecules/ClearableSelect/ClearableSelect';
 
 interface Props {
-  genreOptions: PublicGenre[];
+  genreOptions: GenreListItem[];
   // Fields of one kind of work only, placed between the tags and the Genre.
   children?: ReactNode;
 }

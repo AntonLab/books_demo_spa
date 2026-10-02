@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import type { BookSort, PublicGenre } from 'shared';
+import type { BookSort, GenreListItem } from 'shared';
 import { useBookSearch } from '@/queries/books';
 import { useGenresWithBooks } from '@/queries/genres';
 import {
@@ -31,7 +31,7 @@ export type SearchResults =
 
 export interface SearchPageState {
   filterCount: number;
-  genres: PublicGenre[];
+  genres: GenreListItem[];
   // For the toolbar's Sort order, which sits outside the form.
   sort: BookSort;
   form: {

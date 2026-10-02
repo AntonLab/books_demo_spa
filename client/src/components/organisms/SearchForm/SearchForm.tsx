@@ -39,7 +39,7 @@ import type {
   BookSearchFormValues,
   SearchFieldError,
 } from '@/types/bookSearch';
-import type { PublicGenre } from 'shared';
+import type { GenreListItem } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 import styles from './SearchForm.module.css';
 
@@ -59,7 +59,7 @@ interface SearchFormProps {
   id: string;
   // Read once, on mount: the caller remounts the form when the URL changes.
   initialValues: BookSearchFormValues;
-  genres: PublicGenre[];
+  genres: GenreListItem[];
   // A 400's issues, each shown on the field it names.
   fieldErrors: SearchFieldError[];
   onSearch: (values: BookSearchFormValues) => void;

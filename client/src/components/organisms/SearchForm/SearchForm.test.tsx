@@ -11,6 +11,7 @@ import {
   type SearchFormHandle,
 } from './SearchForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
@@ -53,10 +54,7 @@ beforeEach(() => {
   jest.resetAllMocks();
 });
 
-const genres = [
-  { id: 4, name: 'Gothic' },
-  { id: 5, name: 'Hard SF' },
-];
+const genres = [genreItem(4, 'Gothic'), genreItem(5, 'Hard SF')];
 
 const preferences = (expanded: boolean) => ({
   devicePreferences: {

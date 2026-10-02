@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AdminGenresPage } from './AdminGenresPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
@@ -56,10 +57,7 @@ const renderPage = (session: PublicUser | null) => {
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
-    items: [
-      { id: 1, name: 'Gothic' },
-      { id: 2, name: 'Hard SF' },
-    ],
+    items: [genreItem(1, 'Gothic'), genreItem(2, 'Hard SF')],
   });
 });
 
@@ -102,7 +100,7 @@ describe('AdminGenresPage for a moderator', () => {
   });
 
   it('adds a genre by name', async () => {
-    mockedGenres.createGenre.mockResolvedValue({ id: 5, name: 'Romance' });
+    mockedGenres.createGenre.mockResolvedValue(publicGenre(5, 'Romance'));
     renderPage(admin);
 
     await userEvent.type(await screen.findByLabelText('Genre name'), 'Romance');
@@ -149,10 +147,9 @@ describe('AdminGenresPage for a moderator', () => {
   });
 
   it('renames a genre in place', async () => {
-    mockedGenres.renameGenre.mockResolvedValue({
-      id: 1,
-      name: 'Gothic Revival',
-    });
+    mockedGenres.renameGenre.mockResolvedValue(
+      publicGenre(1, 'Gothic Revival')
+    );
     renderPage(admin);
 
     await screen.findByText('Gothic');
