@@ -18,6 +18,7 @@ import type {
   ListFavoritesQuery,
 } from '../types/favorite.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import { joined } from './joined.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
 import {
   readableBookWhere,
@@ -107,15 +108,6 @@ function asMissingReference(
     throw new NotFoundError('User', accountId);
   }
   throw error;
-}
-
-// An `include` marked required always carries its row; the association's
-// type cannot say so.
-function joined<T>(value: T | undefined): T {
-  if (value === undefined) {
-    throw new Error('A required include came back without its row');
-  }
-  return value;
 }
 
 export function createSequelizeFavoriteRepository(): FavoriteRepository {

@@ -5,6 +5,7 @@ import { LibraryEntry, toPublicLibraryEntry } from '../models/LibraryEntry.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type { ListLibraryQuery } from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import { joined } from './joined.ts';
 import { readableBookWhere, type Viewer } from './visibility.ts';
 
 // The signed-in account a Library belongs to. Never a Guest: every route that
@@ -27,15 +28,6 @@ export interface LibraryRepository {
     query: ListLibraryQuery,
     account: Account
   ): Promise<{ items: LibraryBook[]; total: number }>;
-}
-
-// An `include` marked required always carries its row; the association's
-// type cannot say so.
-function joined<T>(value: T | undefined): T {
-  if (value === undefined) {
-    throw new Error('A required include came back without its row');
-  }
-  return value;
 }
 
 export function createSequelizeLibraryRepository(): LibraryRepository {
