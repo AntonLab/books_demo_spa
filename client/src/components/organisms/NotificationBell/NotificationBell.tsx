@@ -311,6 +311,7 @@ export const NotificationBell: FC<NotificationBellProps> = ({ userId }) => {
             label={
               unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'
             }
+            tooltipHidden={open}
             className={styles.bell}
           >
             🔔

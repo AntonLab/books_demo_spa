@@ -94,6 +94,22 @@ describe('NotificationBell', () => {
     ).toBeInTheDocument();
   });
 
+  it('hides its tooltip while the popover is open', async () => {
+    mockedNotifications.listNotifications.mockResolvedValue(page([]));
+    renderWithProviders(<NotificationBell userId={3} />);
+    const bell = await screen.findByRole('button', { name: 'Notifications' });
+
+    await userEvent.hover(bell);
+    await userEvent.click(bell);
+
+    expect(await screen.findByText('No notifications yet.')).toBeVisible();
+    await waitFor(() =>
+      expect(
+        document.querySelector('.ant-tooltip:not(.ant-tooltip-hidden)')
+      ).toBeNull()
+    );
+  });
+
   it('says nothing is unread when nothing is', async () => {
     mockedNotifications.listNotifications.mockResolvedValue(
       page([notification({ readAt: '2026-09-26T10:00:00.000Z' })])

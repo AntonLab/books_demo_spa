@@ -27,6 +27,15 @@ describe('IconButton', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit');
   });
 
+  it('keeps the tooltip closed on hover and focus while tooltipHidden, and the name', async () => {
+    render(<IconButton label="Edit" icon={<EditOutlined />} tooltipHidden />);
+    const button = screen.getByRole('button', { name: 'Edit' });
+    await userEvent.hover(button);
+    await userEvent.tab();
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    expect(button).toHaveAccessibleName('Edit');
+  });
+
   it('renders children after the icon without changing its name', () => {
     render(
       <IconButton label="Like" icon={<EditOutlined />}>

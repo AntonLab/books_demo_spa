@@ -146,7 +146,11 @@ export const ReadingPreferences: FC<ReadingPreferencesProps> = ({
       open={open}
       onOpenChange={setOpen}
     >
-      <IconButton label="Reading preferences" icon={<SettingOutlined />} />
+      <IconButton
+        label="Reading preferences"
+        icon={<SettingOutlined />}
+        tooltipHidden={open}
+      />
     </Popover>
   );
 };
