@@ -306,7 +306,9 @@ async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
     where: { userId: viewer.id, bookId: { [Op.ne]: null } },
     attributes: ['id', 'bookId'],
   });
-  return new Map(rows.map((row) => [row.bookId as number, row.id]));
+  return new Map(
+    rows.flatMap((row) => (row.bookId === null ? [] : [[row.bookId, row.id]]))
+  );
 }
 
 function buildWhere(

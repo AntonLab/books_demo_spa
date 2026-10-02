@@ -136,8 +136,6 @@ export async function findSeriesCoAuthorIds(
   return series ? creditedIds(credits, seriesId) : null;
 }
 
-// creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
-// LIMIT keeps paging over series rather than credit rows.
 async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
   if (viewer === null) return new Map();
   const rows = await Favorite.findAll({
@@ -151,6 +149,8 @@ async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
   );
 }
 
+// creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
+// LIMIT keeps paging over series rather than credit rows.
 function buildWhere(
   query: ListSeriesQuery,
   creditedSeriesIds: number[] | undefined,
