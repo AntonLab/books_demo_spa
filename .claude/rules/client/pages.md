@@ -107,13 +107,19 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
   come from `BookDetail`.
-- `FavoritesPanel` keeps one page number per tab and clamps it while
-  rendering: removing the last row of the last page steps back a page.
+- `usePageClamp` redirects a page past the end, with `replace`, to the last
+  page of the true `total`. A books page past the end is served as the last
+  non-empty page and a series page comes back empty, both with the true
+  `total`, so the clamp reads `total`. It waits while the list is pending or
+  blocked on a Genre.
 - `ProfilePage`'s outer tabs are paths (`/profile`, `/profile/favorites`,
-  `/profile/my-books`), since the account menu and the book and series
-  editors open a given tab; the inner Books/Series tabs stay antd state
-  (ADR-0010). A non-author on My Books is redirected only after the session
-  resolves, so an author reloading it stays.
+  `/profile/my-books`, the last labelled "My works"), since the account menu
+  and the book and series editors open a given tab; the outer `Tabs` has
+  `destroyOnHidden`. The inner Books/Series tabs of both panels live in
+  `?tab=series` (Books is never written), superseding ADR-0010's "inner tabs
+  are antd state" for these two panels only. My works hides the Author field
+  and ignores a typed `author`. A non-author on My works is redirected only
+  after the session resolves, so an author reloading it stays.
 - `ChapterPage` applies the reading Device preferences: background and font
   through a nested `ConfigProvider` (a class overriding `--ant-*` never
   reaches antd's components, which redeclare them), size and line height

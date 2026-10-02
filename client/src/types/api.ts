@@ -50,5 +50,3 @@ export type NotificationSettings = Shared.NotificationSettings;
 export type PublicLike = Wire<Shared.PublicLike>;
 
 export type PublicFavorite = Wire<Shared.PublicFavorite>;
-export type FavoriteBook = Wire<Shared.FavoriteBook>;
-export type FavoriteSeries = Wire<Shared.FavoriteSeries>;

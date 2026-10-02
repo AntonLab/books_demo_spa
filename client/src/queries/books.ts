@@ -67,17 +67,6 @@ export const useBook = (id: number) => {
   });
 };
 
-// A Co-author's own books, drafts included: the server widens a list to drafts
-// only when `?userId=` names the caller. `enabled` waits for the session, so
-// the page never asks for a list with no id in it.
-export const useMyBooks = (userId: number | undefined) => {
-  return useQuery({
-    queryKey: queryKeys.books({ userId, pageSize: PAGE_SIZE_MAX }),
-    queryFn: () => listBooks({ userId, pageSize: PAGE_SIZE_MAX }),
-    enabled: userId !== undefined,
-  });
-};
-
 // Every book write invalidates the whole `books` prefix: a change to one book
 // can move it into or out of any list (a status change hides it from the main
 // page), and the detail key sits under the same prefix. The `series` prefix

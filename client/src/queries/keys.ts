@@ -33,13 +33,8 @@ export const queryKeys = {
   notifications: (userId: number) => ['notifications', userId] as const,
   // The prefix over every Account's notifications.
   allNotifications: ['notifications'] as const,
-  // The prefix over both Favorites lists: a toggle or a removal changes
-  // which page holds what, so it invalidates all of them.
+  // The prefix a Favorite toggle or removal invalidates.
   allFavorites: ['favorites'] as const,
-  favoriteBooks: (page: number, pageSize: number) =>
-    ['favorites', 'books', { page, pageSize }] as const,
-  favoriteSeries: (page: number, pageSize: number) =>
-    ['favorites', 'series', { page, pageSize }] as const,
   // Not keyed by Account, unlike notifications: the answer is always the
   // session's, so watchSession's refetch on an Account change is correct.
   notificationSettings: ['notificationSettings'] as const,
