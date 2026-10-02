@@ -55,6 +55,11 @@ const SearchPage = lazy(() =>
     default: m.SearchPage,
   }))
 );
+const ReadingListPage = lazy(() =>
+  import('@/pages/ReadingListPage/ReadingListPage').then((m) => ({
+    default: m.ReadingListPage,
+  }))
+);
 const SeriesPage = lazy(() =>
   import('@/pages/SeriesPage/SeriesPage').then((m) => ({
     default: m.SeriesPage,
@@ -110,6 +115,7 @@ export const AppShell: FC = () => {
               />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/series/:id" element={<SeriesPage />} />
+              <Route path="/lists/:id" element={<ReadingListPage />} />
               {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/favorites" element={<ProfilePage />} />
