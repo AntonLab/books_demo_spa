@@ -432,6 +432,19 @@ test('PATCH without genreId keeps the genre, and an explicit null clears it', as
   );
 });
 
+test('GET list with favoritedBy=me is 401 for a Guest and 400 for another value', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const guest = await fetch(`${base}/api/books?favoritedBy=me`);
+      const bad = await fetch(`${base}/api/books?favoritedBy=you`);
+
+      assert.equal(guest.status, 401);
+      assert.equal(bad.status, 400);
+    }
+  );
+});
+
 test('GET list filters by genre', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },

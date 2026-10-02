@@ -79,6 +79,9 @@ export function createBookController(repository: BookRepository) {
 
     list: async (req, res) => {
       const query = validatedQuery<ListBooksQuery>(req);
+      if (query.favoritedBy !== undefined && !req.user) {
+        throw new UnauthorizedError();
+      }
       const { items, total, current } = await repository.list(
         query,
         viewerOf(req.user)

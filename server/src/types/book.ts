@@ -81,6 +81,8 @@ export const listBooksQuerySchema = z
     current: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
     userId: idSchema.optional(),
+    // The signed-in viewer's Favorites; no id is ever passed.
+    favoritedBy: z.literal('me').optional(),
     seriesId: idSchema.optional(),
     genreId: idSchema.optional(),
     tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),

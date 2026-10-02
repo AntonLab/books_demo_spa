@@ -101,6 +101,20 @@ test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 o
   }
 });
 
+test('listBooksQuerySchema takes favoritedBy=me and refuses any other value', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ favoritedBy: 'me' }).favoritedBy,
+    'me'
+  );
+  assert.equal(listBooksQuerySchema.parse({}).favoritedBy, undefined);
+  for (const bad of ['ME', '1', '', 'you']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ favoritedBy: bad }).success,
+      false
+    );
+  }
+});
+
 test('listBooksQuerySchema trims text filters and refuses a blank or over-long one', () => {
   const parsed = listBooksQuerySchema.parse({
     q: '  dragon ',
