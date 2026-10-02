@@ -13,6 +13,7 @@ import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
 import { createLibraryRoutes } from './libraryRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
+import { createReadingListRoutes } from './readingListRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
@@ -46,6 +47,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   router.use('/likes', createLikeRoutes(deps));
   router.use('/favorites', createFavoriteRoutes(deps));
   router.use('/library', createLibraryRoutes(deps));
+  router.use('/reading-lists', createReadingListRoutes(deps));
   router.use('/notifications', createNotificationRoutes(deps));
   return router;
 }
