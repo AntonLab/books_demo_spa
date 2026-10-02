@@ -81,7 +81,9 @@ export const usePages = ({
   // The route keeps this page mounted from one chapter to the next. Resetting
   // during render, not in an effect, means the old chapter's page is never
   // painted over the new text.
-  if (view.chapterId !== chapterId) {
+  // Object.is: a path id that is not a number is NaN, and NaN !== NaN would
+  // reset the view on every render.
+  if (!Object.is(view.chapterId, chapterId)) {
     setView(openedView(chapterId, openOnLastPage));
   }
 

@@ -10,7 +10,9 @@ import {
 } from '@/store/devicePreferencesSlice';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
-import { useLocation } from 'react-router';
+import { Route, Routes, useLocation, useNavigationType } from 'react-router';
+import { ApiError } from '@/api/client';
+import { BookPage } from '@/pages/BookPage/BookPage';
 import type { FC } from 'react';
 import * as measurePages from './measurePages';
 
@@ -66,6 +68,24 @@ const renderAt = (chapterId: number) =>
     route: `/books/1/chapters/${chapterId}`,
     path: '/books/:bookId/chapters/:chapterId',
   });
+
+const Probe: FC = () => {
+  const { pathname } = useLocation();
+  return <p>{`${pathname}|${useNavigationType()}`}</p>;
+};
+
+const renderWithRoutes = (chapterId: string) =>
+  renderWithProviders(
+    <Routes>
+      <Route
+        path="/books/:bookId/chapters/:chapterId"
+        element={<ChapterPage />}
+      />
+      <Route path="/books/:id" element={<BookPage />} />
+      <Route path="/" element={<Probe />} />
+    </Routes>,
+    { route: `/books/1/chapters/${chapterId}` }
+  );
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -214,6 +234,43 @@ describe('ChapterPage', () => {
 
     renderAt(9);
 
+    expect(
+      await screen.findByText('Could not load this chapter.')
+    ).toBeInTheDocument();
+  });
+
+  it('replaces to the Book page when the chapter is gone', async () => {
+    mocked.getChapter.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithRoutes('5');
+    expect(
+      await screen.findAllByText('This chapter no longer exists.')
+    ).toHaveLength(1);
+    expect(
+      await screen.findByRole('heading', { name: book.title })
+    ).toBeInTheDocument();
+  });
+
+  it('goes on Home when the Book is gone too', async () => {
+    mocked.getChapter.mockRejectedValue(new ApiError(404, 'gone'));
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithRoutes('5');
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+    expect(
+      await screen.findAllByText('This book no longer exists.')
+    ).toHaveLength(1);
+  });
+
+  it('treats a chapter id that is not a number like a missing chapter', async () => {
+    mocked.getChapter.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithRoutes('abc');
+    expect(
+      await screen.findAllByText('This chapter no longer exists.')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the Alert on a server error', async () => {
+    mocked.getChapter.mockRejectedValue(new ApiError(500, 'boom'));
+    renderWithRoutes('5');
     expect(
       await screen.findByText('Could not load this chapter.')
     ).toBeInTheDocument();

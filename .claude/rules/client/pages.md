@@ -13,11 +13,11 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `SeriesPage` (`/series/:id`) shows the `SeriesCard`, then the series' books
   in Series order: one page at `PAGE_SIZE_MAX`, no pagination, drafts left
   out by the server. The books are asked for only once the series loads, so a
-  404, like an id that is not a positive integer, shows "This series no
-  longer exists." and nothing else is requested. "Edit series" opens the
-  Series edit modal and shows for its Co-authors and Moderators. A bare
-  `/series` is `NotFoundPage`; every series link points here, and old
-  `/search?series=` links are not redirected.
+  404, like an id that is not a positive integer, redirects Home (`replace`)
+  with "This series no longer exists." through `GoneRedirect`, and nothing
+  else is requested for a bad id. "Edit series" opens the
+  Series edit modal and shows for its Co-authors and Moderators. Every series
+  link points here, and old `/search?series=` links are not redirected.
 - `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
   paginated book results. The URL is its only state, read and written through
   `useSearchPage` (beside the page) and `types/bookSearch.ts`; every link into
@@ -138,9 +138,10 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - There are no Manage pages. Edit happens in `BookEditDetailsModal` (tabs
   Details | Chapters, the Chapter editor over it) and `SeriesEditDetailsModal`
   (Details | Books), opened from `BookPage`, `SeriesPage` and My works.
-  `/books/:id/edit` and `/series/:id/edit` fall to `NotFoundPage`; the Chapter
-  routes (`/books/:id/chapters/new` and `/books/:id/chapters/:chapterId/edit`)
-  redirect with `replace` to the Book page. `/books/new` and `/series/new` keep
-  the "no longer exists" messages through `BookPage` / `SeriesPage`: neither
-  asks the server, `BookPage` shows "This book no longer exists." and
-  `SeriesPage` "This series no longer exists.".
+  Every unknown route, including `/books/:id/edit`, `/series/:id/edit` and a
+  bare `/series`, redirects Home with "Page not found."; the Chapter routes
+  (`/books/:id/chapters/new` and `/books/:id/chapters/:chapterId/edit`)
+  redirect with `replace` to the Book page. `BookPage` (a 404 or a bad id,
+  unless the Book has Unsaved text), `SeriesPage` and `ChapterPage` (to the
+  Book page) redirect with their own messages through `GoneRedirect`, which
+  wraps `usePageGuard`'s denied path. `AppShell` renders a footer.
