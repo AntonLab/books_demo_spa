@@ -35,6 +35,8 @@ const coAuthor = {
 
 const series: SeriesDetail = {
   id: 12,
+  coverUrl: null,
+  bookCount: 0,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor that should have stayed shut.',

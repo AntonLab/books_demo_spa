@@ -54,6 +54,8 @@ const book = {
 const series = {
   id: 12,
   title: 'The Scale Cycle',
+  coverUrl: null,
+  bookCount: 0,
   authors: [ann],
   description: 'Dragons.',
   tags: [],

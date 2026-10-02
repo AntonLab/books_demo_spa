@@ -53,6 +53,10 @@ export function createFakeSeriesRepository(
     authors: (credits.get(series.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
+    // The fake knows no book status, so every filed book counts; the real
+    // repository's Published-only rule is proven on MySQL.
+    bookCount: [...books.values()].filter((seriesId) => seriesId === series.id)
+      .length,
   });
 
   // Stands in for the genres row the real repository looks up before it
@@ -85,6 +89,8 @@ export function createFakeSeriesRepository(
         description: input.description,
         tags: input.tags,
         genre: genreAt(input.genreId),
+        coverUrl: null,
+        bookCount: 0,
         createdAt: now,
         updatedAt: now,
       };

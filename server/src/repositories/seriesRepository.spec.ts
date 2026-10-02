@@ -16,6 +16,7 @@ import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../models/Genre.ts';
 import { Series } from '../models/Series.ts';
+import { SeriesCover } from '../models/SeriesCover.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
@@ -349,6 +350,62 @@ describe('seriesRepository against real MySQL', { skip }, () => {
 
     assert.equal(page.total, 1);
     assert.equal(page.items[0]?.title, 'Shared Series');
+  });
+
+  test('bookCount counts only Published books, on list, detail and findById', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Counted',
+      description: '',
+      tags: [],
+    });
+    const filed = (status: 'in_progress' | 'complete' | 'draft') =>
+      createCreditedBook(
+        {
+          title: status,
+          description: '',
+          tags: [],
+          seriesId: series.id,
+          status,
+        },
+        [ownerId]
+      );
+    await filed('in_progress');
+    await filed('complete');
+    await filed('draft');
+
+    assert.equal(
+      (await repository.findById(series.id, asModerator))?.bookCount,
+      2
+    );
+    assert.equal(
+      (await repository.findDetailById(series.id, asModerator))?.bookCount,
+      2
+    );
+    const listed = await repository.list({ limit: 10, offset: 0 }, asModerator);
+    assert.equal(
+      listed.items.find((item) => item.id === series.id)?.bookCount,
+      2
+    );
+  });
+
+  test('coverUrl is versioned by the Cover row and gone with it; deleting the series cascades', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Covered',
+      description: '',
+      tags: [],
+    });
+    await SeriesCover.create({ seriesId: series.id, data: Buffer.from('x') });
+
+    const found = await repository.findById(series.id, asModerator);
+    assert.match(
+      found?.coverUrl ?? '',
+      new RegExp(`^/api/series/${series.id}/cover\\?v=\\d+$`)
+    );
+
+    assert.equal(await repository.remove(series.id, asOwner()), true);
+    assert.equal(await SeriesCover.findByPk(series.id), null);
   });
 
   test('removing a book from a series unlinks it and leaves the book standing', async () => {

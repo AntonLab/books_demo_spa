@@ -12,6 +12,11 @@ export interface PublicSeries {
   // The Series' own Genre, or null. Set independently of its Books' — a
   // Book never takes its Genre from its Series (CONTEXT.md, ADR-0008).
   genre: PublicGenre | null;
+  // Where the Cover is served, versioned so a replaced one busts the cache;
+  // null when the Series has none.
+  coverUrl: string | null;
+  // Published Books only, so a reader's count never reveals a Draft book.
+  bookCount: number;
   createdAt: Date;
   updatedAt: Date;
 }

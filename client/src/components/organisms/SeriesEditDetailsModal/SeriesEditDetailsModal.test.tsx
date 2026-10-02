@@ -26,6 +26,8 @@ const ann = {
 
 const series: SeriesDetail = {
   id: 12,
+  coverUrl: null,
+  bookCount: 0,
   authors: [ann],
   title: 'The Scale Cycle',
   description: 'Dragons, in four parts.',

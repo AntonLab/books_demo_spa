@@ -4,6 +4,7 @@ import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { SeriesCover } from '../models/SeriesCover.ts';
 import { User } from '../models/User.ts';
 import {
   addCoAuthor,
@@ -96,18 +97,68 @@ const credits: CreditTable = {
     SeriesAuthor.destroy({ where: { seriesId, userId }, transaction }),
 };
 
+// Every Cover's URL for the series named, in one query, as a Book's.
+async function loadCoverUrls(
+  seriesIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, string>> {
+  if (seriesIds.length === 0) return new Map();
+
+  const covers = await SeriesCover.findAll({
+    where: { seriesId: seriesIds },
+    attributes: ['seriesId', 'updatedAt'],
+    transaction,
+  });
+  return new Map(
+    covers.map((cover) => [
+      cover.seriesId,
+      `/api/series/${cover.seriesId}/cover?v=${cover.updatedAt.getTime()}`,
+    ])
+  );
+}
+
+// Published Books per series, in one grouped query. Drafts are left out so a
+// reader's count never reveals one.
+async function loadBookCounts(
+  seriesIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, number>> {
+  if (seriesIds.length === 0) return new Map();
+
+  const rows = await Book.findAll({
+    where: { seriesId: seriesIds, status: { [Op.ne]: 'draft' } },
+    attributes: ['seriesId', [fn('COUNT', col('id')), 'count']],
+    group: ['seriesId'],
+    raw: true,
+    transaction,
+  });
+  return new Map(
+    rows.flatMap((row) => {
+      const { seriesId, count } = row as unknown as {
+        seriesId: number;
+        count: number | string;
+      };
+      return [[seriesId, Number(count)]];
+    })
+  );
+}
+
 async function withAuthors(
   series: Series,
   transaction?: Transaction
 ): Promise<PublicSeries> {
-  const [authors, genres] = await Promise.all([
+  const [authors, genres, coverUrls, bookCounts] = await Promise.all([
     loadAuthors(credits, [series.id], transaction),
     loadGenres([series.genreId], transaction),
+    loadCoverUrls([series.id], transaction),
+    loadBookCounts([series.id], transaction),
   ]);
   return toPublicSeries(
     series,
     authors.get(series.id) ?? [],
-    genreOf(series.genreId, genres)
+    genreOf(series.genreId, genres),
+    coverUrls.get(series.id) ?? null,
+    bookCounts.get(series.id) ?? 0
   );
 }
 
@@ -115,15 +166,21 @@ async function withAuthors(
 // in one query each. Exported for favoriteRepository, whose rows embed the
 // series they point at.
 export async function publicSeriesOf(rows: Series[]): Promise<PublicSeries[]> {
-  const [authors, genres] = await Promise.all([
-    loadAuthors(
-      credits,
-      rows.map((row) => row.id)
-    ),
+  const ids = rows.map((row) => row.id);
+  const [authors, genres, coverUrls, bookCounts] = await Promise.all([
+    loadAuthors(credits, ids),
     loadGenres(rows.map((row) => row.genreId)),
+    loadCoverUrls(ids),
+    loadBookCounts(ids),
   ]);
   return rows.map((row) =>
-    toPublicSeries(row, authors.get(row.id) ?? [], genreOf(row.genreId, genres))
+    toPublicSeries(
+      row,
+      authors.get(row.id) ?? [],
+      genreOf(row.genreId, genres),
+      coverUrls.get(row.id) ?? null,
+      bookCounts.get(row.id) ?? 0
+    )
   );
 }
 

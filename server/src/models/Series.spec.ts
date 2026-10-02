@@ -85,7 +85,7 @@ test('toPublicSeries copies the tag array rather than aliasing the model', () =>
     tags: ['sci-fi'],
   });
 
-  const output = toPublicSeries(series, [], null);
+  const output = toPublicSeries(series, [], null, null, 0);
   output.tags.push('mutated');
 
   assert.deepEqual(series.tags, ['sci-fi']);
@@ -102,7 +102,10 @@ test('toPublicSeries parses a JSON string, should a driver return one raw', () =
   // normalisation it would be spread character by character.
   series.setDataValue('tags', '["sci-fi","epic"]' as unknown as string[]);
 
-  assert.deepEqual(toPublicSeries(series, [], null).tags, ['sci-fi', 'epic']);
+  assert.deepEqual(toPublicSeries(series, [], null, null, 0).tags, [
+    'sci-fi',
+    'epic',
+  ]);
 });
 
 test('the genre filter is indexed, so `?genreId=` needs no scan', () => {
@@ -120,7 +123,7 @@ test('toPublicSeries reports a series with no Genre as genre: null', () => {
     tags: [],
   });
 
-  const output = toPublicSeries(series, [], null);
+  const output = toPublicSeries(series, [], null, null, 0);
 
   assert.equal(output.genre, null);
   assert.ok('genre' in output);

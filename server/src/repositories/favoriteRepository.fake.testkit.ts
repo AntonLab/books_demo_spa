@@ -38,6 +38,8 @@ export function aPublicSeries(id: number): PublicSeries {
     id,
     authors: [],
     title: `Series ${id}`,
+    coverUrl: null,
+    bookCount: 0,
     description: '',
     tags: [],
     genre: null,

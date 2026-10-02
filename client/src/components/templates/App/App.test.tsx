@@ -123,6 +123,8 @@ beforeEach(() => {
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
   mockedSeries.getSeries.mockResolvedValue({
     id: 12,
+    coverUrl: null,
+    bookCount: 0,
     authors: [
       {
         id: 3,

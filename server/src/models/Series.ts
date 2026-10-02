@@ -98,10 +98,14 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
 export function toPublicSeries(
   series: Series,
   authors: AuthorSummary[],
-  genre: PublicGenre | null
+  genre: PublicGenre | null,
+  coverUrl: string | null,
+  bookCount: number
 ): PublicSeries {
   return {
     id: series.id,
+    coverUrl,
+    bookCount,
     authors,
     title: series.title,
     description: series.description,

@@ -6,6 +6,8 @@ import type { PublicSeries } from '@/types/api';
 
 const series: PublicSeries = {
   id: 12,
+  coverUrl: null,
+  bookCount: 0,
   authors: [
     {
       id: 3,

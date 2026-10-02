@@ -14,6 +14,7 @@ import {
 } from './PasswordResetToken.ts';
 import { initPermissionModel } from './Permission.ts';
 import { initSeriesModel, Series } from './Series.ts';
+import { initSeriesCoverModel, SeriesCover } from './SeriesCover.ts';
 import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
 import { initSessionModel, Session } from './Session.ts';
 import { initUserModel, User } from './User.ts';
@@ -31,6 +32,7 @@ function initEachModel(sequelize: Sequelize): void {
   // reference it.
   initGenreModel(sequelize);
   initSeriesModel(sequelize);
+  initSeriesCoverModel(sequelize);
   initSeriesAuthorModel(sequelize);
   initBookModel(sequelize);
   initBookCoverModel(sequelize);
@@ -119,6 +121,15 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   BookCover.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  // A Series' Cover, on the same terms as a Book's.
+  Series.hasOne(SeriesCover, {
+    as: 'cover',
+    foreignKey: 'seriesId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  SeriesCover.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
 
   // A Book's Genre (ADR-0008). SET NULL rather than CASCADE: a Genre is a
   // label on the Book, not part of it, so deleting the Genre leaves the Book
