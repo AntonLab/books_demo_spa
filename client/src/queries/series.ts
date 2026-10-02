@@ -7,6 +7,7 @@ import {
 import {
   createSeries,
   deleteSeries,
+  deleteSeriesCover,
   getSeries,
   listFavoritedSeries,
   listSeries,
@@ -14,6 +15,7 @@ import {
   removeBookFromSeries,
   reorderSeriesBooks,
   updateSeries,
+  uploadSeriesCover,
   type ListSeriesParams,
 } from '../api/series';
 import type { SeriesPayload } from 'shared';
@@ -123,6 +125,13 @@ export const useDeleteSeries = (id: number) =>
     refreshOnError: true,
     deletedId: id,
   });
+
+// A Cover change invalidates every prefix a card of the Series may sit in.
+export const useUploadSeriesCover = (id: number) =>
+  useSeriesMutation((file: File) => uploadSeriesCover(id, file));
+
+export const useDeleteSeriesCover = (id: number) =>
+  useSeriesMutation(() => deleteSeriesCover(id));
 
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));

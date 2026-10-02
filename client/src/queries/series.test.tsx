@@ -1,6 +1,13 @@
 import { waitFor } from '@testing-library/react';
 import { ApiError } from '../api/client';
-import { useDeleteSeries, useFavoritedSeries, useSeriesList } from './series';
+import {
+  useDeleteSeries,
+  useDeleteSeriesCover,
+  useFavoritedSeries,
+  useSeriesList,
+  useUploadSeriesCover,
+} from './series';
+import type { PublicSeries } from '../types/api';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import * as seriesApi from '../api/series';
 
@@ -60,5 +67,44 @@ describe('useFavoritedSeries', () => {
     expect(
       queryClient.getQueryData(['series', { tag: 'a', favoritedBy: 'me' }])
     ).toEqual(body);
+  });
+});
+
+describe('useUploadSeriesCover / useDeleteSeriesCover', () => {
+  it('upload calls the API and invalidates the series and books caches', async () => {
+    mockedSeries.uploadSeriesCover.mockResolvedValue({} as PublicSeries);
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useUploadSeriesCover(12)
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const file = new File([new Uint8Array([1])], 'a.webp', {
+      type: 'image/webp',
+    });
+
+    result.current.mutate(file);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedSeries.uploadSeriesCover).toHaveBeenCalledWith(12, file);
+    expect(invalidate).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['series'] })
+    );
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
+  });
+
+  it('delete calls the API and invalidates the same caches', async () => {
+    mockedSeries.deleteSeriesCover.mockResolvedValue(undefined);
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useDeleteSeriesCover(12)
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    result.current.mutate();
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedSeries.deleteSeriesCover).toHaveBeenCalledWith(12);
+    expect(invalidate).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['series'] })
+    );
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
   });
 });

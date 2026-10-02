@@ -77,6 +77,21 @@ export const deleteSeries = (id: number): Promise<void> => {
   return request<void>(`/series/${id}`, { method: 'DELETE' });
 };
 
+// The body is a Blob (a File), so request() sends it as-is.
+export const uploadSeriesCover = (
+  id: number,
+  file: File
+): Promise<PublicSeries> => {
+  return request<PublicSeries>(`/series/${id}/cover`, {
+    method: 'PUT',
+    body: file,
+  });
+};
+
+export const deleteSeriesCover = (id: number): Promise<void> => {
+  return request<void>(`/series/${id}/cover`, { method: 'DELETE' });
+};
+
 export const addSeriesCoAuthor = (
   seriesId: number,
   userId: number

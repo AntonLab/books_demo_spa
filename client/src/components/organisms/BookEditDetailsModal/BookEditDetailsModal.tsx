@@ -84,7 +84,7 @@ export const BookEditDetailsModal: FC<BookEditDetailsModalProps> = ({
     }));
     const seriesOptions =
       book.series && !own.some((entry) => entry.id === book.series?.id)
-        ? [...own, book.series]
+        ? [...own, { id: book.series.id, title: book.series.title }]
         : own;
 
     // No destroyOnHidden: the Details pane stays mounted, so typed values and
