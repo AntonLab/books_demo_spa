@@ -97,4 +97,15 @@ describe('devicePreferencesSlice', () => {
       devicePreferencesReducer(changed, devicePreferences.readingReset())
     ).toEqual({ ...initialDevicePreferences, theme: 'dark' });
   });
+
+  it('themeReset puts the theme back to light and leaves the rest', () => {
+    const state = {
+      ...initialDevicePreferences,
+      theme: 'dark' as const,
+      resultsLayout: 'list' as const,
+    };
+    expect(
+      devicePreferencesReducer(state, devicePreferences.themeReset())
+    ).toEqual({ ...state, theme: 'light' });
+  });
 });

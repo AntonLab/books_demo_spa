@@ -8,6 +8,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth';
 import type { LoginInput, RegisterInput } from '../api/auth';
 import { ApiError } from '../api/client';
+import { updateUser } from '../api/users';
 import { queryKeys } from './keys';
 import type { PublicUser } from '../types/api';
 
@@ -173,6 +174,17 @@ export const useConfirmReset = () => {
     // The server destroys every session for the user on a successful reset —
     // this one included — so the client must not keep showing a signed-in
     // header.
+    onSuccess: () => setSession(client, null),
+  });
+};
+
+export const useChangePassword = (userId: number) => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { password: string; currentPassword: string }) =>
+      updateUser(userId, input),
+    // The server ends every session of the user, this one included, so no
+    // logout request follows.
     onSuccess: () => setSession(client, null),
   });
 };

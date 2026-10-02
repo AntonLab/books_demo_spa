@@ -1,7 +1,9 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { useDeleteAvatar, useUploadAvatar } from './users';
+import { useChangePassword } from './auth';
+import { queryKeys } from './keys';
+import { useDeleteAvatar, useUpdateAccount, useUploadAvatar } from './users';
 import { createTestQueryClient } from '../test/queryClient';
 import * as usersApi from '../api/users';
 import type { PublicUser } from '../types/api';
@@ -58,6 +60,57 @@ describe('useUploadAvatar', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['comments'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['authors'] });
+  });
+});
+
+describe('useUpdateAccount', () => {
+  it('updates the user and invalidates the session cache', async () => {
+    mockedUsers.updateUser.mockResolvedValue({ ...session, login: 'x' });
+    const client = createTestQueryClient();
+    const invalidate = jest.spyOn(client, 'invalidateQueries');
+
+    const { result } = renderHook(() => useUpdateAccount(7), {
+      wrapper: wrapper(client),
+    });
+    await expect(result.current.mutateAsync({ login: 'x' })).resolves.toEqual({
+      ...session,
+      login: 'x',
+    });
+
+    expect(mockedUsers.updateUser).toHaveBeenCalledWith(7, { login: 'x' });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'me'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['authors'] });
+  });
+});
+
+describe('useChangePassword', () => {
+  const input = { password: 'new-pass-1', currentPassword: 'old-pass-1' };
+
+  it('updates the user and clears the session without a logout request', async () => {
+    mockedUsers.updateUser.mockResolvedValue(session);
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, session);
+
+    const { result } = renderHook(() => useChangePassword(7), {
+      wrapper: wrapper(client),
+    });
+    await result.current.mutateAsync(input);
+
+    expect(mockedUsers.updateUser).toHaveBeenCalledWith(7, input);
+    expect(client.getQueryData(queryKeys.session)).toBeNull();
+  });
+
+  it('keeps the session when the update fails', async () => {
+    mockedUsers.updateUser.mockRejectedValue(new Error('nope'));
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, session);
+
+    const { result } = renderHook(() => useChangePassword(7), {
+      wrapper: wrapper(client),
+    });
+    await expect(result.current.mutateAsync(input)).rejects.toThrow('nope');
+
+    expect(client.getQueryData(queryKeys.session)).toEqual(session);
   });
 });
 

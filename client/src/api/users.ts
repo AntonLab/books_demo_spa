@@ -1,8 +1,27 @@
 import { request } from './client';
 import type { PublicUser } from '../types/api';
 
-// The Account's Avatar. Its own module, the way authors.ts is — the
-// users resource has no other writes reachable from this client yet.
+// The Account's own writes: its fields and its Avatar. Its own module, the way
+// authors.ts is.
+export interface AccountChanges {
+  login?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  password?: string;
+  currentPassword?: string;
+}
+
+export const updateUser = (
+  userId: number,
+  changes: AccountChanges
+): Promise<PublicUser> => {
+  return request<PublicUser>(`/users/${userId}`, {
+    method: 'PATCH',
+    body: changes,
+  });
+};
+
 export const uploadAvatar = (
   userId: number,
   file: File

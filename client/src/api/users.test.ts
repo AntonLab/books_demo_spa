@@ -1,4 +1,4 @@
-import { deleteAvatar, uploadAvatar } from './users';
+import { deleteAvatar, updateUser, uploadAvatar } from './users';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (body: unknown, status = 200): jest.Mock => {
@@ -41,6 +41,17 @@ describe('uploadAvatar', () => {
       'Content-Type': 'image/webp',
       'X-XSRF-Token': 'tok-123',
     });
+  });
+});
+
+describe('updateUser', () => {
+  it('PATCHes the user with only the given changes as JSON', async () => {
+    const fetchMock = mockFetch({ id: 7, login: 'new' });
+    await updateUser(7, { login: 'new' });
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/users/7');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ login: 'new' });
   });
 });
 
