@@ -198,6 +198,68 @@ describe('genreRepository against real MySQL', { skip }, () => {
     assert.equal((await repository.list()).length, 4);
   });
 
+  const makeBook = (
+    genreId: number,
+    status: 'draft' | 'in_progress' | 'complete'
+  ) =>
+    Book.create({
+      title: `b${genreId}${status}`,
+      description: 'x',
+      tags: [],
+      genreId,
+      status,
+    });
+
+  test('nonEmpty adds the parent of a qualifying Subgenre; a Draft reveals neither', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    const horror = await Genre.create({ name: 'Horror' });
+    const gothic = await Genre.create({ name: 'Gothic', parentId: horror.id });
+    const romance = await Genre.create({ name: 'Romance' });
+    await Genre.create({ name: 'Mystery' });
+    await makeBook(urban.id, 'complete');
+    await makeBook(gothic.id, 'draft');
+    await makeBook(romance.id, 'in_progress');
+
+    const items = await repository.list({ nonEmpty: true });
+    assert.deepEqual(
+      items.map((g) => g.name),
+      ['Fantasy', 'Romance', 'Urban']
+    );
+    assert.equal(items.find((g) => g.name === 'Urban')?.parentId, fantasy.id);
+  });
+
+  test('listWithCounts counts a Genre’s own Books and Series, Drafts included, with no roll-up', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    await makeBook(urban.id, 'draft');
+    await makeBook(urban.id, 'complete');
+    await makeBook(fantasy.id, 'in_progress');
+    await Series.create({
+      title: 'S',
+      description: 'x',
+      tags: [],
+      genreId: urban.id,
+    });
+
+    assert.deepEqual(await repository.listWithCounts(), [
+      {
+        id: fantasy.id,
+        name: 'Fantasy',
+        parentId: null,
+        bookCount: 1,
+        seriesCount: 0,
+      },
+      {
+        id: urban.id,
+        name: 'Urban',
+        parentId: fantasy.id,
+        bookCount: 2,
+        seriesCount: 1,
+      },
+    ]);
+  });
+
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   genreRepositoryContract(async () => ({ repository }));

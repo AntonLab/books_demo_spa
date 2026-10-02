@@ -12,7 +12,7 @@ import {
   StateConflictError,
   ValidationError,
 } from '../types/errors.ts';
-import type { GenreListItem, PublicGenre } from 'shared';
+import type { AdminGenreListItem, GenreListItem, PublicGenre } from 'shared';
 import type { GenreInput, GenreUpdateInput } from '../types/genre.ts';
 
 export interface GenreRepository {
@@ -21,6 +21,9 @@ export interface GenreRepository {
   // `nonEmpty` keeps only Genres holding a Book in progress or complete, so a
   // Draft book never reveals its Genre.
   list(options?: { nonEmpty?: boolean }): Promise<GenreListItem[]>;
+  // Every Genre with its own Books and Series, Drafts included and nothing
+  // rolled up from Subgenres. The admin list.
+  listWithCounts(): Promise<AdminGenreListItem[]>;
   create(input: GenreInput): Promise<PublicGenre>;
   // null when no Genre has that id, the way every other repository reports a
   // missing row.
@@ -158,6 +161,15 @@ export function genreOf(
   return genres.get(genreId) ?? null;
 }
 
+const NON_EMPTY_IDS =
+  "(SELECT DISTINCT `genreId` FROM `books` WHERE `status` <> 'draft' AND `genreId` IS NOT NULL)";
+
+// `table` is a fixed literal at both call sites, never caller input.
+const ownRowCount = (table: 'books' | 'series') =>
+  literal(
+    `(SELECT COUNT(*) FROM \`${table}\` WHERE \`${table}\`.\`genreId\` = \`Genre\`.\`id\`)`
+  );
+
 export function createSequelizeGenreRepository(): GenreRepository {
   return {
     async list({ nonEmpty = false } = {}) {
@@ -168,16 +180,40 @@ export function createSequelizeGenreRepository(): GenreRepository {
       const genres = await Genre.findAll({
         where: nonEmpty
           ? {
-              id: {
-                [Op.in]: literal(
-                  "(SELECT DISTINCT `genreId` FROM `books` WHERE `status` <> 'draft' AND `genreId` IS NOT NULL)"
-                ),
-              },
+              [Op.or]: [
+                { id: { [Op.in]: literal(NON_EMPTY_IDS) } },
+                {
+                  id: {
+                    [Op.in]: literal(
+                      `(SELECT \`g\`.\`parentId\` FROM \`genres\` AS \`g\` WHERE \`g\`.\`parentId\` IS NOT NULL AND \`g\`.\`id\` IN ${NON_EMPTY_IDS})`
+                    ),
+                  },
+                },
+              ],
             }
           : {},
         order: [['name', 'ASC']],
       });
       return genres.map(({ id, name, parentId }) => ({ id, name, parentId }));
+    },
+
+    async listWithCounts() {
+      const genres = await Genre.findAll({
+        attributes: {
+          include: [
+            [ownRowCount('books'), 'bookCount'],
+            [ownRowCount('series'), 'seriesCount'],
+          ],
+        },
+        order: [['name', 'ASC']],
+      });
+      return genres.map((genre) => ({
+        id: genre.id,
+        name: genre.name,
+        parentId: genre.parentId,
+        bookCount: Number(genre.get('bookCount')),
+        seriesCount: Number(genre.get('seriesCount')),
+      }));
     },
 
     async create(input) {

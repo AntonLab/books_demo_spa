@@ -13,6 +13,8 @@ export interface FakeGenreRepositoryOptions {
   // Spy: what each list call asked for. The fake holds no books, so it
   // cannot tell which Genres are non-empty and returns them all.
   listCalls?: { nonEmpty: boolean }[];
+  // What listWithCounts reports per Genre id; absent ids count zero.
+  counts?: ReadonlyMap<number, { bookCount: number; seriesCount: number }>;
 }
 
 // Alphabetical, case-insensitively, which is what MySQL's
@@ -77,6 +79,15 @@ export function createFakeGenreRepository(
     async list({ nonEmpty = false } = {}) {
       options.listCalls?.push({ nonEmpty });
       return [...rows.values()].sort(byName).map((row) => ({ ...row }));
+    },
+
+    async listWithCounts() {
+      return [...rows.values()].sort(byName).map((row) => ({
+        ...row,
+        bookCount: 0,
+        seriesCount: 0,
+        ...options.counts?.get(row.id),
+      }));
     },
 
     async create(input) {
