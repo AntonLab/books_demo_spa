@@ -31,9 +31,9 @@ export const ChangePasswordForm: FC<{ userId: number }> = ({ userId }) => {
       // An antd message outlives the unmount that the cleared session causes.
       void message.success('Password changed. Sign in with your new password.');
     } catch (error) {
-      const fieldErrors = accountFieldErrors(error);
+      const fieldErrors = accountFieldErrors<PasswordValues>(error);
       if (fieldErrors) {
-        form.setFields(fieldErrors as Parameters<typeof form.setFields>[0]);
+        form.setFields(fieldErrors);
         if (error instanceof ApiError && error.status === 403) {
           form.resetFields(['password', 'confirm']);
         }

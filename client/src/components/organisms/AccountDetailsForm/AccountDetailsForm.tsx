@@ -60,11 +60,9 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
       setSaved(pickFields(result));
       form.setFieldsValue({ ...pickFields(result), currentPassword: '' });
     } catch (error) {
-      const fieldErrors = accountFieldErrors(error);
+      const fieldErrors = accountFieldErrors<AccountValues>(error);
       if (fieldErrors) {
-        // accountFieldErrors names fields as plain strings, which the form's
-        // typed NamePath cannot tell from its own keys.
-        form.setFields(fieldErrors as Parameters<typeof form.setFields>[0]);
+        form.setFields(fieldErrors);
         return;
       }
       setFormError(

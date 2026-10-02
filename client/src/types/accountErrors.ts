@@ -1,3 +1,4 @@
+import type { FormInstance } from 'antd';
 import { ApiError } from '@/api/client';
 
 export interface AccountFieldError {
@@ -5,12 +6,19 @@ export interface AccountFieldError {
   errors: string[];
 }
 
+type FormFieldErrors<Values> = Parameters<FormInstance<Values>['setFields']>[0];
+
 const TAKEN_FIELDS = ['login', 'email'];
 
 // `null` means the error belongs to no field: show `error.message` in an Alert.
-export const accountFieldErrors = (
+// The server names fields as plain strings, which the form's typed NamePath
+// cannot tell from its own keys, so the one cast to the form's type is here.
+export const accountFieldErrors = <Values>(
   error: unknown
-): AccountFieldError[] | null => {
+): FormFieldErrors<Values> | null =>
+  fieldErrorsOf(error) as FormFieldErrors<Values> | null;
+
+const fieldErrorsOf = (error: unknown): AccountFieldError[] | null => {
   if (!(error instanceof ApiError)) return null;
 
   if (error.status === 409) {

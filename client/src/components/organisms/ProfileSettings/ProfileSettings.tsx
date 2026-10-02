@@ -11,8 +11,7 @@ import { useSession } from '@/queries/auth';
 import { useDeleteAvatar, useUploadAvatar } from '@/queries/users';
 
 // The signed-in Account's avatar, details, password, email setting and device
-// resets. ProfilePage renders it
-// only once the session holds a PublicUser.
+// resets. ProfilePage renders it only once the session holds a PublicUser.
 export const ProfileSettings: FC = () => {
   const { token } = theme.useToken();
   const { data: session } = useSession();
