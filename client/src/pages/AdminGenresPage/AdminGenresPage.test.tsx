@@ -1,4 +1,10 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { AdminGenresPage } from './AdminGenresPage';
@@ -95,6 +101,16 @@ describe('AdminGenresPage for everyone else', () => {
 });
 
 describe('AdminGenresPage for a moderator', () => {
+  it('opens the edit form when Enter is pressed on a focused action button', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    act(() => screen.getByRole('button', { name: 'Edit Mystery' }).focus());
+    await user.keyboard('{Enter}');
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
   it('serves a superadmin the same page', async () => {
     renderPage({ ...admin, role: 'superadmin' });
 

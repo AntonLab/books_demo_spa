@@ -125,7 +125,16 @@ const GenreManager: FC = () => {
     <Flex align="center" gap="small">
       <Typography.Text>{genre.name}</Typography.Text>
       <Typography.Text type="secondary">{countsLabel(counts)}</Typography.Text>
-      <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+      <Flex
+        gap="small"
+        style={{ marginInlineStart: 'auto' }}
+        // rc-tree handles Enter on its list and swallows the button's click.
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.stopPropagation();
+          }
+        }}
+      >
         {genre.parentId === null && (
           <IconButton
             size="small"

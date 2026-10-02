@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditOutlined } from '@ant-design/icons';
 import { IconButton } from './IconButton';
@@ -19,6 +19,16 @@ describe('IconButton', () => {
     render(<IconButton label="Edit" icon={<EditOutlined />} />);
     await userEvent.tab();
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit');
+  });
+
+  it('closes the keyboard-focus tooltip when focus leaves', async () => {
+    render(<IconButton label="Edit" icon={<EditOutlined />} />);
+    await userEvent.tab();
+    await screen.findByRole('tooltip');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    );
   });
 
   it('shows the tooltip while disabled', async () => {
