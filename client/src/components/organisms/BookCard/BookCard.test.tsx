@@ -24,6 +24,7 @@ const book: PublicBook = {
     },
   ],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],

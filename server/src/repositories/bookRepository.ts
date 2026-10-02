@@ -32,6 +32,7 @@ import {
 import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import type {
   BookDetail,
+  BookSeriesRef,
   BookSort,
   PublicBook,
   SeriesBookSummary,
@@ -180,20 +181,74 @@ async function loadCoverUrls(
   );
 }
 
+// Each Book's Series and its place N in it, in one Series query and one Books
+// query however many Books there are. N counts Published Books in Series order
+// only, so a Draft book never shifts anyone's N; a Draft row itself gets null.
+async function loadSeriesRefs(
+  rows: Pick<Book, 'id' | 'seriesId' | 'status'>[],
+  transaction?: Transaction
+): Promise<Map<number, BookSeriesRef>> {
+  const seriesIds = [
+    ...new Set(
+      rows.flatMap((row) => (row.seriesId === null ? [] : [row.seriesId]))
+    ),
+  ];
+  const refs = new Map<number, BookSeriesRef>();
+  if (seriesIds.length === 0) return refs;
+
+  const [seriesRows, published] = await Promise.all([
+    Series.findAll({
+      where: { id: seriesIds },
+      attributes: ['id', 'title'],
+      transaction,
+    }),
+    Book.findAll({
+      where: { seriesId: seriesIds, status: { [Op.ne]: 'draft' } },
+      attributes: ['id', 'seriesId'],
+      order: [
+        ['seriesId', 'ASC'],
+        ['seriesPosition', 'ASC'],
+        ['id', 'ASC'],
+      ],
+      transaction,
+    }),
+  ]);
+  const titles = new Map(seriesRows.map((row) => [row.id, row.title]));
+  const placeOf = new Map<number, number>();
+  const counted = new Map<number, number>();
+  for (const row of published) {
+    const place = (counted.get(row.seriesId as number) ?? 0) + 1;
+    counted.set(row.seriesId as number, place);
+    placeOf.set(row.id, place);
+  }
+  for (const row of rows) {
+    const title = row.seriesId === null ? undefined : titles.get(row.seriesId);
+    if (row.seriesId === null || title === undefined) continue;
+    refs.set(row.id, {
+      id: row.seriesId,
+      title,
+      position: row.status === 'draft' ? null : (placeOf.get(row.id) ?? null),
+    });
+  }
+  return refs;
+}
+
 async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const [authors, coverUrls, genres] = await Promise.all([
+  const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
     loadAuthors(credits, [book.id], transaction),
     loadCoverUrls([book.id], transaction),
     loadGenres([book.genreId], transaction),
+    loadSeriesRefs([book], transaction),
   ]);
   return toPublicBook(
     book,
     authors.get(book.id) ?? [],
     coverUrls.get(book.id) ?? null,
-    genreOf(book.genreId, genres)
+    genreOf(book.genreId, genres),
+    seriesRefs.get(book.id) ?? null
   );
 }
 
@@ -202,17 +257,19 @@ async function withAuthors(
 // favoriteRepository, whose rows embed the books they point at.
 export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
   const ids = rows.map((row) => row.id);
-  const [authors, coverUrls, genres] = await Promise.all([
+  const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
     loadAuthors(credits, ids),
     loadCoverUrls(ids),
     loadGenres(rows.map((row) => row.genreId)),
+    loadSeriesRefs(rows),
   ]);
   return rows.map((row) =>
     toPublicBook(
       row,
       authors.get(row.id) ?? [],
       coverUrls.get(row.id) ?? null,
-      genreOf(row.genreId, genres)
+      genreOf(row.genreId, genres),
+      seriesRefs.get(row.id) ?? null
     )
   );
 }
@@ -514,7 +571,6 @@ export function createSequelizeBookRepository(): BookRepository {
       const viewerId = viewer?.id ?? null;
       const book = await Book.findOne({
         where: { [Op.and]: [{ id }, await readableBookWhere(viewer)] },
-        include: [{ model: Series, as: 'series' }],
       });
       if (!book) return null;
 
@@ -557,9 +613,6 @@ export function createSequelizeBookRepository(): BookRepository {
 
       return {
         ...(await withAuthors(book)),
-        series: book.series
-          ? { id: book.series.id, title: book.series.title }
-          : null,
         likeCount,
         viewerLikeId: viewerLike?.id ?? null,
         commentCount,

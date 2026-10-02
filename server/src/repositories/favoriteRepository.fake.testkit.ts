@@ -21,6 +21,7 @@ export function aPublicBook(id: number): PublicBook {
     id,
     authors: [],
     seriesId: null,
+    series: null,
     title: `Book ${id}`,
     description: '',
     tags: [],

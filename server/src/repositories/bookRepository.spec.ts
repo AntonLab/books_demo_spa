@@ -1390,6 +1390,63 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.deepEqual(await seriesTitles(), ['Two', 'One', 'Three', 'Moved in']);
   });
 
+  test('a Draft book never counts toward N, and leaving the series clears the reference', async () => {
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId,
+      title: 'Hidden',
+      description: '',
+      tags: [],
+    });
+    const published = await fileBook('Shown');
+
+    const guestView = await repository.findDetailById(published.id, null);
+    assert.equal(guestView?.series?.position, 1);
+    assert.equal(await repository.findDetailById(draft.id, null), null);
+    const own = await repository.findDetailById(draft.id, asOwner());
+    assert.equal(own?.series?.position, null);
+    assert.equal(own?.series?.id, seriesId);
+
+    const left = await repository.update(published.id, { seriesId: null });
+    assert.equal(left?.series, null);
+  });
+
+  test('publishing a Draft book shifts the later Books by one, live', async () => {
+    const first = await repository.create({
+      userId: ownerId,
+      seriesId,
+      title: 'First',
+      description: '',
+      tags: [],
+    });
+    const second = await fileBook('Second');
+    assert.equal(
+      (await repository.findDetailById(second.id, null))?.series?.position,
+      1
+    );
+
+    await repository.update(first.id, { status: 'in_progress' });
+    assert.equal(
+      (await repository.findDetailById(first.id, null))?.series?.position,
+      1
+    );
+    assert.equal(
+      (await repository.findDetailById(second.id, null))?.series?.position,
+      2
+    );
+  });
+
+  test('the list and the detail embed the same series reference', async () => {
+    const book = await fileBook('Same');
+    const listed = (await listAsGuest({ current: 1, pageSize: 20, seriesId }))
+      .items;
+    const detail = await repository.findDetailById(book.id, null);
+    assert.deepEqual(
+      listed.find((item) => item.id === book.id)?.series,
+      detail?.series
+    );
+  });
+
   test('a book keeps its place when saved into the same series, and is appended when moved to another', async () => {
     const other = await createCreditedSeries(
       { title: 'Other', description: 'x', tags: [] },

@@ -52,6 +52,7 @@ const book: PublicBook = {
   id: 1,
   authors: [coAuthor],
   seriesId: 12,
+  series: { id: 12, title: 'The Ashgrove Chronicles', position: 1 },
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: [],

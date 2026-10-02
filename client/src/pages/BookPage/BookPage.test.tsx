@@ -64,7 +64,7 @@ const book: BookDetail = {
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  series: { id: 2, title: 'The Scale Cycle' },
+  series: { id: 2, title: 'The Scale Cycle', position: 1 },
   likeCount: 4,
   commentCount: 0,
   wordCount: 0,

@@ -108,7 +108,7 @@ test('toPublicBook leaves the Series order out — it orders a list and is never
     tags: [],
   });
 
-  assert.ok(!('seriesPosition' in toPublicBook(book, [], null, null)));
+  assert.ok(!('seriesPosition' in toPublicBook(book, [], null, null, null)));
 });
 
 test('Book belongs to a Series and reaches its Co-authors through credits', () => {
@@ -128,7 +128,7 @@ test('toPublicBook copies the tag array rather than aliasing the model', () => {
     tags: ['sci-fi'],
   });
 
-  const output = toPublicBook(book, [], null, null);
+  const output = toPublicBook(book, [], null, null, null);
   output.tags.push('mutated');
 
   assert.deepEqual(book.tags, ['sci-fi']);
@@ -145,7 +145,10 @@ test('toPublicBook parses a JSON string, should a driver return one raw', () => 
   // normalisation it would be spread character by character.
   book.setDataValue('tags', '["sci-fi","epic"]' as unknown as string[]);
 
-  assert.deepEqual(toPublicBook(book, [], null, null).tags, ['sci-fi', 'epic']);
+  assert.deepEqual(toPublicBook(book, [], null, null, null).tags, [
+    'sci-fi',
+    'epic',
+  ]);
 });
 
 test('toPublicBook reports a standalone book as seriesId: null, never undefined', () => {
@@ -156,7 +159,7 @@ test('toPublicBook reports a standalone book as seriesId: null, never undefined'
     tags: [],
   });
 
-  const output = toPublicBook(book, [], null, null);
+  const output = toPublicBook(book, [], null, null, null);
 
   assert.equal(output.seriesId, null);
   assert.ok('seriesId' in output);
@@ -170,7 +173,7 @@ test('toPublicBook reports a book with no Genre as genre: null, never undefined'
     tags: [],
   });
 
-  const output = toPublicBook(book, [], null, null);
+  const output = toPublicBook(book, [], null, null, null);
 
   assert.equal(output.genre, null);
   assert.ok('genre' in output);

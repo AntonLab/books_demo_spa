@@ -1,6 +1,7 @@
 import { NotFoundError } from '../types/errors.ts';
 import type {
   BookDetail,
+  BookSeriesRef,
   PublicBook,
   PublicGenre,
   AuthorSummary,
@@ -88,12 +89,30 @@ export function createFakeBookRepository(
       : null;
   };
 
+  // Mirrors loadSeriesRefs in the real repository: N counts Published books in
+  // Series order, and a Draft row gets null.
+  const seriesRefOf = (book: PublicBook): BookSeriesRef | null => {
+    const filedIn =
+      book.seriesId === null ? undefined : series.get(book.seriesId);
+    if (book.seriesId === null || filedIn === undefined) return null;
+    const place =
+      inSeriesOrder(book.seriesId)
+        .filter((row) => row.status !== 'draft')
+        .findIndex((row) => row.id === book.id) + 1;
+    return {
+      id: book.seriesId,
+      title: filedIn.title,
+      position: book.status === 'draft' || place === 0 ? null : place,
+    };
+  };
+
   const withCredits = (book: PublicBook): PublicBook => ({
     ...book,
     authors: (credits.get(book.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
     coverUrl: coverUrlOf(book.id),
+    series: seriesRefOf(book),
   });
 
   // Stands in for the series row's foreign key, which the real repository
@@ -150,6 +169,7 @@ export function createFakeBookRepository(
         authors: [],
         status: 'draft',
         seriesId: input.seriesId,
+        series: null,
         title: input.title,
         description: input.description,
         tags: input.tags,
@@ -206,14 +226,8 @@ export function createFakeBookRepository(
       const book = rows.get(id);
       if (!book) return null;
 
-      const filedIn =
-        book.seriesId === null ? undefined : series.get(book.seriesId);
       return {
         ...withCredits(book),
-        series:
-          book.seriesId === null || filedIn === undefined
-            ? null
-            : { id: book.seriesId, title: filedIn.title },
         likeCount: likes.count,
         // Only a signed-in caller can have a like of their own to report.
         viewerLikeId: viewer === null ? null : likes.viewerLikeId,

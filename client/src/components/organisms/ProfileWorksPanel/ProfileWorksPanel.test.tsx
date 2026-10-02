@@ -49,6 +49,7 @@ const book = {
   genre: null,
   coverUrl: null,
   seriesId: null,
+  series: null,
   ...dates,
 } as PublicBook;
 const series = {

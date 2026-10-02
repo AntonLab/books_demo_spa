@@ -36,6 +36,7 @@ const bookDetail: BookDetail = {
   id: 1,
   authors: [ann],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: [],
@@ -44,7 +45,6 @@ const bookDetail: BookDetail = {
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  series: null,
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,
@@ -161,7 +161,7 @@ describe('BookEditDetailsModal', () => {
     mockedBooks.getBook.mockResolvedValue({
       ...bookDetail,
       seriesId: 12,
-      series: { id: 12, title: 'The Scale Cycle' },
+      series: { id: 12, title: 'The Scale Cycle', position: null },
     });
     mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderModal();

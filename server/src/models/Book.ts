@@ -12,6 +12,7 @@ import type { Genre } from './Genre.ts';
 import type { Series } from './Series.ts';
 import { toTagArray } from './tagArray.ts';
 import type {
+  BookSeriesRef,
   BookStatus,
   PublicBook,
   PublicGenre,
@@ -163,12 +164,14 @@ export function toPublicBook(
   book: Book,
   authors: AuthorSummary[],
   coverUrl: string | null,
-  genre: PublicGenre | null
+  genre: PublicGenre | null,
+  series: BookSeriesRef | null
 ): PublicBook {
   return {
     id: book.id,
     authors,
     seriesId: book.seriesId ?? null,
+    series,
     title: book.title,
     description: book.description,
     tags: toTagArray(book.tags),

@@ -31,6 +31,7 @@ const book = (
     },
   ],
   seriesId: null,
+  series: null,
   title,
   description: `${title}, described`,
   tags: [],

@@ -13,6 +13,7 @@ const book: PublicBook = {
   id: 1,
   authors: [],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'Long ago.',
   tags: [],
