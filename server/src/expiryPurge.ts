@@ -1,5 +1,5 @@
 import { NOTIFICATION_READ_TTL_MS } from 'shared';
-import { logger } from './logger.ts';
+import { logger, messageOf } from './logger.ts';
 import type { NotificationRepository } from './repositories/notificationRepository.ts';
 import {
   RESET_TOKEN_RETENTION_MS,
@@ -24,10 +24,7 @@ async function attempt(purge: () => Promise<number>): Promise<number> {
   try {
     return await purge();
   } catch (error) {
-    logger.error(
-      'Expiry purge failed',
-      error instanceof Error ? error.message : String(error)
-    );
+    logger.error('Expiry purge failed', messageOf(error));
     return 0;
   }
 }

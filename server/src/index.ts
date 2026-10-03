@@ -5,7 +5,7 @@ import { loadConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { startExpiryPurge } from './expiryPurge.ts';
-import { logger } from './logger.ts';
+import { logger, messageOf } from './logger.ts';
 import { createAuthRateLimits } from './middleware/authRateLimit.ts';
 import { initModels } from './models/index.ts';
 import { createOnlineRegistry } from './online/onlineRegistry.ts';
@@ -112,9 +112,6 @@ async function main(): Promise<void> {
 }
 
 await main().catch((error: unknown) => {
-  logger.error(
-    'Fatal error during startup',
-    error instanceof Error ? error.message : String(error)
-  );
+  logger.error('Fatal error during startup', messageOf(error));
   process.exitCode = 1;
 });

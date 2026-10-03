@@ -1,5 +1,5 @@
 import { NOTIFICATION_STREAM_EVENT, type PublicNotification } from 'shared';
-import { logger } from '../logger.ts';
+import { logger, messageOf } from '../logger.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 
 // How often every open stream's session is re-checked. Also the keep-alive:
@@ -68,10 +68,7 @@ export function createOnlineRegistry(deps: OnlineRegistryDeps): OnlineRegistry {
     } catch (error) {
       // A database hiccup keeps every stream until the next check, rather
       // than signing every Account out of its live notifications.
-      logger.error(
-        'Online revalidation failed',
-        error instanceof Error ? error.message : String(error)
-      );
+      logger.error('Online revalidation failed', messageOf(error));
     }
   };
 

@@ -4,7 +4,7 @@ import type { PublicUser, SessionUser } from 'shared';
 import { permissionsFor } from '../permissions/permissionStore.ts';
 import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
 import { passwordResetMail } from '../delivery/passwordResetMail.ts';
-import { logger } from '../logger.ts';
+import { logger, messageOf } from '../logger.ts';
 import { validatedBody } from '../middleware/validate.ts';
 import { hashPassword, verifyPassword } from '../password.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
@@ -55,9 +55,6 @@ function dummyPasswordHash(): Promise<string> {
   dummyHash ??= hashPassword(randomBytes(16).toString('hex'));
   return dummyHash;
 }
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 const toSession = (user: PublicUser): SessionUser => ({
   ...user,

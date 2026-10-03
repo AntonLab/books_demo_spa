@@ -1,4 +1,4 @@
-import { logger } from './logger.ts';
+import { logger, messageOf } from './logger.ts';
 
 // How long a shutdown may take before it is forced.
 export const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -60,10 +60,7 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
       // whatever a failed listen already set), once nothing holds the loop.
       logger.info('Shutdown complete');
     } catch (error) {
-      logger.error(
-        'Shutdown failed',
-        error instanceof Error ? error.message : String(error)
-      );
+      logger.error('Shutdown failed', messageOf(error));
       deps.exit(1);
     }
   };

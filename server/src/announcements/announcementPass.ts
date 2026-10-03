@@ -1,5 +1,5 @@
 import type { MailDelivery } from '../delivery/mailDelivery.ts';
-import { logger } from '../logger.ts';
+import { logger, messageOf } from '../logger.ts';
 import type { OnlineRegistry } from '../online/onlineRegistry.ts';
 import type {
   AnnouncementRepository,
@@ -19,9 +19,6 @@ export interface AnnouncementPassDeps {
 interface AnnouncementPass {
   stop(): void;
 }
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 async function tell(
   deps: AnnouncementPassDeps,

@@ -1,6 +1,6 @@
 import type { Transaction } from 'sequelize';
 import type { PublicNotification } from 'shared';
-import { logger } from '../logger.ts';
+import { logger, messageOf } from '../logger.ts';
 
 export type PublishNotification = (
   userId: number,
@@ -39,7 +39,7 @@ export function publishAfterCommit(
         logger.error('Could not push a notification', {
           userId,
           notificationId: notification.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: messageOf(error),
         });
       }
     }
