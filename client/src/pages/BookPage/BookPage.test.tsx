@@ -909,8 +909,10 @@ describe('BookPage tabs', () => {
 
   // Only the open tab's panel: antd marks the others aria-hidden, which role
   // queries skip.
-  // The upper set comes first; the lower set's open panel is also a tabpanel.
-  const openPanel = () => within(screen.getAllByRole('tabpanel')[0]);
+  // The lower set's open panel is also a tabpanel, so pick the upper one by
+  // its label.
+  const openPanel = () =>
+    within(screen.getByRole('tabpanel', { name: /^(Chapters|Statistics)$/ }));
 
   // Each figure is one table cell holding its label and then its value.
   const statistic = (label: string) =>
