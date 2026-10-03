@@ -5,6 +5,7 @@ import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as authApi from '@/api/auth';
+import * as accountsApi from '@/api/accounts';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
@@ -12,8 +13,9 @@ import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
-import type { PublicUser } from '@/types/api';
+import type { AccountProfile, PublicUser } from '@/types/api';
 
+jest.mock('@/api/accounts');
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
@@ -23,6 +25,7 @@ jest.mock('@/api/series');
 jest.mock('@/api/favorites');
 jest.mock('@/api/genres');
 
+const mockedAccounts = jest.mocked(accountsApi);
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
@@ -32,6 +35,25 @@ const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
+
+const profile: AccountProfile = {
+  id: 7,
+  firstName: 'Margaret',
+  lastName: 'Hale',
+  avatarUrl: null,
+  about: '',
+  lastSeenAt: null,
+  bookCount: 0,
+  seriesCount: 0,
+  totals: {
+    booksInReadingLists: 0,
+    seriesInReadingLists: 0,
+    bookLikes: 0,
+    seriesLikes: 0,
+    commentsOnBooks: 0,
+    favorites: 0,
+  },
+};
 
 const LocationProbe = () => {
   const location = useLocation();
@@ -69,6 +91,7 @@ const LAZY_PAGES = [
   'ChapterPage',
   'MainPage',
   'ProfilePage',
+  'PublicProfilePage',
   'SearchPage',
   'SeriesPage',
 ];
@@ -225,6 +248,30 @@ describe('AppShell routing', () => {
 
     expect(
       await screen.findByRole('heading', { name: 'The Scale Cycle' })
+    ).toBeInTheDocument();
+  });
+
+  it.each(['/accounts/abc', '/accounts/0', '/accounts/-3', '/accounts/1.5'])(
+    'sends %s Home with a message, asking the server nothing',
+    async (route) => {
+      await expectGoneHome(route);
+      expect(mockedAccounts.getAccountProfile).not.toHaveBeenCalled();
+    }
+  );
+
+  it('sends a missing, blocked or pending Account Home (404)', async () => {
+    mockedAccounts.getAccountProfile.mockRejectedValue(
+      new ApiError(404, 'Not found')
+    );
+    await expectGoneHome('/accounts/9');
+  });
+
+  it('renders PublicProfilePage at /accounts/:id for a Guest', async () => {
+    mockedAccounts.getAccountProfile.mockResolvedValue(profile);
+    renderWithProviders(<AppShell />, { route: '/accounts/7' });
+
+    expect(
+      await screen.findByRole('heading', { name: 'Margaret Hale' })
     ).toBeInTheDocument();
   });
 
