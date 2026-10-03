@@ -29,6 +29,18 @@ text, when it was last Online (unless it hides that), totals across its
 Published works, and its Published Series and Books.
 _Avoid_: Profile (that one is private), author page
 
+**Last online**:
+When an Account was last seen signed in, accurate to five minutes. A Public
+profile shows it as "Online now", "Last online today", "Last online yesterday"
+or "Last online" with a date, and omits it when the Account hides it. Not the
+same as Online, which is a live connection.
+_Avoid_: Last seen, last active
+
+**About**:
+The plain text an Account writes about itself, up to 1000 characters, shown on
+its Public profile. Empty means the Public profile has no About block.
+_Avoid_: Bio, description (a Book or Series has one of those)
+
 **Role**:
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
 role assumed for someone with no session; no Account holds it.
