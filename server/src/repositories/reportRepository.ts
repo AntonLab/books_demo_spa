@@ -28,4 +28,18 @@ export interface ReportRepository {
     query: ListReportsQuery,
     viewer: Account
   ): Promise<{ items: ReportRow[]; total: number }>;
+
+  // take, uphold and dismiss act on every Report of the Comment in the state
+  // the action needs. Errors in this order: NotFoundError('Comment', id);
+  // ForbiddenError when `moderator` owns the Comment; StateConflictError (409)
+  // when no Report is in that state (take: 'new'; uphold, dismiss:
+  // 'in_review'). Settled Reports are never touched. Each records
+  // `moderator` (whoever acts last). `take` moves 'new' to 'in_review' and
+  // sets takenAt. `uphold` moves 'in_review' to 'upheld', sets settledAt and
+  // the Comment's tombstone to 'removed' only where it is null. `dismiss`
+  // moves 'in_review' to 'dismissed', sets settledAt and stores the Comment's
+  // current text in settledText.
+  take(commentId: number, moderator: Account): Promise<void>;
+  uphold(commentId: number, moderator: Account): Promise<void>;
+  dismiss(commentId: number, moderator: Account): Promise<void>;
 }

@@ -55,7 +55,47 @@ export function createFakeReportRepository(options: {
   rows: FakeReport[];
 }): ReportRepository {
   const { accounts, comments, rows } = options;
+  const act = (
+    commentId: number,
+    moderator: Account,
+    needed: ReportStatus,
+    apply: (row: FakeReport, comment: FakeComment) => void
+  ) => {
+    const comment = comments.get(commentId);
+    if (!comment) throw new NotFoundError('Comment', commentId);
+    if (comment.userId === moderator.id) throw new ForbiddenError();
+    const matching = rows.filter(
+      (row) => row.commentId === commentId && row.status === needed
+    );
+    if (!matching.length) {
+      throw new StateConflictError(`Comment has no ${needed} report`);
+    }
+    for (const row of matching) {
+      row.moderatorId = moderator.id;
+      apply(row, comment);
+    }
+  };
   return {
+    async take(commentId: number, moderator: Account) {
+      act(commentId, moderator, 'new', (row) => {
+        row.status = 'in_review';
+        row.takenAt = new Date();
+      });
+    },
+    async uphold(commentId: number, moderator: Account) {
+      act(commentId, moderator, 'in_review', (row, comment) => {
+        row.status = 'upheld';
+        row.settledAt = new Date();
+        comment.tombstone ??= 'removed';
+      });
+    },
+    async dismiss(commentId: number, moderator: Account) {
+      act(commentId, moderator, 'in_review', (row, comment) => {
+        row.status = 'dismissed';
+        row.settledAt = new Date();
+        row.settledText = comment.text;
+      });
+    },
     async create(
       commentId: number,
       input: CreateReportInput,

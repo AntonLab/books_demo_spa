@@ -1,9 +1,10 @@
 import { describe } from 'node:test';
-import { reportCreateContract } from './reportRepository.contract.testkit.ts';
 import {
-  reportListContract,
-  type ReportListWorld,
-} from './reportRepository.list.contract.testkit.ts';
+  reportActionsContract,
+  type ReportActionsWorld,
+} from './reportRepository.actions.contract.testkit.ts';
+import { reportCreateContract } from './reportRepository.contract.testkit.ts';
+import { reportListContract } from './reportRepository.list.contract.testkit.ts';
 import {
   createFakeReportRepository,
   type FakeAccount,
@@ -12,7 +13,7 @@ import {
 } from './reportRepository.fake.testkit.ts';
 
 describe('the fake reportRepository', () => {
-  const setUp = async (): Promise<ReportListWorld> => {
+  const setUp = async (): Promise<ReportActionsWorld> => {
     const accounts = new Map<number, FakeAccount>();
     const comments = new Map<number, FakeComment>();
     const rows: FakeReport[] = [];
@@ -83,6 +84,18 @@ describe('the fake reportRepository', () => {
         const comment = comments.get(commentId);
         if (comment) comment.tombstone = kind;
       },
+      async commentTombstone(commentId: number) {
+        return comments.get(commentId)?.tombstone ?? null;
+      },
+      async reportState(reportId: number) {
+        const row = rows.find((candidate) => candidate.id === reportId);
+        return {
+          moderatorId: row?.moderatorId ?? null,
+          takenAt: row?.takenAt ?? null,
+          settledAt: row?.settledAt ?? null,
+          settledText: row?.settledText ?? null,
+        };
+      },
       async storedReports(commentId: number) {
         return rows
           .filter((row) => row.commentId === commentId)
@@ -110,4 +123,5 @@ describe('the fake reportRepository', () => {
   };
   reportCreateContract(setUp);
   reportListContract(setUp);
+  reportActionsContract(setUp);
 });
