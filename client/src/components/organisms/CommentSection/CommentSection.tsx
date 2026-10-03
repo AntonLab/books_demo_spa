@@ -67,13 +67,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const [composing, setComposing] = useState<Composing | null>(null);
   const [reporting, setReporting] = useState<number | null>(null);
 
-  // The heading is rendered by every branch rather than only the loaded one,
-  // so the section keeps its place on the page while the thread is in flight.
+  // The Book page's tab label names the region, so no heading here. Every
+  // branch renders the row, so the section keeps its height while the thread
+  // is in flight.
   const header = (action?: ReactNode) => (
-    <Flex justify="space-between" align="center" className={styles.header}>
-      <Typography.Title level={3} className={styles.title}>
-        Comments
-      </Typography.Title>
+    <Flex justify="flex-end" align="center" className={styles.header}>
       {action}
     </Flex>
   );

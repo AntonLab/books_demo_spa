@@ -13,6 +13,7 @@ import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
+import * as readingListsApi from '@/api/readingLists';
 import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
 import * as libraryApi from '@/api/library';
@@ -38,6 +39,7 @@ const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
+const mockedReadingLists = jest.mocked(readingListsApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedLibrary = jest.mocked(libraryApi);
 const mockedSeries = jest.mocked(seriesApi);
@@ -144,8 +146,11 @@ const unsavedFor = (
   },
 });
 
+const noLists = { items: [], total: 0, current: 1, pageSize: 10 };
+
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedReadingLists.listReadingLists.mockResolvedValue(noLists);
   mockedBooks.getBook.mockResolvedValue(book);
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
   mockedSeries.listSeries.mockResolvedValue({
@@ -487,10 +492,122 @@ describe('BookPage', () => {
     // The tab took the old section's place, heading and all.
     expect(screen.queryByRole('heading', { name: 'Chapters' })).toBeNull();
     expect(
-      screen.getByRole('heading', { name: 'Comments' })
+      screen.getByRole('tab', { name: 'Comments (0)' })
     ).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('BookPage lower tabs', () => {
+  const listsPage = (total: number) => ({
+    items: [
+      {
+        id: 4,
+        title: 'Cold nights',
+        description: '',
+        tags: [],
+        owner: { id: 9, login: 'reader' },
+        itemCount: 2,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+    total,
+    current: 1,
+    pageSize: 10,
+  });
+
+  it('counts the Comments from the Book and opens on them, the thread inside the tab', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 3 });
+    renderPage();
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (3)', selected: true })
+    ).toBeInTheDocument();
+    // The tab label names the region: no second "Comments" heading inside it.
+    expect(screen.queryByRole('heading', { name: 'Comments' })).toBeNull();
+  });
+
+  it('counts the lists holding the Book before the tab is opened, then lists them with links', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    const tab = await screen.findByRole('tab', { name: 'Reading lists (1)' });
+    expect(tab).toHaveAttribute('aria-selected', 'false');
+    expect(mockedReadingLists.listReadingLists).toHaveBeenCalledWith({
+      bookId: 1,
+      current: 1,
+      pageSize: 10,
+    });
+
+    await userEvent.click(tab);
+
+    expect(
+      await screen.findByRole('link', { name: 'Cold nights' })
+    ).toHaveAttribute('href', '/lists/4');
+  });
+
+  it('shows the empty message on a Book no list holds', async () => {
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('tab', { name: 'Reading lists (0)' })
+    );
+
+    expect(
+      await screen.findByText('Not in any reading list yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a Guest both lower tabs with their counts and no write controls', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (2)' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Reading lists (1)' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add comment' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Add to reading list' })
+    ).toBeNull();
+  });
+
+  it('keeps the closed Comments section and an empty Reading lists tab on a Draft', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    expect(
+      await screen.findByText('Comments are closed while this book is a draft.')
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('tab', { name: 'Reading lists (0)' })
+    );
+    expect(
+      await screen.findByText('Not in any reading list yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('raises the Comments count when a Comment is posted and the Book refetches', async () => {
+    mockedBooks.getBook
+      .mockResolvedValueOnce({ ...book, commentCount: 0 })
+      .mockResolvedValue({ ...book, commentCount: 1 });
+    mockedComments.createComment.mockResolvedValue({} as never);
+    renderPage(reader);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add comment' })
+    );
+    await userEvent.type(screen.getByRole('textbox'), 'Lovely');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (1)' })
+    ).toBeInTheDocument();
   });
 });
 
@@ -600,7 +717,7 @@ describe('BookPage on a draft', () => {
     expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
 
-  it('keeps both upper tabs on a draft', async () => {
+  it('keeps all four tabs on a draft', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
 
     renderPage({ ...reader, id: 4, role: 'author' });
@@ -609,6 +726,8 @@ describe('BookPage on a draft', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
+      'Comments (0)',
+      'Reading lists (0)',
     ]);
   });
 });
@@ -790,7 +909,8 @@ describe('BookPage tabs', () => {
 
   // Only the open tab's panel: antd marks the others aria-hidden, which role
   // queries skip.
-  const openPanel = () => within(screen.getByRole('tabpanel'));
+  // The upper set comes first; the lower set's open panel is also a tabpanel.
+  const openPanel = () => within(screen.getAllByRole('tabpanel')[0]);
 
   // Each figure is one table cell holding its label and then its value.
   const statistic = (label: string) =>
@@ -810,6 +930,8 @@ describe('BookPage tabs', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
+      'Comments (0)',
+      'Reading lists (0)',
     ]);
     expect(
       screen.getByRole('tab', { name: 'Chapters', selected: true })

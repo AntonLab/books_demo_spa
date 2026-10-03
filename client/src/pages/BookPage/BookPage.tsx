@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { EditOutlined } from '@ant-design/icons';
+import {
+  CommentOutlined,
+  EditOutlined,
+  UnorderedListOutlined,
+} from '@ant-design/icons';
 import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
@@ -15,6 +19,8 @@ import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
+import { BookReadingListsTab } from '@/components/organisms/BookReadingListsTab/BookReadingListsTab';
+import { useBookReadingLists } from '@/components/organisms/BookReadingListsTab/useBookReadingLists';
 import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
 import { CommentSection } from '@/components/organisms/CommentSection/CommentSection';
 import { useSession } from '@/queries/auth';
@@ -57,6 +63,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   // Fetched in parallel with the book rather than after it: neither section
   // needs the detail response to know what to ask for.
   const chapters = useChapters(bookId);
+  const readingLists = useBookReadingLists(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
   const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
   const setStatus = useSetReadingStatus();
@@ -92,6 +99,11 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   // rest from the Edit modal. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
   const published = publishedChapters(chapters.data?.items ?? []);
+  // No count until the first response is in, so no false (0) flashes.
+  const readingListsLabel =
+    readingLists.isPending || readingLists.error !== null
+      ? 'Reading lists'
+      : `Reading lists (${readingLists.total})`;
 
   return (
     <article>
@@ -195,7 +207,25 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
       <Divider />
 
-      <CommentSection bookId={bookId} closed={isDraft} />
+      {/* Uncontrolled like the set above: the open tab is page state
+          (ADR-0010), so a reload opens Comments. No fixed body height: the
+          thread grows with the page. */}
+      <Tabs
+        items={[
+          {
+            key: 'comments',
+            icon: <CommentOutlined aria-hidden />,
+            label: `Comments (${book.commentCount})`,
+            children: <CommentSection bookId={bookId} closed={isDraft} />,
+          },
+          {
+            key: 'readingLists',
+            icon: <UnorderedListOutlined aria-hidden />,
+            label: readingListsLabel,
+            children: <BookReadingListsTab list={readingLists} />,
+          },
+        ]}
+      />
 
       {editing && (
         <BookEditDetailsModal
