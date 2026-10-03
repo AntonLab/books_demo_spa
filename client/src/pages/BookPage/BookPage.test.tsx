@@ -230,7 +230,7 @@ describe('BookPage', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('link', { name: 'The Scale Cycle' })
+      await screen.findByRole('link', { name: 'The Scale Cycle · Book 1' })
     ).toHaveAttribute('href', '/series/2');
   });
 
@@ -600,14 +600,13 @@ describe('BookPage on a draft', () => {
     expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
 
-  it('keeps all three tabs on a draft', async () => {
+  it('keeps both upper tabs on a draft', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
 
     renderPage({ ...reader, id: 4, role: 'author' });
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Description',
       'Chapters',
       'Statistics',
     ]);
@@ -620,8 +619,10 @@ describe('BookPage Edit button', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
 
+    // Unnamed: the clicked Edit button keeps focus, and its tooltip then
+    // becomes the dialog's accessible name.
     expect(
-      await screen.findByRole('dialog', { name: 'Edit book' })
+      within(await screen.findByRole('dialog')).getByText('Edit book')
     ).toBeInTheDocument();
   });
 
@@ -718,6 +719,54 @@ describe('BookPage Unsaved text', () => {
   });
 });
 
+describe('BookPage header and action row', () => {
+  const moderator: PublicUser = { ...reader, id: 50, role: 'admin' };
+
+  it('shows the whole description in the header card, under the title', async () => {
+    const long = 'Long ago, in a kingdom of scales. '.repeat(30).trim();
+    mockedBooks.getBook.mockResolvedValue({ ...book, description: long });
+    renderPage();
+
+    expect(await screen.findByText(long)).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Description' })).toBeNull();
+  });
+
+  it('lays the actions out as Like, Favorite, Library status, Add to reading list, Edit, then the library counts', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+    renderPage(moderator);
+
+    const names = [
+      await screen.findByRole('button', { name: 'Like' }),
+      screen.getByRole('button', { name: 'Add to favorites' }),
+      screen.getByRole('combobox', { name: 'Reading status' }),
+      screen.getByRole('button', { name: 'Add to reading list' }),
+      screen.getByRole('button', { name: 'Edit' }),
+      screen.getByText('In 0 libraries'),
+    ];
+    names.slice(1).forEach((node, index) => {
+      expect(
+        names[index]!.compareDocumentPosition(node) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+  });
+
+  it('shows the Edit icon button with an Edit tooltip', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.hover(await screen.findByRole('button', { name: 'Edit' }));
+
+    expect(await screen.findByRole('tooltip', { name: 'Edit' })).toBeVisible();
+  });
+
+  it('shows a Guest only the library counts under the card', async () => {
+    renderPage();
+
+    expect(await screen.findByText('In 0 libraries')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+});
+
 describe('BookPage tabs', () => {
   const chapter: ChapterSummary = {
     id: 21,
@@ -754,29 +803,17 @@ describe('BookPage tabs', () => {
     await userEvent.click(screen.getByRole('tab', { name }));
   };
 
-  it('opens on Description, the first of three tabs', async () => {
+  it('opens on Chapters, the first of two upper tabs, with no Description tab', async () => {
     renderPage();
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Description',
       'Chapters',
       'Statistics',
     ]);
     expect(
-      screen.getByRole('tab', { name: 'Description', selected: true })
+      screen.getByRole('tab', { name: 'Chapters', selected: true })
     ).toBeInTheDocument();
-    expect(
-      openPanel().getByText('Long ago, in a kingdom of scales.')
-    ).toBeInTheDocument();
-  });
-
-  it('shows a placeholder for a description that is only blanks', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, description: ' \n\t ' });
-
-    renderPage();
-
-    expect(await screen.findByText('No description yet.')).toBeInTheDocument();
   });
 
   it('numbers only the published chapters, even for a Co-author', async () => {

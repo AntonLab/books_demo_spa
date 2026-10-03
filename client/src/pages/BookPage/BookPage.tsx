@@ -1,31 +1,17 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Divider,
-  Empty,
-  Flex,
-  Skeleton,
-  Space,
-  Tabs,
-  Tag,
-  theme,
-  Typography,
-} from 'antd';
-import { Link, useNavigate, useParams } from 'react-router';
+import { EditOutlined } from '@ant-design/icons';
+import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
+import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
-import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
 import { ReadingStatusSelect } from '@/components/molecules/ReadingStatusSelect/ReadingStatusSelect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
-import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
-import { TagList } from '@/components/molecules/TagList/TagList';
 import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
@@ -38,7 +24,6 @@ import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
 import { useSetReadingStatus } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
-import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
 import {
   bookCapabilities,
@@ -113,124 +98,74 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       {/* The chapter pages turn this Account away, so this is the only place
           its Unsaved text shows. */}
       {!mayEdit && <BookUnsavedTextNotices bookId={bookId} />}
-      {/* Flex, not Space: Space wraps each child in a div.ant-space-item
-          that carries no flex rule of its own, so a flex style on a child
-          beneath it does nothing. Flex's children are the flex items
-          themselves. */}
-      <Flex align="start" gap={token.margin} className={styles.row}>
-        <BookCover coverUrl={book.coverUrl} title={book.title} />
-        {/* flex: 1 lets this column take the rest of the row; minWidth: 0
-            overrides the flex item's default content-based floor, so long
-            text wraps instead of forcing horizontal scroll at phone
-            width. */}
-        <div className={styles.body}>
-          <Typography.Title level={2} className={styles.title}>
-            {book.title}
-          </Typography.Title>
+      <BookCard book={book} heading />
 
-          <Space size={token.marginSM} wrap>
-            <Space size={4} wrap>
-              {book.authors.map((author, index) => (
-                <Space key={author.id} size={4}>
-                  <AccountAvatar
-                    avatarUrl={author.avatarUrl}
-                    name={`${author.firstName} ${author.lastName}`}
-                    size="small"
-                  />
-                  <Typography.Text>
-                    {`${author.firstName} ${author.lastName}${
-                      index < book.authors.length - 1 ? ',' : ''
-                    }`}
-                  </Typography.Text>
-                </Space>
-              ))}
-            </Space>
-            <Tag color={BOOK_STATUS_COLORS[book.status]}>
-              {BOOK_STATUS_LABELS[book.status]}
-            </Tag>
-            {mayEdit && (
-              <Button size="small" onClick={() => setEditing(true)}>
-                Edit
-              </Button>
-            )}
-            {book.series && (
-              <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
-            )}
-            {book.genre !== null && <GenrePath genre={book.genre} />}
-            {mayLike && (
-              <LikeButton
-                count={book.likeCount}
-                likedId={book.viewerLikeId}
-                onToggle={(existingId) =>
-                  toggleLike.mutate({
-                    existingId,
-                    payload: { bookId: book.id, isLike: true },
-                  })
-                }
-              />
-            )}
-            {mayFavorite && (
-              <FavoriteButton
-                count={book.favoriteCount}
-                favoriteId={book.viewerFavoriteId}
-                // A second click before the refetch lands would send the
-                // same add twice and meet a 409.
-                disabled={toggleFavorite.isPending}
-                onToggle={(existingId) =>
-                  toggleFavorite.mutate({
-                    existingId,
-                    payload: { bookId: book.id },
-                  })
-                }
-              />
-            )}
-            {mayAddBookToReadingList(book, session) && (
-              <AddToReadingList target={{ bookId: book.id }} />
-            )}
-            {mayKeepInLibrary && (
-              <ReadingStatusSelect
-                // Its own id: rc-component's generated ids all read `test-id`
-                // under Jest, and this select would then name any modal whose
-                // title is labelled by that id.
-                id="book-reading-status"
-                value={book.viewerReadingStatus}
-                disabled={setStatus.isPending}
-                onChange={(status) =>
-                  setStatus.mutate(
-                    { bookId: book.id, status },
-                    { onError: toastError }
-                  )
-                }
-              />
-            )}
-          </Space>
+      <Space size={token.marginSM} wrap>
+        {mayLike && (
+          <LikeButton
+            count={book.likeCount}
+            likedId={book.viewerLikeId}
+            onToggle={(existingId) =>
+              toggleLike.mutate({
+                existingId,
+                payload: { bookId: book.id, isLike: true },
+              })
+            }
+          />
+        )}
+        {mayFavorite && (
+          <FavoriteButton
+            count={book.favoriteCount}
+            favoriteId={book.viewerFavoriteId}
+            // A second click before the refetch lands would send the
+            // same add twice and meet a 409.
+            disabled={toggleFavorite.isPending}
+            onToggle={(existingId) =>
+              toggleFavorite.mutate({
+                existingId,
+                payload: { bookId: book.id },
+              })
+            }
+          />
+        )}
+        {mayKeepInLibrary && (
+          <ReadingStatusSelect
+            // Its own id: rc-component's generated ids all read `test-id`
+            // under Jest, and this select would then name any modal whose
+            // title is labelled by that id.
+            id="book-reading-status"
+            value={book.viewerReadingStatus}
+            disabled={setStatus.isPending}
+            onChange={(status) =>
+              setStatus.mutate(
+                { bookId: book.id, status },
+                { onError: toastError }
+              )
+            }
+          />
+        )}
+        {mayAddBookToReadingList(book, session) && (
+          <AddToReadingList target={{ bookId: book.id }} />
+        )}
+        {mayEdit && (
+          <IconButton
+            type="text"
+            size="small"
+            label="Edit"
+            icon={<EditOutlined aria-hidden />}
+            onClick={() => setEditing(true)}
+          />
+        )}
+      </Space>
 
-          <BookLibraryCounts counts={book.libraryCounts} />
-
-          {book.tags.length > 0 && (
-            <div className={styles.tags}>
-              <TagList tags={book.tags} />
-            </div>
-          )}
-        </div>
-      </Flex>
+      <BookLibraryCounts counts={book.libraryCounts} />
 
       {/* Uncontrolled: the open tab is this page's own state (ADR-0010) and
-          never reaches the URL, so a reload opens Description. */}
+          never reaches the URL, so a reload opens Chapters. */}
       <Tabs
         className={styles.tabs}
         classNames={{ body: styles.tabsBody }}
         items={[
-          {
-            key: 'description',
-            label: 'Description',
-            children:
-              book.description.trim() === '' ? (
-                <Empty description="No description yet." />
-              ) : (
-                <Typography.Paragraph>{book.description}</Typography.Paragraph>
-              ),
-          },
           {
             key: 'chapters',
             label: 'Chapters',
