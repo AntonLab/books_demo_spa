@@ -13,8 +13,10 @@ import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../models/Genre.ts';
+import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesCover } from '../models/SeriesCover.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
@@ -1086,6 +1088,134 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         items: [],
         total: 0,
       });
+    });
+
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
+    let readers = 0;
+
+    const chapters = (bookId: number, at: (Date | null)[]) =>
+      Chapter.bulkCreate(
+        at.map((publishedAt, index) => ({
+          bookId,
+          title: `Chapter ${index + 1}`,
+          text: 'text',
+          publishedAt,
+          position: index + 1,
+        }))
+      );
+    const react = async (bookId: number, isLikes: boolean[]) => {
+      for (const isLike of isLikes) {
+        readers += 1;
+        const reader = await User.create({
+          login: `reader${readers}`,
+          email: `reader${readers}@example.com`,
+          password: 'hunter2hunter2',
+          firstName: 'Rea',
+          lastName: 'Der',
+        });
+        await Like.create({ userId: reader.id, bookId, isLike });
+      }
+    };
+    const titlesOf = async (sort: 'popular' | 'new' | 'updated') => {
+      const { items, total } = await page({ published: 'true', sort });
+      return { titles: items.map((series) => series.title), total };
+    };
+
+    // S1 holds a Book released 5 days ago and one updated 1 day ago (and a
+    // Chapter still scheduled); S2 one Book from 3 days ago; S3 only a scheduled
+    // Chapter; S4 a Published Book with no Chapter; S5 only a Draft whose old
+    // Chapter and Likes must not count.
+    const rankedScenario = async () => {
+      const s1 = await makeSeries('S1');
+      await chapters((await fileBook(s1.id)).id, [daysFromNow(-5)]);
+      await chapters((await fileBook(s1.id)).id, [
+        daysFromNow(-1),
+        daysFromNow(2),
+      ]);
+      const s2 = await makeSeries('S2');
+      await chapters((await fileBook(s2.id)).id, [daysFromNow(-3)]);
+      const s3 = await makeSeries('S3');
+      await chapters((await fileBook(s3.id)).id, [daysFromNow(1)]);
+      const s4 = await makeSeries('S4');
+      await fileBook(s4.id);
+      const s5 = await makeSeries('S5');
+      const draft = await fileBook(s5.id, 'draft');
+      await chapters(draft.id, [daysFromNow(-20)]);
+      await react(draft.id, [true, true, true, true, true]);
+    };
+
+    test('a published, sorted list of an Account with no Series is empty, not an error', async () => {
+      for (const sort of ['popular', 'new', 'updated'] as const) {
+        assert.deepEqual(
+          await page({ userId: ownerId, published: 'true', sort }),
+          { items: [], total: 0 }
+        );
+      }
+    });
+
+    test('popular sums the Likes on its Published Books, dislikes and Drafts aside, ties newest first', async () => {
+      const loved = await makeSeries('Loved');
+      await react((await fileBook(loved.id)).id, [true]);
+      await react((await fileBook(loved.id)).id, [true, true]);
+      const mixed = await makeSeries('Mixed');
+      await react((await fileBook(mixed.id)).id, [true, false, false]);
+      await react((await fileBook(mixed.id, 'draft')).id, [
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]);
+      await fileBook((await makeSeries('Quiet A')).id);
+      await fileBook((await makeSeries('Quiet B')).id);
+      await fileBook((await makeSeries('Draft only')).id, 'draft');
+
+      const popular = await titlesOf('popular');
+      assert.deepEqual(popular.titles, [
+        'Loved',
+        'Mixed',
+        'Quiet B',
+        'Quiet A',
+      ]);
+      assert.equal(popular.total, 4);
+    });
+
+    test('new ranks by the earliest Release time among its Published Books, the unreleased last', async () => {
+      await rankedScenario();
+
+      // S2 (3 days) beats S1 (5 days); S4 then S3 have none, newest id first.
+      assert.deepEqual(await titlesOf('new'), {
+        titles: ['S2', 'S1', 'S4', 'S3'],
+        total: 4,
+      });
+    });
+
+    test('updated ranks by the latest Last update among its Published Books, a scheduled Chapter aside, the unreleased last', async () => {
+      await rankedScenario();
+
+      // S1 (1 day) beats S2 (3 days).
+      assert.deepEqual(await titlesOf('updated'), {
+        titles: ['S1', 'S2', 'S4', 'S3'],
+        total: 4,
+      });
+    });
+
+    test('a sorted list pages by limit and offset over the same order', async () => {
+      await rankedScenario();
+
+      const second = await page({
+        published: 'true',
+        sort: 'new',
+        limit: 2,
+        offset: 2,
+      });
+
+      assert.deepEqual(
+        second.items.map((series) => series.title),
+        ['S4', 'S3']
+      );
+      assert.equal(second.total, 4);
     });
   });
 

@@ -305,6 +305,21 @@ test('GET list takes published=true and refuses any other value with 400', async
   );
 });
 
+test('GET list takes a known sort and refuses any other with 400', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      for (const sort of ['popular', 'new', 'updated']) {
+        const response = await fetch(
+          `${base}/api/series?published=true&sort=${sort}`
+        );
+        assert.equal(response.status, 200, sort);
+      }
+      assert.equal((await fetch(`${base}/api/series?sort=oldest`)).status, 400);
+    }
+  );
+});
+
 test('GET list returns items with the paging envelope', async () => {
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository() },

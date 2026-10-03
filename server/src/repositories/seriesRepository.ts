@@ -1,5 +1,5 @@
-import { col, fn, Op, where as sequelizeWhere } from 'sequelize';
-import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
+import { col, fn, literal, Op, where as sequelizeWhere } from 'sequelize';
+import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
@@ -21,7 +21,12 @@ import {
   loadGenres,
 } from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { ListResponse, PublicSeries, SeriesDetail } from 'shared';
+import type {
+  BookSort,
+  ListResponse,
+  PublicSeries,
+  SeriesDetail,
+} from 'shared';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -221,6 +226,23 @@ async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
   );
 }
 
+// What `?sort=` ranks a series row by: the Book sorts over its non-Draft Books,
+// as correlated subqueries (NULL for a series with no Published Chapter, 0 Likes
+// for `popular`). Chapters count once their Publication time has passed, as
+// bookRepository's publicationEdge judges them; the escaped Date is the only
+// value spliced in.
+function seriesRankOf(sort: BookSort): Utils.Literal {
+  if (sort === 'popular') {
+    return literal(
+      "(SELECT COUNT(*) FROM `likes` JOIN `books` ON `books`.`id` = `likes`.`bookId` WHERE `books`.`seriesId` = `Series`.`id` AND `books`.`status` <> 'draft' AND `likes`.`isLike` = true)"
+    );
+  }
+  const now = sequelizeOf().escape(new Date());
+  return literal(
+    `(SELECT ${sort === 'new' ? 'MIN' : 'MAX'}(\`chapters\`.\`publishedAt\`) FROM \`chapters\` JOIN \`books\` ON \`books\`.\`id\` = \`chapters\`.\`bookId\` WHERE \`books\`.\`seriesId\` = \`Series\`.\`id\` AND \`books\`.\`status\` <> 'draft' AND \`chapters\`.\`publishedAt\` <= ${now})`
+  );
+}
+
 // creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
 // LIMIT keeps paging over series rather than credit rows.
 function buildWhere(
@@ -324,7 +346,12 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         },
         limit: query.limit,
         offset: query.offset,
-        order: [['id', 'ASC']],
+        order: query.sort
+          ? [
+              [seriesRankOf(query.sort), 'DESC'],
+              ['id', 'DESC'],
+            ]
+          : [['id', 'ASC']],
       });
 
       const items = await publicSeriesOf(rows);

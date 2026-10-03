@@ -150,6 +150,17 @@ test('listSeriesQuerySchema takes favoritedBy=me and refuses any other value', (
   }
 });
 
+test('listSeriesQuerySchema takes a Book sort and refuses any other', () => {
+  for (const sort of ['popular', 'new', 'updated']) {
+    assert.equal(listSeriesQuerySchema.parse({ sort }).sort, sort);
+  }
+  assert.equal(listSeriesQuerySchema.parse({}).sort, undefined);
+  assert.equal(
+    listSeriesQuerySchema.safeParse({ sort: 'oldest' }).success,
+    false
+  );
+});
+
 test('listSeriesQuerySchema takes published=true and refuses any other value', () => {
   assert.equal(
     listSeriesQuerySchema.parse({ published: 'true' }).published,
