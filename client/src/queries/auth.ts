@@ -34,6 +34,24 @@ interface SessionChannel {
 
 const sessionHash = hashKey(queryKeys.session);
 
+// A list key is `['books' | 'series', params]`; a detail key has a number at
+// index 1 and never matches. Another user's `userId` list is public and stays.
+const isAccountList = (
+  queryKey: readonly unknown[],
+  accountId: number | null
+): boolean => {
+  const [scope, params] = queryKey;
+  if ((scope !== 'books' && scope !== 'series') || typeof params !== 'object') {
+    return false;
+  }
+  if (params === null) return false;
+  const { favoritedBy, userId } = params as {
+    favoritedBy?: unknown;
+    userId?: unknown;
+  };
+  return favoritedBy === 'me' || (accountId !== null && userId === accountId);
+};
+
 // A session is a cookie every tab of the browser shares, so a sign-in or Sign
 // out in one tab changes who every other tab is acting as — a tab still showing
 // the old Account would send its writes as the new one. Two duties, for the
@@ -75,10 +93,15 @@ export const watchSession = (
       // refetch while the bell is still mounted would ask as the next one (a
       // Guest's 401 on Sign out). Library and Favorites are private too: the
       // next Account must not see the last one's lists while the refetch lands.
+      // The Favorites and My works lists live under the shared `books` and
+      // `series` prefixes, so a predicate finds them.
       client.removeQueries({ queryKey: queryKeys.allNotifications });
       client.removeQueries({ queryKey: queryKeys.allLibrary });
       client.removeQueries({ queryKey: queryKeys.allFavorites });
       client.removeQueries({ queryKey: queryKeys.allMyReadingLists });
+      client.removeQueries({
+        predicate: (query) => isAccountList(query.queryKey, accountId ?? null),
+      });
       void client.invalidateQueries({
         predicate: (query) => query.queryHash !== sessionHash,
       });

@@ -314,6 +314,52 @@ describe('watchSession', () => {
     expect(client.getQueryState(key)).toBe(undefined);
   });
 
+  it("drops the last Account's Favorites and My works lists, and keeps everyone else's", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
+    const favoriteSeries = queryKeys.series({ favoritedBy: 'me', limit: 20 });
+    const myBooks = queryKeys.books({ userId: user.id, pageSize: 20 });
+    const mySeries = queryKeys.series({ userId: user.id, limit: 100 });
+    const someoneElsesBooks = queryKeys.books({ userId: 99, pageSize: 20 });
+    const mainPageBooks = queryKeys.books({ sort: 'popular', pageSize: 20 });
+    const bookDetail = queryKeys.book(7);
+    const all = [
+      favoriteBooks,
+      favoriteSeries,
+      myBooks,
+      mySeries,
+      someoneElsesBooks,
+      mainPageBooks,
+      bookDetail,
+    ];
+    all.forEach((key) => client.setQueryData(key, { items: [] }));
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    all.forEach((key) => expect(client.getQueryState(key)).toBeDefined());
+
+    client.setQueryData(queryKeys.session, null);
+    [favoriteBooks, favoriteSeries, myBooks, mySeries].forEach((key) =>
+      expect(client.getQueryState(key)).toBe(undefined)
+    );
+    [someoneElsesBooks, mainPageBooks, bookDetail].forEach((key) =>
+      expect(client.getQueryState(key)).toBeDefined()
+    );
+  });
+
+  it("drops Account A's lists when Account B signs in directly", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
+    client.setQueryData(favoriteBooks, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, id: 2, login: 'amy' });
+
+    expect(client.getQueryState(favoriteBooks)).toBe(undefined);
+  });
+
   describe('a failed request', () => {
     const failQuery = (client: QueryClient, error: ApiError) =>
       client
