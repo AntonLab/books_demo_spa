@@ -33,6 +33,10 @@ export interface CommentWithAuthor extends PublicComment {
   author: AuthorSummary | null;
   likeCount: number;
   viewerLikeId: number | null;
+  // An Open report marks the comment for every viewer, a Guest included.
+  hasOpenReport: boolean;
+  // The id of the viewer's own Report on this comment; null for a Guest.
+  viewerReportedId: number | null;
 }
 
 // The body of POST /api/comments. No userId: the author comes from the

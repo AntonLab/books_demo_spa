@@ -15,6 +15,7 @@ import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { Comment } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
+import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
@@ -77,6 +78,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   beforeEach(async () => {
     // Children first: the foreign keys forbid clearing parents out from under
     // them.
+    await Report.destroy({ where: {}, truncate: false });
     await Like.destroy({ where: {}, truncate: false });
     await Comment.destroy({ where: {}, truncate: false });
     await Book.destroy({ where: {}, truncate: false });
@@ -530,6 +532,73 @@ describe('commentRepository against real MySQL', { skip }, () => {
 
     await Book.update({ status: 'complete' }, { where: { id: bookId } });
     assert.equal(await total(null), 1);
+  });
+
+  describe('report flags', () => {
+    const listAs = (viewer: Viewer) =>
+      repository.list({ limit: 20, offset: 0, bookId }, viewer);
+
+    async function aComment() {
+      return repository.create(
+        { bookId, parentId: null, text: 'flag me' },
+        ownerId
+      );
+    }
+
+    const report = (commentId: number, extra: Partial<Report['dataValues']>) =>
+      Report.create({
+        commentId,
+        reporterId: readerId,
+        reportedAccountId: ownerId,
+        reason: 'spam',
+        ...extra,
+      });
+
+    test('a Comment with no Report carries false and null', async () => {
+      await aComment();
+      const item = (await listAs({ id: readerId, role: 'user' })).items[0];
+      assert.equal(item?.hasOpenReport, false);
+      assert.equal(item?.viewerReportedId, null);
+    });
+
+    test('an Open report shows to everyone, the reporter also gets its id', async () => {
+      const comment = await aComment();
+      const open = await report(comment.id, { status: 'in_review' });
+      const guest = (await listAs(null)).items[0];
+      const reporter = (await listAs({ id: readerId, role: 'user' })).items[0];
+      const owner = (await listAs({ id: ownerId, role: 'author' })).items[0];
+      assert.deepEqual(
+        [guest?.hasOpenReport, guest?.viewerReportedId],
+        [true, null]
+      );
+      assert.deepEqual(
+        [reporter?.hasOpenReport, reporter?.viewerReportedId],
+        [true, open.id]
+      );
+      assert.deepEqual(
+        [owner?.hasOpenReport, owner?.viewerReportedId],
+        [true, null]
+      );
+    });
+
+    test('a settled Report clears the mark but the reporter keeps its id', async () => {
+      const comment = await aComment();
+      const settled = await report(comment.id, {
+        status: 'dismissed',
+        settledAt: new Date(),
+      });
+      const reporter = (await listAs({ id: readerId, role: 'user' })).items[0];
+      assert.equal(reporter?.hasOpenReport, false);
+      assert.equal(reporter?.viewerReportedId, settled.id);
+    });
+
+    test('a System report marks the Comment but gives a Guest no id', async () => {
+      const comment = await aComment();
+      await report(comment.id, { reporterId: null, isSystem: true });
+      const guest = (await listAs(null)).items[0];
+      assert.equal(guest?.hasOpenReport, true);
+      assert.equal(guest?.viewerReportedId, null);
+    });
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

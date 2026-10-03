@@ -94,6 +94,8 @@ export function createFakeCommentRepository(
             likeCount: 0,
             // Only a signed-in caller can have a like of their own to report.
             viewerLikeId: viewer === null ? null : viewerLikeId,
+            hasOpenReport: false,
+            viewerReportedId: null,
           })),
         total: matching.length,
       };

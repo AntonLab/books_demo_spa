@@ -192,7 +192,13 @@ test('toCommentWithAuthor names no author for a tombstone', () => {
     avatarUrl: null,
   };
 
-  assert.equal(toCommentWithAuthor(comment, author, 0, null).author, null);
+  assert.equal(
+    toCommentWithAuthor(comment, author, 0, null, {
+      hasOpenReport: false,
+      viewerReportedId: null,
+    }).author,
+    null
+  );
 });
 
 test('toPublicComment normalises a missing parentId to null, as books do for seriesId', () => {

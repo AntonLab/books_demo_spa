@@ -7,9 +7,11 @@ import {
 } from '../models/Comment.ts';
 import { Book } from '../models/Book.ts';
 import { Like } from '../models/Like.ts';
+import { Report } from '../models/Report.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { loadAvatarUrls } from './userRepository.ts';
+import { OPEN_REPORT_STATUSES } from 'shared';
 import type {
   CommentWithAuthor,
   ListResponse,
@@ -160,6 +162,37 @@ export function createSequelizeCommentRepository(): CommentRepository {
         }
       }
 
+      // A Guest has no reporterId clause: `reporterId = null` would match the
+      // System reports.
+      const reports =
+        ids.length === 0
+          ? []
+          : await Report.findAll({
+              attributes: ['id', 'commentId', 'reporterId', 'status'],
+              where: {
+                commentId: ids,
+                [Op.or]: [
+                  { status: [...OPEN_REPORT_STATUSES] },
+                  ...(viewerId === null ? [] : [{ reporterId: viewerId }]),
+                ],
+              },
+              raw: true,
+            });
+
+      const openReported = new Set<number>();
+      const viewerReports = new Map<number, number>();
+      for (const report of reports) {
+        if (report.commentId === null) continue;
+        if (
+          (OPEN_REPORT_STATUSES as readonly string[]).includes(report.status)
+        ) {
+          openReported.add(report.commentId);
+        }
+        if (viewerId !== null && report.reporterId === viewerId) {
+          viewerReports.set(report.commentId, report.id);
+        }
+      }
+
       const avatarUrls = await loadAvatarUrls(
         rows.flatMap((row) => (row.user ? [row.user.id] : []))
       );
@@ -179,7 +212,11 @@ export function createSequelizeCommentRepository(): CommentRepository {
               ? toAuthorSummary(row.user, avatarUrls.get(row.user.id) ?? null)
               : null,
             counts.get(row.id) ?? 0,
-            viewerLikes.get(row.id) ?? null
+            viewerLikes.get(row.id) ?? null,
+            {
+              hasOpenReport: openReported.has(row.id),
+              viewerReportedId: viewerReports.get(row.id) ?? null,
+            }
           );
         }),
         total: count,

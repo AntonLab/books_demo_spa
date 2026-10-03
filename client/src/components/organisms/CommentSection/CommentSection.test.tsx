@@ -47,6 +47,8 @@ const root: CommentWithAuthor = {
   },
   likeCount: 0,
   viewerLikeId: null,
+  hasOpenReport: false,
+  viewerReportedId: null,
 };
 
 const reply: CommentWithAuthor = {

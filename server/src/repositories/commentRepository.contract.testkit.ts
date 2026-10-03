@@ -115,6 +115,20 @@ export function commentRepositoryContract(
     assert.equal(page.total, 2);
   });
 
+  test('contract: listed comments carry no report flags while nothing is reported', async () => {
+    const { repository, anAccount, aBook } = await setUp();
+    const actorId = await anAccount();
+    const bookId = await aBook();
+    await repository.create({ bookId, parentId: null, text: 'Plain' }, actorId);
+    const query = { limit: 20, offset: 0, bookId };
+
+    for (const viewer of [null, { id: actorId, role: 'user' as const }]) {
+      const item = (await repository.list(query, viewer)).items[0];
+      assert.equal(item?.hasOpenReport, false);
+      assert.equal(item?.viewerReportedId, null);
+    }
+  });
+
   test('contract: an update rewrites the text and keeps the owner', async () => {
     const { repository, anAccount, aBook } = await setUp();
     const actorId = await anAccount();

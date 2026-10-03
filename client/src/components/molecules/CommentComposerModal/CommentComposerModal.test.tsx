@@ -21,6 +21,8 @@ const target: CommentWithAuthor = {
   },
   likeCount: 2,
   viewerLikeId: null,
+  hasOpenReport: false,
+  viewerReportedId: null,
 };
 
 const renderModal = (
