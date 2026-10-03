@@ -13,18 +13,20 @@ its own when you Read a file its `paths:` names — writing or editing one does
 not. Before creating a file, or changing a topic whose files you have not
 read, read the rule first:
 
-| Rule                | Covers                                                                 |
-| ------------------- | ---------------------------------------------------------------------- |
-| `api.md`            | `request()`, its body and CSRF traps, the per-module request contract  |
-| `queries.md`        | retries, the session shape, mutation wrapping, invalidation            |
-| `store.md`          | the two slices, `localStorage` persistence, binding to the Account     |
-| `components.md`     | component traps: menus, comments, cards, images, icons, sortable lists |
-| `chapter-editor.md` | the Chapter editor modal: saving, conflicts, Unsaved text              |
-| `pages.md`          | page-level rules                                                       |
-| `routing.md`        | App shell: lazy loading, `Suspense`/`ErrorBoundary`, provider order    |
-| `styling.md`        | tokens and quarks, CSS Modules, the antd cascade layer                 |
-| `testing.md`        | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
-| `webpack.md`        | the typed webpack config parts, how Node loads them, build traps       |
+| Rule                   | Covers                                                                 |
+| ---------------------- | ---------------------------------------------------------------------- |
+| `api.md`               | `request()`, its body and CSRF traps, the per-module request contract  |
+| `queries.md`           | retries, the session shape, mutation wrapping, invalidation            |
+| `store.md`             | the two slices, `localStorage` persistence, binding to the Account     |
+| `components.md`        | component traps: menus, comments, cards, images, icons, sortable lists |
+| `chapter-editor.md`    | the Chapter editor modal: saving, conflicts, Unsaved text              |
+| `components-search.md` | search suggestions: `SearchBar`, `SearchForm`                          |
+| `pages.md`             | page-level rules                                                       |
+| `chapter-page.md`      | `ChapterPage`: reading preferences, the Pages layout                   |
+| `routing.md`           | App shell: lazy loading, `Suspense`/`ErrorBoundary`, provider order    |
+| `styling.md`           | tokens and quarks, CSS Modules, the antd cascade layer                 |
+| `testing.md`           | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
+| `webpack.md`           | the typed webpack config parts, how Node loads them, build traps       |
 
 ## Commands
 
