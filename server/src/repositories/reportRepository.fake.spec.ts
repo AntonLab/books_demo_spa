@@ -5,6 +5,7 @@ import {
 } from './reportRepository.actions.contract.testkit.ts';
 import { reportCreateContract } from './reportRepository.contract.testkit.ts';
 import { reportListContract } from './reportRepository.list.contract.testkit.ts';
+import { reportStatisticsContract } from './reportRepository.statistics.contract.testkit.ts';
 import {
   createFakeReportRepository,
   type FakeAccount,
@@ -124,4 +125,5 @@ describe('the fake reportRepository', () => {
   reportCreateContract(setUp);
   reportListContract(setUp);
   reportActionsContract(setUp);
+  reportStatisticsContract(setUp);
 });

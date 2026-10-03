@@ -1,6 +1,10 @@
 import type { Viewer } from './visibility.ts';
-import type { ReportRow } from 'shared';
-import type { CreateReportInput, ListReportsQuery } from '../types/report.ts';
+import type { ReportRow, ReportStatistics } from 'shared';
+import type {
+  CreateReportInput,
+  ListReportsQuery,
+  ReportRange,
+} from '../types/report.ts';
 
 // The signed-in account behind a Report. Never a Guest: every route that
 // reaches this repository is guarded.
@@ -42,4 +46,12 @@ export interface ReportRepository {
   take(commentId: number, moderator: Account): Promise<void>;
   uphold(commentId: number, moderator: Account): Promise<void>;
   dismiss(commentId: number, moderator: Account): Promise<void>;
+
+  // `byStatus` and `byReason` count Reports created in [from, to) and carry
+  // every key, zero when absent. `topAccounts` ranks reported Accounts by
+  // their count of those Reports (count descending, id ascending), at most
+  // REPORT_TOP_ACCOUNTS, skipping Reports whose reported Account is deleted.
+  // `averageSettleSeconds` is the mean of settledAt - createdAt over Reports
+  // settled in [from, to), whenever created; null when there are none.
+  statistics(range: ReportRange): Promise<ReportStatistics>;
 }

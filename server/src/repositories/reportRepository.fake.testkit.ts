@@ -1,8 +1,12 @@
 import {
   BAN_MARK_THRESHOLD,
   OPEN_REPORT_STATUSES,
+  REPORT_REASONS,
+  REPORT_STATUSES,
+  REPORT_TOP_ACCOUNTS,
   type ReportReason,
   type ReportRow,
+  type ReportStatistics,
   type ReportStatus,
   type Tombstone,
   type UserRole,
@@ -14,7 +18,11 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
-import type { CreateReportInput, ListReportsQuery } from '../types/report.ts';
+import type {
+  CreateReportInput,
+  ListReportsQuery,
+  ReportRange,
+} from '../types/report.ts';
 import type { Account, ReportRepository } from './reportRepository.ts';
 
 export interface FakeAccount {
@@ -197,6 +205,45 @@ export function createFakeReportRepository(options: {
           };
         });
       return { items, total: matches.length };
+    },
+    async statistics({ from, to }: ReportRange) {
+      const inRange = (date: Date | null) =>
+        date !== null && date >= from && date < to;
+      const created = rows.filter((row) => inRange(row.createdAt));
+      const byStatus = Object.fromEntries(
+        REPORT_STATUSES.map((status) => [status, 0])
+      ) as ReportStatistics['byStatus'];
+      const byReason = Object.fromEntries(
+        REPORT_REASONS.map((reason) => [reason, 0])
+      ) as ReportStatistics['byReason'];
+      const perAccount = new Map<number, number>();
+      for (const row of created) {
+        byStatus[row.status] += 1;
+        byReason[row.reason] += 1;
+        if (row.reportedAccountId !== null) {
+          perAccount.set(
+            row.reportedAccountId,
+            (perAccount.get(row.reportedAccountId) ?? 0) + 1
+          );
+        }
+      }
+      const topAccounts = [...perAccount]
+        .sort(([idA, a], [idB, b]) => b - a || idA - idB)
+        .slice(0, REPORT_TOP_ACCOUNTS)
+        .map(([id, count]) => ({
+          id,
+          login: accounts.get(id)?.login ?? '',
+          count,
+        }));
+      const settled = rows.filter((row) => inRange(row.settledAt));
+      const averageSettleSeconds = settled.length
+        ? settled.reduce(
+            (sum, row) =>
+              sum + (row.settledAt!.getTime() - row.createdAt.getTime()) / 1000,
+            0
+          ) / settled.length
+        : null;
+      return { byStatus, byReason, topAccounts, averageSettleSeconds };
     },
   };
 }
