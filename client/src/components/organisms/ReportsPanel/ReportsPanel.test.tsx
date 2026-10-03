@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ReportsPanel } from './ReportsPanel';
 import { ApiError } from '@/api/client';
 import * as reportsApi from '@/api/reports';
+import { watchSession } from '@/queries/auth';
 import { queryKeys } from '@/queries/keys';
 import { createTestQueryClient } from '@/test/queryClient';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -43,7 +44,7 @@ const listOf = (items: ReportRow[], total = items.length) => ({
 
 const renderPanel = (
   queryClient: QueryClient = createTestQueryClient(),
-  session: SessionUser = admin
+  session: SessionUser | null = admin
 ) => {
   queryClient.setQueryData(queryKeys.session, session);
   return renderWithProviders(<ReportsPanel />, { queryClient });
@@ -87,6 +88,29 @@ describe('ReportsPanel', () => {
       );
     });
 
+    it('moves "today" to the new day when the tab stays open past midnight', async () => {
+      mockedReports.listReports.mockResolvedValue(listOf([]));
+      const queryClient = createTestQueryClient();
+      renderPanel(queryClient);
+      await waitFor(() =>
+        expect(mockedReports.listReports).toHaveBeenCalledTimes(1)
+      );
+
+      jest.setSystemTime(new Date(2026, 9, 4, 0, 10));
+      await act(async () => {
+        await queryClient.invalidateQueries({ queryKey: queryKeys.allReports });
+      });
+
+      await waitFor(() =>
+        expect(mockedReports.listReports).toHaveBeenLastCalledWith({
+          from: new Date(2026, 9, 4).toISOString(),
+          to: new Date(2026, 9, 5).toISOString(),
+          limit: 20,
+          offset: 0,
+        })
+      );
+    });
+
     it('asks for the statistics of the same range as the list', async () => {
       mockedReports.listReports.mockResolvedValue(listOf([]));
       renderPanel();
@@ -97,6 +121,29 @@ describe('ReportsPanel', () => {
         })
       );
     });
+  });
+
+  it('asks for nothing when the session is not a Moderator', async () => {
+    renderPanel(undefined, sessionOf({ ...adminAccount, role: 'author' }));
+    await act(async () => {});
+    expect(mockedReports.listReports).not.toHaveBeenCalled();
+    expect(mockedReports.getReportStatistics).not.toHaveBeenCalled();
+  });
+
+  it('sends no further request once the session ends', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    const queryClient = createTestQueryClient();
+    watchSession(queryClient, null);
+    renderPanel(queryClient);
+    await screen.findByRole('button', { name: 'Take' });
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, null);
+    });
+    await act(async () => {});
+
+    expect(mockedReports.listReports).toHaveBeenCalledTimes(1);
+    expect(mockedReports.getReportStatistics).toHaveBeenCalledTimes(1);
   });
 
   it('shows the statistics above the table', async () => {

@@ -10,7 +10,7 @@ import {
   Typography,
 } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
-import { REPORT_STATUSES } from 'shared';
+import { REPORT_STATUSES, isModeratorRole } from 'shared';
 import type { ReportStatus } from 'shared';
 import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
 import { TOMBSTONE_LABELS } from '@/components/molecules/Comment/Comment';
@@ -52,22 +52,30 @@ const reporterName = (row: ReportRow): string =>
   row.isSystem ? 'System' : accountLogin(row.reporter);
 
 export const ReportsPanel: FC = () => {
-  const [range, setRange] = useState<[Dayjs, Dayjs]>(() => [dayjs(), dayjs()]);
+  // The default is "today" when read, so a tab left open past midnight moves on
+  // at its next render.
+  const [picked, setPicked] = useState<[Dayjs, Dayjs] | null>(null);
+  const range: [Dayjs, Dayjs] = picked ?? [dayjs(), dayjs()];
   const [status, setStatus] = useState<ReportStatus | undefined>();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
 
-  const { data, isError, isFetching } = useReports({
-    ...dayRange(...range),
-    ...(status === undefined ? {} : { status }),
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
-  });
-
-  const statistics = useReportStatistics(dayRange(...range));
-
   const { data: session } = useSession();
+  const moderator = isModeratorRole(session?.role);
+
+  const { data, isError, isFetching } = useReports(
+    {
+      ...dayRange(...range),
+      ...(status === undefined ? {} : { status }),
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    },
+    moderator
+  );
+
+  const statistics = useReportStatistics(dayRange(...range), moderator);
+
   const take = useTakeReport();
   const uphold = useUpholdReport();
   const dismiss = useDismissReport();
@@ -99,7 +107,7 @@ export const ReportsPanel: FC = () => {
           value={range}
           onChange={(value) => {
             if (value?.[0] && value[1]) {
-              setRange([value[0], value[1]]);
+              setPicked([value[0], value[1]]);
               setPage(1);
             }
           }}

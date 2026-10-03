@@ -205,6 +205,26 @@ describe('watchSession', () => {
     };
   };
 
+  it("drops the last Account's Reports and statistics rather than refetching them", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, sessionOf(user));
+    const listKey = queryKeys.reports({
+      from: 'a',
+      to: 'b',
+      limit: 20,
+      offset: 0,
+    });
+    const statisticsKey = queryKeys.reportStatistics({ from: 'a', to: 'b' });
+    client.setQueryData(listKey, { items: [] });
+    client.setQueryData(statisticsKey, {});
+
+    client.setQueryData(queryKeys.session, null);
+
+    expect(client.getQueryState(listKey)).toBe(undefined);
+    expect(client.getQueryState(statisticsKey)).toBe(undefined);
+  });
+
   it('announces a session its own mutation wrote, not one it fetched', async () => {
     mockedAuth.me.mockResolvedValue(sessionOf(user));
     mockedAuth.logout.mockResolvedValue(undefined);

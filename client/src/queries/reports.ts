@@ -17,18 +17,20 @@ import type { ListReportsParams, ReportRange } from '../api/reports';
 import { blockUser } from '../api/users';
 import { queryKeys } from './keys';
 
-export const useReports = (params: ListReportsParams) => {
+export const useReports = (params: ListReportsParams, enabled = true) => {
   return useQuery({
     queryKey: queryKeys.reports(params),
     queryFn: () => listReports(params),
     placeholderData: keepPreviousData,
+    enabled,
   });
 };
 
-export const useReportStatistics = (range: ReportRange) => {
+export const useReportStatistics = (range: ReportRange, enabled = true) => {
   return useQuery({
     queryKey: queryKeys.reportStatistics(range),
     queryFn: () => getReportStatistics(range),
+    enabled,
   });
 };
 

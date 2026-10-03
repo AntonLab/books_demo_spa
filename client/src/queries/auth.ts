@@ -99,6 +99,11 @@ export const watchSession = (
       client.removeQueries({ queryKey: queryKeys.allLibrary });
       client.removeQueries({ queryKey: queryKeys.allFavorites });
       client.removeQueries({ queryKey: queryKeys.allMyReadingLists });
+      // Reports are for a Moderator, so a refetch as the next Account (a Guest
+      // after Sign out) would answer 401; `enabled` alone does not stop it,
+      // because an invalidation refetches an observer whose last render still
+      // said enabled.
+      client.removeQueries({ queryKey: queryKeys.allReports });
       client.removeQueries({
         predicate: (query) => isAccountList(query.queryKey, accountId ?? null),
       });

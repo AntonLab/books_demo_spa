@@ -123,6 +123,23 @@ describe('report writes', () => {
 });
 
 describe('report reads', () => {
+  it('fetches nothing while disabled', async () => {
+    const range = { from: 'a', to: 'b' };
+    const { wrapper } = setUp();
+
+    renderHook(
+      () => ({
+        list: useReports(range, false),
+        stats: useReportStatistics(range, false),
+      }),
+      { wrapper }
+    );
+    await act(async () => {});
+
+    expect(mockedReports.listReports).not.toHaveBeenCalled();
+    expect(mockedReports.getReportStatistics).not.toHaveBeenCalled();
+  });
+
   it('useReports and useReportStatistics fetch under distinct keys', async () => {
     const range = { from: 'a', to: 'b' };
     mockedReports.listReports.mockResolvedValue({
