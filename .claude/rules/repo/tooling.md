@@ -93,4 +93,9 @@ checks the `.mjs` files, but no package's ESLint config reaches them.
 the newest version, so it needs no update when the plugin does.
 `plan-check.mjs` tells a test block from implementation by a `test`/`it`/
 `describe`/`expect` call; a plan whose tests use another runner's names needs
-the pattern widened, not the 15-line limit.
+the pattern widened, not the 15-line limit. It also caps a task at
+`MAX_TASK_LINES` (180); a longer task becomes two.
+
+Fire-and-forget: await a promise, or mark a deliberate one `void` with the
+reason beside it (`onFinish={(values) => void handleFinish(values)}`). The
+typed lint rules take no `eslint-disable`.

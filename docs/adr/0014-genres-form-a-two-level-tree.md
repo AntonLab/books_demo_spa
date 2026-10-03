@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-10-02
+amends: ADR-0008
 ---
 
 # Genres form a two-level tree, names unique among siblings
