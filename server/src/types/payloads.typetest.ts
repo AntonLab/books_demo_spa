@@ -17,6 +17,7 @@ import type {
   GenrePayload,
   ReadingListPayload,
   ReorderReadingListItemsPayload,
+  ReportPayload,
   SeriesPayload,
   SetReadingStatusPayload,
   UpdateBookPayload,
@@ -36,6 +37,7 @@ import type {
   reorderReadingListItemsSchema,
   updateReadingListSchema,
 } from './readingList.ts';
+import type { createReportSchema } from './report.ts';
 import type { createSeriesSchema, updateSeriesSchema } from './series.ts';
 
 type Expect<T extends true> = T;
@@ -67,4 +69,5 @@ export type PayloadAssertions = [
   Expect<
     Fits<ReorderReadingListItemsPayload, typeof reorderReadingListItemsSchema>
   >,
+  Expect<Fits<ReportPayload, typeof createReportSchema>>,
 ];
