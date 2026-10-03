@@ -42,8 +42,9 @@ that read like mistakes and are not.
   only by keeping live replies in their thread, so a tombstoned root survives
   with at least one live direct reply, and a tombstoned reply never does.
 - A surviving tombstone renders as `TOMBSTONE_LABELS` text with no Owner, no
-  avatar and no controls, for anyone. There are no moderation buttons in the
-  client: remove and restore stay API-only until a moderation screen exists.
+  avatar and no controls, for anyone. Comment actions are `IconButton`s. Report
+  shows to a signed-in non-Owner; the moderation actions live in the Admin
+  panel.
 - Edit, delete and like render only when the server would allow them; the
   server refuses each with 403 regardless. `closed` (a Draft book) makes the
   section read-only.

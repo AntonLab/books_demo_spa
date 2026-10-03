@@ -1,9 +1,11 @@
-import { useState, type FC, type ReactNode } from 'react';
+import { useRef, useState, type FC, type ReactNode } from 'react';
 import { Alert, Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
 import { CommentComposerModal } from '@/components/molecules/CommentComposerModal/CommentComposerModal';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
+import { ReportCommentModal } from '@/components/molecules/ReportCommentModal/ReportCommentModal';
+import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
 import {
   useComments,
@@ -13,6 +15,7 @@ import {
 } from '@/queries/comments';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
+import { useReportComment } from '@/queries/reports';
 import { useAppDispatch } from '@/store/hooks';
 import {
   entriesOfBook,
@@ -53,7 +56,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const dispatch = useAppDispatch();
   const entries = useOwnUnsavedEntries();
 
+  const report = useReportComment(bookId);
+  const sending = useRef(false);
+
   const [composing, setComposing] = useState<Composing | null>(null);
+  const [reporting, setReporting] = useState<number | null>(null);
 
   // The heading is rendered by every branch rather than only the loaded one,
   // so the section keeps its place on the page while the thread is in flight.
@@ -224,6 +231,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
       onEdit={(id) => open({ mode: 'edit', id })}
       onDelete={deleteComment}
       onLike={like}
+      canReport={canAct && session?.id !== comment.userId}
+      onReport={(id) => {
+        report.reset();
+        setReporting(id);
+      }}
     />
   );
 
@@ -319,6 +331,37 @@ export const CommentSection: FC<CommentSectionProps> = ({
                 : null
           }
           replyTo={replyTarget}
+        />
+      )}
+
+      {canAct && reporting !== null && (
+        <ReportCommentModal
+          onSubmit={(payload) => {
+            // A ref, not report.isPending: a double click lands both clicks
+            // before the pending state renders.
+            if (sending.current) return;
+            // The modal shows the failure from the mutation's own state; the
+            // empty handler only keeps the rejection from going unhandled.
+            sending.current = true;
+            void report
+              .mutateAsync({ commentId: reporting, payload })
+              .then(
+                () => setReporting(null),
+                () => {}
+              )
+              .finally(() => {
+                sending.current = false;
+              });
+          }}
+          onCancel={() => setReporting(null)}
+          pending={report.isPending}
+          error={
+            !report.isError
+              ? null
+              : report.error instanceof ApiError && report.error.status === 409
+                ? report.error.message
+                : 'Could not send the report.'
+          }
         />
       )}
     </section>

@@ -7,14 +7,17 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
+import * as reportsApi from '@/api/reports';
 import type { CommentWithAuthor, PublicUser } from '@/types/api';
 import type { RootState } from '@/store';
 
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
+jest.mock('@/api/reports');
 
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
+const mockedReports = jest.mocked(reportsApi);
 
 const viewer: PublicUser = {
   id: 3,
@@ -165,7 +168,10 @@ describe('CommentSection', () => {
     await screen.findByText('Agreed');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]!);
-    const dialog = screen.getByRole('dialog', { name: 'Reply to Oth Er' });
+    // Not named: under Jest the dialog and the focused IconButton's tooltip
+    // share the id `test-id`, so the dialog's aria-labelledby reads "Reply".
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Reply to Oth Er')).toBeInTheDocument();
     expect(within(dialog).getByText('Agreed')).toBeInTheDocument();
     await userEvent.type(within(dialog).getByRole('textbox'), 'Me too');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Post' }));
@@ -232,7 +238,8 @@ describe('CommentSection', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
 
-    const dialog = screen.getByRole('dialog', { name: 'Reply to Read Er' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Reply to Read Er')).toBeInTheDocument();
     expect(within(dialog).getByText('A fine book')).toBeInTheDocument();
     // Read-only: the quoted comment carries none of its controls.
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).toBeNull();
@@ -262,7 +269,8 @@ describe('CommentSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Edit comment' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Edit comment')).toBeInTheDocument();
     expect(within(dialog).getByRole('textbox')).toHaveValue('A fine book');
     expect(
       within(dialog).getByRole('button', { name: 'Save' })
@@ -468,6 +476,61 @@ describe('CommentSection', () => {
       isLike: true,
     });
   });
+
+  it("offers Report on someone else's comment and never on your own", async () => {
+    renderSignedIn();
+    await screen.findByText('Agreed');
+    expect(screen.getAllByRole('button', { name: 'Report' })).toHaveLength(1);
+  });
+
+  it('offers no Report to a Guest', async () => {
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Agreed');
+    expect(screen.queryByRole('button', { name: /report/i })).toBeNull();
+  });
+
+  // Opens the modal on `reply` (id 6), picks Spam and sends, with the click on Send as given.
+  const reportReply = async (send: (button: HTMLElement) => Promise<void>) => {
+    renderSignedIn();
+    await screen.findByText('Agreed');
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Spam' }));
+    await send(screen.getByRole('button', { name: /Send report/ }));
+  };
+
+  it('sends a report, closes the modal and refetches the thread', async () => {
+    mockedReports.reportComment.mockResolvedValue({ id: 1 });
+    await reportReply((b) => userEvent.click(b));
+    await waitFor(() =>
+      expect(mockedReports.reportComment).toHaveBeenCalledWith(6, {
+        reason: 'spam',
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends once on a double click', async () => {
+    mockedReports.reportComment.mockReturnValue(new Promise(() => {}));
+    await reportReply((b) => userEvent.dblClick(b));
+    expect(mockedReports.reportComment).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      new ApiError(409, 'This comment already has an open report.'),
+      'This comment already has an open report.',
+    ],
+    [new ApiError(500, 'boom'), 'Could not send the report.'],
+  ])(
+    'keeps the modal open and shows the message for %p',
+    async (error, message) => {
+      mockedReports.reportComment.mockRejectedValue(error);
+      await reportReply((b) => userEvent.click(b));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    }
+  );
 });
 
 describe('CommentSection Unsaved text', () => {

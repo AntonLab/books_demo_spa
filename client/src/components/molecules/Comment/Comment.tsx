@@ -1,13 +1,20 @@
 import type { FC } from 'react';
-import { Button, Space, theme, Typography } from 'antd';
+import { Space, Tag, theme, Typography } from 'antd';
+import {
+  CommentOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  FlagOutlined,
+} from '@ant-design/icons';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { formatDate } from '@/format/date';
 import styles from './Comment.module.css';
 import type { Tombstone } from 'shared';
 import type { CommentWithAuthor } from '@/types/api';
 
-const TOMBSTONE_LABELS: Record<Tombstone, string> = {
+export const TOMBSTONE_LABELS: Record<Tombstone, string> = {
   deleted: '[deleted]',
   removed: '[removed by moderator]',
 };
@@ -26,6 +33,8 @@ interface CommentProps {
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
   onLike: (comment: CommentWithAuthor) => void;
+  canReport: boolean;
+  onReport: (id: number) => void;
 }
 
 // The name is free because antd removed its own Comment component in v5, so
@@ -41,6 +50,8 @@ export const Comment: FC<CommentProps> = ({
   onEdit,
   onDelete,
   onLike,
+  canReport,
+  onReport,
 }) => {
   const { token } = theme.useToken();
 
@@ -76,6 +87,7 @@ export const Comment: FC<CommentProps> = ({
         <Typography.Text type="secondary">
           {formatDate(comment.createdAt)}
         </Typography.Text>
+        {comment.hasOpenReport && <Tag>Moderating</Tag>}
       </Space>
 
       <Typography.Paragraph
@@ -100,24 +112,50 @@ export const Comment: FC<CommentProps> = ({
           />
         )}
         {canReply && (
-          <Button type="text" size="small" onClick={() => onReply(comment.id)}>
-            Reply
-          </Button>
+          <IconButton
+            label="Reply"
+            icon={<CommentOutlined />}
+            size="small"
+            type="text"
+            onClick={() => onReply(comment.id)}
+          />
         )}
         {isOwn && (
           <>
-            <Button type="text" size="small" onClick={() => onEdit(comment.id)}>
-              Edit
-            </Button>
-            <Button
-              type="text"
+            <IconButton
+              label="Edit"
+              icon={<EditOutlined />}
               size="small"
+              type="text"
+              onClick={() => onEdit(comment.id)}
+            />
+            <IconButton
+              label="Delete"
+              icon={<DeleteOutlined />}
+              size="small"
+              type="text"
               danger
               onClick={() => onDelete(comment.id)}
-            >
-              Delete
-            </Button>
+            />
           </>
+        )}
+        {canReport && (
+          <IconButton
+            label={
+              comment.viewerReportedId !== null
+                ? 'Reported'
+                : comment.hasOpenReport
+                  ? 'Already under review'
+                  : 'Report'
+            }
+            icon={<FlagOutlined />}
+            size="small"
+            type="text"
+            disabled={
+              comment.viewerReportedId !== null || comment.hasOpenReport
+            }
+            onClick={() => onReport(comment.id)}
+          />
         )}
       </Space>
     </article>

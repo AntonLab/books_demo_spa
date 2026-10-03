@@ -35,6 +35,8 @@ const baseProps = {
   onEdit: jest.fn(),
   onDelete: jest.fn(),
   onLike: jest.fn(),
+  canReport: true,
+  onReport: jest.fn(),
 };
 
 beforeEach(() => {
@@ -160,6 +162,57 @@ describe('Comment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reply' }));
 
     expect(onReply).toHaveBeenCalledWith(5);
+  });
+
+  it('reports a report request with the comment id', async () => {
+    const onReport = jest.fn();
+    render(<Comment {...baseProps} onReport={onReport} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }));
+    expect(onReport).toHaveBeenCalledWith(5);
+  });
+
+  it('offers no Report button when reporting is not allowed', () => {
+    render(<Comment {...baseProps} canReport={false} />);
+    expect(screen.queryByRole('button', { name: /report/i })).toBeNull();
+  });
+
+  it.each([
+    [{ viewerReportedId: 9 }, 'Reported'],
+    [{ hasOpenReport: true }, 'Already under review'],
+    [{ hasOpenReport: true, viewerReportedId: 9 }, 'Reported'],
+  ])('disables Report for %j as "%s"', (flags, name) => {
+    render(<Comment {...baseProps} comment={{ ...comment, ...flags }} />);
+    expect(screen.getByRole('button', { name })).toBeDisabled();
+  });
+
+  it('marks a comment with an open report as Moderating, for a Guest too', () => {
+    render(
+      <Comment
+        {...baseProps}
+        canReport={false}
+        canLike={false}
+        canReply={false}
+        comment={{ ...comment, hasOpenReport: true }}
+      />
+    );
+    expect(screen.getByText('Moderating')).toBeInTheDocument();
+  });
+
+  it('shows no Moderating mark on a Tombstone', () => {
+    render(
+      <Comment
+        {...baseProps}
+        comment={{
+          ...comment,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+          hasOpenReport: true,
+        }}
+      />
+    );
+    expect(screen.queryByText('Moderating')).toBeNull();
   });
 
   describe('a deleted comment', () => {
