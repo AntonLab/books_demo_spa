@@ -135,6 +135,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   no dev server, takes no snapshot and never Reads a screenshot.
 - **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
   `general-purpose`: the latter ran on Sonnet and loaded the full context.
+  While a plan pipeline runs, `code-mapper` does the mapping and
+  `sdd-implementer` makes the changes. Neither a search agent nor
+  `cavecrew-builder` stands in for them.
 - `.claude/agents/` is git-ignored: each clone keeps its own copy, and a fresh
   clone has none, so every agent named here and in `pipeline.md` exists only
   where someone put the files by hand. A dispatch to a missing one fails.
@@ -157,8 +160,9 @@ and `sed -i`, `cp`, `>` or a `node -e` rewrite skip the Prettier hook. List a di
 ### Plan pipeline agents
 
 Save the spec before dispatching `plan-writer`; it refuses to run without one.
-A small feature (one workspace, ~10 files) skips plan-writer and runs Native
-instead. Pass `model` on every dispatch — opus only when the user asks, since
+Every plan goes through plan-writer and runs full subagent-driven development
+with a task reviewer per task. Run one spec per main session: `/clear` after
+its PR. Pass `model` on every dispatch — opus only when the user asks, since
 it burned the weekly limit mid-plan. Full detail (the six agents, controller
 scripts, dispatch order, fix rounds) lives in
 `.claude/rules/repo/pipeline.md`; **Read it before running the pipeline** — it

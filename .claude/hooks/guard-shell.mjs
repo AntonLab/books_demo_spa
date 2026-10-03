@@ -15,11 +15,29 @@ import { readFileSync } from 'node:fs';
 const input = JSON.parse(readFileSync(0, 'utf8'));
 const command = String(input.tool_input?.command ?? '');
 const inSubagent = Boolean(input.agent_type);
+// A heredoc body is stdin data: a PR body naming `npm run typecheck` was
+// refused as a gate run, and an apostrophe in prose unbalanced the quote
+// stripping below. A body that a shell or interpreter executes stays code.
+const stripHeredocs = (text) => {
+  const kept = [];
+  let terminator = null;
+  for (const line of text.split('\n')) {
+    if (terminator) {
+      if (line.trim() !== terminator) continue;
+      terminator = null;
+    }
+    kept.push(line);
+    const opener = line.match(/(?<!<)<<(?!<)-?\s*(['"]?)(\w+)\1/);
+    if (opener && !/\b(bash|sh|zsh|node|python3?|py|deno|bun)\b/.test(line))
+      terminator = opener[2];
+  }
+  return kept.join('\n');
+};
+const code = stripHeredocs(command);
 // Quoted text is data (a commit message naming `sed -i`), except a quoted
 // redirect target, which is still a file the command writes.
-const bare = command.replace(
-  /(>>?\s*)?("[^"]*"|'[^']*')/g,
-  (match, redirect) => (redirect ? match : '""')
+const bare = code.replace(/(>>?\s*)?("[^"]*"|'[^']*')/g, (match, redirect) =>
+  redirect ? match : '""'
 );
 const RUNS_SCRIPT = /\b(node|python3?|py|deno|bun)\b/;
 
@@ -33,6 +51,24 @@ const writeTargets = () => {
     targets.push(m[1]);
   for (const m of bare.matchAll(/\btee\s+(?:-a\s+)?([^\s;|&)]+)/g))
     targets.push(m[1]);
+  // A draft written in /tmp and copied over a plan slipped past the redirect
+  // check on the backlog run; the destination is the last operand. `git mv`
+  // is a tracked rename, not a copy past the hook. The `cp` itself must be
+  // bare (not inside a commit message), but its operands are read with their
+  // quotes kept, since a quoted destination is still a file it writes.
+  const COPY = /(?<!git\s+)\b(?:cp|mv)\s+([^;|&]+)/g;
+  if (bare.search(COPY) !== -1) {
+    const unquoted = code.replace(/"([^"]*)"|'([^']*)'/g, (_, a, b) =>
+      (a ?? b).replace(/\s/g, '_')
+    );
+    for (const m of unquoted.matchAll(COPY)) {
+      const operands = m[1]
+        .trim()
+        .split(/\s+/)
+        .filter((a) => !a.startsWith('-'));
+      if (operands.length >= 2) targets.push(operands.at(-1));
+    }
+  }
   for (const m of bare.matchAll(
     /\b(?:Set-Content|Add-Content|Out-File)\b[^;|]*?(?:-(?:Path|FilePath)\s+)?(["']?[A-Za-z]?:?[\w$~.\\/-]+["']?)/gi
   ))
@@ -71,8 +107,7 @@ const deny = (reason) => {
 const [inPlace, scriptWrite, driveFind] = rules;
 if (inPlace[0].test(bare)) deny(inPlace[1]);
 // A script's body is quoted, so this one reads the whole command.
-if (RUNS_SCRIPT.test(bare) && scriptWrite[0].test(command))
-  deny(scriptWrite[1]);
+if (RUNS_SCRIPT.test(bare) && scriptWrite[0].test(code)) deny(scriptWrite[1]);
 if (driveFind[0].test(bare)) deny(driveFind[1]);
 
 const targets = writeTargets();
