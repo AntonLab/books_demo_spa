@@ -28,6 +28,7 @@ import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
+import { Report } from '../../models/Report.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../../models/Genre.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
@@ -92,6 +93,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Favorite,
   LibraryEntry,
   Like,
+  Report,
   Comment,
   Chapter,
   BookAuthor,

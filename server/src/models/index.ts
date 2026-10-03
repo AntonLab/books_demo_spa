@@ -19,6 +19,7 @@ import {
   initReadingListItemModel,
   ReadingListItem,
 } from './ReadingListItem.ts';
+import { initReportModel, Report } from './Report.ts';
 import { initSeriesModel, Series } from './Series.ts';
 import { initSeriesCoverModel, SeriesCover } from './SeriesCover.ts';
 import { initSeriesAuthorModel, SeriesAuthor } from './SeriesAuthor.ts';
@@ -45,6 +46,7 @@ function initEachModel(sequelize: Sequelize): void {
   initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
   initCommentModel(sequelize);
+  initReportModel(sequelize);
   initLikeModel(sequelize);
   initFavoriteModel(sequelize);
   initLibraryEntryModel(sequelize);
@@ -201,6 +203,36 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   Comment.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  // A Report dies with its Comment; every Account reference is set null, so a
+  // deleted Account leaves the Report (and the Moderators' record) behind.
+  Comment.hasMany(Report, {
+    as: 'reports',
+    foreignKey: 'commentId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Report.belongsTo(Comment, { as: 'comment', foreignKey: 'commentId' });
+  for (const [as, name] of [
+    ['reportsMade', 'reporterId'],
+    ['reportsAgainst', 'reportedAccountId'],
+    ['reportsHandled', 'moderatorId'],
+  ] as const) {
+    User.hasMany(Report, {
+      as,
+      // allowNull is restated so Sequelize does not infer NOT NULL from the
+      // association and quietly make SET NULL illegal.
+      foreignKey: { name, allowNull: true },
+      onDelete: 'SET NULL',
+      onUpdate: 'CASCADE',
+    });
+  }
+  Report.belongsTo(User, { as: 'reporter', foreignKey: 'reporterId' });
+  Report.belongsTo(User, {
+    as: 'reportedAccount',
+    foreignKey: 'reportedAccountId',
+  });
+  Report.belongsTo(User, { as: 'moderator', foreignKey: 'moderatorId' });
 
   // The self-association: a reply hangs off the comment it answers. Neither of
   // the shapes above fits it, and the deciding factor is MySQL's cascade depth
