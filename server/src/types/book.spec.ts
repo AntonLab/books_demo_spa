@@ -101,6 +101,21 @@ test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 o
   }
 });
 
+test('listBooksQuerySchema takes published=true and refuses any other value', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ published: 'true' }).published,
+    'true'
+  );
+  assert.equal(listBooksQuerySchema.parse({}).published, undefined);
+  for (const bad of ['false', '1', '', 'TRUE']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ published: bad }).success,
+      false,
+      bad
+    );
+  }
+});
+
 test('listBooksQuerySchema takes favoritedBy=me and refuses any other value', () => {
   assert.equal(
     listBooksQuerySchema.parse({ favoritedBy: 'me' }).favoritedBy,

@@ -83,6 +83,9 @@ export const listBooksQuerySchema = z
     userId: idSchema.optional(),
     // The signed-in viewer's Favorites; no id is ever passed.
     favoritedBy: z.literal('me').optional(),
+    // Narrows to Published Books for every viewer: a public page lists an
+    // Owner's work without their Drafts.
+    published: z.literal('true').optional(),
     seriesId: idSchema.optional(),
     genreId: idSchema.optional(),
     tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),

@@ -375,16 +375,12 @@ function buildWhere(
   query: ListBooksQuery,
   lookups: IdLookups,
   viewer: Viewer,
-  rank: Utils.Literal | undefined,
   genreIds: number[] | undefined
 ): WhereOptions {
+  // No clause for a sort: a Book with nothing published has no Release time
+  // or Last update, so `ORDER BY ... DESC` puts it last and `total` matches
+  // what the pages list.
   const clauses: WhereOptions[] = [];
-
-  // A Book with no Published Chapter has no Release time or Last update, so
-  // those two rankings leave it out; Popularity ranks every Book.
-  if (rank !== undefined && query.sort !== 'popular') {
-    clauses.push(sequelizeWhere(rank, Op.ne, null));
-  }
 
   // `?userId=`: a book matches through any of its Co-authors.
   if (lookups.creditedBookIds !== undefined) {
@@ -422,7 +418,12 @@ function buildWhere(
     }
   }
 
-  const listed = listedBookWhere(viewer, query.userId);
+  // Mirrors the non-Owner branch of `listedBookWhere`, which the private
+  // Profile still needs for the Owner's Drafts.
+  const listed =
+    query.published === undefined
+      ? listedBookWhere(viewer, query.userId)
+      : { status: { [Op.ne]: 'draft' } };
   if (listed !== null) clauses.push(listed);
 
   if (query.seriesId !== undefined) {
@@ -540,7 +541,7 @@ export function createSequelizeBookRepository(): BookRepository {
         query.genreId === undefined
           ? undefined
           : await genreFamilyIds(query.genreId);
-      const where = buildWhere(query, lookups, viewer, rank, genreIds);
+      const where = buildWhere(query, lookups, viewer, genreIds);
       // Counted first, so a page past the end can be served as the last
       // non-empty one (page 1 when nothing matches) rather than as an empty
       // page the client would have to page back from.

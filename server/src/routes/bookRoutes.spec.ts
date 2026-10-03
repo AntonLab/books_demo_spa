@@ -480,6 +480,25 @@ test('GET list takes a known sort and refuses any other with 400', async () => {
   );
 });
 
+test('GET list takes published=true and refuses any other value with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/books?published=true&sort=new`)).status,
+        200
+      );
+      for (const bad of ['false', '1', '']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?published=${bad}`)).status,
+          400,
+          bad
+        );
+      }
+    }
+  );
+});
+
 test('GET list takes every search filter together and refuses a bad one with 400', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },

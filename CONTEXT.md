@@ -371,7 +371,7 @@ last one signs in on that device.
 **Release time**:
 The Publication time of a Book's earliest Published Chapter: the moment it
 first had something to read. A Book with no Published Chapter has none, so it
-is not a New release. Its Book status and creation time do not enter into it.
+is listed after every New release. Its Book status and creation time do not enter into it.
 _Avoid_: Created at, publish date (for a Book)
 
 **New release**:

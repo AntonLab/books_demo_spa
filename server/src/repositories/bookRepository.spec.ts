@@ -409,6 +409,35 @@ describe('bookRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('published=true drops the Drafts that ?userId= lists for their own Co-author, whoever asks', async () => {
+    await publishedBook('Live');
+    await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Hidden draft',
+      description: 'd',
+      tags: [],
+    });
+    const titlesFor = async (viewer: Viewer, published?: 'true') =>
+      (
+        await repository.list(
+          { current: 1, pageSize: 20, userId: ownerId, published },
+          viewer
+        )
+      ).items
+        .map((book) => book.title)
+        .sort();
+
+    assert.deepEqual(await titlesFor(asOwner()), ['Hidden draft', 'Live']);
+    for (const viewer of [
+      asOwner(),
+      { id: 0, role: 'superadmin' as const },
+      null,
+    ]) {
+      assert.deepEqual(await titlesFor(viewer, 'true'), ['Live']);
+    }
+  });
+
   // What every `own` check on a book asks (bookController.assertCoAuthor).
   test('findCoAuthorIds lists the co-authors in credit order, and null for a missing book', async () => {
     const earlierId = (await User.create({ ...coAuthor, role: 'author' })).id;
@@ -822,7 +851,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       });
     });
 
-    test('new ranks by the earliest published chapter and leaves out books with nothing published', async () => {
+    test('new ranks by the earliest published chapter and lists books with nothing published last', async () => {
       const older = await publishedBook('Older');
       const newer = await publishedBook('Newer');
       const scheduled = await publishedBook('Scheduled only');
@@ -831,13 +860,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
       await addChapters(newer.id, [daysFromNow(-2), null]);
       await addChapters(scheduled.id, [daysFromNow(1), null]);
 
+      // The two without a Release time follow, newest id first.
       assert.deepEqual(await sortedTitles('new'), {
-        titles: ['Newer', 'Older'],
-        total: 2,
+        titles: ['Newer', 'Older', 'No chapters', 'Scheduled only'],
+        total: 4,
       });
     });
 
-    test('updated ranks by the latest published chapter, a scheduled one aside', async () => {
+    test('updated ranks by the latest published chapter, a scheduled one aside, and lists books with nothing published last', async () => {
       const older = await publishedBook('Older');
       const newer = await publishedBook('Newer');
       await publishedBook('No chapters');
@@ -845,9 +875,27 @@ describe('bookRepository against real MySQL', { skip }, () => {
       await addChapters(newer.id, [daysFromNow(-2), daysFromNow(1)]);
 
       assert.deepEqual(await sortedTitles('updated'), {
-        titles: ['Older', 'Newer'],
-        total: 2,
+        titles: ['Older', 'Newer', 'No chapters'],
+        total: 3,
       });
+    });
+
+    test('a range filter still leaves out a book with nothing published, sorted or not', async () => {
+      const dated = await publishedBook('Dated');
+      await publishedBook('No chapters');
+      await addChapters(dated.id, [daysFromNow(-2)]);
+
+      const page = await listAsGuest({
+        current: 1,
+        pageSize: 20,
+        sort: 'new',
+        releasedFrom: daysFromNow(-5),
+      });
+
+      assert.deepEqual(
+        page.items.map((book) => book.title),
+        ['Dated']
+      );
     });
   });
 
