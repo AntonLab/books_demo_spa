@@ -362,7 +362,7 @@ _Avoid_: Collection (that is not a Series either), selection, shelf
 
 **Recently viewed**:
 The last six Books whose page or Chapter was opened on one device. Like a
-Device preference, the server never sees it. A Guest's views carry over to the
+Device preference, the server keeps no copy of it. A Guest's views carry over to the
 Account that signs in; it is cleared only when a different Account from the
 last one signs in on that device.
 
