@@ -17,6 +17,7 @@ import {
 import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
+import { useRecentlyViewedAccountBinding } from '@/store/useRecentlyViewed';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
@@ -82,6 +83,7 @@ const BookRedirect: FC = () => {
 export const AppShell: FC = () => {
   const { pathname } = useLocation();
   useUnsavedTextAccountBinding();
+  useRecentlyViewedAccountBinding();
   // The Profile routes all render ProfilePage and only switch its outer Tabs;
   // keying the boundary by the bare pathname would remount it, and every antd
   // pane it has mounted, on each tab click. They share one key instead, and so

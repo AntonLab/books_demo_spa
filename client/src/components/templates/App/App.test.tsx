@@ -532,6 +532,43 @@ describe('AppShell and Unsaved text', () => {
   });
 });
 
+describe('AppShell and Recently viewed', () => {
+  it('binds the Recently viewed to the Account signed in', async () => {
+    mockedAuth.me.mockResolvedValue({
+      id: 5,
+      login: 'eve',
+      email: 'eve@example.com',
+      firstName: 'Eve',
+      lastName: 'Evans',
+      status: 'active',
+      role: 'user',
+      avatarUrl: null,
+      about: '',
+      showLastSeen: true,
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    });
+    mockedNotifications.listNotifications.mockResolvedValue({
+      items: [],
+      total: 0,
+      unread: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { store } = renderWithProviders(<AppShell />, {
+      preloadedState: { recentlyViewed: { accountId: 3, ids: [4] } },
+    });
+
+    await waitFor(() =>
+      expect(store.getState().recentlyViewed).toEqual({
+        accountId: 5,
+        ids: [],
+      })
+    );
+  });
+});
+
 describe('App', () => {
   // The composition root: QueryClientProvider > Provider > StyleProvider >
   // ThemedConfigProvider > AntdApp > BrowserRouter > AppShell, mounted for
