@@ -14,6 +14,7 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Comment } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
+import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
@@ -373,6 +374,90 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(tombstone?.tombstone, 'deleted');
     assert.equal(tombstone?.userId, null);
     assert.equal((await Comment.findByPk(reply.id))?.parentId, comment.id);
+  });
+
+  test('deleting an account dismisses the Open reports on its comments and leaves everything else', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Leaving',
+      email: 'leaving@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host',
+      email: 'host@example.com',
+    });
+    const book = await createCreditedBook(
+      { title: 'Host Book', description: 'Hosts the thread', tags: [] },
+      [host.id]
+    );
+    const mine = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Mine',
+    });
+    const theirs = await Comment.create({
+      bookId: book.id,
+      userId: host.id,
+      text: 'Theirs',
+    });
+    const report = (
+      commentId: number,
+      accountId: number,
+      extra: Partial<Report['dataValues']>
+    ) =>
+      Report.create({
+        commentId,
+        reporterId: null,
+        isSystem: true,
+        reportedAccountId: accountId,
+        reason: 'harassment',
+        explanation: null,
+        ...extra,
+      });
+    await report(mine.id, leaving.id, {});
+    await report(mine.id, leaving.id, {
+      status: 'in_review',
+      moderatorId: host.id,
+    });
+    const settledAt = new Date(Date.now() - 3_600_000);
+    // A DATETIME column keeps whole seconds, so compare against the reloaded row.
+    const upheld = await (
+      await report(mine.id, leaving.id, {
+        status: 'upheld',
+        moderatorId: host.id,
+        settledAt,
+      })
+    ).reload();
+    const other = await report(theirs.id, host.id, {});
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    const rows = await Report.findAll({
+      where: { commentId: mine.id },
+      order: [['id', 'ASC']],
+    });
+    assert.deepEqual(
+      rows.map((row) => row.status),
+      ['dismissed', 'dismissed', 'upheld']
+    );
+    for (const row of rows.slice(0, 2)) {
+      assert.equal(row.moderatorId, null);
+      assert.equal(row.settledText, null);
+      assert.notEqual(row.settledAt, null);
+    }
+    assert.equal(rows[2]?.moderatorId, host.id);
+    assert.equal(rows[2]?.settledAt?.getTime(), upheld.settledAt?.getTime());
+    assert.equal((await other.reload()).status, 'new');
+  });
+
+  test('deleting an account with no reported comments still succeeds', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Quiet',
+      email: 'quiet@example.com',
+    });
+    assert.equal(await repository.remove(leaving.id), true);
   });
 
   test('deleting an account keeps its shared books and deletes the ones it alone was credited on', async () => {
