@@ -134,7 +134,7 @@ export interface PlannedAuthor {
 }
 
 export interface Plan {
-  accounts: { spec: AccountSpec; createdAt: Date }[];
+  accounts: { spec: AccountSpec; createdAt: Date; lastSeenAt: Date | null }[];
   authors: PlannedAuthor[];
   comments: PlannedComment[];
   // Kept beside the comments rather than on them, so a PlannedComment stays a
@@ -891,19 +891,29 @@ export function buildPlan(rng: Rng): Plan {
 
   // Staff predate every author; readers arrive across the whole period, so the
   // users list is not ten accounts created the same afternoon.
+  // lastSeenAt draws nothing from rng, and is clamped so no account is last
+  // seen before it existed.
+  const withLastSeen = (spec: AccountSpec, createdAt: Date) => ({
+    spec,
+    createdAt,
+    lastSeenAt:
+      spec.lastSeenAgoMs === null
+        ? null
+        : new Date(
+            Math.max(Date.now() - spec.lastSeenAgoMs, createdAt.getTime())
+          ),
+  });
   const accounts: Plan['accounts'] = [
-    ...STAFF.map((spec) => ({
-      spec,
-      createdAt: new Date(earliest - rng.int(30, 90) * DAY_MS),
-    })),
-    ...authors.map((author) => ({
-      spec: author.spec,
-      createdAt: author.createdAt,
-    })),
-    ...READERS.map((spec) => ({
-      spec,
-      createdAt: new Date(rng.float(earliest, Date.now() - 30 * DAY_MS)),
-    })),
+    ...STAFF.map((spec) =>
+      withLastSeen(spec, new Date(earliest - rng.int(30, 90) * DAY_MS))
+    ),
+    ...authors.map((author) => withLastSeen(author.spec, author.createdAt)),
+    ...READERS.map((spec) =>
+      withLastSeen(
+        spec,
+        new Date(rng.float(earliest, Date.now() - 30 * DAY_MS))
+      )
+    ),
   ];
 
   const threads = planThreads(

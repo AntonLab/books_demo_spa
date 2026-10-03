@@ -122,10 +122,11 @@ async function writeAccounts(
 ): Promise<number[]> {
   const ids: number[] = [];
 
-  for (const { spec, createdAt } of plan.accounts) {
+  for (const { spec, createdAt, lastSeenAt } of plan.accounts) {
     // createUserSchema carries no `role` on purpose: the role travels
     // separately so a PATCH body can never smuggle one in. The seed follows
-    // that split rather than working around it.
+    // that split rather than working around it. lastSeenAt is attached the
+    // same way, after parsing: no request body may set it.
     const fields = createUserSchema.parse({
       login: spec.login,
       email: `${spec.login}@example.com`,
@@ -133,13 +134,21 @@ async function writeAccounts(
       firstName: spec.firstName,
       lastName: spec.lastName,
       status: 'active',
+      about: spec.about,
+      showLastSeen: spec.showLastSeen,
     });
 
     // create(), not bulkCreate: bulkCreate defaults to individualHooks: false,
     // which would skip User.beforeSave and store the password in clear text.
     // `silent` is what stops save() from overwriting the backdated updatedAt.
     const user = await User.create(
-      { ...fields, role: spec.role, createdAt, updatedAt: createdAt },
+      {
+        ...fields,
+        role: spec.role,
+        lastSeenAt,
+        createdAt,
+        updatedAt: createdAt,
+      },
       { transaction, silent: true }
     );
     ids.push(user.id);

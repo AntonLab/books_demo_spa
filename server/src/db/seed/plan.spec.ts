@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RNG_SEED, createRng } from './rng.ts';
 import {
+  ABOUT_MAX_LENGTH,
   BAN_MARK_THRESHOLD,
+  LAST_ONLINE_WINDOW_MS,
   READING_LIST_TITLE_MAX_LENGTH,
   READING_STATUSES,
   REPORT_EXPLANATION_MAX_LENGTH,
@@ -59,6 +61,47 @@ test('plans the ten personas the demo is signed in as', () => {
   assert.equal(roles.filter((role) => role === 'author').length, 3);
   assert.equal(roles.filter((role) => role === 'user').length, 5);
   assert.equal(new Set(plan.accounts.map(({ spec }) => spec.login)).size, 10);
+});
+
+test('spreads Last online over the display classes, hides one stamp and never dates one before its account', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const now = Date.now();
+  const age = (login: string) => {
+    const account = plan.accounts.find(({ spec }) => spec.login === login);
+    assert.ok(account, login);
+    return account.lastSeenAt === null
+      ? null
+      : now - account.lastSeenAt.getTime();
+  };
+
+  assert.ok((age('superadmin') ?? Infinity) < LAST_ONLINE_WINDOW_MS);
+  assert.ok((age('admin') ?? 0) > LAST_ONLINE_WINDOW_MS);
+  assert.ok((age('admin') ?? Infinity) < 60 * 60 * 1000);
+  assert.ok((age('mhale') ?? 0) > 24 * 60 * 60 * 1000);
+  assert.ok((age('mhale') ?? Infinity) < 48 * 60 * 60 * 1000);
+  assert.ok((age('ipetrov') ?? 0) > 7 * 24 * 60 * 60 * 1000);
+  assert.equal(age('user1'), null);
+  for (const { lastSeenAt, createdAt, spec } of plan.accounts) {
+    assert.ok(lastSeenAt === null || lastSeenAt >= createdAt, spec.login);
+  }
+});
+
+test('hides exactly one seeded stamp and gives a few Accounts an About that fits the limit, one long enough to clamp', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const hidden = plan.accounts.filter(({ spec }) => !spec.showLastSeen);
+  const withAbout = plan.accounts.filter(({ spec }) => spec.about !== '');
+
+  assert.equal(hidden.length, 1);
+  assert.notEqual(hidden[0]?.lastSeenAt, null);
+  assert.ok(withAbout.length >= 3);
+  for (const { spec } of withAbout) {
+    assert.ok(spec.about.length <= ABOUT_MAX_LENGTH, spec.login);
+  }
+  assert.ok(
+    withAbout.some(
+      ({ spec }) => spec.about.length > 300 && spec.about.includes('\n')
+    )
+  );
 });
 
 test('gives every author a catalogue whose newest book is its only draft', () => {

@@ -255,6 +255,33 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
+  test('stores Last online, About and the hide flag for the demo Accounts', async () => {
+    const rows = await offending(
+      `SELECT login, about, showLastSeen, lastSeenAt, createdAt, updatedAt FROM users`
+    );
+    const byLogin = new Map(
+      rows.map((row) => [
+        (row as { login: string }).login,
+        row as Record<string, unknown>,
+      ])
+    );
+
+    assert.equal(byLogin.get('user3')?.showLastSeen, 0);
+    assert.notEqual(byLogin.get('user3')?.lastSeenAt, null);
+    assert.equal(byLogin.get('user1')?.lastSeenAt, null);
+    assert.match(String(byLogin.get('nquinn')?.about), /\n/);
+    assert.equal(byLogin.get('admin')?.about, '');
+    assert.deepEqual(
+      await offending(`SELECT id FROM users WHERE lastSeenAt < createdAt`),
+      []
+    );
+    // A seeded stamp is not an edit: the backdated updatedAt stays.
+    assert.deepEqual(
+      await offending(`SELECT id FROM users WHERE updatedAt <> createdAt`),
+      []
+    );
+  });
+
   test('dates no comment or like before its account was created', async () => {
     assert.deepEqual(
       await offending(
