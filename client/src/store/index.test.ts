@@ -1,4 +1,5 @@
 import { createAppStore, syncFromStorageEvent } from './index';
+import { recentlyViewed } from './recentlyViewedSlice';
 import { unsavedText } from './unsavedTextSlice';
 import { STORAGE_KEYS } from './persistence';
 
@@ -100,5 +101,53 @@ describe('cross-tab sync', () => {
     expect(store.getState().unsavedText.entries['book:1:comment']?.text).toBe(
       'Local text'
     );
+  });
+
+  it("replaces this tab's history with another tab's value, and resets on a removed key", () => {
+    const store = createAppStore({});
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.recentlyViewed,
+      newValue: JSON.stringify({ accountId: 3, ids: [7, 6] }),
+    });
+    expect(store.getState().recentlyViewed).toEqual({
+      accountId: 3,
+      ids: [7, 6],
+    });
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.recentlyViewed,
+      newValue: null,
+    });
+    expect(store.getState().recentlyViewed).toEqual({
+      accountId: null,
+      ids: [],
+    });
+  });
+
+  it("keeps this tab's history when another tab shows a different signed-in Account", () => {
+    const store = createAppStore({});
+    store.dispatch(recentlyViewed.accountChanged(3));
+    store.dispatch(recentlyViewed.record(1));
+    const before = store.getState().recentlyViewed;
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.recentlyViewed,
+      newValue: JSON.stringify({ accountId: 5, ids: [9] }),
+    });
+
+    expect(store.getState().recentlyViewed).toEqual(before);
+  });
+
+  it('ignores a corrupt history from another tab', () => {
+    const store = createAppStore({});
+    store.dispatch(recentlyViewed.record(1));
+
+    syncFromStorageEvent(store, {
+      key: STORAGE_KEYS.recentlyViewed,
+      newValue: 'not json',
+    });
+
+    expect(store.getState().recentlyViewed.ids).toEqual([1]);
   });
 });

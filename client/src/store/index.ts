@@ -3,7 +3,7 @@ import {
   devicePreferences,
   devicePreferencesReducer,
 } from './devicePreferencesSlice';
-import { recentlyViewedReducer } from './recentlyViewedSlice';
+import { recentlyViewed, recentlyViewedReducer } from './recentlyViewedSlice';
 import { unsavedText, unsavedTextReducer } from './unsavedTextSlice';
 import {
   createPersistenceMiddleware,
@@ -49,7 +49,8 @@ export const syncFromStorageEvent = (
 ): void => {
   if (
     event.key !== STORAGE_KEYS.devicePreferences &&
-    event.key !== STORAGE_KEYS.unsavedText
+    event.key !== STORAGE_KEYS.unsavedText &&
+    event.key !== STORAGE_KEYS.recentlyViewed
   ) {
     return;
   }
@@ -62,26 +63,32 @@ export const syncFromStorageEvent = (
     );
     return;
   }
-  const incoming = parsed?.unsavedText ?? null;
-  const thisAccountId = target.getState().unsavedText.accountId;
-  // Two tabs signed into different Accounts would otherwise ping-pong: this
-  // tab adopts the other Account's slice, the Account binding's
-  // `accountChanged` effect wipes it straight back to this Account and
-  // writes that, the other tab adopts it back, and so on — each round
-  // losing Unsaved text.
-  // `null` on either side (nobody seen signed in yet, or the key was
-  // cleared) never triggers `accountChanged`, so only a genuine mismatch
-  // between two signed-in Accounts is skipped here.
-  if (
-    incoming !== null &&
-    incoming.accountId !== null &&
-    thisAccountId !== null &&
-    incoming.accountId !== thisAccountId
-  ) {
+  if (event.key === STORAGE_KEYS.recentlyViewed) {
+    const incoming = parsed?.recentlyViewed ?? null;
+    if (differentAccounts(incoming, target.getState().recentlyViewed)) return;
+    target.dispatch(recentlyViewed.replaced(incoming));
     return;
   }
+  const incoming = parsed?.unsavedText ?? null;
+  if (differentAccounts(incoming, target.getState().unsavedText)) return;
   target.dispatch(unsavedText.replaced(incoming));
 };
+
+// Two tabs signed into different Accounts would otherwise ping-pong: this
+// tab adopts the other Account's slice, the Account binding's
+// `accountChanged` effect wipes it straight back to this Account and
+// writes that, the other tab adopts it back, and so on — each round
+// losing Unsaved text or history.
+// `null` on either side (nobody seen signed in yet, or the key was
+// cleared) never triggers `accountChanged`, so only a genuine mismatch
+// between two signed-in Accounts counts.
+const differentAccounts = (
+  incoming: { accountId: number | null } | null,
+  mine: { accountId: number | null }
+): boolean =>
+  incoming?.accountId != null &&
+  mine.accountId !== null &&
+  incoming.accountId !== mine.accountId;
 
 export const store = createAppStore();
 
