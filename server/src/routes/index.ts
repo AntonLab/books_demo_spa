@@ -14,6 +14,7 @@ import { createLikeRoutes } from './likeRoutes.ts';
 import { createLibraryRoutes } from './libraryRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
 import { createReadingListRoutes } from './readingListRoutes.ts';
+import { createCommentReportRoutes } from './reportRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
@@ -44,6 +45,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   // Reference data for the catalogue: no path here collides with any above.
   router.use('/genres', createGenreRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
+  router.use('/comments', createCommentReportRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
   router.use('/favorites', createFavoriteRoutes(deps));
   router.use('/library', createLibraryRoutes(deps));

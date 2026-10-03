@@ -39,6 +39,10 @@ import {
   type ReadingListRepository,
 } from './readingListRepository.ts';
 import {
+  createSequelizeReportRepository,
+  type ReportRepository,
+} from './reportRepository.ts';
+import {
   createSequelizeSeriesRepository,
   type SeriesRepository,
 } from './seriesRepository.ts';
@@ -66,6 +70,7 @@ export interface Repositories {
   favoriteRepository: FavoriteRepository;
   libraryRepository: LibraryRepository;
   readingListRepository: ReadingListRepository;
+  reportRepository: ReportRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
 }
@@ -85,6 +90,7 @@ export function createSequelizeRepositories(): Repositories {
     favoriteRepository: createSequelizeFavoriteRepository(),
     libraryRepository: createSequelizeLibraryRepository(),
     readingListRepository: createSequelizeReadingListRepository(),
+    reportRepository: createSequelizeReportRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
   };
