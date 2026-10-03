@@ -13,6 +13,7 @@ export * from './genre.ts';
 export * from './library.ts';
 export * from './like.ts';
 export * from './notification.ts';
+export * from './permission.ts';
 export * from './readingList.ts';
 export * from './report.ts';
 export * from './role.ts';

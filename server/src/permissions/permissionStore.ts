@@ -1,4 +1,6 @@
+import type { SessionPermissions } from 'shared';
 import { Permission, toPublicPermission } from '../models/Permission.ts';
+import { ACTIONS, MODULES } from '../types/permission.ts';
 import { buildMatrixRows } from './matrix.ts';
 import type {
   Action,
@@ -58,4 +60,17 @@ export function scopeFor(
   action: Action
 ): PermissionScope {
   return matrix.get(key(role, module, action)) ?? 'none';
+}
+
+// Reads the loaded matrix through scopeFor, so a future per-Account grant
+// changes this one place.
+export function permissionsFor(role: Role): SessionPermissions {
+  return Object.fromEntries(
+    MODULES.map((module) => [
+      module,
+      Object.fromEntries(
+        ACTIONS.map((action) => [action, scopeFor(role, module, action)])
+      ),
+    ])
+  ) as SessionPermissions;
 }
