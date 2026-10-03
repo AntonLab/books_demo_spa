@@ -47,6 +47,7 @@ that read like mistakes and are not.
   another Account's live Comment and Restore on a Removed one, both through
   `IconButton`; Removed Tombstones show to Moderators only, as a reply and as a
   root.
+- `ReportActions` and `ReportedAccountCell` are molecules of the Reports table, with `GenreManager`'s confirm (`Popconfirm` plus `IconButton` `tooltipHidden`) and disabled-with-a-reason tooltip.
 - Edit, delete and like render only when the server would allow them; the
   server refuses each with 403 regardless. `closed` (a Draft book) makes the
   section read-only.

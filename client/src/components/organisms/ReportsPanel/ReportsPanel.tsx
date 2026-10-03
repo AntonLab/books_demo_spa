@@ -8,8 +8,19 @@ import { ListPagination } from '@/components/molecules/ListPagination/ListPagina
 import { TOMBSTONE_LABELS } from '@/components/molecules/Comment/Comment';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import { formatDateTime } from '@/format/date';
-import { useReports } from '@/queries/reports';
+import { ApiError } from '@/api/client';
+import { ReportActions } from '@/components/molecules/ReportActions/ReportActions';
+import { ReportedAccountCell } from '@/components/molecules/ReportedAccountCell/ReportedAccountCell';
+import { useSession } from '@/queries/auth';
+import {
+  useBanAccount,
+  useDismissReport,
+  useReports,
+  useTakeReport,
+  useUpholdReport,
+} from '@/queries/reports';
 import spacing from '@/theme/spacing.module.css';
+import { banBlockedReason } from '@/types/banReach';
 import { REASON_LABELS, STATUS_LABELS } from '@/types/report';
 import { dayRange } from '@/types/reportRange';
 import type { ReportRow } from '@/types/api';
@@ -43,6 +54,23 @@ export const ReportsPanel: FC = () => {
     offset: (page - 1) * pageSize,
   });
 
+  const { data: session } = useSession();
+  const take = useTakeReport();
+  const uphold = useUpholdReport();
+  const dismiss = useDismissReport();
+  const ban = useBanAccount();
+  const busy = [take, uphold, dismiss, ban].some((m) => m.isPending);
+  const failure = [take, uphold, dismiss, ban].find((m) => m.isError)?.error;
+
+  // Resets all four first, so only the latest failure shows.
+  const run = <V,>(
+    mutation: { mutate: (variables: V) => void },
+    variables: V
+  ) => {
+    [take, uphold, dismiss, ban].forEach((m) => m.reset());
+    mutation.mutate(variables);
+  };
+
   // A page emptied from elsewhere (its last report settled) steps back to the
   // last page that still has rows.
   if (data && data.items.length === 0 && page > 1) {
@@ -75,6 +103,17 @@ export const ReportsPanel: FC = () => {
           }}
         />
       </Flex>
+      {failure && (
+        <Alert
+          type="error"
+          className={spacing.gapBelow}
+          title={
+            failure instanceof ApiError
+              ? failure.message
+              : 'Could not complete the action.'
+          }
+        />
+      )}
       {isError ? (
         <Alert type="error" title="Could not load the reports." />
       ) : (
@@ -123,7 +162,19 @@ export const ReportsPanel: FC = () => {
               },
               {
                 title: 'Reported account',
-                render: (_, row) => accountLogin(row.reportedAccount),
+                render: (_, { reportedAccount }) => (
+                  <ReportedAccountCell
+                    account={reportedAccount}
+                    blockedReason={
+                      reportedAccount &&
+                      banBlockedReason(session, reportedAccount)
+                    }
+                    pending={busy}
+                    onBan={() =>
+                      reportedAccount && run(ban, reportedAccount.id)
+                    }
+                  />
+                ),
               },
               {
                 title: 'Comment',
@@ -154,6 +205,25 @@ export const ReportsPanel: FC = () => {
               {
                 title: 'Moderator',
                 render: (_, row) => row.moderatorLogin ?? '—',
+              },
+              {
+                title: 'Actions',
+                render: (_, row) => {
+                  const target = {
+                    commentId: row.comment.id,
+                    bookId: row.comment.bookId,
+                  };
+                  return (
+                    <ReportActions
+                      status={row.status}
+                      isOwnComment={row.isOwnComment}
+                      disabled={busy}
+                      onTake={() => run(take, target)}
+                      onUphold={() => run(uphold, target)}
+                      onDismiss={() => run(dismiss, target)}
+                    />
+                  );
+                },
               },
             ]}
           />

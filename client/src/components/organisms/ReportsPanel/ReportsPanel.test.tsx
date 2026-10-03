@@ -8,10 +8,27 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { reportRow } from '@/test/reports';
 import type { QueryClient } from '@tanstack/react-query';
-import type { ReportRow } from '@/types/api';
+import * as usersApi from '@/api/users';
+import type { PublicUser, ReportRow } from '@/types/api';
 
+jest.mock('@/api/auth');
 jest.mock('@/api/reports');
+jest.mock('@/api/users');
 const mockedReports = jest.mocked(reportsApi);
+const mockedUsers = jest.mocked(usersApi);
+
+const admin: PublicUser = {
+  id: 1,
+  login: 'root',
+  email: 'root@example.com',
+  firstName: 'Root',
+  lastName: 'Admin',
+  status: 'active',
+  role: 'admin',
+  avatarUrl: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
 
 const listOf = (items: ReportRow[], total = items.length) => ({
   items,
@@ -20,10 +37,15 @@ const listOf = (items: ReportRow[], total = items.length) => ({
   offset: 0,
 });
 
-const renderPanel = (queryClient: QueryClient = createTestQueryClient()) =>
-  renderWithProviders(<ReportsPanel />, { queryClient });
+const renderPanel = (queryClient: QueryClient = createTestQueryClient()) => {
+  queryClient.setQueryData(queryKeys.session, admin);
+  return renderWithProviders(<ReportsPanel />, { queryClient });
+};
 
 describe('ReportsPanel', () => {
+  // The call counts below start from zero in every test.
+  beforeEach(() => jest.clearAllMocks());
+
   describe('with the clock at 2026-10-03 15:30', () => {
     beforeEach(() =>
       jest.useFakeTimers({
@@ -197,5 +219,127 @@ describe('ReportsPanel', () => {
       await screen.findByText('Could not load the reports.')
     ).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
+  });
+
+  it('takes a new report, then refetches the rows', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.takeReport.mockResolvedValue(undefined);
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Take' }));
+    await waitFor(() =>
+      expect(mockedReports.takeReport).toHaveBeenCalledWith(5)
+    );
+    await waitFor(() =>
+      expect(mockedReports.listReports).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('shows the server message when another Moderator got there first, and refetches', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.takeReport.mockRejectedValue(
+      new ApiError(409, 'This report is already being reviewed.')
+    );
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Take' }));
+    expect(
+      await screen.findByText('This report is already being reviewed.')
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedReports.listReports).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('clears the last failure when the next action starts', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.takeReport
+      .mockRejectedValueOnce(new ApiError(409, 'Already taken.'))
+      .mockResolvedValue(undefined);
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Take' }));
+    expect(await screen.findByText('Already taken.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Take' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Already taken.')).toBeNull()
+    );
+  });
+
+  it('upholds after confirmation and dismisses at once', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([reportRow({ status: 'in_review' })])
+    );
+    mockedReports.upholdReport.mockResolvedValue(undefined);
+    mockedReports.dismissReport.mockResolvedValue(undefined);
+    renderPanel();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Uphold' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, uphold' })
+    );
+    await waitFor(() =>
+      expect(mockedReports.upholdReport).toHaveBeenCalledWith(5)
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    await waitFor(() =>
+      expect(mockedReports.dismissReport).toHaveBeenCalledWith(5)
+    );
+  });
+
+  it('bans the reported Account after confirmation and refetches', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({
+          reportedAccount: {
+            id: 4,
+            login: 'Writer',
+            status: 'active',
+            role: 'user',
+            atBanThreshold: true,
+          },
+        }),
+      ])
+    );
+    mockedUsers.blockUser.mockResolvedValue(admin);
+    renderPanel();
+    expect(await screen.findByText('Ban mark')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ban user' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, ban' })
+    );
+    await waitFor(() => expect(mockedUsers.blockUser).toHaveBeenCalledWith(4));
+    await waitFor(() =>
+      expect(mockedReports.listReports).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('offers no Ban user for a deleted Account or a System report on a deleted one', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({ reportedAccount: null, reporter: null, isSystem: true }),
+      ])
+    );
+    renderPanel();
+    await screen.findByText('System');
+    expect(screen.queryByRole('button', { name: 'Ban user' })).toBeNull();
+  });
+
+  it('keeps Ban user disabled for an admin facing an admin', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({
+          reportedAccount: {
+            id: 4,
+            login: 'Boss',
+            status: 'active',
+            role: 'admin',
+            atBanThreshold: false,
+          },
+        }),
+      ])
+    );
+    renderPanel();
+    expect(
+      await screen.findByRole('button', { name: 'Ban user' })
+    ).toBeDisabled();
   });
 });
