@@ -9,7 +9,7 @@
  * The plugins are imported directly: the root package.json declares them and
  * npm hoists them into the root `node_modules`, so bare specifiers resolve
  * from this file. Only `languageOptions` genuinely differ between the packages
- * (browser globals and ES2020 vs Node globals and ES2022), so those stay in
+ * (browser globals and ES2020 vs Node globals), so those stay in
  * the package configs.
  *
  * TypeScript files are linted with type information: the block for .ts and

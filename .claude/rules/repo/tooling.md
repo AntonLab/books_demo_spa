@@ -20,6 +20,9 @@ paths:
 - It sets `noUncheckedIndexedAccess` for all three packages: an index read is
   `T | undefined`, application code handles the miss, and only test files
   assert it away with `!`.
+- Fire-and-forget: await a promise, or mark a deliberate one `void` with the
+  reason beside it (`onFinish={(values) => void handleFinish(values)}`). The
+  typed lint rules take no `eslint-disable`.
 - `erasableSyntaxOnly` and `verbatimModuleSyntax` hold everywhere, because
   Node strips types from the server and `shared` (ADR-0006); the client keeps
   the same rules so code moves between packages unchanged.
@@ -96,7 +99,3 @@ the newest version, so it needs no update when the plugin does.
 `describe`/`expect` call; a plan whose tests use another runner's names needs
 the pattern widened, not the 15-line limit. It also caps a task at
 `MAX_TASK_LINES` (180); a longer task becomes two.
-
-Fire-and-forget: await a promise, or mark a deliberate one `void` with the
-reason beside it (`onFinish={(values) => void handleFinish(values)}`). The
-typed lint rules take no `eslint-disable`.

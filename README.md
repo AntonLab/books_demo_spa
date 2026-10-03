@@ -81,8 +81,10 @@ stored hashed. Every write, plus both reads on `/api/users`, runs through a
 five-role permission matrix (`guest`, `user`, `author`, `admin`, `superadmin`)
 instead of a blanket session check: a request with no session gets 401, and a
 signed-in role with no grant for that action gets 403. Ownership is enforced
-on every resource a user creates — only a row's owner, or an
-`admin`/`superadmin` acting as moderator, may change it. See
+on books, series, chapters, comments, likes, favorites and user accounts —
+only a row's owner, or an `admin`/`superadmin` acting as moderator, may change
+it. Reading lists, library entries and notifications are always the session's
+own rows. See
 `.claude/rules/server/` — `permissions.md` for the full matrix, `auth.md` for
 account blocking, `visibility.md` for the tombstone rules on deleted comments.
 
@@ -99,6 +101,10 @@ The scripts are in the root `package.json` and each package's own; run the root
 ones from the repo root. Every script except the Prettier pair fans out over
 every workspace that defines it; target one with npm's `-w` flag
 (`npm run dev -w client`, `npm run build -w server`).
+
+`npm run dev` serves the client on :3000 and the API on :4000. `npm run start -w
+server` runs the API without the file watcher, and `npm run test:watch -w client`
+reruns the client tests on change.
 
 The server's test suite talks to a real MySQL database, so `.env.local` must be
 configured before `npm test` there.
