@@ -16,7 +16,7 @@ import {
   type ListBooksParams,
 } from '../api/books';
 import type { BookSort, CreateBookPayload, UpdateBookPayload } from 'shared';
-import { PAGE_SIZE_MAX } from 'shared';
+import { BOOK_IDS_MAX, PAGE_SIZE_MAX } from 'shared';
 import { queryKeys } from './keys';
 
 const BOOKS_PAGE_SIZE = 20;
@@ -27,6 +27,26 @@ export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
   return useQuery({
     queryKey: queryKeys.books({ sort, pageSize }),
     queryFn: () => listBooks({ sort, pageSize }),
+  });
+};
+
+export const RECENTLY_VIEWED_SIZE = 6;
+
+// The Books of a viewing history, newest first. The request and key use the ids
+// as a set, so a re-opened Book (order change only) reuses the cached answer.
+export const useRecentlyViewedBooks = (ids: number[]) => {
+  const asked = [...ids].sort((a, b) => a - b).join(',');
+  return useQuery({
+    queryKey: queryKeys.books({ ids: asked, pageSize: BOOK_IDS_MAX }),
+    queryFn: () => listBooks({ ids: asked, pageSize: BOOK_IDS_MAX }),
+    enabled: ids.length > 0,
+    // The slice comes after the server dropped some: BOOK_IDS_MAX ids are
+    // asked so that RECENTLY_VIEWED_SIZE can still show.
+    select: (page) =>
+      page.items
+        .filter((item) => ids.includes(item.id))
+        .sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id))
+        .slice(0, RECENTLY_VIEWED_SIZE),
   });
 };
 

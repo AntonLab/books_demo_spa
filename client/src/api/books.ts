@@ -36,6 +36,9 @@ export interface ListBooksParams {
   favoritedBy?: 'me';
   // Only Published Books, even for the Owner.
   published?: 'true';
+  // Book ids, comma-separated, 1 to BOOK_IDS_MAX; only the Published ones among
+  // them answer.
+  ids?: string;
 }
 
 // Every filter combines with the others by AND. Written in the order the

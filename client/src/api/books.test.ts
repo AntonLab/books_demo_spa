@@ -65,6 +65,16 @@ describe('listBooks', () => {
     );
   });
 
+  it('encodes ids as one comma-separated value', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ ids: '3,1,2', pageSize: 20 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?ids=3%2C1%2C2&pageSize=20'
+    );
+  });
+
   it('encodes the search filters in the order given', async () => {
     const fetchMock = mockFetch(envelope);
 
