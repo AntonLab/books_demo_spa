@@ -11,6 +11,7 @@ import {
   useComments,
   useCreateComment,
   useDeleteComment,
+  useRestoreComment,
   useUpdateComment,
 } from '@/queries/comments';
 import { queryKeys } from '@/queries/keys';
@@ -23,8 +24,11 @@ import {
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
 import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
+import { isModeratorRole } from 'shared';
 import type { CommentWithAuthor } from '@/types/api';
 import styles from './CommentSection.module.css';
+
+const noop = () => {};
 
 interface CommentSectionProps {
   bookId: number;
@@ -51,6 +55,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const create = useCreateComment(bookId);
   const update = useUpdateComment(bookId);
   const remove = useDeleteComment(bookId);
+  const restore = useRestoreComment(bookId);
   const toggleLike = useToggleLike(queryKeys.comments(bookId));
 
   const dispatch = useAppDispatch();
@@ -92,23 +97,31 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const all = data?.items ?? [];
 
+  // A closed thread offers no action at all: every one of them either writes
+  // through the composer or reacts, and neither is open on a draft.
+  const canAct = Boolean(session) && !closed;
+  const moderating = canAct && isModeratorRole(session?.role);
+
   // The server returns a flat list; the two-level tree is assembled here, in
   // one pass over it. Only roots and their direct replies render, so a
   // tombstone earns its place only as a root keeping at least one live reply
   // in its thread. Every other tombstone — a reply, or a root whose replies
   // are all tombstones too — is noise, and is dropped here rather than on the
   // server: this is the only place that already knows what hangs off what.
+  // The exception is a Moderator, who keeps every Removed tombstone, as a
+  // reply and as a root, so Restore stays reachable.
+  const shows = (item: CommentWithAuthor) =>
+    item.tombstone === null || (moderating && item.tombstone === 'removed');
   const liveReplies = new Map<number, CommentWithAuthor[]>();
   for (const item of all) {
-    if (item.parentId === null || item.tombstone !== null) continue;
+    if (item.parentId === null || !shows(item)) continue;
     const siblings = liveReplies.get(item.parentId) ?? [];
     siblings.push(item);
     liveReplies.set(item.parentId, siblings);
   }
   const roots = all.filter(
     (item) =>
-      item.parentId === null &&
-      (item.tombstone === null || liveReplies.has(item.id))
+      item.parentId === null && (shows(item) || liveReplies.has(item.id))
   );
 
   const find = (id: number) => all.find((item) => item.id === id);
@@ -213,9 +226,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
     });
   };
 
-  // A closed thread offers no action at all: every one of them either writes
-  // through the composer or reacts, and neither is open on a draft.
-  const canAct = Boolean(session) && !closed;
+  // Remove is deleteComment: the server makes a Removed comment when another
+  // Account calls it. Neither it nor Restore renders an error here, like Delete.
+  const restoreComment = (id: number) => {
+    void restore.mutateAsync(id).then(noop, noop);
+  };
 
   const renderComment = (comment: CommentWithAuthor, canReply: boolean) => (
     <Comment
@@ -236,6 +251,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
         report.reset();
         setReporting(id);
       }}
+      // The server's rule: a Moderator's own Comment gets Delete, not Remove.
+      // A Tombstone has no userId, so it passes.
+      canModerate={moderating && session?.id !== comment.userId}
+      onRemove={deleteComment}
+      onRestore={restoreComment}
     />
   );
 

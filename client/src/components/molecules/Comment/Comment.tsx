@@ -1,10 +1,12 @@
-import type { FC } from 'react';
-import { Space, Tag, theme, Typography } from 'antd';
+import { useState, type FC } from 'react';
+import { Popconfirm, Space, Tag, theme, Typography } from 'antd';
 import {
   CommentOutlined,
   DeleteOutlined,
   EditOutlined,
   FlagOutlined,
+  StopOutlined,
+  UndoOutlined,
 } from '@ant-design/icons';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
@@ -35,6 +37,9 @@ interface CommentProps {
   onLike: (comment: CommentWithAuthor) => void;
   canReport: boolean;
   onReport: (id: number) => void;
+  canModerate: boolean;
+  onRemove: (id: number) => void;
+  onRestore: (id: number) => void;
 }
 
 // The name is free because antd removed its own Comment component in v5, so
@@ -52,19 +57,35 @@ export const Comment: FC<CommentProps> = ({
   onLike,
   canReport,
   onReport,
+  canModerate,
+  onRemove,
+  onRestore,
 }) => {
   const { token } = theme.useToken();
+  const [confirming, setConfirming] = useState(false);
 
   // A tombstone carries no author, no text and no controls — not even for the
-  // person who deleted or removed it. It exists only so its replies keep a
-  // parent to hang off; anything more would put back what deleting or
-  // removing was meant to take away.
+  // person who deleted or removed it — except a Moderator's Restore on a
+  // Removed one. It exists only so its replies keep a parent to hang off;
+  // anything more would put back what deleting or removing was meant to take
+  // away.
   if (comment.tombstone !== null) {
     return (
       <article className={styles.comment}>
-        <Typography.Text type="secondary" italic>
-          {TOMBSTONE_LABELS[comment.tombstone]}
-        </Typography.Text>
+        <Space size={token.marginXS}>
+          <Typography.Text type="secondary" italic>
+            {TOMBSTONE_LABELS[comment.tombstone]}
+          </Typography.Text>
+          {comment.tombstone === 'removed' && canModerate && (
+            <IconButton
+              label="Restore"
+              icon={<UndoOutlined />}
+              size="small"
+              type="text"
+              onClick={() => onRestore(comment.id)}
+            />
+          )}
+        </Space>
       </article>
     );
   }
@@ -138,6 +159,24 @@ export const Comment: FC<CommentProps> = ({
               onClick={() => onDelete(comment.id)}
             />
           </>
+        )}
+        {canModerate && (
+          <Popconfirm
+            title="Remove this comment?"
+            okText="Yes, remove"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => onRemove(comment.id)}
+            onOpenChange={setConfirming}
+          >
+            <IconButton
+              label="Remove"
+              icon={<StopOutlined />}
+              size="small"
+              type="text"
+              danger
+              tooltipHidden={confirming}
+            />
+          </Popconfirm>
         )}
         {canReport && (
           <IconButton

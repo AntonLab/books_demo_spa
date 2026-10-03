@@ -4,8 +4,10 @@ import type { ReactNode } from 'react';
 import {
   useCreateComment,
   useDeleteComment,
+  useRestoreComment,
   useUpdateComment,
 } from './comments';
+import { queryKeys } from './keys';
 import { createTestQueryClient } from '../test/queryClient';
 import * as commentsApi from '../api/comments';
 import type { PublicComment } from '../types/api';
@@ -54,6 +56,7 @@ beforeEach(() => {
   mockedComments.createComment.mockResolvedValue(comment);
   mockedComments.updateComment.mockResolvedValue(comment);
   mockedComments.deleteComment.mockResolvedValue(undefined);
+  mockedComments.restoreComment.mockResolvedValue(comment);
 });
 
 describe('comment writes', () => {
@@ -81,6 +84,18 @@ describe('comment writes', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedComments.deleteComment).toHaveBeenCalledWith(5);
     expectThreadAndBookInvalidated();
+  });
+
+  it('restoring a comment refreshes the thread, the book and the reports', async () => {
+    const { wrapper, expectThreadAndBookInvalidated, invalidate } = setUp();
+    const { result } = renderHook(() => useRestoreComment(1), { wrapper });
+
+    result.current.mutate(5);
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(mockedComments.restoreComment).toHaveBeenCalledWith(5);
+    expectThreadAndBookInvalidated();
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allReports });
   });
 
   it('editing a comment refreshes the thread and the book, through the same path', async () => {

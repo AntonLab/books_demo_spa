@@ -80,6 +80,14 @@ const renderSignedIn = (preloadedState?: Partial<RootState>) => {
   });
 };
 
+const renderAs = (role: PublicUser['role'] | 'guest') => {
+  const queryClient = createTestQueryClient();
+  if (role !== 'guest') {
+    queryClient.setQueryData(queryKeys.session, { ...viewer, role });
+  }
+  return renderWithProviders(<CommentSection bookId={1} />, { queryClient });
+};
+
 const addComment = () =>
   userEvent.click(screen.getByRole('button', { name: 'Add comment' }));
 
@@ -127,6 +135,118 @@ describe('CommentSection', () => {
     expect(
       await screen.findByText('Could not load the comments.')
     ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['user', 0],
+    ['author', 0],
+    ['admin', 1],
+    ['superadmin', 1],
+    ['guest', 0],
+  ] as const)(
+    'a %s sees %i Remove button, never on their own comment',
+    async (role, count) => {
+      renderAs(role);
+      await screen.findByText('Agreed');
+
+      expect(screen.queryAllByRole('button', { name: 'Remove' })).toHaveLength(
+        count
+      );
+    }
+  );
+
+  it('Remove asks first, then calls DELETE for the comment and refetches the thread, the book and the reports', async () => {
+    mockedComments.deleteComment.mockResolvedValue(undefined);
+    const { queryClient } = renderAs('admin');
+    const spy = jest.spyOn(queryClient, 'invalidateQueries');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    await waitFor(() =>
+      expect(mockedComments.deleteComment).toHaveBeenCalledWith(6)
+    );
+    await waitFor(() =>
+      expect(mockedComments.listComments).toHaveBeenCalledTimes(2)
+    );
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.allReports });
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.book(1) });
+  });
+
+  it.each([
+    ['admin', 'removed', 1],
+    ['superadmin', 'removed', 1],
+    ['user', 'removed', 0],
+    ['admin', 'deleted', 0],
+  ] as const)(
+    'a %s with a %s root Tombstone sees %i Restore button',
+    async (role, kind, count) => {
+      mockedComments.listComments.mockResolvedValue({
+        items: [
+          { ...root, tombstone: kind, text: '', userId: null, author: null },
+          reply,
+        ],
+        total: 2,
+        limit: 100,
+        offset: 0,
+      });
+      renderAs(role);
+      await screen.findByText('Agreed');
+
+      expect(screen.queryAllByRole('button', { name: 'Restore' })).toHaveLength(
+        count
+      );
+    }
+  );
+
+  it('shows a Moderator a Removed root that has no live reply, and Restore calls the server', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        {
+          ...root,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedComments.restoreComment.mockResolvedValue(root);
+    renderAs('admin');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Restore' })
+    );
+
+    await waitFor(() =>
+      expect(mockedComments.restoreComment).toHaveBeenCalledWith(5)
+    );
+  });
+
+  it('hides that same Removed root from a plain user', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        {
+          ...root,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    renderSignedIn();
+
+    expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
   });
 
   it('prompts an anonymous visitor to sign in instead of offering a composer', async () => {

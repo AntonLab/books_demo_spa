@@ -30,6 +30,12 @@ export const updateComment = (
   });
 };
 
+export const restoreComment = (id: number): Promise<PublicComment> => {
+  return request<PublicComment>(`/comments/${id}/restore`, { method: 'POST' });
+};
+
+// A Moderator's Remove has no function of its own: it is this call, and the
+// server makes a Removed comment or an Owner delete by who calls.
 // The server answers 204, which request() maps to undefined.
 export const deleteComment = (id: number): Promise<void> => {
   return request<void>(`/comments/${id}`, { method: 'DELETE' });

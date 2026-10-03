@@ -3,6 +3,7 @@ import {
   createComment,
   deleteComment,
   listComments,
+  restoreComment,
   updateComment,
 } from '../api/comments';
 import type { CreateCommentPayload } from 'shared';
@@ -57,4 +58,8 @@ export const useUpdateComment = (bookId: number) => {
 
 export const useDeleteComment = (bookId: number) => {
   return useCommentMutation<number>(bookId, deleteComment);
+};
+
+export const useRestoreComment = (bookId: number) => {
+  return useCommentMutation<number>(bookId, restoreComment);
 };

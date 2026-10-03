@@ -2,6 +2,7 @@ import {
   createComment,
   deleteComment,
   listComments,
+  restoreComment,
   updateComment,
 } from './comments';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
@@ -82,6 +83,19 @@ describe('updateComment', () => {
       method: 'PATCH',
       body: JSON.stringify({ text: 'edited' }),
     });
+  });
+});
+
+describe('restoreComment', () => {
+  it('posts to the restore path with no body and returns the comment', async () => {
+    const fetchMock = mockFetch(jsonResponse({ id: 5 }));
+
+    await expect(restoreComment(5)).resolves.toMatchObject({ id: 5 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/comments/5/restore');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' });
+    // request() always sets the key, to undefined when there is no payload.
+    expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
   });
 });
 

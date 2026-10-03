@@ -37,6 +37,21 @@ const baseProps = {
   onLike: jest.fn(),
   canReport: true,
   onReport: jest.fn(),
+  canModerate: false,
+  onRemove: jest.fn(),
+  onRestore: jest.fn(),
+};
+
+const removedComment: CommentWithAuthor = {
+  ...comment,
+  tombstone: 'removed',
+  text: '',
+  userId: null,
+  author: null,
+};
+const deletedComment: CommentWithAuthor = {
+  ...removedComment,
+  tombstone: 'deleted',
 };
 
 beforeEach(() => {
@@ -213,6 +228,50 @@ describe('Comment', () => {
       />
     );
     expect(screen.queryByText('Moderating')).toBeNull();
+  });
+
+  it('asks before it removes, then removes once', async () => {
+    const onRemove = jest.fn();
+    render(
+      <Comment {...baseProps} isOwn={false} canModerate onRemove={onRemove} />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onRemove).toHaveBeenCalledWith(5);
+  });
+
+  it('offers Restore on a Removed comment to a Moderator, with no other control', async () => {
+    const onRestore = jest.fn();
+    render(
+      <Comment
+        {...baseProps}
+        comment={removedComment}
+        canModerate
+        onRestore={onRestore}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+
+    expect(onRestore).toHaveBeenCalledWith(5);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  it.each([
+    ['a Removed comment, without canModerate', removedComment, false],
+    ['a Deleted comment, with canModerate', deletedComment, true],
+  ])('offers no Restore on %s', (_name, tombstone, canModerate) => {
+    render(
+      <Comment {...baseProps} comment={tombstone} canModerate={canModerate} />
+    );
+
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   describe('a deleted comment', () => {
