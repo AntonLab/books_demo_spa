@@ -499,6 +499,38 @@ test('GET list takes published=true and refuses any other value with 400', async
   );
 });
 
+test('GET list takes ids and answers only those books, and refuses malformed ids with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const ids: number[] = [];
+      for (const title of ['One', 'Two', 'Three']) {
+        const created = await json<{ id: number }>(
+          await post(base, { ...valid, title })
+        );
+        ids.push(created.id);
+      }
+      const wanted = [ids[0], ids[2], 999_999];
+      const body = await json<{ total: number; items: { id: number }[] }>(
+        await fetch(`${base}/api/books?ids=${wanted.join(',')}`)
+      );
+      assert.deepEqual(body.items.map((item) => item.id).sort(), [
+        ids[0],
+        ids[2],
+      ]);
+      assert.equal(body.total, 2);
+
+      for (const bad of ['', '1,', '0', 'abc', '1,1']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?ids=${bad}`)).status,
+          400,
+          bad
+        );
+      }
+    }
+  );
+});
+
 test('GET list takes every search filter together and refuses a bad one with 400', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },

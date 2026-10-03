@@ -1,4 +1,5 @@
 import {
+  BOOK_IDS_MAX,
   BOOK_SORTS,
   BOOK_STATUSES,
   PAGE_SIZE_MAX,
@@ -73,6 +74,22 @@ const instantSchema = z.iso
   .datetime({ offset: true })
   .transform((value) => new Date(value));
 
+const IDS_MESSAGE = `ids must be 1 to ${BOOK_IDS_MAX} distinct positive integers`;
+
+// The pattern runs before idSchema because Number() would let ' 1', '1e2' and
+// '' through.
+const bookIdsSchema = z
+  .string()
+  .transform((value) => value.split(','))
+  .pipe(
+    z
+      .array(z.string().regex(/^[1-9]\d*$/, IDS_MESSAGE))
+      .min(1, IDS_MESSAGE)
+      .max(BOOK_IDS_MAX, IDS_MESSAGE)
+  )
+  .transform((items) => items.map((item) => idSchema.parse(item)))
+  .refine((ids) => new Set(ids).size === ids.length, IDS_MESSAGE);
+
 const inOrder = (from: Date | undefined, to: Date | undefined): boolean =>
   from === undefined || to === undefined || from <= to;
 
@@ -87,6 +104,8 @@ export const listBooksQuerySchema = z
     // Owner's work without their Drafts.
     published: z.literal('true').optional(),
     seriesId: idSchema.optional(),
+    // A public lookup of the named Books, Published only for every viewer.
+    ids: bookIdsSchema.optional(),
     genreId: idSchema.optional(),
     tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),
     q: searchTextSchema.optional(),

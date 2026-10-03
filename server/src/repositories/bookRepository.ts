@@ -418,10 +418,15 @@ function buildWhere(
     }
   }
 
+  if (query.ids !== undefined) {
+    clauses.push({ id: query.ids });
+  }
+
   // Mirrors the non-Owner branch of `listedBookWhere`, which the private
-  // Profile still needs for the Owner's Drafts.
+  // Profile still needs for the Owner's Drafts. `ids` is a public lookup, never
+  // a Draft, even the viewer's own.
   const listed =
-    query.published === undefined
+    query.published === undefined && query.ids === undefined
       ? listedBookWhere(viewer, query.userId)
       : { status: { [Op.ne]: 'draft' } };
   if (listed !== null) clauses.push(listed);

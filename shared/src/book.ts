@@ -12,6 +12,10 @@ export type BookStatus = (typeof BOOK_STATUSES)[number];
 export const BOOK_SORTS = ['popular', 'new', 'updated'] as const;
 export type BookSort = (typeof BOOK_SORTS)[number];
 
+// The most Book ids one `GET /api/books?ids=` names, and the cap of a device's
+// Recently viewed history.
+export const BOOK_IDS_MAX = 20;
+
 // The Series a Book is filed in, with the Book's place in it. N is derived and
 // counts Published Books only, so it never reveals a Draft book; null for a
 // Draft book itself.

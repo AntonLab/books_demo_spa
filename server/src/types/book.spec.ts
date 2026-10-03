@@ -101,6 +101,42 @@ test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 o
   }
 });
 
+test('listBooksQuerySchema reads ids as 1 to 20 distinct positive integers', () => {
+  assert.deepEqual(listBooksQuerySchema.parse({ ids: '3,1,2' }).ids, [3, 1, 2]);
+  assert.equal(listBooksQuerySchema.parse({ ids: '7' }).ids?.[0], 7);
+  assert.equal(listBooksQuerySchema.parse({}).ids, undefined);
+  const twenty = Array.from({ length: 20 }, (_, index) => index + 1);
+  assert.equal(
+    listBooksQuerySchema.parse({ ids: twenty.join(',') }).ids?.length,
+    20
+  );
+});
+
+test('listBooksQuerySchema refuses malformed ids', () => {
+  const twentyOne = Array.from({ length: 21 }, (_, index) => index + 1);
+  for (const bad of [
+    '',
+    '1,',
+    ',1',
+    '1,,2',
+    '0',
+    '-1',
+    '1.5',
+    '1e2',
+    ' 1',
+    '1, 2',
+    'abc',
+    '1,1',
+    twentyOne.join(','),
+  ]) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ ids: bad }).success,
+      false,
+      JSON.stringify(bad)
+    );
+  }
+});
+
 test('listBooksQuerySchema takes published=true and refuses any other value', () => {
   assert.equal(
     listBooksQuerySchema.parse({ published: 'true' }).published,

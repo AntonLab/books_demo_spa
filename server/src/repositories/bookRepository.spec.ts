@@ -409,6 +409,46 @@ describe('bookRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('ids lists only the Published Books among those named, for every viewer', async () => {
+    const MISSING_ID = 999_999;
+    const live = await publishedBook('Live');
+    const otherLive = await publishedBook('Other live');
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Hidden draft',
+      description: 'd',
+      tags: [],
+    });
+
+    for (const viewer of [
+      asOwner(),
+      { id: 0, role: 'superadmin' as const },
+      null,
+    ]) {
+      const named = await repository.list(
+        {
+          current: 1,
+          pageSize: 20,
+          ids: [live.id, draft.id, MISSING_ID],
+        },
+        viewer
+      );
+      assert.deepEqual(
+        named.items.map((book) => book.title),
+        ['Live']
+      );
+      assert.equal(named.total, 1);
+
+      const paged = await repository.list(
+        { current: 1, pageSize: 1, ids: [live.id, otherLive.id] },
+        viewer
+      );
+      assert.equal(paged.total, 2);
+      assert.equal(paged.items.length, 1);
+    }
+  });
+
   test('published=true drops the Drafts that ?userId= lists for their own Co-author, whoever asks', async () => {
     await publishedBook('Live');
     await repository.create({

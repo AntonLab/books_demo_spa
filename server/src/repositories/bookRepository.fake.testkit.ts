@@ -202,6 +202,7 @@ export function createFakeBookRepository(
         (row) =>
           (query.userId === undefined ||
             (credits.get(row.id) ?? []).includes(query.userId)) &&
+          (query.ids === undefined || query.ids.includes(row.id)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
           (query.genreId === undefined ||
             row.genre?.id === query.genreId ||
