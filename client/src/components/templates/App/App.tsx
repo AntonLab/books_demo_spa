@@ -29,9 +29,9 @@ import styles from './App.module.css';
 // render on every route, so splitting them would buy nothing. Each page is a
 // named export, so `lazy` has to remap it onto `default` — see
 // .claude/rules/client/pages.md.
-const AdminGenresPage = lazy(() =>
-  import('@/pages/AdminGenresPage/AdminGenresPage').then((m) => ({
-    default: m.AdminGenresPage,
+const AdminPage = lazy(() =>
+  import('@/pages/AdminPage/AdminPage').then((m) => ({
+    default: m.AdminPage,
   }))
 );
 const BookPage = lazy(() =>
@@ -79,9 +79,11 @@ export const AppShell: FC = () => {
   useUnsavedTextAccountBinding();
   // The Profile routes all render ProfilePage and only switch its outer Tabs;
   // keying the boundary by the bare pathname would remount it, and every antd
-  // pane it has mounted, on each tab click. They share one key instead.
+  // pane it has mounted, on each tab click. They share one key instead, and so
+  // do the Admin panel's routes.
   const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
-  const boundaryKey = isProfile ? '/profile' : pathname;
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
+  const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
 
   return (
     <Layout className={styles.layout}>
@@ -131,7 +133,12 @@ export const AppShell: FC = () => {
                 path="/my-books"
                 element={<Navigate replace to="/profile/my-books" />}
               />
-              <Route path="/admin/genres" element={<AdminGenresPage />} />
+              <Route
+                path="/admin"
+                element={<Navigate replace to="/admin/reports" />}
+              />
+              <Route path="/admin/reports" element={<AdminPage />} />
+              <Route path="/admin/genres" element={<AdminPage />} />
               <Route
                 path="*"
                 element={<GoneRedirect message="Page not found." />}

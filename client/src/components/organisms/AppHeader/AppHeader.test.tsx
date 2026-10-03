@@ -415,15 +415,15 @@ describe('AppHeader genres submenu', () => {
 describe('AppHeader account menu', () => {
   const admin: PublicUser = { ...user, role: 'admin' };
 
-  it('offers Favorites after Profile, then Manage genres to an admin', async () => {
+  it('offers Favorites after Profile, then the Admin panel to an admin', async () => {
     await renderHeader(<AppHeader />, withSession(admin));
 
     await userEvent.click(screen.getByText('bob'));
-    await screen.findByText('Manage genres');
+    await screen.findByText('Admin panel');
 
     // Scoped to the account dropdown's own popup — its rendered class, not
     // an index or the nav menu on the left, which is also role="menu" — so
-    // this pins Manage genres landing right after Profile rather than merely
+    // this pins the Admin panel landing right after Profile rather than merely
     // existing somewhere in the menu.
     const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
     if (!dropdown) {
@@ -436,12 +436,12 @@ describe('AppHeader account menu', () => {
       'Favorites',
       'Library',
       'Reading lists',
-      'Manage genres',
+      'Admin panel',
       'Log out',
     ]);
   });
 
-  it('offers Manage genres to a superadmin', async () => {
+  it('offers the Admin panel to a superadmin', async () => {
     await renderHeader(
       <AppHeader />,
       withSession({ ...user, role: 'superadmin' })
@@ -449,17 +449,17 @@ describe('AppHeader account menu', () => {
 
     await userEvent.click(screen.getByText('bob'));
 
-    expect(await screen.findByText('Manage genres')).toBeInTheDocument();
+    expect(await screen.findByText('Admin panel')).toBeInTheDocument();
   });
 
-  it('hides Manage genres from every other role', async () => {
+  it('hides the Admin panel from every other role', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     await userEvent.click(screen.getByText('bob'));
 
     // Profile is there, so the menu really did open before this claim.
     expect(await screen.findByText('Profile')).toBeInTheDocument();
-    expect(screen.queryByText('Manage genres')).toBeNull();
+    expect(screen.queryByText('Admin panel')).toBeNull();
   });
 
   it('offers My works to an author, between Favorites and the divider', async () => {
@@ -510,7 +510,7 @@ describe('AppHeader account menu', () => {
     );
   });
 
-  it('navigates to the management page when Manage genres is clicked', async () => {
+  it('navigates to the Admin panel when it is clicked', async () => {
     await renderHeader(
       <>
         <AppHeader />
@@ -520,9 +520,9 @@ describe('AppHeader account menu', () => {
     );
 
     await userEvent.click(screen.getByText('bob'));
-    await userEvent.click(await screen.findByText('Manage genres'));
+    await userEvent.click(await screen.findByText('Admin panel'));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
+    expect(screen.getByTestId('location')).toHaveTextContent('/admin');
   });
 
   it('opens the Library tab from the menu', async () => {

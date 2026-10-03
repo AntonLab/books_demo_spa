@@ -55,7 +55,9 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
   the section has loaded more than six.
-- `AdminGenresPage` is a two-level `Tree` of the counts list, with a search box,
+- `AdminPage` has Reports and Genres path tabs (`/admin/reports`,
+  `/admin/genres`); `/admin` redirects to Reports.
+- `GenreManager` (an organism under `AdminPage`'s Genres tab) is a two-level `Tree` of the counts list, with a search box,
   a usage filter and per-row Add subgenre / Edit / Delete (`GenreFormModal`;
   there is no rename in place). A top-level row shows its own works plus its
   Subgenres'; the totals and the Delete lock (a Genre with Subgenres cannot be
@@ -64,7 +66,7 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   unfiltered tree): a drop that keeps the parent, targets a Subgenre, or
   demotes a Genre that has Subgenres is refused and sends nothing; no
   optimistic move, a 409 lands in the page Alert.
-- Pages that gate on Role (`AdminGenresPage`) read the session
+- Pages that gate on Role (`AdminPage`) read the session
   with no `isPending` branch, so the "not for you" `Alert` shows briefly until
   the session resolves, even for someone allowed in.
 - What the viewer may do with a work comes from `bookCapabilities` /

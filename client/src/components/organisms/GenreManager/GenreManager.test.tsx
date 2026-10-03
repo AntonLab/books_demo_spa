@@ -6,62 +6,21 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router';
-import { AdminGenresPage } from './AdminGenresPage';
+import { GenreManager } from './GenreManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { adminGenre, publicGenre } from '@/test/genres';
-import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
-import type { PublicUser } from '@/types/api';
 
-jest.mock('@/api/auth');
 jest.mock('@/api/genres');
 
 const mockedGenres = jest.mocked(genresApi);
 
-const admin: PublicUser = {
-  id: 1,
-  login: 'root',
-  email: 'root@example.com',
-  firstName: 'Root',
-  lastName: 'Admin',
-  status: 'active',
-  role: 'admin',
-  avatarUrl: null,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-};
-
-const LocationProbe = () => (
-  <div data-testid="location">{useLocation().pathname}</div>
-);
-
-const expectSentHome = () =>
-  waitFor(() =>
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
-  );
-
-// Seeds the session cache so the page renders a settled state without waiting
-// on a request.
-const renderPage = (session: PublicUser | null) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
-  return renderWithProviders(
-    <>
-      <AdminGenresPage />
-      <LocationProbe />
-    </>,
-    {
-      queryClient,
-      route: '/admin/genres',
-    }
-  );
-};
+const renderManager = () =>
+  renderWithProviders(<GenreManager />, { route: '/admin/genres' });
 
 const renderLoaded = async () => {
-  const view = renderPage(admin);
+  const view = renderManager();
   await screen.findByText('Mystery');
   return view;
 };
@@ -79,28 +38,7 @@ beforeEach(() => {
   });
 });
 
-describe('AdminGenresPage for everyone else', () => {
-  it('sends an anonymous visitor home and asks for no genres', async () => {
-    renderPage(null);
-
-    await expectSentHome();
-    expect(screen.queryByRole('heading', { name: 'Genres' })).toBeNull();
-    expect(mockedGenres.listGenreCounts).not.toHaveBeenCalled();
-  });
-
-  it('sends an author, who keeps books rather than genres, home with a popup', async () => {
-    renderPage({ ...admin, role: 'author' });
-
-    await expectSentHome();
-    expect(
-      await screen.findAllByText("You don't have access to this page.")
-    ).toHaveLength(1);
-    expect(screen.queryByRole('textbox', { name: 'Search genres' })).toBeNull();
-    expect(mockedGenres.listGenreCounts).not.toHaveBeenCalled();
-  });
-});
-
-describe('AdminGenresPage for a moderator', () => {
+describe('GenreManager', () => {
   it('opens the edit form when Enter is pressed on a focused action button', async () => {
     const user = userEvent.setup();
     await renderLoaded();
@@ -109,15 +47,6 @@ describe('AdminGenresPage for a moderator', () => {
     await user.keyboard('{Enter}');
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('serves a superadmin the same page', async () => {
-    renderPage({ ...admin, role: 'superadmin' });
-
-    expect(await screen.findByText('Mystery')).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Add genre' })
-    ).toBeInTheDocument();
   });
 
   it('shows each Genre with its counts, a parent with totals', async () => {
@@ -350,7 +279,7 @@ describe('AdminGenresPage for a moderator', () => {
 
   it('reports a failure to load the list', async () => {
     mockedGenres.listGenreCounts.mockRejectedValue(new Error('Network down'));
-    renderPage(admin);
+    renderManager();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not load the genres.'
@@ -359,7 +288,7 @@ describe('AdminGenresPage for a moderator', () => {
 
   it('shows an empty state when there are no genres yet', async () => {
     mockedGenres.listGenreCounts.mockResolvedValue({ items: [] });
-    renderPage(admin);
+    renderManager();
 
     expect(await screen.findByText('No genres yet.')).toBeInTheDocument();
   });

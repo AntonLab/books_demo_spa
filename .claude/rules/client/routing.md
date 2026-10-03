@@ -16,7 +16,8 @@ paths:
    recovery UI.
 4. **Key the boundary by route** (`key={useLocation().pathname}`), or a caught
    error persists across every later navigation. The Profile routes share
-   one key: a key per tab would remount `ProfilePage` on every tab click.
+   one key, and so do the Admin routes: a key per tab would remount
+   `ProfilePage` or `AdminPage` on every tab click.
 5. `QueryClientProvider` is the outermost provider, then the Redux
    `Provider`, then `StyleProvider` and `ThemedConfigProvider` (antd's
    algorithm from Device preferences). `AppShell` is exported apart from `App`

@@ -64,7 +64,7 @@ const expectGoneHome = async (route: string, notice = 'Page not found.') => {
 // findBy*'s 1 s; loading them here leaves each route test waiting only for
 // its render, as a browser does once the chunk is cached.
 const LAZY_PAGES = [
-  'AdminGenresPage',
+  'AdminPage',
   'BookPage',
   'ChapterPage',
   'MainPage',
@@ -228,12 +228,29 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('guards AdminGenresPage at /admin/genres', async () => {
-    renderWithProviders(<AppShell />, { route: '/admin/genres' });
+  it.each(['/admin/reports', '/admin/genres'])(
+    'guards the Admin panel at %s',
+    async (route) => {
+      renderWithProviders(<AppShell />, { route });
 
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
+      expect(
+        await screen.findByRole('dialog', { name: 'Log in' })
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('redirects /admin to the Reports tab', async () => {
+    renderWithProviders(
+      <>
+        <AppShell />
+        <LocationProbe />
+      </>,
+      { route: '/admin' }
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/admin/reports')
+    );
   });
 
   it('sends an unknown route Home with a message', async () => {

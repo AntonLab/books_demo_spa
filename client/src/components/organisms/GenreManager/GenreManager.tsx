@@ -15,13 +15,10 @@ import type { TreeDataNode } from 'antd';
 import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import type { AdminGenreListItem } from 'shared';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
-import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import {
   GenreFormModal,
   type GenreFormMode,
 } from '@/components/organisms/GenreFormModal/GenreFormModal';
-import { usePageGuard } from '@/hooks/usePageGuard';
-import { useSession } from '@/queries/auth';
 import {
   useDeleteGenre,
   useGenresCounts,
@@ -35,7 +32,6 @@ import {
   type UsageFilter,
 } from '@/types/genreAdmin';
 import { buildGenreTree } from '@/types/genreTree';
-import { isModeratorRole } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 
 interface GenreTreeData extends TreeDataNode {
@@ -52,25 +48,7 @@ const USAGE_OPTIONS: { value: UsageFilter; label: string }[] = [
   { value: 'unused', label: 'Unused' },
 ];
 
-// Keeping the Genre list is an Admin's (or Superadmin's) job (ADR-0008).
-// Every other Role is sent home — and, because the manager below is a separate
-// component, makes no request at all.
-export const AdminGenresPage: FC = () => {
-  const { data: session, isPending } = useSession();
-  const allowed = usePageGuard(
-    isPending
-      ? 'pending'
-      : !session
-        ? 'guest'
-        : isModeratorRole(session.role)
-          ? 'allowed'
-          : 'denied'
-  );
-
-  return allowed ? <GenreManager /> : <PageSpinner />;
-};
-
-const GenreManager: FC = () => {
+export const GenreManager: FC = () => {
   const genres = useGenresCounts();
   const remove = useDeleteGenre();
   const move = useUpdateGenre();
@@ -182,7 +160,7 @@ const GenreManager: FC = () => {
 
   return (
     <>
-      <Typography.Title level={2}>Genres</Typography.Title>
+      <Typography.Title level={3}>Genres</Typography.Title>
 
       <Flex wrap gap="small" className={spacing.gapBelow}>
         <Input

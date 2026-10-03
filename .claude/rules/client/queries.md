@@ -32,7 +32,7 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
   unresolved or gone, which is why `useSearchPage` reports a status with no
   `books` then.
 - `useGenresWithBooks` (`?nonEmpty=true`, under the `genres` prefix) feeds the
-  header menu and the search form; book forms and `AdminGenresPage` keep
+  header menu and the search form; book forms and `GenreManager` keep
   `useGenres`. A book write invalidates `genres` too, since a status change
   moves a Genre in or out of that list.
 - **Wrap every `mutationFn`; never pass an `src/api/` function straight
