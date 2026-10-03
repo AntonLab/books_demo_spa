@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ABOUT_MAX_LENGTH,
   AUTHOR_SEARCH_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
   LOGIN_MAX_LENGTH,
@@ -30,6 +31,30 @@ const valid = {
   firstName: 'Bob',
   lastName: 'Bobsson',
 };
+
+test('updateUserSchema accepts About up to the limit and rejects one over', () => {
+  assert.equal(
+    updateUserSchema.safeParse({ about: 'x'.repeat(ABOUT_MAX_LENGTH) }).success,
+    true
+  );
+  assert.equal(updateUserSchema.safeParse({ about: '' }).success, true);
+  assert.equal(
+    updateUserSchema.safeParse({ about: 'x'.repeat(ABOUT_MAX_LENGTH + 1) })
+      .success,
+    false
+  );
+});
+
+test('updateUserSchema takes a boolean showLastSeen only', () => {
+  assert.equal(
+    updateUserSchema.safeParse({ showLastSeen: false }).success,
+    true
+  );
+  assert.equal(
+    updateUserSchema.safeParse({ showLastSeen: 'no' }).success,
+    false
+  );
+});
 
 test('accepts a well-formed user and defaults status to absent', () => {
   const parsed = createUserSchema.parse(valid);

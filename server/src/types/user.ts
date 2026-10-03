@@ -1,4 +1,5 @@
 import {
+  ABOUT_MAX_LENGTH,
   AUTHOR_SEARCH_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
   LOGIN_MAX_LENGTH,
@@ -24,6 +25,9 @@ export const createUserSchema = z.object({
   firstName: z.string().min(1).max(NAME_MAX_LENGTH),
   lastName: z.string().min(1).max(NAME_MAX_LENGTH),
   status: z.enum(USER_STATUSES).optional(),
+  // Not trimmed: line breaks and leading spaces are the writer's.
+  about: z.string().max(ABOUT_MAX_LENGTH).optional(),
+  showLastSeen: z.boolean().optional(),
 });
 
 export const updateUserSchema = createUserSchema
