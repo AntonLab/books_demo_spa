@@ -64,10 +64,10 @@ Four" reads as a test run, not a demo.
 
 ## Deleting
 
-- Tables are deleted in an explicit order (`notifications` → `reading_list_items` → `reading_lists` → `favorites` →
-  `likes` → `comments` → `chapters` → `book_authors` → `books` →
-  `series_authors` → `series` → `genres` → `users`), not by leaning on cascades
-  that could change.
+- Tables are deleted in an explicit order (`notifications` →
+  `reading_list_items` → `reading_lists` → `favorites` → `likes` → `comments` →
+  `chapters` → `book_authors` → `books` → `series_authors` → `series` →
+  `genres` → `users`), not by leaning on cascades that could change.
   Covers and Avatars go by cascade with `books`/`users`. `permissions` is left
   alone: `syncPermissions()` derives it from code.
 - The delete and every insert share one transaction; a failure leaves the
