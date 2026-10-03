@@ -29,6 +29,7 @@ import { useChapter, useChapters } from '@/queries/chapters';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import type { ReadingPreferences as Reading } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useRecordRecentlyViewed } from '@/store/useRecentlyViewed';
 import { READING_PALETTES, READING_SERIF_FONT } from '@/theme/tokens';
 import { publishedChapters, type ChapterSummary } from '@/types/chapter';
 import {
@@ -126,6 +127,8 @@ export const ChapterPage: FC = () => {
   const { data: bookDetail } = useBook(book);
   const { data: list } = useChapters(book);
   const { data: chapter, isPending, isError, error } = useChapter(id);
+  // A Chapter page opened without its Book page still counts for the Book.
+  useRecordRecentlyViewed(chapter === undefined ? undefined : bookDetail);
 
   // Destructured: react-hooks/refs reads any property of an object holding
   // refs as a ref read during render.

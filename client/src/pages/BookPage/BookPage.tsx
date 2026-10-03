@@ -36,6 +36,7 @@ import {
   mayAddBookToReadingList,
 } from '@/types/capabilities';
 import { entriesOfBook } from '@/store/unsavedTextSlice';
+import { useRecordRecentlyViewed } from '@/store/useRecentlyViewed';
 import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
@@ -60,6 +61,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
+  useRecordRecentlyViewed(book);
   // Fetched in parallel with the book rather than after it: neither section
   // needs the detail response to know what to ask for.
   const chapters = useChapters(bookId);

@@ -507,6 +507,44 @@ describe('BookPage', () => {
   });
 });
 
+describe('BookPage recording Recently viewed', () => {
+  it('records a Published Book once its data has loaded', async () => {
+    const { store } = renderPage();
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(store.getState().recentlyViewed.ids).toEqual([1]);
+  });
+
+  it('moves a re-opened Book to the front without a duplicate', async () => {
+    const { store } = renderPage(undefined, {
+      recentlyViewed: { accountId: null, ids: [5, 1, 7] },
+    });
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(store.getState().recentlyViewed.ids).toEqual([1, 5, 7]);
+  });
+
+  it("does not record a Draft, even the Co-author's own", async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+
+    const { store } = renderPage({ ...reader, id: 3 });
+    await screen.findByText('Draft');
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+  });
+
+  it('records nothing when the Book is gone', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+
+    const { store } = renderWithHome('1');
+    await screen.findByText('/|REPLACE');
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+  });
+});
+
 describe('BookPage lower tabs', () => {
   const listsPage = (total: number) => ({
     items: [

@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { ChapterPage } from './ChapterPage';
@@ -251,6 +251,35 @@ describe('ChapterPage', () => {
     expect(
       await screen.findByRole('heading', { name: book.title })
     ).toBeInTheDocument();
+  });
+
+  it("records the chapter's Book once the chapter has loaded", async () => {
+    const { store } = renderAt(9);
+
+    await screen.findByRole('heading', { name: 'One' });
+
+    await waitFor(() =>
+      expect(store.getState().recentlyViewed.ids).toEqual([1])
+    );
+  });
+
+  it('does not record a Draft Book', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+
+    const { store } = renderAt(9);
+    await screen.findByRole('heading', { name: 'One' });
+    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalled());
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+  });
+
+  it('records nothing when the chapter is gone', async () => {
+    mocked.getChapter.mockRejectedValue(new ApiError(404, 'gone'));
+
+    const { store } = renderAt(5);
+    await screen.findAllByText('This chapter no longer exists.');
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
   });
 
   it('goes on Home when the Book is gone too', async () => {
