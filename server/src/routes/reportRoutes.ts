@@ -1,9 +1,15 @@
 import { Router } from 'express';
 import { createReportController } from '../controllers/reportController.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
+import { createRequireModerator } from '../middleware/requireModerator.ts';
 import { validate } from '../middleware/validate.ts';
 import { idParamSchema } from '../types/params.ts';
-import { createReportSchema } from '../types/report.ts';
+import {
+  commentIdParamSchema,
+  createReportSchema,
+  listReportsQuerySchema,
+  reportRangeSchema,
+} from '../types/report.ts';
 import type { RouteDeps } from './index.ts';
 
 // requireAuth rather than the matrix: any signed-in Account may report.
@@ -21,7 +27,31 @@ export function createCommentReportRoutes(deps: RouteDeps): Router {
   return router;
 }
 
-// Task 10 fills this and mounts it on /reports.
-export function createReportRoutes(_deps: RouteDeps): Router {
-  return Router();
+// requireModerator runs before validate, so a non-Moderator never sees a 400.
+export function createReportRoutes(deps: RouteDeps): Router {
+  const controller = createReportController(deps.reportRepository);
+  const guard = [createRequireAuth(deps), createRequireModerator()];
+  const router = Router();
+
+  router.get(
+    '/',
+    ...guard,
+    validate({ query: listReportsQuerySchema }),
+    controller.list
+  );
+  router.get(
+    '/statistics',
+    ...guard,
+    validate({ query: reportRangeSchema }),
+    controller.statistics
+  );
+  for (const action of ['take', 'uphold', 'dismiss'] as const) {
+    router.post(
+      `/:commentId/${action}`,
+      ...guard,
+      validate({ params: commentIdParamSchema }),
+      controller[action]
+    );
+  }
+  return router;
 }
