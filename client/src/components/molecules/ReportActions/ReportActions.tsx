@@ -25,7 +25,7 @@ export const ReportActions: FC<Props> = ({
 }) => {
   const [confirming, setConfirming] = useState(false);
   const off = disabled || isOwnComment;
-  const label = (name: string) => (isOwnComment ? OWN_COMMENT : name);
+  const tooltip = isOwnComment ? OWN_COMMENT : undefined;
 
   if (status === 'new') {
     return (
@@ -33,7 +33,8 @@ export const ReportActions: FC<Props> = ({
         size="small"
         type="text"
         icon={<EyeOutlined />}
-        label={label('Take')}
+        label="Take"
+        tooltip={tooltip}
         disabled={off}
         onClick={onTake}
       />
@@ -55,7 +56,8 @@ export const ReportActions: FC<Props> = ({
           size="small"
           type="text"
           icon={<CheckOutlined />}
-          label={label('Uphold')}
+          label="Uphold"
+          tooltip={tooltip}
           disabled={off}
           tooltipHidden={confirming}
         />
@@ -64,7 +66,8 @@ export const ReportActions: FC<Props> = ({
         size="small"
         type="text"
         icon={<CloseOutlined />}
-        label={label('Dismiss')}
+        label="Dismiss"
+        tooltip={tooltip}
         disabled={off}
         onClick={onDismiss}
       />

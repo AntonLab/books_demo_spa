@@ -16,27 +16,32 @@ export const ReportedAccountCell: FC<Props> = ({
   onBan,
 }) => {
   if (!account) return 'Deleted account';
+  const disabled = blockedReason !== null || pending;
 
   return (
     <Flex gap="small" align="center" wrap>
       {account.login}
       {account.atBanThreshold && <Tag color="error">Ban mark</Tag>}
       <Tooltip title={blockedReason}>
-        <Popconfirm
-          title={`Ban ${account.login}?`}
-          okText="Yes, ban"
-          okButtonProps={{ danger: true }}
-          onConfirm={onBan}
-        >
-          <Button
-            size="small"
-            type="text"
-            danger
-            disabled={blockedReason !== null || pending}
+        {/* A disabled button swallows mouse events, so the span takes them. */}
+        <span style={{ display: 'inline-block' }}>
+          <Popconfirm
+            title={`Ban ${account.login}?`}
+            okText="Yes, ban"
+            okButtonProps={{ danger: true }}
+            onConfirm={onBan}
           >
-            Ban user
-          </Button>
-        </Popconfirm>
+            <Button
+              size="small"
+              type="text"
+              danger
+              disabled={disabled}
+              style={disabled ? { pointerEvents: 'none' } : undefined}
+            >
+              Ban user
+            </Button>
+          </Popconfirm>
+        </span>
       </Tooltip>
     </Flex>
   );

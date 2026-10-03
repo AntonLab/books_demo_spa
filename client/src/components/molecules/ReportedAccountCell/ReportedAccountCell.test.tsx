@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReportedAccount } from 'shared';
 import { ReportedAccountCell } from './ReportedAccountCell';
@@ -69,8 +69,18 @@ describe('ReportedAccountCell', () => {
     const onBan = setup({ blockedReason: 'Already banned' });
     const button = screen.getByRole('button', { name: 'Ban user' });
     expect(button).toBeDisabled();
-    await userEvent.click(button);
+    fireEvent.click(button);
     expect(onBan).not.toHaveBeenCalled();
+    expect(screen.queryByText('Ban Writer?')).toBeNull();
+  });
+
+  it('shows the blocked reason on hover of the disabled Ban user', async () => {
+    setup({ blockedReason: 'Already banned' });
+    const wrapper = screen.getByRole('button', {
+      name: 'Ban user',
+    }).parentElement!;
+    await userEvent.hover(wrapper);
+    expect(await screen.findByText('Already banned')).toBeInTheDocument();
   });
 
   it('disables Ban user while pending', () => {

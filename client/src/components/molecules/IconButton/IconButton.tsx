@@ -8,6 +8,8 @@ export interface IconButtonProps extends Omit<
   'aria-label' | 'title'
 > {
   label: string;
+  // Tooltip text when it should differ from the accessible name, e.g. a denial.
+  tooltip?: string;
   // Keeps the tooltip shut while the button's Popover is open, so it does not
   // cover it.
   tooltipHidden?: boolean;
@@ -20,6 +22,7 @@ export interface IconButtonProps extends Omit<
 // dialog or popover blurs during React's commit, where flushSync logs an error.
 export const IconButton: FC<IconButtonProps> = ({
   label,
+  tooltip = label,
   tooltipHidden,
   onFocus,
   onBlur,
@@ -30,7 +33,7 @@ export const IconButton: FC<IconButtonProps> = ({
 
   return (
     <Tooltip
-      title={label}
+      title={tooltip}
       trigger={['hover']}
       open={!tooltipHidden && (hovered || focused)}
       onOpenChange={setHovered}

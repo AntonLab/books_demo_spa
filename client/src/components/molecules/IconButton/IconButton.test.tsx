@@ -37,6 +37,15 @@ describe('IconButton', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit');
   });
 
+  it('shows a tooltip text that differs from the name', async () => {
+    render(
+      <IconButton label="Edit" tooltip="Not yours" icon={<EditOutlined />} />
+    );
+    const button = screen.getByRole('button', { name: 'Edit' });
+    await userEvent.hover(button);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Not yours');
+  });
+
   it('keeps the tooltip closed on hover and focus while tooltipHidden, and the name', async () => {
     render(<IconButton label="Edit" icon={<EditOutlined />} tooltipHidden />);
     const button = screen.getByRole('button', { name: 'Edit' });

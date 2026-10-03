@@ -46,10 +46,13 @@ describe('ReportActions', () => {
 
   it("disables every action with the own-comment tooltip on the Moderator's own Comment", async () => {
     const { onUphold } = setup({ status: 'in_review', isOwnComment: true });
-    const buttons = screen.getAllByRole('button', { name: OWN });
-    expect(buttons).toHaveLength(2);
+    const buttons = ['Uphold', 'Dismiss'].map((name) =>
+      screen.getByRole('button', { name })
+    );
     buttons.forEach((b) => expect(b).toBeDisabled());
     await userEvent.click(buttons[0]!);
     expect(onUphold).not.toHaveBeenCalled();
+    await userEvent.hover(buttons[1]!);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(OWN);
   });
 });
