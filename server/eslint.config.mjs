@@ -8,10 +8,6 @@ export default createConfig(
   { ignores: ['dist'], tsconfigRootDir: import.meta.dirname },
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      globals: { ...globals.node },
-    },
+    languageOptions: { globals: { ...globals.node } },
   }
 );

@@ -30,7 +30,6 @@ const sharedRules = {
   // The repo writes types on their own `import type` line beside the value
   // import from the same module; that pair is not a duplicate.
   'no-duplicate-imports': ['error', { allowSeparateTypeImports: true }],
-  '@typescript-eslint/no-explicit-any': 'error',
   // noUncheckedIndexedAccess types a miss as undefined; application code
   // handles it. Tests may assert it away (the override below).
   '@typescript-eslint/no-non-null-assertion': 'error',
