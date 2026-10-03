@@ -88,26 +88,30 @@ export async function hiddenBookIds(viewer: Viewer): Promise<number[]> {
   return drafts.map((book) => book.id);
 }
 
-// The series a viewer may see, as a WHERE on `series`: every series holding at
-// least one Published book, plus the series the viewer co-authors — or every
-// series for a Moderator. A series has no status of its own; an empty or
-// all-draft one simply has nothing a reader could open yet.
+// Every series holding at least one Published book, for any viewer. A series
+// has no status of its own; an empty or all-draft one simply has nothing a
+// reader could open yet.
 //
-// The published side is a subquery rather than an id list, because it grows
-// with the whole catalogue. It carries no caller-supplied value, so there is
-// nothing to bind.
-export async function visibleSeriesWhere(
-  viewer: Viewer
-): Promise<WhereOptions> {
-  if (isModerator(viewer)) return {};
-
-  const withPublishedBook: WhereOptions = {
+// A subquery rather than an id list, because it grows with the whole
+// catalogue. It carries no caller-supplied value, so there is nothing to bind.
+export function publishedSeriesWhere(): WhereOptions {
+  return {
     id: {
       [Op.in]: literal(
         "(SELECT DISTINCT `seriesId` FROM `books` WHERE `status` <> 'draft' AND `seriesId` IS NOT NULL)"
       ),
     },
   };
+}
+
+// The series a viewer may see, as a WHERE on `series`: the published ones,
+// plus the series the viewer co-authors — or every series for a Moderator.
+export async function visibleSeriesWhere(
+  viewer: Viewer
+): Promise<WhereOptions> {
+  if (isModerator(viewer)) return {};
+
+  const withPublishedBook = publishedSeriesWhere();
   if (viewer === null) return withPublishedBook;
 
   const credited = await SeriesAuthor.findAll({

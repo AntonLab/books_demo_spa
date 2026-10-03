@@ -29,7 +29,11 @@ import type {
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
-import { visibleSeriesWhere, type Viewer } from './visibility.ts';
+import {
+  publishedSeriesWhere,
+  visibleSeriesWhere,
+  type Viewer,
+} from './visibility.ts';
 
 export type SeriesListResult = Pick<
   ListResponse<PublicSeries>,
@@ -313,7 +317,9 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         where: {
           [Op.and]: [
             buildWhere(query, creditedSeriesIds, genreIds, favorites),
-            await visibleSeriesWhere(viewer),
+            query.published
+              ? publishedSeriesWhere()
+              : await visibleSeriesWhere(viewer),
           ],
         },
         limit: query.limit,

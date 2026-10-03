@@ -289,6 +289,22 @@ test('GET list with favoritedBy=me is 401 for a Guest and 400 for another value'
   );
 });
 
+test('GET list takes published=true and refuses any other value with 400', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/series?published=true`)).status,
+        200
+      );
+      for (const bad of ['false', '1', '']) {
+        const response = await fetch(`${base}/api/series?published=${bad}`);
+        assert.equal(response.status, 400, bad);
+      }
+    }
+  );
+});
+
 test('GET list returns items with the paging envelope', async () => {
   await withAuthenticatedApp(
     { seriesRepository: createFakeRepository() },

@@ -19,7 +19,10 @@ import { Series } from '../models/Series.ts';
 import { SeriesCover } from '../models/SeriesCover.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import {
+  createCreditedBook,
+  createCreditedSeries,
+} from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
@@ -1034,6 +1037,55 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         (await repository.findDetailById(hidden.id, asOwner()))?.id,
         hidden.id
       );
+    });
+  });
+
+  describe('published and sorted lists', () => {
+    const makeSeries = (title: string) =>
+      createCreditedSeries({ title, description: title, tags: [] }, [ownerId]);
+    const fileBook = (
+      seriesId: number,
+      status: 'in_progress' | 'draft' = 'in_progress'
+    ) =>
+      createCreditedBook(
+        { title: 'Filed', description: 'd', tags: [], seriesId, status },
+        [ownerId]
+      );
+    const page = (
+      query: Partial<Parameters<typeof repository.list>[0]>,
+      viewer: Viewer = null
+    ) => repository.list({ limit: 20, offset: 0, ...query }, viewer);
+
+    test('published=true lists only Series holding a Published Book, for every viewer', async () => {
+      const live = await makeSeries('Live');
+      await fileBook(live.id);
+      const draftOnly = await makeSeries('Draft only');
+      await fileBook(draftOnly.id, 'draft');
+      await makeSeries('Empty');
+      const titles = async (viewer: Viewer, published?: 'true') =>
+        (await page({ userId: ownerId, published }, viewer)).items
+          .map((series) => series.title)
+          .sort();
+
+      assert.deepEqual(await titles(asOwner()), [
+        'Draft only',
+        'Empty',
+        'Live',
+      ]);
+      for (const viewer of [asOwner(), asModerator, null]) {
+        assert.deepEqual(await titles(viewer, 'true'), ['Live']);
+      }
+      assert.equal(
+        (await page({ userId: ownerId, published: 'true' }, asOwner())).total,
+        1
+      );
+    });
+
+    test('published=true on an Account with no Series is an empty page, not an error', async () => {
+      assert.deepEqual(await page({ userId: ownerId, published: 'true' }), {
+        items: [],
+        total: 0,
+      });
     });
   });
 

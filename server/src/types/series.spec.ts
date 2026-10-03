@@ -150,6 +150,21 @@ test('listSeriesQuerySchema takes favoritedBy=me and refuses any other value', (
   }
 });
 
+test('listSeriesQuerySchema takes published=true and refuses any other value', () => {
+  assert.equal(
+    listSeriesQuerySchema.parse({ published: 'true' }).published,
+    'true'
+  );
+  assert.equal(listSeriesQuerySchema.parse({}).published, undefined);
+  for (const bad of ['false', '1', '']) {
+    assert.equal(
+      listSeriesQuerySchema.safeParse({ published: bad }).success,
+      false,
+      bad
+    );
+  }
+});
+
 test('listSeriesQuerySchema takes genreId as a filter', () => {
   assert.equal(listSeriesQuerySchema.parse({ genreId: '4' }).genreId, 4);
   assert.equal(listSeriesQuerySchema.parse({}).genreId, undefined);
