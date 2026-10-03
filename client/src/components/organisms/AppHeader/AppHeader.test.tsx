@@ -640,6 +640,71 @@ describe('AppHeader returning a Guest after Log in', () => {
   });
 });
 
+describe('AppHeader on a phone', () => {
+  const longLogin = 'a'.repeat(20);
+  let original: typeof window.matchMedia;
+  beforeEach(() => {
+    original = window.matchMedia;
+    // antd's `xs` breakpoint is (max-width: 575px); jsdom never matches.
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(max-width: 575px)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  it('shows only the Avatar on the user button, named by the login', async () => {
+    await renderHeader(
+      <AppHeader />,
+      withSession({ ...user, login: longLogin })
+    );
+
+    expect(screen.getByRole('button', { name: longLogin })).toBeInTheDocument();
+    expect(screen.queryByText(longLogin)).toBeNull();
+  });
+
+  it('collapses Home and Genres into one menu button', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(null)
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Home' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Home' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: /Genres/ }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Gothic' })
+    );
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
+  });
+});
+
+describe('AppHeader on a wide screen', () => {
+  it('keeps the nav links and the login text', async () => {
+    await renderHeader(<AppHeader />, withSession(user));
+
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull();
+  });
+});
+
 describe('AppHeader theme button', () => {
   it('toggles the theme and names what it will do next', async () => {
     const { store } = await renderHeader(<AppHeader />, withSession(null));

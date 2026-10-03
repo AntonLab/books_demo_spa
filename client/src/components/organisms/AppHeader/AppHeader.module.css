@@ -15,7 +15,18 @@
   flex: none;
 }
 
+.search {
+  width: 100%;
+  max-width: var(--ant-app-search-bar-max-width);
+  min-width: 0;
+}
+
 @media (max-width: 575px) {
+  .header {
+    gap: var(--ant-margin-xs);
+    padding-inline: var(--ant-padding-sm);
+  }
+
   .logo {
     height: 24px;
   }

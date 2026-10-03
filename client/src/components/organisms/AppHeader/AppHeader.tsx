@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
+import { MenuOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Grid, Layout, Menu, Skeleton, Space } from 'antd';
 import { queryKeys } from '@/queries/keys';
 import type { LoginReturnState } from '@/hooks/usePageGuard';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
@@ -36,6 +37,8 @@ export const AppHeader: FC = () => {
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.devicePreferences.theme);
   const queryClient = useQueryClient();
+  // `=== true`: before antd has measured, a desktop must not flash the phone layout.
+  const phone = Grid.useBreakpoint().xs === true;
   // Where usePageGuard's Guest was headed; kept until Log in resolves.
   const [returnTo, setReturnTo] = useState<string | null>(null);
 
@@ -108,6 +111,18 @@ export const AppHeader: FC = () => {
     { key: 'logout', label: 'Log out' },
   ];
 
+  // pathname + search, so a genre item whose key carries a query string
+  // is highlighted on its own page while / keeps working.
+  const navSelectedKey = `${location.pathname}${location.search}`;
+
+  // A click on a genre's own anchor is the Link's to handle (a
+  // modifier-click opens a new tab); a keypress or a click beside the
+  // anchor reaches only the item, so the menu navigates for those.
+  const handleNavClick: MenuProps['onClick'] = ({ key, domEvent }) => {
+    if ((domEvent.target as Element).closest('a')) return;
+    void navigate(key);
+  };
+
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
       signOut();
@@ -130,26 +145,39 @@ export const AppHeader: FC = () => {
           - `triggerSubMenuAction="click"`: the default is hover, which a touch
             device has no way to perform and which a test can only drive
             through rc-menu's open delay. */}
-      <Menu
-        theme="dark"
-        mode="horizontal"
-        disabledOverflow
-        triggerSubMenuAction="click"
-        items={navItems}
-        // pathname + search, so a genre item whose key carries a query string
-        // is highlighted on its own page while / keeps working.
-        selectedKeys={[`${location.pathname}${location.search}`]}
-        // A click on a genre's own anchor is the Link's to handle (a
-        // modifier-click opens a new tab); a keypress or a click beside the
-        // anchor reaches only the item, so the menu navigates for those.
-        onClick={({ key, domEvent }) => {
-          if ((domEvent.target as Element).closest('a')) return;
-          void navigate(key);
-        }}
-        className={styles.nav}
-      />
+      {phone ? (
+        // The list is vertical, so a submenu opens inside the dropdown.
+        <Dropdown
+          menu={{
+            items: navItems,
+            onClick: handleNavClick,
+            selectedKeys: [navSelectedKey],
+          }}
+          trigger={['click']}
+        >
+          <IconButton
+            type="text"
+            className={styles.onDark}
+            label="Menu"
+            icon={<MenuOutlined />}
+          />
+        </Dropdown>
+      ) : (
+        <Menu
+          theme="dark"
+          mode="horizontal"
+          disabledOverflow
+          triggerSubMenuAction="click"
+          items={navItems}
+          selectedKeys={[navSelectedKey]}
+          onClick={handleNavClick}
+          className={styles.nav}
+        />
+      )}
 
-      <SearchBar />
+      <div className={styles.search}>
+        <SearchBar />
+      </div>
 
       {/* Offered to everyone, Guests included: a Device preference belongs
           to the device, not to an Account. The header itself stays dark in
@@ -186,14 +214,18 @@ export const AppHeader: FC = () => {
               a non-interactive element here is invisible to keyboard
               navigation. A <Button> is focusable and Enter/Space-activated
               for free. */}
-            <Button type="text" className={styles.account}>
+            <Button
+              type="text"
+              className={styles.account}
+              aria-label={phone ? user.login : undefined}
+            >
               <Space>
                 <AccountAvatar
                   avatarUrl={user.avatarUrl}
                   name={user.login}
                   size="small"
                 />
-                {user.login}
+                {!phone && user.login}
               </Space>
             </Button>
           </Dropdown>
