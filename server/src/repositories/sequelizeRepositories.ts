@@ -1,4 +1,8 @@
 import {
+  createSequelizeAccountRepository,
+  type AccountRepository,
+} from './accountRepository.ts';
+import {
   createSequelizeBookRepository,
   type BookRepository,
 } from './bookRepository.ts';
@@ -60,6 +64,7 @@ import {
 // kit builds.
 export interface Repositories {
   userRepository: UserRepository;
+  accountRepository: AccountRepository;
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
@@ -80,6 +85,7 @@ export interface Repositories {
 export function createSequelizeRepositories(): Repositories {
   return {
     userRepository: createSequelizeUserRepository(),
+    accountRepository: createSequelizeAccountRepository(),
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),

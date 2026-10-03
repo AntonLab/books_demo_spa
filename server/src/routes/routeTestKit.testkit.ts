@@ -62,6 +62,7 @@ export function unlimitedAuthRateLimits(): AuthRateLimits {
 export function defaultDeps(): AppDeps {
   return {
     userRepository: createUnusedRepository('user'),
+    accountRepository: createUnusedRepository('account'),
     seriesRepository: createUnusedRepository('series'),
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),

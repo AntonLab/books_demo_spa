@@ -3,6 +3,7 @@ import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { OnlineRegistry } from '../online/onlineRegistry.ts';
 import type { Repositories } from '../repositories/sequelizeRepositories.ts';
+import { createAccountRoutes } from './accountRoutes.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
@@ -41,6 +42,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   // needs the session and user repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
   router.use('/authors', createAuthorRoutes(deps));
+  router.use('/accounts', createAccountRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
   router.use('/books', createBookRoutes(deps));
