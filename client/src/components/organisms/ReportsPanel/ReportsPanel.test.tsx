@@ -6,7 +6,7 @@ import * as reportsApi from '@/api/reports';
 import { queryKeys } from '@/queries/keys';
 import { createTestQueryClient } from '@/test/queryClient';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { reportRow } from '@/test/reports';
+import { emptyStatistics, reportRow } from '@/test/reports';
 import type { QueryClient } from '@tanstack/react-query';
 import * as usersApi from '@/api/users';
 import type { PublicUser, ReportRow } from '@/types/api';
@@ -44,7 +44,10 @@ const renderPanel = (queryClient: QueryClient = createTestQueryClient()) => {
 
 describe('ReportsPanel', () => {
   // The call counts below start from zero in every test.
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedReports.getReportStatistics.mockResolvedValue(emptyStatistics());
+  });
 
   describe('with the clock at 2026-10-03 15:30', () => {
     beforeEach(() =>
@@ -76,6 +79,64 @@ describe('ReportsPanel', () => {
         })
       );
     });
+
+    it('asks for the statistics of the same range as the list', async () => {
+      mockedReports.listReports.mockResolvedValue(listOf([]));
+      renderPanel();
+      await waitFor(() =>
+        expect(mockedReports.getReportStatistics).toHaveBeenCalledWith({
+          from: new Date(2026, 9, 3).toISOString(),
+          to: new Date(2026, 9, 4).toISOString(),
+        })
+      );
+    });
+  });
+
+  it('shows the statistics above the table', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.getReportStatistics.mockResolvedValue({
+      ...emptyStatistics(),
+      byStatus: { new: 3, in_review: 0, upheld: 0, dismissed: 0 },
+    });
+    renderPanel();
+    expect(
+      within(
+        await screen.findByRole('region', { name: 'By status' })
+      ).getByText('3')
+    ).toBeInTheDocument();
+  });
+
+  it('refetches the statistics after an action, but not when the status filter changes', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.takeReport.mockResolvedValue(undefined);
+    renderPanel();
+    await userEvent.click(await screen.findByRole('button', { name: 'Take' }));
+    await waitFor(() =>
+      expect(mockedReports.getReportStatistics).toHaveBeenCalledTimes(2)
+    );
+
+    await userEvent.click(
+      screen.getByRole('combobox', { name: 'Status filter' })
+    );
+    await userEvent.click(await screen.findByTitle('Upheld'));
+    await waitFor(() =>
+      expect(mockedReports.listReports).toHaveBeenLastCalledWith(
+        expect.objectContaining({ status: 'upheld' })
+      )
+    );
+    expect(mockedReports.getReportStatistics).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a failure alert for the statistics while the list still renders', async () => {
+    mockedReports.listReports.mockResolvedValue(listOf([reportRow()]));
+    mockedReports.getReportStatistics.mockRejectedValue(
+      new ApiError(500, 'boom')
+    );
+    renderPanel();
+    expect(
+      await screen.findByText('Could not load the statistics.')
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Writer')).toBeInTheDocument();
   });
 
   it('renders a report row with every column', async () => {
@@ -218,7 +279,8 @@ describe('ReportsPanel', () => {
     expect(
       await screen.findByText('Could not load the reports.')
     ).toBeInTheDocument();
-    expect(screen.queryByRole('table')).toBeNull();
+    // The statistics table stays; the list's does not.
+    expect(screen.queryByRole('columnheader', { name: 'Reporter' })).toBeNull();
   });
 
   it('takes a new report, then refetches the rows', async () => {

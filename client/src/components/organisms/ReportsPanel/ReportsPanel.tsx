@@ -1,6 +1,14 @@
 import { useState, type FC } from 'react';
 import { Link } from 'react-router';
-import { Alert, DatePicker, Flex, Select, Table, Typography } from 'antd';
+import {
+  Alert,
+  DatePicker,
+  Flex,
+  Select,
+  Skeleton,
+  Table,
+  Typography,
+} from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import { REPORT_STATUSES } from 'shared';
 import type { ReportStatus } from 'shared';
@@ -9,6 +17,7 @@ import { TOMBSTONE_LABELS } from '@/components/molecules/Comment/Comment';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import { formatDateTime } from '@/format/date';
 import { ApiError } from '@/api/client';
+import { ReportStatisticsView } from '@/components/molecules/ReportStatisticsView/ReportStatisticsView';
 import { ReportActions } from '@/components/molecules/ReportActions/ReportActions';
 import { ReportedAccountCell } from '@/components/molecules/ReportedAccountCell/ReportedAccountCell';
 import { useSession } from '@/queries/auth';
@@ -16,6 +25,7 @@ import {
   useBanAccount,
   useDismissReport,
   useReports,
+  useReportStatistics,
   useTakeReport,
   useUpholdReport,
 } from '@/queries/reports';
@@ -53,6 +63,8 @@ export const ReportsPanel: FC = () => {
     limit: pageSize,
     offset: (page - 1) * pageSize,
   });
+
+  const statistics = useReportStatistics(dayRange(...range));
 
   const { data: session } = useSession();
   const take = useTakeReport();
@@ -103,6 +115,15 @@ export const ReportsPanel: FC = () => {
           }}
         />
       </Flex>
+      <div className={spacing.gapBelow}>
+        {statistics.isError ? (
+          <Alert type="error" title="Could not load the statistics." />
+        ) : statistics.data ? (
+          <ReportStatisticsView statistics={statistics.data} />
+        ) : (
+          <Skeleton active />
+        )}
+      </div>
       {failure && (
         <Alert
           type="error"
