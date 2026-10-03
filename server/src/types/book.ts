@@ -2,12 +2,12 @@ import {
   BOOK_IDS_MAX,
   BOOK_SORTS,
   BOOK_STATUSES,
-  PAGE_SIZE_MAX,
   RANGE_ORDER,
   SEARCH_TEXT_MAX_LENGTH,
   SEARCHABLE_BOOK_STATUSES,
 } from 'shared';
 import { z } from 'zod';
+import { pageShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 import {
   WORK_TAG_MAX_LENGTH,
@@ -95,8 +95,7 @@ const inOrder = (from: Date | undefined, to: Date | undefined): boolean =>
 
 export const listBooksQuerySchema = z
   .object({
-    current: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+    ...pageShape,
     userId: idSchema.optional(),
     // The signed-in viewer's Favorites; no id is ever passed.
     favoritedBy: z.literal('me').optional(),

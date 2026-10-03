@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { PAGE_SIZE_MAX, READING_STATUSES } from 'shared';
+import { READING_STATUSES } from 'shared';
+import { pageShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 export const setReadingStatusSchema = z.object({
@@ -10,8 +11,7 @@ export const libraryParamSchema = z.object({ bookId: idSchema });
 
 export const listLibraryQuerySchema = z.object({
   status: z.enum(READING_STATUSES).optional(),
-  current: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+  ...pageShape,
 });
 
 export type SetReadingStatusInput = z.infer<typeof setReadingStatusSchema>;

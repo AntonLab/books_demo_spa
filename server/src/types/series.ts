@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BOOK_SORTS } from 'shared';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 import {
   WORK_TAG_MAX_LENGTH,
@@ -44,8 +45,7 @@ export const updateSeriesSchema = z
   });
 
 export const listSeriesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...limitOffsetShape,
   userId: idSchema.optional(),
   favoritedBy: z.literal('me').optional(),
   // Narrows to Series with a Published Book for every viewer, so a public page

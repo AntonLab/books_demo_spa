@@ -11,6 +11,7 @@ import {
   USER_STATUSES,
 } from 'shared';
 import { z } from 'zod';
+import { limitOffsetShape } from './pagination.ts';
 
 // No `role` here, and none in updateUserSchema below, which is derived from
 // this one with `.partial()` — a field added here appears there for free, and
@@ -44,8 +45,7 @@ export const updateUserSchema = createUserSchema
   );
 
 export const listUsersQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...limitOffsetShape,
   status: z.enum(USER_STATUSES).optional(),
   q: z.string().min(1).max(64).optional(),
 });

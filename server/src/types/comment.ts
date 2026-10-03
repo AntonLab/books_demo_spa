@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 // `text` is a TEXT column, which holds 65,535 *bytes* — as few as ~16k
@@ -39,8 +40,7 @@ export const updateCommentSchema = z.object({
 });
 
 export const listCommentsQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...limitOffsetShape,
   bookId: idSchema.optional(),
   userId: idSchema.optional(),
   // The filter a thread view repeats, and the one comments_parent_id_id exists

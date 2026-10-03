@@ -1,5 +1,6 @@
 import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
 import { z } from 'zod';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 // Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
@@ -75,8 +76,7 @@ export const reorderChaptersSchema = z.object({
 });
 
 export const listChaptersQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...limitOffsetShape,
   bookId: idSchema.optional(),
   q: z.string().min(1).max(200).optional(),
 });
