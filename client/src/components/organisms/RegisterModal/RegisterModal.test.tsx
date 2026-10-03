@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { RegisterModal } from './RegisterModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { queryKeys } from '@/queries/keys';
@@ -22,6 +23,8 @@ const user: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -77,11 +80,26 @@ describe('RegisterModal validation', () => {
       await screen.findByText('The two passwords do not match')
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['First name', 'Enter your first name'],
+    ['Last name', 'Enter your last name'],
+  ])('refuses spaces only in %s', async (label, message) => {
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
+    await fillInTheForm();
+
+    await userEvent.clear(screen.getByLabelText(label));
+    await userEvent.type(screen.getByLabelText(label), '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(mockedAuth.register).not.toHaveBeenCalled();
+  });
 });
 
 describe('RegisterModal submission', () => {
   it('sends every server field and never sends confirm', async () => {
-    mockedAuth.register.mockResolvedValue(user);
+    mockedAuth.register.mockResolvedValue(sessionOf(user));
     renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 
     await fillInTheForm();
@@ -104,7 +122,7 @@ describe('RegisterModal submission', () => {
   });
 
   it('caches the user and closes the modal on success', async () => {
-    mockedAuth.register.mockResolvedValue(user);
+    mockedAuth.register.mockResolvedValue(sessionOf(user));
     const { queryClient } = renderWithProviders(
       <RegisterModal onOpen={onOpen} onClose={onClose} />
     );
@@ -113,13 +131,15 @@ describe('RegisterModal submission', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Register' }));
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
+      expect(queryClient.getQueryData(queryKeys.session)).toEqual(
+        sessionOf(user)
+      );
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('registers as a plain user when the box is left alone', async () => {
-    mockedAuth.register.mockResolvedValue(user);
+    mockedAuth.register.mockResolvedValue(sessionOf(user));
 
     renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
     await fillInTheForm();
@@ -135,7 +155,9 @@ describe('RegisterModal submission', () => {
   });
 
   it('registers as an author when the box is ticked', async () => {
-    mockedAuth.register.mockResolvedValue({ ...user, role: 'author' });
+    mockedAuth.register.mockResolvedValue(
+      sessionOf({ ...user, role: 'author' })
+    );
 
     renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
     await fillInTheForm();

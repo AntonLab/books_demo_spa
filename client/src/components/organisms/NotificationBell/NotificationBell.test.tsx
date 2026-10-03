@@ -198,7 +198,7 @@ describe('NotificationBell', () => {
     ).toHaveAttribute('href', '/books/7');
     expect(
       screen.getByRole('link', { name: '“The Nightbus Files”' })
-    ).toHaveAttribute('href', '/series/4/edit');
+    ).toHaveAttribute('href', '/series/4');
     // A deleted work is named, never linked.
     expect(
       screen.queryByRole('link', { name: '“Salt and Candlelight”' })

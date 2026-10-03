@@ -2,10 +2,11 @@ import type { FC, ReactNode } from 'react';
 import { Card as AntCard, Flex, Space, theme, Typography } from 'antd';
 import { Link } from 'react-router';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 import { TagList } from '@/components/molecules/TagList/TagList';
 import type { PublicGenre } from 'shared';
 import type { AuthorSummary } from '@/types/api';
-import { searchPath } from '@/types/bookSearch';
 import spacing from '@/theme/spacing.module.css';
 import styles from './Card.module.css';
 
@@ -23,6 +24,9 @@ interface CardProps {
   genre: PublicGenre | null;
   tags: string[];
   media?: ReactNode;
+  // A short line about what the work belongs to, under the title. BookCard puts
+  // its Series here.
+  subtitle?: ReactNode;
   footer?: ReactNode;
 }
 
@@ -37,6 +41,7 @@ export const Card: FC<CardProps> = ({
   genre,
   tags,
   media,
+  subtitle,
   footer,
 }) => {
   const { token } = theme.useToken();
@@ -88,6 +93,10 @@ export const Card: FC<CardProps> = ({
             </Typography.Title>
           )}
 
+          {subtitle !== undefined && (
+            <div className={styles.line}>{subtitle}</div>
+          )}
+
           <Space size={token.marginXS} wrap className={styles.line}>
             {authors.map((author, index) => (
               <Space key={author.id} size={4}>
@@ -97,9 +106,11 @@ export const Card: FC<CardProps> = ({
                   size="small"
                 />
                 <Typography.Text type="secondary">
-                  {`${author.firstName} ${author.lastName}${
-                    index < authors.length - 1 ? ',' : ''
-                  }`}
+                  <NameLink
+                    id={author.id}
+                    name={`${author.firstName} ${author.lastName}`}
+                  />
+                  {index < authors.length - 1 && ','}
                 </Typography.Text>
               </Space>
             ))}
@@ -116,9 +127,7 @@ export const Card: FC<CardProps> = ({
 
           {!tile && genre !== null && (
             <div className={styles.line}>
-              <Link to={searchPath({ genre: String(genre.id) })}>
-                {genre.name}
-              </Link>
+              <GenrePath genre={genre} />
             </div>
           )}
 

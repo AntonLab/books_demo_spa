@@ -2,12 +2,6 @@
   margin-bottom: var(--ant-margin);
 }
 
-/* The header's margin replaces the Title's own, which would push the heading
-   off centre against the button beside it. */
-.title {
-  margin: 0;
-}
-
 .replies {
   margin-left: var(--ant-margin-xl);
 }

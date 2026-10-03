@@ -1,20 +1,27 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
+import { editorChapter } from '@/test/editFixtures';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
+import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { BookDetail } from '@/types/book';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
+jest.mock('@/api/chapters');
+jest.mock('@/api/authors');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedChapters = jest.mocked(chaptersApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
@@ -30,6 +37,7 @@ const bookDetail: BookDetail = {
   id: 1,
   authors: [ann],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'Long ago, in a kingdom of scales.',
   tags: [],
@@ -38,12 +46,13 @@ const bookDetail: BookDetail = {
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  series: null,
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 
@@ -56,23 +65,32 @@ const author: PublicUser = {
   status: 'active',
   role: 'author',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
 const onClose = jest.fn();
+const onGone = jest.fn();
 
 const renderModal = (session: PublicUser = author) => {
   const queryClient = createTestQueryClient();
   queryClient.setQueryData(queryKeys.session, session);
   return renderWithProviders(
-    <BookEditDetailsModal bookId={1} onClose={onClose} />,
+    <BookEditDetailsModal bookId={1} onClose={onClose} onGone={onGone} />,
     { queryClient }
   );
 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedChapters.listChapters.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
   mockedSeries.listSeries.mockResolvedValue({
     items: [],
     total: 0,
@@ -80,7 +98,7 @@ beforeEach(() => {
     offset: 0,
   });
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
 });
 
@@ -127,7 +145,7 @@ describe('BookEditDetailsModal', () => {
   it('keeps an existing genre on an unrelated save', async () => {
     mockedBooks.getBook.mockResolvedValue({
       ...bookDetail,
-      genre: { id: 4, name: 'Gothic' },
+      genre: publicGenre(4, 'Gothic'),
     });
     mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderModal();
@@ -148,7 +166,7 @@ describe('BookEditDetailsModal', () => {
     mockedBooks.getBook.mockResolvedValue({
       ...bookDetail,
       seriesId: 12,
-      series: { id: 12, title: 'The Scale Cycle' },
+      series: { id: 12, title: 'The Scale Cycle', position: null },
     });
     mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderModal();
@@ -224,5 +242,167 @@ describe('BookEditDetailsModal', () => {
       await screen.findByText('Only its co-authors can edit this book.')
     ).toBeInTheDocument();
     expect(screen.queryByLabelText('Title')).toBeNull();
+  });
+});
+
+const summary = {
+  id: 9,
+  bookId: 1,
+  title: 'One',
+  publishedAt: null,
+  createdAt: '2026-09-10T00:00:00.000Z',
+  updatedAt: '2026-09-10T08:15:30.123Z',
+};
+const toChapters = async () => {
+  await userEvent.click(await screen.findByRole('tab', { name: 'Chapters' }));
+  return screen.findByRole('button', { name: 'Edit One' });
+};
+
+// Under Jest every antd modal's aria-labelledby reads `test-id`, so with two
+// open they share one accessible name; find each by its title instead.
+const dialogTitled = async (title: string) => {
+  const heading = await screen.findByText(title, {
+    selector: '.ant-modal-title',
+  });
+  return heading.closest('[role="dialog"]') as HTMLElement;
+};
+
+describe('BookEditDetailsModal Chapter editor', () => {
+  beforeEach(() => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedChapters.listChapters.mockResolvedValue({
+      items: [summary],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedChapters.getChapter.mockResolvedValue(editorChapter);
+  });
+
+  // Escape is not exercised: antd's Escape stack keys modals by useId, which
+  // reads `test-id` for every modal under Jest, so a second modal never joins it.
+  it('opens the Chapter modal over the Book modal, and closing it leaves the Book modal open', async () => {
+    renderModal();
+    await userEvent.click(await toChapters());
+    const chapter = await dialogTitled('Edit chapter');
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
+    await userEvent.click(
+      within(chapter).getByRole('button', { name: 'Close' })
+    );
+
+    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Edit One' })).toBeVisible();
+  });
+
+  it('opens a new chapter from Add chapter', async () => {
+    renderModal();
+    await toChapters();
+    await userEvent.click(screen.getByRole('button', { name: 'Add chapter' }));
+    expect(await dialogTitled('New chapter')).toBeInTheDocument();
+  });
+
+  it('closes silently with typed text and then marks the row', async () => {
+    renderModal();
+    await userEvent.click(await toChapters());
+    const chapter = await dialogTitled('Edit chapter');
+    await userEvent.type(await within(chapter).findByLabelText('Title'), '!');
+    await userEvent.click(
+      within(chapter).getByRole('button', { name: 'Close' })
+    );
+    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    expect(screen.queryByText('Discard changes?')).toBeNull();
+    expect(await screen.findByText('Unsaved changes')).toBeInTheDocument();
+  });
+});
+
+describe('BookEditDetailsModal tabs', () => {
+  it('opens on Details with the form, Cover, Co-authors and Delete book', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit book' })
+    ).toBeInTheDocument();
+    expect(await screen.findByLabelText('Title')).toBeVisible();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Details',
+      'Chapters',
+    ]);
+    expect(screen.getByRole('heading', { name: 'Cover' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Co-authors' })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Add a co-author')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete book' })
+    ).toBeInTheDocument();
+  });
+
+  it('gives a Moderator the form and Delete book but no co-author picker', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal({ ...author, id: 99, role: 'admin' });
+
+    expect(await screen.findByLabelText('Title')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete book' })
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText('Add a co-author')).toBeNull();
+  });
+
+  it('keeps typed Details values over a Chapters tab round trip and still asks before closing', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    renderModal();
+
+    await userEvent.type(await screen.findByLabelText('Title'), '!');
+    await userEvent.click(screen.getByRole('tab', { name: 'Chapters' }));
+    expect(await screen.findByText('No chapters yet.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    expect(screen.getByLabelText('Title')).toHaveValue('A Tale of Dragons!');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Chapters' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect((await screen.findAllByText('Discard changes?')).length).not.toBe(0);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('deletes the book once confirmed, closes and reports it gone', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedBooks.deleteBook.mockResolvedValue(undefined);
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    expect(mockedBooks.deleteBook).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    await waitFor(() => expect(onGone).toHaveBeenCalledTimes(1));
+    expect(mockedBooks.deleteBook).toHaveBeenCalledWith(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays open with the server message when the delete is refused', async () => {
+    mockedBooks.getBook.mockResolvedValue(bookDetail);
+    mockedBooks.deleteBook.mockRejectedValue(
+      new Error('You may not delete this book')
+    );
+    renderModal();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(
+      await screen.findByText('You may not delete this book')
+    ).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onGone).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,10 @@
 import { NotFoundError } from '../types/errors.ts';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import type {
   BookDetail,
+  BookSeriesRef,
+  LibraryCounts,
+  ReadingStatus,
   PublicBook,
   PublicGenre,
   AuthorSummary,
@@ -35,6 +39,9 @@ export interface FakeBookRepositoryOptions {
   // repository: the count, and the id of a signed-in viewer's own Favorite.
   // Whether a Draft book counts is the real repository's rule, proven on MySQL.
   favorites?: { count: number; viewerFavoriteId: number | null };
+  // What a book's detail reports about its Libraries, which live in another
+  // repository: the counts, and a signed-in viewer's own Reading status.
+  library?: { counts: LibraryCounts; viewerStatus: ReadingStatus | null };
   // What a book's detail reports from its comments and chapters, which live in
   // other repositories. Which comments and chapters count is the real
   // repository's rule, proven on MySQL.
@@ -62,6 +69,7 @@ export function createFakeBookRepository(
     genres = new Map(),
     likes = { count: 0, viewerLikeId: null },
     favorites = { count: 0, viewerFavoriteId: null },
+    library = { counts: EMPTY_LIBRARY_COUNTS, viewerStatus: null },
     tallies = { commentCount: 0, wordCount: 0 },
     viewers = [],
     reorders = [],
@@ -88,12 +96,30 @@ export function createFakeBookRepository(
       : null;
   };
 
+  // Mirrors loadSeriesRefs in the real repository: N counts Published books in
+  // Series order, and a Draft row gets null.
+  const seriesRefOf = (book: PublicBook): BookSeriesRef | null => {
+    const filedIn =
+      book.seriesId === null ? undefined : series.get(book.seriesId);
+    if (book.seriesId === null || filedIn === undefined) return null;
+    const place =
+      inSeriesOrder(book.seriesId)
+        .filter((row) => row.status !== 'draft')
+        .findIndex((row) => row.id === book.id) + 1;
+    return {
+      id: book.seriesId,
+      title: filedIn.title,
+      position: book.status === 'draft' || place === 0 ? null : place,
+    };
+  };
+
   const withCredits = (book: PublicBook): PublicBook => ({
     ...book,
     authors: (credits.get(book.id) ?? []).flatMap(
       (id) => accounts.get(id) ?? []
     ),
     coverUrl: coverUrlOf(book.id),
+    series: seriesRefOf(book),
   });
 
   // Stands in for the series row's foreign key, which the real repository
@@ -150,6 +176,7 @@ export function createFakeBookRepository(
         authors: [],
         status: 'draft',
         seriesId: input.seriesId,
+        series: null,
         title: input.title,
         description: input.description,
         tags: input.tags,
@@ -175,8 +202,11 @@ export function createFakeBookRepository(
         (row) =>
           (query.userId === undefined ||
             (credits.get(row.id) ?? []).includes(query.userId)) &&
+          (query.ids === undefined || query.ids.includes(row.id)) &&
           (!query.tag || row.tags.includes(query.tag)) &&
-          (query.genreId === undefined || row.genre?.id === query.genreId) &&
+          (query.genreId === undefined ||
+            row.genre?.id === query.genreId ||
+            row.genre?.parent?.id === query.genreId) &&
           (!query.q ||
             row.title.includes(query.q) ||
             row.description.includes(query.q))
@@ -204,14 +234,8 @@ export function createFakeBookRepository(
       const book = rows.get(id);
       if (!book) return null;
 
-      const filedIn =
-        book.seriesId === null ? undefined : series.get(book.seriesId);
       return {
         ...withCredits(book),
-        series:
-          book.seriesId === null || filedIn === undefined
-            ? null
-            : { id: book.seriesId, title: filedIn.title },
         likeCount: likes.count,
         // Only a signed-in caller can have a like of their own to report.
         viewerLikeId: viewer === null ? null : likes.viewerLikeId,
@@ -219,6 +243,8 @@ export function createFakeBookRepository(
         wordCount: tallies.wordCount,
         favoriteCount: favorites.count,
         viewerFavoriteId: viewer === null ? null : favorites.viewerFavoriteId,
+        viewerReadingStatus: viewer === null ? null : library.viewerStatus,
+        libraryCounts: library.counts,
       };
     },
 

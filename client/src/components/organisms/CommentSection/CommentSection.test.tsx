@@ -7,14 +7,17 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
+import * as reportsApi from '@/api/reports';
 import type { CommentWithAuthor, PublicUser } from '@/types/api';
 import type { RootState } from '@/store';
 
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
+jest.mock('@/api/reports');
 
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
+const mockedReports = jest.mocked(reportsApi);
 
 const viewer: PublicUser = {
   id: 3,
@@ -25,6 +28,8 @@ const viewer: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -47,6 +52,8 @@ const root: CommentWithAuthor = {
   },
   likeCount: 0,
   viewerLikeId: null,
+  hasOpenReport: false,
+  viewerReportedId: null,
 };
 
 const reply: CommentWithAuthor = {
@@ -73,6 +80,14 @@ const renderSignedIn = (preloadedState?: Partial<RootState>) => {
     queryClient,
     preloadedState,
   });
+};
+
+const renderAs = (role: PublicUser['role'] | 'guest') => {
+  const queryClient = createTestQueryClient();
+  if (role !== 'guest') {
+    queryClient.setQueryData(queryKeys.session, { ...viewer, role });
+  }
+  return renderWithProviders(<CommentSection bookId={1} />, { queryClient });
 };
 
 const addComment = () =>
@@ -124,6 +139,118 @@ describe('CommentSection', () => {
     ).toBeInTheDocument();
   });
 
+  it.each([
+    ['user', 0],
+    ['author', 0],
+    ['admin', 1],
+    ['superadmin', 1],
+    ['guest', 0],
+  ] as const)(
+    'a %s sees %i Remove button, never on their own comment',
+    async (role, count) => {
+      renderAs(role);
+      await screen.findByText('Agreed');
+
+      expect(screen.queryAllByRole('button', { name: 'Remove' })).toHaveLength(
+        count
+      );
+    }
+  );
+
+  it('Remove asks first, then calls DELETE for the comment and refetches the thread, the book and the reports', async () => {
+    mockedComments.deleteComment.mockResolvedValue(undefined);
+    const { queryClient } = renderAs('admin');
+    const spy = jest.spyOn(queryClient, 'invalidateQueries');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    await waitFor(() =>
+      expect(mockedComments.deleteComment).toHaveBeenCalledWith(6)
+    );
+    await waitFor(() =>
+      expect(mockedComments.listComments).toHaveBeenCalledTimes(2)
+    );
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.allReports });
+    expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.book(1) });
+  });
+
+  it.each([
+    ['admin', 'removed', 1],
+    ['superadmin', 'removed', 1],
+    ['user', 'removed', 0],
+    ['admin', 'deleted', 0],
+  ] as const)(
+    'a %s with a %s root Tombstone sees %i Restore button',
+    async (role, kind, count) => {
+      mockedComments.listComments.mockResolvedValue({
+        items: [
+          { ...root, tombstone: kind, text: '', userId: null, author: null },
+          reply,
+        ],
+        total: 2,
+        limit: 100,
+        offset: 0,
+      });
+      renderAs(role);
+      await screen.findByText('Agreed');
+
+      expect(screen.queryAllByRole('button', { name: 'Restore' })).toHaveLength(
+        count
+      );
+    }
+  );
+
+  it('shows a Moderator a Removed root that has no live reply, and Restore calls the server', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        {
+          ...root,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedComments.restoreComment.mockResolvedValue(root);
+    renderAs('admin');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Restore' })
+    );
+
+    await waitFor(() =>
+      expect(mockedComments.restoreComment).toHaveBeenCalledWith(5)
+    );
+  });
+
+  it('hides that same Removed root from a plain user', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [
+        {
+          ...root,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+        },
+      ],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    renderSignedIn();
+
+    expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
+  });
+
   it('prompts an anonymous visitor to sign in instead of offering a composer', async () => {
     renderWithProviders(<CommentSection bookId={1} />);
 
@@ -163,7 +290,10 @@ describe('CommentSection', () => {
     await screen.findByText('Agreed');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[1]!);
-    const dialog = screen.getByRole('dialog', { name: 'Reply to Oth Er' });
+    // Not named: under Jest the dialog and the focused IconButton's tooltip
+    // share the id `test-id`, so the dialog's aria-labelledby reads "Reply".
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Reply to Oth Er')).toBeInTheDocument();
     expect(within(dialog).getByText('Agreed')).toBeInTheDocument();
     await userEvent.type(within(dialog).getByRole('textbox'), 'Me too');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Post' }));
@@ -230,7 +360,8 @@ describe('CommentSection', () => {
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Reply' })[0]!);
 
-    const dialog = screen.getByRole('dialog', { name: 'Reply to Read Er' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Reply to Read Er')).toBeInTheDocument();
     expect(within(dialog).getByText('A fine book')).toBeInTheDocument();
     // Read-only: the quoted comment carries none of its controls.
     expect(within(dialog).queryByRole('button', { name: 'Edit' })).toBeNull();
@@ -260,7 +391,8 @@ describe('CommentSection', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    const dialog = screen.getByRole('dialog', { name: 'Edit comment' });
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Edit comment')).toBeInTheDocument();
     expect(within(dialog).getByRole('textbox')).toHaveValue('A fine book');
     expect(
       within(dialog).getByRole('button', { name: 'Save' })
@@ -465,6 +597,158 @@ describe('CommentSection', () => {
       commentId: 6,
       isLike: true,
     });
+  });
+
+  it("offers Report on someone else's comment and never on your own", async () => {
+    renderSignedIn();
+    await screen.findByText('Agreed');
+    expect(screen.getAllByRole('button', { name: 'Report' })).toHaveLength(1);
+  });
+
+  it('offers no Report to a Guest', async () => {
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Agreed');
+    expect(screen.queryByRole('button', { name: /report/i })).toBeNull();
+  });
+
+  // Opens the modal on `reply` (id 6), picks Spam and sends, with the click on Send as given.
+  const reportReply = async (send: (button: HTMLElement) => Promise<void>) => {
+    renderSignedIn();
+    await screen.findByText('Agreed');
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Spam' }));
+    await send(screen.getByRole('button', { name: /Send report/ }));
+  };
+
+  it('sends a report, closes the modal and refetches the thread', async () => {
+    mockedReports.reportComment.mockResolvedValue({ id: 1 });
+    await reportReply((b) => userEvent.click(b));
+    await waitFor(() =>
+      expect(mockedReports.reportComment).toHaveBeenCalledWith(6, {
+        reason: 'spam',
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends once on a double click', async () => {
+    mockedReports.reportComment.mockReturnValue(new Promise(() => {}));
+    await reportReply((b) => userEvent.dblClick(b));
+    expect(mockedReports.reportComment).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      new ApiError(409, 'This comment already has an open report.'),
+      'This comment already has an open report.',
+    ],
+    [new ApiError(500, 'boom'), 'Could not send the report.'],
+  ])(
+    'keeps the modal open and shows the message for %p',
+    async (error, message) => {
+      mockedReports.reportComment.mockRejectedValue(error);
+      await reportReply((b) => userEvent.click(b));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    }
+  );
+});
+
+describe('a failed Delete, Remove or Restore', () => {
+  const removedRoot: CommentWithAuthor = {
+    ...root,
+    tombstone: 'removed',
+    text: '',
+    userId: null,
+    author: null,
+  };
+
+  it("shows the server's message for a Delete the author cannot make", async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(404, 'Comment not found')
+    );
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Comment not found')).toBeInTheDocument();
+  });
+
+  it('shows a generic message when the network fails on Delete', async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(
+      await screen.findByText('Could not delete the comment.')
+    ).toBeInTheDocument();
+  });
+
+  it("shows the server's message for a refused Remove", async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(403, 'Not allowed to remove this comment')
+    );
+    renderAs('admin');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    expect(
+      await screen.findByText('Not allowed to remove this comment')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a generic message when the network fails on Restore', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [removedRoot],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedComments.restoreComment.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+    renderAs('admin');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Restore' })
+    );
+
+    expect(
+      await screen.findByText('Could not restore the comment.')
+    ).toBeInTheDocument();
+  });
+
+  it('sends one Restore for a double click and disables the button meanwhile', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [removedRoot],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    let finish: (value: CommentWithAuthor) => void = () => {};
+    mockedComments.restoreComment.mockReturnValue(
+      new Promise<CommentWithAuthor>((resolve) => {
+        finish = resolve;
+      })
+    );
+    renderAs('admin');
+    const restore = await screen.findByRole('button', { name: 'Restore' });
+
+    await userEvent.dblClick(restore);
+
+    expect(mockedComments.restoreComment).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(restore).toBeDisabled());
+    await act(async () => finish(root));
   });
 });
 

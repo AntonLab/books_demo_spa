@@ -1,22 +1,28 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useNavigationType } from 'react-router';
 import { SeriesPage } from './SeriesPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
+import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import * as favoritesApi from '@/api/favorites';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
+jest.mock('@/api/authors');
 jest.mock('@/api/books');
+jest.mock('@/api/genres');
 jest.mock('@/api/series');
 jest.mock('@/api/favorites');
+jest.mock('@/api/readingLists');
 
 const mockedBooks = jest.mocked(booksApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
 
@@ -30,6 +36,8 @@ const coAuthor = {
 
 const series: SeriesDetail = {
   id: 12,
+  coverUrl: null,
+  bookCount: 2,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor that should have stayed shut.',
@@ -45,6 +53,7 @@ const book: PublicBook = {
   id: 1,
   authors: [coAuthor],
   seriesId: 12,
+  series: { id: 12, title: 'The Ashgrove Chronicles', position: 1 },
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: [],
@@ -60,10 +69,14 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   email: 'ann@example.com',
   status: 'active',
   role: 'author',
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   ...overrides,
 });
+
+const HomeProbe = () => <p>{`Home|${useNavigationType()}`}</p>;
 
 const renderPage = (
   route = '/series/12',
@@ -74,7 +87,8 @@ const renderPage = (
   return renderWithProviders(
     <Routes>
       <Route path="/series/:id" element={<SeriesPage />} />
-      <Route path="/series/:id/edit" element={<p>Series editor</p>} />
+      <Route path="/" element={<HomeProbe />} />
+      <Route path="/profile/my-books" element={<p>My works</p>} />
     </Routes>,
     { route, queryClient }
   );
@@ -82,6 +96,8 @@ const renderPage = (
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
+  mockedSeries.listSeriesBooks.mockResolvedValue({ items: [] });
 });
 
 describe('SeriesPage', () => {
@@ -102,6 +118,13 @@ describe('SeriesPage', () => {
     expect(
       await screen.findByRole('link', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
+    expect(screen.getByText('2 books')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', {
+        level: 2,
+        name: 'The Ashgrove Chronicles',
+      })
+    ).toHaveLength(1);
     expect(mockedSeries.getSeries).toHaveBeenCalledWith(12);
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       seriesId: 12,
@@ -109,6 +132,28 @@ describe('SeriesPage', () => {
     });
     expect(
       screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('links the Subgenre of the series and its parent', async () => {
+    mockedSeries.getSeries.mockResolvedValue({
+      ...series,
+      genre: publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' }),
+    });
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 100,
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Fantasy' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
     ).toBeInTheDocument();
   });
 
@@ -128,16 +173,17 @@ describe('SeriesPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('says the series is gone on a 404 and asks for no books', async () => {
+  it('replaces to Home on a 404 and asks for no books', async () => {
     mockedSeries.getSeries.mockRejectedValue(
       new ApiError(404, 'Series not found')
     );
 
     renderPage('/series/99');
 
+    expect(await screen.findByText('Home|REPLACE')).toBeInTheDocument();
     expect(
-      await screen.findByText('This series no longer exists.')
-    ).toBeInTheDocument();
+      await screen.findAllByText('This series no longer exists.')
+    ).toHaveLength(1);
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
@@ -153,17 +199,18 @@ describe('SeriesPage', () => {
     );
   });
 
-  it('asks the server nothing for an id that is not one', () => {
+  it('replaces to Home, asking the server nothing, for an id that is not one', async () => {
     renderPage('/series/abc');
 
+    expect(await screen.findByText('Home|REPLACE')).toBeInTheDocument();
     expect(
-      screen.getByText('This series no longer exists.')
-    ).toBeInTheDocument();
+      await screen.findAllByText('This series no longer exists.')
+    ).toHaveLength(1);
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
-  it('offers a co-author the editor', async () => {
+  it('opens the Series edit modal for a co-author, over the page', async () => {
     mockedSeries.getSeries.mockResolvedValue(series);
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
@@ -171,13 +218,46 @@ describe('SeriesPage', () => {
       current: 1,
       pageSize: 100,
     });
-
     renderPage('/series/12', account());
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Edit series' })
     );
-    expect(await screen.findByText('Series editor')).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Edit series' })
+    ).toBeInTheDocument();
+  });
+
+  it.each([
+    ['a co-author goes to My works', account(), 'My works'],
+    ['a moderator goes home', account({ id: 50, role: 'admin' }), 'Home|PUSH'],
+  ])('after delete, %s', async (_name, session, landing) => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+    mockedSeries.deleteSeries.mockResolvedValue(undefined);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 100,
+    });
+    renderPage('/series/12', session);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit series' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete series' })
+    );
+    // The server no longer has the series once it is deleted, so any refetch
+    // of it answers 404.
+    mockedSeries.getSeries.mockRejectedValue(new ApiError(404, 'gone'));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(await screen.findByText(landing)).toBeInTheDocument();
+    expect(screen.queryByText('This series no longer exists.')).toBeNull();
   });
 
   it('offers a moderator the editor too, and nobody else', async () => {
@@ -258,5 +338,35 @@ describe('SeriesPage star', () => {
     );
 
     expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(8);
+  });
+
+  describe('Add to reading list', () => {
+    const addButton = { name: 'Add to reading list' };
+
+    it('is offered to a signed-in Account on a Series with a Published Book', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+      renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+      expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+    });
+
+    it('is not offered to a Guest', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
+
+    it('is not offered on a Series without a Published Book', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 0 });
+
+      renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
   });
 });

@@ -5,7 +5,7 @@ import { ClearableSelect } from '@/components/molecules/ClearableSelect/Clearabl
 import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
 import { BOOK_STATUSES } from 'shared';
 import { BOOK_STATUS_LABELS } from '@/types/book';
-import type { PublicGenre, BookStatus } from 'shared';
+import type { GenreListItem, BookStatus } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 
 export interface BookFormValues {
@@ -20,7 +20,7 @@ export interface BookFormValues {
 
 interface BookFormProps {
   seriesOptions: { id: number; title: string }[];
-  genreOptions: PublicGenre[];
+  genreOptions: GenreListItem[];
   submitLabel: string;
   onSubmit: (values: BookFormValues) => void;
   initialValues?: BookFormValues;

@@ -1,42 +1,85 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router';
+import { useLocation, useNavigationType } from 'react-router';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
+import * as accountsApi from '@/api/accounts';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
-import * as favoritesApi from '@/api/favorites';
 import * as notificationsApi from '@/api/notifications';
 import * as seriesApi from '@/api/series';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
-import type { PublicUser } from '@/types/api';
+import type { AccountProfile, PublicUser } from '@/types/api';
 
+jest.mock('@/api/accounts');
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
-jest.mock('@/api/favorites');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
+jest.mock('@/api/favorites');
 jest.mock('@/api/genres');
 
+const mockedAccounts = jest.mocked(accountsApi);
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
-const mockedFavorites = jest.mocked(favoritesApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 
 const emptyEnvelope = { items: [], total: 0, limit: 100, offset: 0 };
 
+const profile: AccountProfile = {
+  id: 7,
+  firstName: 'Margaret',
+  lastName: 'Hale',
+  avatarUrl: null,
+  about: '',
+  lastSeenAt: null,
+  bookCount: 0,
+  seriesCount: 0,
+  totals: {
+    booksInReadingLists: 0,
+    seriesInReadingLists: 0,
+    bookLikes: 0,
+    seriesLikes: 0,
+    commentsOnBooks: 0,
+    favorites: 0,
+  },
+};
+
 const LocationProbe = () => {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
+};
+
+const NavigationProbe = () => (
+  <div data-testid="navigation">{useNavigationType()}</div>
+);
+
+const expectGoneHome = async (route: string, notice = 'Page not found.') => {
+  renderWithProviders(
+    <>
+      <AppShell />
+      <LocationProbe />
+      <NavigationProbe />
+    </>,
+    { route }
+  );
+
+  expect(await screen.findAllByText(notice)).toHaveLength(1);
+  await waitFor(() =>
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+  );
+  expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
 };
 
 // Every page App.tsx loads lazily. A page's first import transforms and
@@ -44,16 +87,12 @@ const LocationProbe = () => {
 // findBy*'s 1 s; loading them here leaves each route test waiting only for
 // its render, as a browser does once the chunk is cached.
 const LAZY_PAGES = [
-  'AdminGenresPage',
+  'AdminPage',
   'BookPage',
   'ChapterPage',
-  'EditBookPage',
-  'EditChapterPage',
-  'EditSeriesPage',
   'MainPage',
-  'NewChapterPage',
-  'NotFoundPage',
   'ProfilePage',
+  'PublicProfilePage',
   'SearchPage',
   'SeriesPage',
 ];
@@ -102,6 +141,8 @@ beforeEach(() => {
     wordCount: 0,
     favoriteCount: 0,
     viewerFavoriteId: null,
+    viewerReadingStatus: null,
+    libraryCounts: EMPTY_LIBRARY_COUNTS,
     viewerLikeId: null,
   });
   mockedChapters.listChapters.mockResolvedValue(emptyEnvelope);
@@ -109,6 +150,8 @@ beforeEach(() => {
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
   mockedSeries.getSeries.mockResolvedValue({
     id: 12,
+    coverUrl: null,
+    bookCount: 0,
     authors: [
       {
         id: 3,
@@ -177,75 +220,28 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows "This book no longer exists." at the old /books/new bookmark without asking the server', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/new' });
-
-    expect(
-      await screen.findByText('This book no longer exists.')
-    ).toBeInTheDocument();
+  it('sends the old /books/new bookmark Home with a message, asking the server nothing', async () => {
+    await expectGoneHome('/books/new', 'This book no longer exists.');
     expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  // A Guest on a guarded page is sent home with Log in open, which only the
-  // page's own guard can cause.
-  it('guards EditBookPage at /books/:id/edit', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/1/edit' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
+  it('sends the removed /books/:id/edit Home with a message', async () => {
+    await expectGoneHome('/books/1/edit');
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
   });
 
-  it('guards NewChapterPage at /books/:bookId/chapters/new, not the reader', async () => {
-    renderWithProviders(<AppShell />, { route: '/books/1/chapters/new' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
-    expect(mockedChapters.getChapter).not.toHaveBeenCalled();
-  });
-
-  it('guards EditChapterPage at /books/:bookId/chapters/:chapterId/edit', async () => {
-    mockedChapters.getChapter.mockResolvedValue({
-      id: 9,
-      bookId: 1,
-      title: 'Chapter One',
-      text: 'It was a dark night.',
-      publishedAt: null,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      updatedAt: '2026-09-01T00:00:00.000Z',
-    });
-
-    renderWithProviders(<AppShell />, { route: '/books/1/chapters/9/edit' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
-  });
-
-  it('shows "This series no longer exists." at the old /series/new bookmark without asking the server', async () => {
-    renderWithProviders(<AppShell />, { route: '/series/new' });
-
-    expect(
-      await screen.findByText('This series no longer exists.')
-    ).toBeInTheDocument();
+  it('sends the old /series/new bookmark Home with a message, asking the server nothing', async () => {
+    await expectGoneHome('/series/new', 'This series no longer exists.');
     expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('guards EditSeriesPage at /series/:id/edit', async () => {
-    renderWithProviders(<AppShell />, { route: '/series/12/edit' });
-
-    expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
-    ).toBeInTheDocument();
+  it('sends the removed /series/:id/edit Home with a message', async () => {
+    await expectGoneHome('/series/12/edit');
+    expect(mockedSeries.getSeries).not.toHaveBeenCalled();
   });
 
-  it('renders the not-found page at a bare /series', async () => {
-    renderWithProviders(<AppShell />, { route: '/series' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
+  it('sends a bare /series Home with a message', async () => {
+    await expectGoneHome('/series');
   });
 
   it('renders SeriesPage at /series/:id', async () => {
@@ -256,26 +252,32 @@ describe('AppShell routing', () => {
     ).toBeInTheDocument();
   });
 
-  it('guards AdminGenresPage at /admin/genres', async () => {
-    renderWithProviders(<AppShell />, { route: '/admin/genres' });
+  it.each(['/accounts/abc', '/accounts/0', '/accounts/-3', '/accounts/1.5'])(
+    'sends %s Home with a message, asking the server nothing',
+    async (route) => {
+      await expectGoneHome(route);
+      expect(mockedAccounts.getAccountProfile).not.toHaveBeenCalled();
+    }
+  );
+
+  it('sends a missing, blocked or pending Account Home (404)', async () => {
+    mockedAccounts.getAccountProfile.mockRejectedValue(
+      new ApiError(404, 'Not found')
+    );
+    await expectGoneHome('/accounts/9');
+  });
+
+  it('renders PublicProfilePage at /accounts/:id for a Guest', async () => {
+    mockedAccounts.getAccountProfile.mockResolvedValue(profile);
+    renderWithProviders(<AppShell />, { route: '/accounts/7' });
 
     expect(
-      await screen.findByRole('dialog', { name: 'Log in' })
+      await screen.findByRole('heading', { name: 'Margaret Hale' })
     ).toBeInTheDocument();
   });
 
-  it('renders the not-found page for an unknown route', async () => {
-    renderWithProviders(<AppShell />, { route: '/nowhere' });
-
-    expect(
-      await screen.findByRole('heading', { name: 'Page not found' })
-    ).toBeInTheDocument();
-  });
-});
-
-describe('AppShell Profile routing', () => {
-  it.each(['/profile', '/profile/favorites', '/profile/my-books'])(
-    'guards ProfilePage at %s',
+  it.each(['/admin/reports', '/admin/genres'])(
+    'guards the Admin panel at %s',
     async (route) => {
       renderWithProviders(<AppShell />, { route });
 
@@ -284,6 +286,94 @@ describe('AppShell Profile routing', () => {
       ).toBeInTheDocument();
     }
   );
+
+  it('redirects /admin to the Reports tab', async () => {
+    renderWithProviders(
+      <>
+        <AppShell />
+        <LocationProbe />
+      </>,
+      { route: '/admin' }
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('/admin/reports')
+    );
+  });
+
+  it('sends an unknown route Home with a message', async () => {
+    await expectGoneHome('/nowhere');
+  });
+
+  it('sends a deep unknown route with a query Home with a message', async () => {
+    await expectGoneHome('/nowhere/deeper?x=1');
+  });
+});
+
+describe('AppShell footer', () => {
+  it.each(['/', '/search'])('shows the footer at %s', async (route) => {
+    renderWithProviders(<AppShell />, { route });
+
+    const footer = await screen.findByRole('contentinfo');
+    expect(footer).toHaveTextContent('© 2026 Books Demo');
+    expect(
+      within(footer).getByRole('link', { name: 'Search' })
+    ).toHaveAttribute('href', '/search');
+  });
+});
+
+describe('removed Chapter pages', () => {
+  it.each([['/books/1/chapters/9/edit'], ['/books/1/chapters/new']])(
+    'redirects %s to the Book page without opening a chapter',
+    async (route) => {
+      renderWithProviders(
+        <>
+          <AppShell />
+          <LocationProbe />
+        </>,
+        { route }
+      );
+
+      expect(
+        await screen.findByRole('heading', { name: 'A Tale of Dragons' })
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/books\/1$/);
+      expect(mockedChapters.getChapter).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Log in' })).toBeNull();
+    }
+  );
+
+  it('replaces the history entry, so Back does not return to the dead route', async () => {
+    const NavigationProbe = () => (
+      <div data-testid="navigation">{useNavigationType()}</div>
+    );
+    renderWithProviders(
+      <>
+        <AppShell />
+        <NavigationProbe />
+      </>,
+      { route: '/books/1/chapters/9/edit' }
+    );
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE');
+  });
+});
+
+describe('AppShell Profile routing', () => {
+  it.each([
+    '/profile',
+    '/profile/favorites',
+    '/profile/library',
+    '/profile/my-books',
+  ])('guards ProfilePage at %s', async (route) => {
+    renderWithProviders(<AppShell />, { route });
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
 
   it('redirects /favorites to /profile/favorites', async () => {
     renderWithProviders(
@@ -327,10 +417,12 @@ describe('AppShell Profile routing', () => {
       status: 'active',
       role: 'user',
       avatarUrl: null,
+      about: '',
+      showLastSeen: true,
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
-    mockedAuth.me.mockResolvedValue(signedIn);
+    mockedAuth.me.mockResolvedValue(sessionOf(signedIn));
     mockedNotifications.listNotifications.mockResolvedValue({
       items: [],
       total: 0,
@@ -341,7 +433,12 @@ describe('AppShell Profile routing', () => {
     mockedNotifications.getNotificationSettings.mockResolvedValue({
       emailNotifications: true,
     });
-    mockedFavorites.listFavoriteBooks.mockResolvedValue(emptyEnvelope);
+    mockedBooks.listFavoritedBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
 
     renderWithProviders(<AppShell />, { route: '/profile' });
     await screen.findByRole('button', { name: 'Upload avatar' });
@@ -398,10 +495,12 @@ describe('AppShell and Unsaved text', () => {
       status: 'active',
       role: 'user',
       avatarUrl: null,
+      about: '',
+      showLastSeen: true,
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
-    mockedAuth.me.mockResolvedValue(signedIn);
+    mockedAuth.me.mockResolvedValue(sessionOf(signedIn));
     // The bell a signed-in header shows asks for these.
     mockedNotifications.listNotifications.mockResolvedValue({
       items: [],
@@ -429,6 +528,45 @@ describe('AppShell and Unsaved text', () => {
       expect(store.getState().unsavedText).toEqual({
         accountId: 1,
         entries: {},
+      })
+    );
+  });
+});
+
+describe('AppShell and Recently viewed', () => {
+  it('binds the Recently viewed to the Account signed in', async () => {
+    mockedAuth.me.mockResolvedValue(
+      sessionOf({
+        id: 5,
+        login: 'eve',
+        email: 'eve@example.com',
+        firstName: 'Eve',
+        lastName: 'Evans',
+        status: 'active',
+        role: 'user',
+        avatarUrl: null,
+        about: '',
+        showLastSeen: true,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      })
+    );
+    mockedNotifications.listNotifications.mockResolvedValue({
+      items: [],
+      total: 0,
+      unread: 0,
+      limit: 20,
+      offset: 0,
+    });
+
+    const { store } = renderWithProviders(<AppShell />, {
+      preloadedState: { recentlyViewed: { accountId: 3, ids: [4] } },
+    });
+
+    await waitFor(() =>
+      expect(store.getState().recentlyViewed).toEqual({
+        accountId: 5,
+        ids: [],
       })
     );
   });

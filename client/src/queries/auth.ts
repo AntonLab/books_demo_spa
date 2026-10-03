@@ -8,13 +8,14 @@ import type { QueryClient } from '@tanstack/react-query';
 import * as authApi from '../api/auth';
 import type { LoginInput, RegisterInput } from '../api/auth';
 import { ApiError } from '../api/client';
+import { updateUser } from '../api/users';
 import { queryKeys } from './keys';
-import type { PublicUser } from '../types/api';
+import type { SessionUser } from '../types/api';
 
 // `null` means "asked, and nobody is signed in"; `undefined` means "not asked
 // yet". TanStack enforces the distinction for us — it rejects an `undefined`
 // return from a queryFn outright — so the cache can hold the whole answer.
-type Session = PublicUser | null;
+type Session = SessionUser | null;
 
 interface ConfirmResetInput {
   token: string;
@@ -32,6 +33,24 @@ interface SessionChannel {
 }
 
 const sessionHash = hashKey(queryKeys.session);
+
+// A list key is `['books' | 'series', params]`; a detail key has a number at
+// index 1 and never matches. Another user's `userId` list is public and stays.
+const isAccountList = (
+  queryKey: readonly unknown[],
+  accountId: number | null
+): boolean => {
+  const [scope, params] = queryKey;
+  if ((scope !== 'books' && scope !== 'series') || typeof params !== 'object') {
+    return false;
+  }
+  if (params === null) return false;
+  const { favoritedBy, userId } = params as {
+    favoritedBy?: unknown;
+    userId?: unknown;
+  };
+  return favoritedBy === 'me' || (accountId !== null && userId === accountId);
+};
 
 // A session is a cookie every tab of the browser shares, so a sign-in or Sign
 // out in one tab changes who every other tab is acting as — a tab still showing
@@ -72,8 +91,22 @@ export const watchSession = (
     if (accountId !== undefined && next !== accountId) {
       // Removed, not invalidated: they belong to the Account that left, and a
       // refetch while the bell is still mounted would ask as the next one (a
-      // Guest's 401 on Sign out).
+      // Guest's 401 on Sign out). Library and Favorites are private too: the
+      // next Account must not see the last one's lists while the refetch lands.
+      // The Favorites and My works lists live under the shared `books` and
+      // `series` prefixes, so a predicate finds them.
       client.removeQueries({ queryKey: queryKeys.allNotifications });
+      client.removeQueries({ queryKey: queryKeys.allLibrary });
+      client.removeQueries({ queryKey: queryKeys.allFavorites });
+      client.removeQueries({ queryKey: queryKeys.allMyReadingLists });
+      // Reports are for a Moderator, so a refetch as the next Account (a Guest
+      // after Sign out) would answer 401; `enabled` alone does not stop it,
+      // because an invalidation refetches an observer whose last render still
+      // said enabled.
+      client.removeQueries({ queryKey: queryKeys.allReports });
+      client.removeQueries({
+        predicate: (query) => isAccountList(query.queryKey, accountId ?? null),
+      });
       void client.invalidateQueries({
         predicate: (query) => query.queryHash !== sessionHash,
       });
@@ -173,6 +206,17 @@ export const useConfirmReset = () => {
     // The server destroys every session for the user on a successful reset —
     // this one included — so the client must not keep showing a signed-in
     // header.
+    onSuccess: () => setSession(client, null),
+  });
+};
+
+export const useChangePassword = (userId: number) => {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { password: string; currentPassword: string }) =>
+      updateUser(userId, input),
+    // The server ends every session of the user, this one included, so no
+    // logout request follows.
     onSuccess: () => setSession(client, null),
   });
 };

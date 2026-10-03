@@ -97,6 +97,43 @@ test('emailNotifications is a NOT NULL boolean that defaults to on', () => {
   );
 });
 
+test('about is a nullable TEXT and lastSeenAt a nullable DATETIME', () => {
+  const sql = generateCreateTable();
+  assert.match(sql, /`about` TEXT/);
+  assert.doesNotMatch(sql, /`about` TEXT NOT NULL/);
+  assert.match(sql, /`lastSeenAt` DATETIME/);
+  assert.doesNotMatch(sql, /`lastSeenAt` DATETIME NOT NULL/);
+});
+
+test('showLastSeen is a NOT NULL boolean that defaults to on', () => {
+  assert.match(
+    generateCreateTable(),
+    /`showLastSeen` TINYINT\(1\) NOT NULL DEFAULT (true|1)/
+  );
+});
+
+test('toPublicUser reads a missing About as empty, carries showLastSeen and omits lastSeenAt', () => {
+  const fields = {
+    id: 1,
+    login: 'Someone',
+    email: 'someone@example.com',
+    password: 'hashed',
+    firstName: 'Some',
+    lastName: 'One',
+    lastSeenAt: new Date(),
+  };
+
+  const view = toPublicUser(User.build(fields), null);
+
+  assert.equal(view.about, '');
+  assert.equal(view.showLastSeen, true);
+  assert.equal('lastSeenAt' in view, false);
+  assert.equal(
+    toPublicUser(User.build({ ...fields, about: 'Hi' }), null).about,
+    'Hi'
+  );
+});
+
 test('toPublicUser carries an explicit role', () => {
   const user = User.build({
     id: 1,

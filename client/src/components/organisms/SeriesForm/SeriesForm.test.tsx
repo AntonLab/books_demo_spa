@@ -7,11 +7,9 @@ import { SeriesForm } from './SeriesForm';
 import type { SeriesFieldValues } from './SeriesForm';
 import { clearSelect } from '@/test/clearSelect';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 
-const genres = [
-  { id: 4, name: 'Gothic' },
-  { id: 5, name: 'Hard SF' },
-];
+const genres = [genreItem(4, 'Gothic'), genreItem(5, 'Hard SF')];
 
 describe('SeriesForm', () => {
   it('fills the form instance it is given, so a caller can read its state', async () => {

@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginModal } from './LoginModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { queryKeys } from '@/queries/keys';
@@ -22,6 +23,8 @@ const user: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -42,7 +45,7 @@ describe('LoginModal', () => {
   });
 
   it('submits the credentials, caches the user and closes the modal', async () => {
-    mockedAuth.login.mockResolvedValue(user);
+    mockedAuth.login.mockResolvedValue(sessionOf(user));
     const { queryClient } = renderWithProviders(
       <LoginModal onOpen={onOpen} onClose={onClose} />
     );
@@ -52,7 +55,9 @@ describe('LoginModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
+      expect(queryClient.getQueryData(queryKeys.session)).toEqual(
+        sessionOf(user)
+      );
     });
     expect(mockedAuth.login).toHaveBeenCalledWith({
       login: 'bob',
@@ -117,15 +122,13 @@ describe('LoginModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('asks before discarding typed input, and closes on confirm', async () => {
+  it('closes at once, whatever was typed, without asking', async () => {
     renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
 
     await userEvent.type(screen.getByLabelText('Login'), 'bob');
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(await screen.findAllByText('Discard changes?')).not.toHaveLength(0);
-    expect(onClose).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Discard changes?')).not.toBeInTheDocument();
   });
 });

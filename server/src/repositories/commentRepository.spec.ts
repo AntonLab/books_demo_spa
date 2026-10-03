@@ -15,6 +15,7 @@ import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { Comment } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
+import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
@@ -77,6 +78,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   beforeEach(async () => {
     // Children first: the foreign keys forbid clearing parents out from under
     // them.
+    await Report.destroy({ where: {}, truncate: false });
     await Like.destroy({ where: {}, truncate: false });
     await Comment.destroy({ where: {}, truncate: false });
     await Book.destroy({ where: {}, truncate: false });
@@ -171,7 +173,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
         { bookId, parentId: null, text: `Parent (${kind})` },
         ownerId
       );
-      await repository.remove(parent.id, kind);
+      await repository.remove(parent.id, kind, readerId);
 
       await assert.rejects(
         repository.create(
@@ -203,7 +205,10 @@ describe('commentRepository against real MySQL', { skip }, () => {
       ownerId
     );
 
-    assert.equal(await repository.remove(created.id, 'removed'), true);
+    assert.equal(
+      await repository.remove(created.id, 'removed', readerId),
+      true
+    );
 
     const row = await Comment.findByPk(created.id);
     assert.equal(row?.tombstone, 'removed');
@@ -221,8 +226,14 @@ describe('commentRepository against real MySQL', { skip }, () => {
       ownerId
     );
 
-    assert.equal(await repository.remove(created.id, 'deleted'), true);
-    assert.equal(await repository.remove(created.id, 'removed'), false);
+    assert.equal(
+      await repository.remove(created.id, 'deleted', readerId),
+      true
+    );
+    assert.equal(
+      await repository.remove(created.id, 'removed', readerId),
+      false
+    );
     assert.equal((await Comment.findByPk(created.id))?.tombstone, 'deleted');
   });
 
@@ -236,7 +247,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       ownerId
     );
 
-    await repository.remove(root.id, 'deleted');
+    await repository.remove(root.id, 'deleted', readerId);
 
     const reloaded = await repository.findById(child.id, null);
     assert.notEqual(reloaded, null);
@@ -245,7 +256,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   });
 
   test('remove reports false on a comment that is not there', async () => {
-    assert.equal(await repository.remove(999_999, 'deleted'), false);
+    assert.equal(await repository.remove(999_999, 'deleted', readerId), false);
   });
 
   test('restore brings back a removed comment, text and owner included', async () => {
@@ -253,7 +264,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       { bookId, parentId: null, text: 'Mistaken removal' },
       ownerId
     );
-    await repository.remove(created.id, 'removed');
+    await repository.remove(created.id, 'removed', readerId);
 
     const restored = await repository.restore(created.id);
 
@@ -267,7 +278,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       { bookId, parentId: null, text: 'Mine to delete' },
       ownerId
     );
-    await repository.remove(deleted.id, 'deleted');
+    await repository.remove(deleted.id, 'deleted', readerId);
     const live = await repository.create(
       { bookId, parentId: null, text: 'Still here' },
       ownerId
@@ -284,7 +295,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       { bookId, parentId: null, text: 'Hidden' },
       ownerId
     );
-    await repository.remove(created.id, 'deleted');
+    await repository.remove(created.id, 'deleted', readerId);
 
     const { items } = await repository.list(
       { limit: 20, offset: 0, bookId },
@@ -336,7 +347,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       { bookId, parentId: null, text: 'Removed' },
       ownerId
     );
-    await repository.remove(gone.id, 'removed');
+    await repository.remove(gone.id, 'removed', readerId);
 
     const { items, total } = await repository.list(
       { limit: 20, offset: 0, userId: ownerId },
@@ -460,7 +471,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     );
     // The edit was let in while the comment was live and lost the race to a
     // moderator's removal.
-    await repository.remove(comment.id, 'removed');
+    await repository.remove(comment.id, 'removed', readerId);
 
     assert.equal(
       await repository.update(comment.id, { text: 'Slipped in' }),
@@ -530,6 +541,259 @@ describe('commentRepository against real MySQL', { skip }, () => {
 
     await Book.update({ status: 'complete' }, { where: { id: bookId } });
     assert.equal(await total(null), 1);
+  });
+
+  describe('report flags', () => {
+    const listAs = (viewer: Viewer) =>
+      repository.list({ limit: 20, offset: 0, bookId }, viewer);
+
+    async function aComment() {
+      return repository.create(
+        { bookId, parentId: null, text: 'flag me' },
+        ownerId
+      );
+    }
+
+    const report = (commentId: number, extra: Partial<Report['dataValues']>) =>
+      Report.create({
+        commentId,
+        reporterId: readerId,
+        reportedAccountId: ownerId,
+        reason: 'spam',
+        ...extra,
+      });
+
+    test('a Comment with no Report carries false and null', async () => {
+      await aComment();
+      const item = (await listAs({ id: readerId, role: 'user' })).items[0];
+      assert.equal(item?.hasOpenReport, false);
+      assert.equal(item?.viewerReportedId, null);
+    });
+
+    test('an Open report shows to everyone, the reporter also gets its id', async () => {
+      const comment = await aComment();
+      const open = await report(comment.id, { status: 'in_review' });
+      const guest = (await listAs(null)).items[0];
+      const reporter = (await listAs({ id: readerId, role: 'user' })).items[0];
+      const owner = (await listAs({ id: ownerId, role: 'author' })).items[0];
+      assert.deepEqual(
+        [guest?.hasOpenReport, guest?.viewerReportedId],
+        [true, null]
+      );
+      assert.deepEqual(
+        [reporter?.hasOpenReport, reporter?.viewerReportedId],
+        [true, open.id]
+      );
+      assert.deepEqual(
+        [owner?.hasOpenReport, owner?.viewerReportedId],
+        [true, null]
+      );
+    });
+
+    test('a settled Report clears the mark but the reporter keeps its id', async () => {
+      const comment = await aComment();
+      const settled = await report(comment.id, {
+        status: 'dismissed',
+        settledAt: new Date(),
+      });
+      const reporter = (await listAs({ id: readerId, role: 'user' })).items[0];
+      assert.equal(reporter?.hasOpenReport, false);
+      assert.equal(reporter?.viewerReportedId, settled.id);
+    });
+
+    test('a System report marks the Comment but gives a Guest no id', async () => {
+      const comment = await aComment();
+      await report(comment.id, { reporterId: null, isSystem: true });
+      const guest = (await listAs(null)).items[0];
+      assert.equal(guest?.hasOpenReport, true);
+      assert.equal(guest?.viewerReportedId, null);
+    });
+  });
+
+  describe('Reports settle and reopen', () => {
+    const LONG =
+      'The ending was slow and the middle dragged on for far too long';
+    const REWRITTEN =
+      'Completely different words here that share almost nothing at all';
+    let moderatorId: number;
+
+    beforeEach(async () => {
+      const { email, password, firstName, lastName } = owner;
+      moderatorId = (
+        await User.create({
+          login: 'Mod',
+          email: `m${email}`,
+          password,
+          firstName,
+          lastName,
+        })
+      ).id;
+    });
+
+    const aComment = () =>
+      repository.create({ bookId, parentId: null, text: LONG }, ownerId);
+
+    const report = (commentId: number, extra: Partial<Report['dataValues']>) =>
+      Report.create({
+        commentId,
+        reporterId: readerId,
+        reportedAccountId: ownerId,
+        reason: 'harassment',
+        explanation: null,
+        ...extra,
+      });
+
+    const dismissed = (
+      commentId: number,
+      extra: Partial<Report['dataValues']> = {}
+    ) =>
+      report(commentId, {
+        status: 'dismissed',
+        settledText: LONG,
+        settledAt: new Date(Date.now() - 3_600_000),
+        ...extra,
+      });
+
+    const reportsOf = (commentId: number) =>
+      Report.findAll({ where: { commentId }, order: [['id', 'ASC']] });
+
+    test('an Owner delete dismisses every Open report, with no moderator, and leaves settled ones', async () => {
+      const comment = await aComment();
+      const settled = await report(comment.id, {
+        status: 'upheld',
+        moderatorId,
+        settledAt: new Date(Date.now() - 3_600_000),
+      });
+      await report(comment.id, { reporterId: null, isSystem: true });
+      await report(comment.id, {
+        reporterId: moderatorId,
+        status: 'in_review',
+        moderatorId,
+      });
+
+      assert.equal(
+        await repository.remove(comment.id, 'deleted', ownerId),
+        true
+      );
+
+      const rows = await reportsOf(comment.id);
+      assert.deepEqual(
+        rows.map((row) => row.status),
+        ['upheld', 'dismissed', 'dismissed']
+      );
+      // The column keeps whole seconds, so compare with what was stored.
+      assert.equal(
+        rows[0]?.settledAt?.getTime(),
+        (await settled.reload()).settledAt?.getTime()
+      );
+      for (const row of rows.slice(1)) {
+        assert.equal(row.moderatorId, null);
+        assert.notEqual(row.settledAt, null);
+      }
+    });
+
+    test('a Moderator Remove upholds every Open report and records that Moderator', async () => {
+      const comment = await aComment();
+      await report(comment.id, { status: 'in_review', moderatorId: readerId });
+      await report(comment.id, { reporterId: null, isSystem: true });
+
+      assert.equal(
+        await repository.remove(comment.id, 'removed', moderatorId),
+        true
+      );
+
+      const rows = await reportsOf(comment.id);
+      assert.deepEqual(
+        rows.map((row) => row.status),
+        ['upheld', 'upheld']
+      );
+      assert.deepEqual(
+        rows.map((row) => row.moderatorId),
+        [moderatorId, moderatorId]
+      );
+      assert.ok(rows.every((row) => row.settledAt !== null));
+    });
+
+    test('removing a Tombstone again touches no Report', async () => {
+      const comment = await aComment();
+      await repository.remove(comment.id, 'deleted', ownerId);
+      const late = await report(comment.id, {
+        reporterId: null,
+        isSystem: true,
+      });
+      assert.equal(
+        await repository.remove(comment.id, 'removed', moderatorId),
+        false
+      );
+      assert.equal((await late.reload()).status, 'new');
+    });
+
+    test('a large edit after a dismissal opens a System report with the same reason and explanation', async () => {
+      const comment = await aComment();
+      await dismissed(comment.id, {
+        reason: 'other',
+        explanation: 'Keeps doing this',
+      });
+      await repository.update(comment.id, { text: REWRITTEN });
+
+      const [, system] = await reportsOf(comment.id);
+      assert.equal(system?.isSystem, true);
+      assert.equal(system?.reporterId, null);
+      assert.equal(system?.status, 'new');
+      assert.equal(system?.reason, 'other');
+      assert.equal(system?.explanation, 'Keeps doing this');
+      assert.equal(system?.reportedAccountId, ownerId);
+      assert.equal(system?.moderatorId, null);
+      // The System report is Open, so a second large edit opens nothing more.
+      await repository.update(comment.id, { text: LONG });
+      assert.equal((await reportsOf(comment.id)).length, 2);
+    });
+
+    test('small, case-only and punctuation-only edits open nothing', async () => {
+      const comment = await aComment();
+      await dismissed(comment.id);
+      for (const text of [
+        `${LONG}!`,
+        LONG.toUpperCase(),
+        `${LONG.replaceAll(' ', ' , ')}.`,
+      ]) {
+        await repository.update(comment.id, { text });
+      }
+      assert.equal((await reportsOf(comment.id)).length, 1);
+    });
+
+    test('an Open report, or a later Upheld one, suppresses the reopen', async () => {
+      const open = await aComment();
+      await dismissed(open.id);
+      await report(open.id, { reporterId: null, isSystem: true });
+      await repository.update(open.id, { text: REWRITTEN });
+      assert.equal((await reportsOf(open.id)).length, 2);
+
+      const upheld = await aComment();
+      await dismissed(upheld.id);
+      await report(upheld.id, {
+        reporterId: null,
+        isSystem: true,
+        status: 'upheld',
+        moderatorId,
+        settledAt: new Date(),
+      });
+      await repository.update(upheld.id, { text: REWRITTEN });
+      assert.equal((await reportsOf(upheld.id)).length, 2);
+    });
+
+    test('editing a Tombstone changes nothing and opens nothing', async () => {
+      const comment = await aComment();
+      await dismissed(comment.id);
+      await repository.remove(comment.id, 'deleted', ownerId);
+
+      assert.equal(
+        await repository.update(comment.id, { text: REWRITTEN }),
+        null
+      );
+      assert.equal((await reportsOf(comment.id)).length, 1);
+      assert.equal((await Comment.findByPk(comment.id))?.text, LONG);
+    });
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

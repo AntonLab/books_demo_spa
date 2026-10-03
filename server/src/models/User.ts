@@ -23,6 +23,9 @@ export class User extends Model<
   declare status: CreationOptional<UserStatus>;
   declare role: CreationOptional<UserRole>;
   declare emailNotifications: CreationOptional<boolean>;
+  declare about: CreationOptional<string | null>;
+  declare showLastSeen: CreationOptional<boolean>;
+  declare lastSeenAt: CreationOptional<Date | null>;
   declare createdAt: CreationOptional<Date>;
   declare updatedAt: CreationOptional<Date>;
   // No `books` or `series`: an account reaches its works through book_authors
@@ -68,6 +71,16 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         allowNull: false,
         defaultValue: true,
       },
+      // Nullable because MySQL forbids a literal default on TEXT.
+      about: { type: DataTypes.TEXT, allowNull: true },
+      showLastSeen: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      // Millisecond precision: the stamp's one-window throttle compares at
+      // that resolution, and a whole-second column would round it away.
+      lastSeenAt: { type: DataTypes.DATE(3), allowNull: true },
       // allowNull: false is required explicitly here — Sequelize only applies
       // its own NOT NULL default to createdAt/updatedAt when it auto-injects
       // them; declaring them ourselves (to attach the CreationOptional<Date>
@@ -109,6 +122,8 @@ export function toPublicUser(user: User, avatarUrl: string | null): PublicUser {
     status: user.status,
     role: user.role,
     avatarUrl,
+    about: user.about ?? '',
+    showLastSeen: user.showLastSeen,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

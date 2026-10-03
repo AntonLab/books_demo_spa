@@ -80,7 +80,6 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
 
   return (
     <>
-      <Typography.Title level={4}>Books</Typography.Title>
       {/* A 409 has already brought in the current list; this says why the
           order just moved under the author's hands. */}
       {reorder.error && (
@@ -110,7 +109,7 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
         isPending={books.isPending}
         isError={books.isError}
         errorText="Could not load the books of this series."
-        emptyText="No books in this series yet. File one into it from the book's edit page."
+        emptyText="No books yet. Add a book to this series from the book's Edit dialog."
         onReorder={(bookIds) => reorder.mutate(bookIds)}
       />
     </>

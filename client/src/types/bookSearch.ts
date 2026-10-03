@@ -50,6 +50,8 @@ export interface BookSearchFormValues {
   seriesTitle?: string;
   seriesId?: number;
   genre?: number;
+  // Only the Series form has a Tag field.
+  tag?: string;
   status?: SearchableBookStatus;
   releasedFrom?: Dayjs | null;
   releasedTo?: Dayjs | null;
@@ -76,6 +78,22 @@ const isDay = (value: string): boolean =>
 
 const idOf = (value: string | null): number | undefined =>
   value !== null && /^[1-9]\d{0,9}$/.test(value) ? Number(value) : undefined;
+
+export const genreIdOf = (genre: string | undefined): number | undefined =>
+  idOf(genre ?? null);
+
+export const pagingOf = (
+  params: URLSearchParams
+): { page: number; pageSize: number } => {
+  const page = Number(params.get('page'));
+  const pageSize = Number(params.get('pageSize'));
+  return {
+    page: Number.isInteger(page) && page > 1 ? page : 1,
+    pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)
+      ? pageSize
+      : DEFAULT_PAGE_SIZE,
+  };
+};
 
 // Anything the page cannot use — an unknown status or sort, an impossible
 // day, a page below 2, an id without its text — reads as empty. `?series=` is
@@ -106,13 +124,7 @@ export const parseBookSearch = (params: URLSearchParams): BookSearch => {
   }
   const sort = params.get('sort');
   if (isOneOf(BOOK_SORTS, sort)) search.sort = sort;
-  const page = Number(params.get('page'));
-  if (Number.isInteger(page) && page > 1) search.page = page;
-  const pageSize = Number(params.get('pageSize'));
-  if ((PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)) {
-    search.pageSize = pageSize;
-  }
-  return search;
+  return { ...search, ...pagingOf(params) };
 };
 
 // Only what is set; the default sort and page 1 are left out, so an empty
@@ -251,6 +263,7 @@ export const filterCount = (search: BookSearch): number =>
 // `seriesId`; `current` / `pageSize` have no field to show an error on.
 const SAME_NAME_FIELDS: readonly string[] = [
   ...TEXT_KEYS,
+  'tag',
   'status',
   ...DAY_KEYS,
   'sort',

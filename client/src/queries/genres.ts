@@ -2,14 +2,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createGenre,
   deleteGenre,
+  listGenreCounts,
   listGenres,
-  renameGenre,
+  updateGenre,
 } from '../api/genres';
-import type { GenrePayload } from 'shared';
+import type { GenrePayload, GenreUpdatePayload } from 'shared';
 import { queryKeys } from './keys';
 
-// The whole list, unpaged: the header's submenu, both forms' select and the
-// management page all read this one entry.
+// The whole flat list, unpaged: both forms' select reads this entry.
 export const useGenres = () => {
   return useQuery({
     queryKey: queryKeys.genres,
@@ -18,11 +18,19 @@ export const useGenres = () => {
 };
 
 // Only the Genres a reader can find a book in: the header's menu and the
-// search form's select. Book forms and the management page keep useGenres.
+// search form's select. Book forms keep useGenres.
 export const useGenresWithBooks = () => {
   return useQuery({
     queryKey: queryKeys.genresWithBooks,
     queryFn: () => listGenres({ nonEmpty: true }),
+  });
+};
+
+// The management page's list: every Genre with its Book and Series counts.
+export const useGenresCounts = () => {
+  return useQuery({
+    queryKey: queryKeys.genresCounts,
+    queryFn: () => listGenreCounts(),
   });
 };
 
@@ -50,10 +58,11 @@ const useGenreMutation = <TVariables, TResult>(
 export const useCreateGenre = () =>
   useGenreMutation((payload: GenrePayload) => createGenre(payload));
 
-export const useRenameGenre = (id: number) =>
-  useGenreMutation((payload: GenrePayload) => renameGenre(id, payload));
+export const useUpdateGenre = () =>
+  useGenreMutation(
+    ({ id, payload }: { id: number; payload: GenreUpdatePayload }) =>
+      updateGenre(id, payload)
+  );
 
-// Explicitly `<void, void>` so the caller writes `mutate()` rather than
-// `mutate(undefined)`: there is nothing to send.
-export const useDeleteGenre = (id: number) =>
-  useGenreMutation<void, void>(() => deleteGenre(id));
+export const useDeleteGenre = () =>
+  useGenreMutation((id: number) => deleteGenre(id));

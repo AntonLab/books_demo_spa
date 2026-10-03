@@ -1,6 +1,8 @@
 import type { FC } from 'react';
-import { Alert, App, Form, Skeleton } from 'antd';
+import { Alert, App, Form, Skeleton, Tabs } from 'antd';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
+import { SeriesDetailsExtras } from './SeriesDetailsExtras';
+import { SeriesOrderList } from '@/components/organisms/SeriesOrderList/SeriesOrderList';
 import { SeriesForm } from '@/components/organisms/SeriesForm/SeriesForm';
 import type {
   SeriesFieldValues,
@@ -14,6 +16,8 @@ import { seriesCapabilities } from '@/types/capabilities';
 interface SeriesEditDetailsModalProps {
   seriesId: number;
   onClose: () => void;
+  // Runs after onClose, when the viewer deleted the series or left its co-authors.
+  onGone?: () => void;
 }
 
 // Mounted only while open. It loads the series itself (cached when a page
@@ -22,6 +26,7 @@ interface SeriesEditDetailsModalProps {
 export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
   seriesId,
   onClose,
+  onGone,
 }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm<SeriesFieldValues>();
@@ -34,6 +39,11 @@ export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
     series !== undefined &&
     session != null &&
     seriesCapabilities(series, session).mayEdit;
+
+  const gone = () => {
+    onClose();
+    onGone?.();
+  };
 
   const handleSubmit = (values: SeriesFormValues) => {
     update.mutate(values, {
@@ -59,27 +69,57 @@ export const SeriesEditDetailsModal: FC<SeriesEditDetailsModalProps> = ({
       );
     }
 
+    // No destroyOnHidden: the Details pane stays mounted, so typed values and
+    // the discard guard survive a tab switch.
     return (
-      <SeriesForm
-        form={form}
-        genreOptions={genres.data?.items ?? []}
-        submitLabel="Save"
-        initialValues={{
-          title: series.title,
-          description: series.description,
-          tags: series.tags,
-          genreId: series.genre?.id ?? null,
-        }}
-        isSubmitting={update.isPending}
-        error={update.error?.message ?? null}
-        onSubmit={handleSubmit}
+      <Tabs
+        items={[
+          {
+            key: 'details',
+            label: 'Details',
+            children: (
+              <>
+                <SeriesForm
+                  form={form}
+                  genreOptions={genres.data?.items ?? []}
+                  submitLabel="Save"
+                  initialValues={{
+                    title: series.title,
+                    description: series.description,
+                    tags: series.tags,
+                    genreId: series.genre?.id ?? null,
+                  }}
+                  isSubmitting={update.isPending}
+                  error={update.error?.message ?? null}
+                  onSubmit={handleSubmit}
+                />
+                <SeriesDetailsExtras
+                  series={series}
+                  session={session}
+                  onGone={gone}
+                />
+              </>
+            ),
+          },
+          {
+            key: 'books',
+            label: 'Books',
+            children: (
+              <SeriesOrderList
+                seriesId={seriesId}
+                mayEdit={seriesCapabilities(series, session).mayEdit}
+                session={session}
+              />
+            ),
+          },
+        ]}
       />
     );
   };
 
   return (
     <DiscardGuardModal
-      title="Edit series details"
+      title="Edit series"
       form={showsForm ? form : undefined}
       onClose={onClose}
       footer={null}

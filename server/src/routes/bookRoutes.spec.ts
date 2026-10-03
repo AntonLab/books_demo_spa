@@ -49,7 +49,7 @@ const MISSING_GENRE_ID = 999996;
 // The Genres that exist. A Genre has no Co-authors and no visibility rule, so
 // one map serves every case here.
 const GENRES = new Map<number, PublicGenre>([
-  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic' }],
+  [KNOWN_GENRE_ID, { id: KNOWN_GENRE_ID, name: 'Gothic', parent: null }],
 ]);
 
 // The series that exist, and who co-authors each.
@@ -376,6 +376,7 @@ test('POST files a book under a genre, and leaves it without one when genreId is
       assert.deepEqual((await json<PublicBook>(filed)).genre, {
         id: KNOWN_GENRE_ID,
         name: 'Gothic',
+        parent: null,
       });
       assert.equal((await json<PublicBook>(without)).genre, null);
     }
@@ -431,6 +432,19 @@ test('PATCH without genreId keeps the genre, and an explicit null clears it', as
   );
 });
 
+test('GET list with favoritedBy=me is 401 for a Guest and 400 for another value', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const guest = await fetch(`${base}/api/books?favoritedBy=me`);
+      const bad = await fetch(`${base}/api/books?favoritedBy=you`);
+
+      assert.equal(guest.status, 401);
+      assert.equal(bad.status, 400);
+    }
+  );
+});
+
 test('GET list filters by genre', async () => {
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },
@@ -462,6 +476,57 @@ test('GET list takes a known sort and refuses any other with 400', async () => {
         );
       }
       assert.equal((await fetch(`${base}/api/books?sort=oldest`)).status, 400);
+    }
+  );
+});
+
+test('GET list takes published=true and refuses any other value with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await fetch(`${base}/api/books?published=true&sort=new`)).status,
+        200
+      );
+      for (const bad of ['false', '1', '']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?published=${bad}`)).status,
+          400,
+          bad
+        );
+      }
+    }
+  );
+});
+
+test('GET list takes ids and answers only those books, and refuses malformed ids with 400', async () => {
+  await withAuthenticatedApp(
+    { bookRepository: createFakeRepository() },
+    async (base) => {
+      const ids: number[] = [];
+      for (const title of ['One', 'Two', 'Three']) {
+        const created = await json<{ id: number }>(
+          await post(base, { ...valid, title })
+        );
+        ids.push(created.id);
+      }
+      const wanted = [ids[0], ids[2], 999_999];
+      const body = await json<{ total: number; items: { id: number }[] }>(
+        await fetch(`${base}/api/books?ids=${wanted.join(',')}`)
+      );
+      assert.deepEqual(body.items.map((item) => item.id).sort(), [
+        ids[0],
+        ids[2],
+      ]);
+      assert.equal(body.total, 2);
+
+      for (const bad of ['', '1,', '0', 'abc', '1,1']) {
+        assert.equal(
+          (await fetch(`${base}/api/books?ids=${bad}`)).status,
+          400,
+          bad
+        );
+      }
     }
   );
 });
@@ -552,6 +617,34 @@ test('GET by id reports the viewer own like when signed in', async () => {
       assert.equal(body.viewerFavoriteId, VIEWER_FAVORITE_ID);
     }
   );
+});
+
+test('GET by id carries the Library counts for all, the Reading status for the viewer, and the list neither', async () => {
+  const counts = { reading: 2, planToRead: 1, read: 4, inLibraries: 7 };
+  const bookRepository = createFakeBookRepository({
+    accounts: SUMMARIES,
+    series: SERIES,
+    genres: GENRES,
+    library: { counts, viewerStatus: 'read' },
+  });
+  await withAuthenticatedApp({ bookRepository }, async (base) => {
+    await post(base, valid);
+
+    const signedIn = await json<BookDetail>(
+      await fetch(`${base}/api/books/1`, { headers: { cookie: AUTH_COOKIE } })
+    );
+    const guest = await json<BookDetail>(await fetch(`${base}/api/books/1`));
+    const list = await json<{ items: object[] }>(
+      await fetch(`${base}/api/books`)
+    );
+
+    assert.equal(signedIn.viewerReadingStatus, 'read');
+    assert.deepEqual(signedIn.libraryCounts, counts);
+    assert.equal(guest.viewerReadingStatus, null);
+    assert.deepEqual(guest.libraryCounts, counts);
+    assert.equal('viewerReadingStatus' in (list.items[0] ?? {}), false);
+    assert.equal('libraryCounts' in (list.items[0] ?? {}), false);
+  });
 });
 
 test('GET by id returns 404 for a missing record', async () => {

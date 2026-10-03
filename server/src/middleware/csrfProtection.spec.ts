@@ -218,6 +218,7 @@ describe('the XSRF token', () => {
 describe('the app', () => {
   const deps = (): AppDeps => ({
     userRepository: createUnusedRepository('user'),
+    accountRepository: createUnusedRepository('account'),
     seriesRepository: createUnusedRepository('series'),
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),
@@ -226,6 +227,9 @@ describe('the app', () => {
     likeRepository: createUnusedRepository('like'),
     notificationRepository: createUnusedRepository('notification'),
     favoriteRepository: createUnusedRepository('favorite'),
+    libraryRepository: createUnusedRepository('library'),
+    readingListRepository: createUnusedRepository('readingList'),
+    reportRepository: createUnusedRepository('report'),
     sessionRepository: createUnusedRepository('session'),
     passwordResetRepository: createUnusedRepository('passwordReset'),
     mailDelivery: createUnusedRepository('mailDelivery'),

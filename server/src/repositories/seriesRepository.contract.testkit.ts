@@ -72,6 +72,17 @@ export function seriesRepositoryContract(
     assert.equal(detail?.viewerFavoriteId, null);
   });
 
+  test('contract: a new series has no Cover and no Published book', async () => {
+    const { repository, anAuthor } = await setUp();
+    const created = await aSeries(repository, await anAuthor());
+
+    assert.equal(created.coverUrl, null);
+    assert.equal(created.bookCount, 0);
+    const detail = await repository.findDetailById(created.id, asModerator);
+    assert.equal(detail?.coverUrl, null);
+    assert.equal(detail?.bookCount, 0);
+  });
+
   test('contract: a series created for a missing account blames the user', async () => {
     const { repository } = await setUp();
 
@@ -256,6 +267,33 @@ export function seriesRepositoryContract(
 
     const refiled = await repository.update(created.id, { genreId });
     assert.equal(refiled?.genre?.id, genreId);
+  });
+
+  test('contract: a cover round-trips, and a missing series reports false/null', async () => {
+    const { repository, anAuthor } = await setUp();
+    const created = await aSeries(repository, await anAuthor());
+    const missingId = created.id + 10_000;
+
+    assert.equal(await repository.getCoverData(created.id, asModerator), null);
+    assert.equal(await repository.setCover(created.id, Buffer.from('a')), true);
+    assert.deepEqual(
+      (await repository.getCoverData(created.id, asModerator))?.data,
+      Buffer.from('a')
+    );
+    const withCover = await repository.findById(created.id, asModerator);
+    assert.match(
+      withCover?.coverUrl ?? '',
+      new RegExp(`^/api/series/${created.id}/cover\\?v=\\d+$`)
+    );
+    assert.equal(await repository.setCover(missingId, Buffer.from('a')), false);
+
+    assert.equal(await repository.removeCover(created.id), true);
+    assert.equal(await repository.getCoverData(created.id, asModerator), null);
+    assert.equal(
+      (await repository.findById(created.id, asModerator))?.coverUrl,
+      null
+    );
+    assert.equal(await repository.removeCover(missingId), false);
   });
 
   test('contract: a genreId that names no Genre is refused on create and on update', async () => {

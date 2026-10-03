@@ -1,13 +1,23 @@
-import type { FC } from 'react';
-import { Button, Space, theme, Typography } from 'antd';
+import { useState, type FC } from 'react';
+import { Popconfirm, Space, Tag, theme, Typography } from 'antd';
+import {
+  CommentOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  FlagOutlined,
+  StopOutlined,
+  UndoOutlined,
+} from '@ant-design/icons';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 import { formatDate } from '@/format/date';
 import styles from './Comment.module.css';
 import type { Tombstone } from 'shared';
 import type { CommentWithAuthor } from '@/types/api';
 
-const TOMBSTONE_LABELS: Record<Tombstone, string> = {
+export const TOMBSTONE_LABELS: Record<Tombstone, string> = {
   deleted: '[deleted]',
   removed: '[removed by moderator]',
 };
@@ -26,6 +36,13 @@ interface CommentProps {
   onEdit: (id: number) => void;
   onDelete: (id: number) => void;
   onLike: (comment: CommentWithAuthor) => void;
+  canReport: boolean;
+  onReport: (id: number) => void;
+  canModerate: boolean;
+  onRemove: (id: number) => void;
+  onRestore: (id: number) => void;
+  // A Delete, Remove or Restore of this comment is in flight.
+  busy?: boolean;
 }
 
 // The name is free because antd removed its own Comment component in v5, so
@@ -41,19 +58,39 @@ export const Comment: FC<CommentProps> = ({
   onEdit,
   onDelete,
   onLike,
+  canReport,
+  onReport,
+  canModerate,
+  onRemove,
+  onRestore,
+  busy = false,
 }) => {
   const { token } = theme.useToken();
+  const [confirming, setConfirming] = useState(false);
 
   // A tombstone carries no author, no text and no controls — not even for the
-  // person who deleted or removed it. It exists only so its replies keep a
-  // parent to hang off; anything more would put back what deleting or
-  // removing was meant to take away.
+  // person who deleted or removed it — except a Moderator's Restore on a
+  // Removed one. It exists only so its replies keep a parent to hang off;
+  // anything more would put back what deleting or removing was meant to take
+  // away.
   if (comment.tombstone !== null) {
     return (
       <article className={styles.comment}>
-        <Typography.Text type="secondary" italic>
-          {TOMBSTONE_LABELS[comment.tombstone]}
-        </Typography.Text>
+        <Space size={token.marginXS}>
+          <Typography.Text type="secondary" italic>
+            {TOMBSTONE_LABELS[comment.tombstone]}
+          </Typography.Text>
+          {comment.tombstone === 'removed' && canModerate && (
+            <IconButton
+              label="Restore"
+              icon={<UndoOutlined />}
+              size="small"
+              type="text"
+              disabled={busy}
+              onClick={() => onRestore(comment.id)}
+            />
+          )}
+        </Space>
       </article>
     );
   }
@@ -69,13 +106,19 @@ export const Comment: FC<CommentProps> = ({
           />
         )}
         <Typography.Text strong>
-          {comment.author
-            ? `${comment.author.firstName} ${comment.author.lastName}`
-            : ''}
+          {comment.author ? (
+            <NameLink
+              id={comment.author.id}
+              name={`${comment.author.firstName} ${comment.author.lastName}`}
+            />
+          ) : (
+            ''
+          )}
         </Typography.Text>
         <Typography.Text type="secondary">
           {formatDate(comment.createdAt)}
         </Typography.Text>
+        {comment.hasOpenReport && <Tag>Moderating</Tag>}
       </Space>
 
       <Typography.Paragraph
@@ -100,24 +143,71 @@ export const Comment: FC<CommentProps> = ({
           />
         )}
         {canReply && (
-          <Button type="text" size="small" onClick={() => onReply(comment.id)}>
-            Reply
-          </Button>
+          <IconButton
+            label="Reply"
+            icon={<CommentOutlined />}
+            size="small"
+            type="text"
+            onClick={() => onReply(comment.id)}
+          />
         )}
         {isOwn && (
           <>
-            <Button type="text" size="small" onClick={() => onEdit(comment.id)}>
-              Edit
-            </Button>
-            <Button
-              type="text"
+            <IconButton
+              label="Edit"
+              icon={<EditOutlined />}
               size="small"
+              type="text"
+              onClick={() => onEdit(comment.id)}
+            />
+            <IconButton
+              label="Delete"
+              icon={<DeleteOutlined />}
+              size="small"
+              type="text"
               danger
+              disabled={busy}
               onClick={() => onDelete(comment.id)}
-            >
-              Delete
-            </Button>
+            />
           </>
+        )}
+        {canModerate && (
+          <Popconfirm
+            title="Remove this comment?"
+            okText="Yes, remove"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => onRemove(comment.id)}
+            onOpenChange={setConfirming}
+            disabled={busy}
+          >
+            <IconButton
+              label="Remove"
+              icon={<StopOutlined />}
+              size="small"
+              type="text"
+              danger
+              disabled={busy}
+              tooltipHidden={confirming}
+            />
+          </Popconfirm>
+        )}
+        {canReport && (
+          <IconButton
+            label={
+              comment.viewerReportedId !== null
+                ? 'Reported'
+                : comment.hasOpenReport
+                  ? 'Already under review'
+                  : 'Report'
+            }
+            icon={<FlagOutlined />}
+            size="small"
+            type="text"
+            disabled={
+              comment.viewerReportedId !== null || comment.hasOpenReport
+            }
+            onClick={() => onReport(comment.id)}
+          />
         )}
       </Space>
     </article>

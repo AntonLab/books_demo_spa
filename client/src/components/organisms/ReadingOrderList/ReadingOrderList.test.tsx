@@ -1,6 +1,11 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ReadingOrderList } from './ReadingOrderList';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { editorAccount } from '@/test/editFixtures';
+import { queryKeys } from '@/queries/keys';
+import type { RootState } from '@/store';
 import { formatDate } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
@@ -35,14 +40,37 @@ const one = chapterNamed(1, 'One', OUT);
 const two = chapterNamed(2, 'Two', OUT);
 const three = chapterNamed(3, 'Three', OUT);
 
-const titlesOnScreen = () =>
-  screen
-    .getAllByRole('link')
-    .map((link) => link.textContent)
-    .filter((text) => ['One', 'Two', 'Three', 'Four'].includes(text ?? ''));
+const onAdd = jest.fn();
+const onEdit = jest.fn();
 
-const renderList = (isCoAuthor = true) =>
-  renderWithProviders(<ReadingOrderList bookId={1} isCoAuthor={isCoAuthor} />);
+const titlesOnScreen = () =>
+  screen.getAllByText(/^(One|Two|Three|Four)$/).map((node) => node.textContent);
+
+const entry = (extra = {}) => ({
+  title: 'Draft',
+  text: 'Words',
+  savedAt: '2026-09-23T10:00:00.000Z',
+  ...extra,
+});
+const withEntries = (
+  entries: Record<string, ReturnType<typeof entry>>
+): Partial<RootState> => ({
+  unsavedText: { accountId: 3, entries },
+});
+
+const renderList = (isCoAuthor = true, preloadedState?: Partial<RootState>) => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, editorAccount());
+  return renderWithProviders(
+    <ReadingOrderList
+      bookId={1}
+      isCoAuthor={isCoAuthor}
+      onAdd={onAdd}
+      onEdit={onEdit}
+    />,
+    { queryClient, preloadedState }
+  );
+};
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -50,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('ReadingOrderList', () => {
-  it('lists every chapter with its state, linked to its editor', async () => {
+  it('lists every chapter with its state and date', async () => {
     mockedChapters.listChapters.mockResolvedValue(
       page([
         chapterNamed(9, 'Out', OUT),
@@ -65,27 +93,112 @@ describe('ReadingOrderList', () => {
     renderList();
 
     expect(
-      await screen.findByRole('link', { name: 'Unwritten' })
-    ).toHaveAttribute('href', '/books/1/chapters/10/edit');
-    expect(
-      screen.getByText('Draft', { selector: '.ant-tag' })
+      await screen.findByText('Draft', { selector: '.ant-tag' })
     ).toBeInTheDocument();
     expect(screen.getByText('Scheduled')).toBeInTheDocument();
     expect(screen.getByText(formatDate(OUT))).toBeInTheDocument();
   });
 
+  it('opens the Chapter editor from a row Edit button', async () => {
+    mockedChapters.listChapters.mockResolvedValue(
+      page([chapterNamed(10, 'Unwritten', null)])
+    );
+    renderList();
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Edit Unwritten' })
+    );
+
+    expect(onEdit).toHaveBeenCalledWith(10);
+  });
+
   it('offers Add chapter to a co-author and to nobody else', async () => {
     const { unmount } = renderList();
-
-    expect(
-      await screen.findByRole('link', { name: 'Add chapter' })
-    ).toHaveAttribute('href', '/books/1/chapters/new');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add chapter' })
+    );
+    expect(onAdd).toHaveBeenCalledTimes(1);
 
     unmount();
     renderList(false);
 
-    expect(await screen.findByText('Chapters')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Add chapter' })).toBeNull();
+    expect(await screen.findByText('No chapters yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add chapter' })).toBeNull();
+  });
+
+  it('marks a row and Add chapter that hold Unsaved text, and not a row with only whitespace', async () => {
+    mockedChapters.listChapters.mockResolvedValue(page([one, two]));
+    renderList(
+      true,
+      withEntries({
+        'book:1:chapter:1': entry(),
+        'book:1:chapter:2': entry({ title: ' ', text: '  ' }),
+        'book:1:chapterNew': entry(),
+      })
+    );
+
+    // The rows load after Add chapter's own marker is already there.
+    await screen.findByText('Two');
+    expect(screen.getAllByText('Unsaved changes')).toHaveLength(2);
+    expect(
+      within(screen.getByText('One').closest('li') as HTMLElement).getByText(
+        'Unsaved changes'
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByText('Two').closest('li') as HTMLElement).queryByText(
+        'Unsaved changes'
+      )
+    ).toBeNull();
+  });
+
+  it('deletes a chapter once confirmed and drops its Unsaved text', async () => {
+    mockedChapters.listChapters.mockResolvedValue(
+      page([chapterNamed(10, 'Unwritten', null)])
+    );
+    mockedChapters.deleteChapter.mockResolvedValue(undefined);
+    const { store } = renderList(
+      true,
+      withEntries({ 'book:1:chapter:10': entry() })
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete Unwritten' })
+    );
+    expect(mockedChapters.deleteChapter).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+    await waitFor(() =>
+      expect(mockedChapters.deleteChapter).toHaveBeenCalledWith(10)
+    );
+    await waitFor(() =>
+      expect(store.getState().unsavedText.entries).toEqual({})
+    );
+  });
+
+  it('shows the server message and keeps the Unsaved text when a delete fails', async () => {
+    mockedChapters.listChapters.mockResolvedValue(
+      page([chapterNamed(10, 'Unwritten', null)])
+    );
+    mockedChapters.deleteChapter.mockRejectedValue(
+      new Error('Chapter is locked')
+    );
+    const { store } = renderList(
+      true,
+      withEntries({ 'book:1:chapter:10': entry() })
+    );
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete Unwritten' })
+    );
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+    expect(await screen.findByText('Chapter is locked')).toBeInTheDocument();
+    expect(Object.keys(store.getState().unsavedText.entries)).toEqual([
+      'book:1:chapter:10',
+    ]);
   });
 
   describe('Reading order', () => {

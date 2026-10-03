@@ -6,7 +6,8 @@ import {
   CardList,
   TILE_COLUMNS,
 } from '@/components/organisms/CardList/CardList';
-import { useSortedBooks } from '@/queries/books';
+import { useRecentlyViewedBooks, useSortedBooks } from '@/queries/books';
+import { useRecentlyViewedIds } from '@/store/useRecentlyViewed';
 import type { BookSort } from 'shared';
 import { BOOK_SORTS } from 'shared';
 import { searchPath } from '@/types/bookSearch';
@@ -18,11 +19,41 @@ const SECTION_SIZE = 6;
 
 export const MainPage: FC = () => (
   <>
+    <RecentlyViewedSection />
     {BOOK_SORTS.map((sort) => (
       <Section key={sort} sort={sort} />
     ))}
   </>
 );
+
+// Absent rather than empty or failed: a visitor with no usable history never
+// asked for this section.
+const RecentlyViewedSection: FC = () => {
+  const headingId = useId();
+  const ids = useRecentlyViewedIds();
+  const { data, isPending, isError, error } = useRecentlyViewedBooks(ids);
+
+  if (ids.length === 0 || isError || data?.length === 0) return null;
+
+  return (
+    <section aria-labelledby={headingId} className={styles.section}>
+      <Flex align="center" className={spacing.gapBelow}>
+        <Typography.Title id={headingId} level={2} className={styles.heading}>
+          Recently viewed
+        </Typography.Title>
+      </Flex>
+      <CardList
+        noun="books"
+        items={data ?? []}
+        renderItem={(book) => <BookCard book={book} tile />}
+        columns={TILE_COLUMNS}
+        isPending={isPending}
+        isError={false}
+        error={error}
+      />
+    </section>
+  );
+};
 
 // Each section loads and fails on its own, and stays in place when empty so the
 // page keeps its shape.

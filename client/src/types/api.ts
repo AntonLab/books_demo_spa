@@ -6,10 +6,17 @@ import type { Wire } from 'shared';
 // would typecheck and then throw on `.getFullYear()`.
 export type PublicUser = Wire<Shared.PublicUser>;
 
+// PublicUser plus the Account's permissions. Register, login and /auth/me
+// answer it; every other user endpoint stays a bare PublicUser.
+export type SessionUser = Wire<Shared.SessionUser>;
+
 // The email-free author shape the public endpoints embed. The omission is what
 // makes it safe to return without a session — the email is the whole reason
 // /api/users is guarded, so the client can never look an author up itself.
 export type AuthorSummary = Wire<Shared.AuthorSummary>;
+
+// What GET /api/accounts/:id answers; Wire<> because `lastSeenAt` is a Date.
+export type AccountProfile = Wire<Shared.AccountProfile>;
 
 // Like a book, a series has no userId: its Co-authors come embedded, in credit
 // order.
@@ -47,8 +54,12 @@ export type NotificationList = Wire<Shared.NotificationList>;
 
 export type NotificationSettings = Shared.NotificationSettings;
 
+// A row of the Moderator's Reports list; Wire<> because `createdAt` is a Date.
+export type ReportRow = Wire<Shared.ReportRow>;
+
+// Counts and seconds only, no Date in it, so it needs no Wire<>.
+export type ReportStatistics = Shared.ReportStatistics;
+
 export type PublicLike = Wire<Shared.PublicLike>;
 
 export type PublicFavorite = Wire<Shared.PublicFavorite>;
-export type FavoriteBook = Wire<Shared.FavoriteBook>;
-export type FavoriteSeries = Wire<Shared.FavoriteSeries>;

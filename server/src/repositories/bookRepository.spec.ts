@@ -1,6 +1,6 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ForeignKeyConstraintError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -14,7 +14,8 @@ import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
@@ -27,6 +28,7 @@ import {
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import { bookRepositoryContract } from './bookRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
+import type { PublicBook, WithFavoriteId } from 'shared';
 
 // A schema of its own rather than the users' or series' suite: node:test runs
 // spec files in parallel processes, and two suites calling sync({ force: true })
@@ -98,7 +100,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     // Children first: the foreign keys forbid clearing users out from under
     // them.
     await Book.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
     await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
@@ -407,6 +409,75 @@ describe('bookRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('ids lists only the Published Books among those named, for every viewer', async () => {
+    const MISSING_ID = 999_999;
+    const live = await publishedBook('Live');
+    const otherLive = await publishedBook('Other live');
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Hidden draft',
+      description: 'd',
+      tags: [],
+    });
+
+    for (const viewer of [
+      asOwner(),
+      { id: 0, role: 'superadmin' as const },
+      null,
+    ]) {
+      const named = await repository.list(
+        {
+          current: 1,
+          pageSize: 20,
+          ids: [live.id, draft.id, MISSING_ID],
+        },
+        viewer
+      );
+      assert.deepEqual(
+        named.items.map((book) => book.title),
+        ['Live']
+      );
+      assert.equal(named.total, 1);
+
+      const paged = await repository.list(
+        { current: 1, pageSize: 1, ids: [live.id, otherLive.id] },
+        viewer
+      );
+      assert.equal(paged.total, 2);
+      assert.equal(paged.items.length, 1);
+    }
+  });
+
+  test('published=true drops the Drafts that ?userId= lists for their own Co-author, whoever asks', async () => {
+    await publishedBook('Live');
+    await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Hidden draft',
+      description: 'd',
+      tags: [],
+    });
+    const titlesFor = async (viewer: Viewer, published?: 'true') =>
+      (
+        await repository.list(
+          { current: 1, pageSize: 20, userId: ownerId, published },
+          viewer
+        )
+      ).items
+        .map((book) => book.title)
+        .sort();
+
+    assert.deepEqual(await titlesFor(asOwner()), ['Hidden draft', 'Live']);
+    for (const viewer of [
+      asOwner(),
+      { id: 0, role: 'superadmin' as const },
+      null,
+    ]) {
+      assert.deepEqual(await titlesFor(viewer, 'true'), ['Live']);
+    }
+  });
+
   // What every `own` check on a book asks (bookController.assertCoAuthor).
   test('findCoAuthorIds lists the co-authors in credit order, and null for a missing book', async () => {
     const earlierId = (await User.create({ ...coAuthor, role: 'author' })).id;
@@ -678,6 +749,48 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(inMissing.total, 0);
   });
 
+  test('the genre filter on a top-level Genre also returns its Subgenres’ books; a Subgenre matches only itself', async () => {
+    const fantasy = await Genre.create({ name: 'Family Fantasy' });
+    const urban = await Genre.create({
+      name: 'Family Urban',
+      parentId: fantasy.id,
+    });
+    const horror = await Genre.create({ name: 'Family Horror' });
+    const make = (title: string, genreId: number) =>
+      createPublished({
+        userId: ownerId,
+        seriesId: null,
+        title,
+        description: 'x',
+        tags: [],
+        genreId,
+      });
+    const top = await make('Top', fantasy.id);
+    const sub = await make('Sub', urban.id);
+    await make('Elsewhere', horror.id);
+
+    const byTop = await listAsGuest({
+      current: 1,
+      pageSize: 20,
+      genreId: fantasy.id,
+    });
+    const bySub = await listAsGuest({
+      current: 1,
+      pageSize: 20,
+      genreId: urban.id,
+    });
+
+    assert.deepEqual(
+      byTop.items.map((item) => item.id).sort(),
+      [top.id, sub.id].sort()
+    );
+    assert.deepEqual(
+      bySub.items.map((item) => item.id),
+      [sub.id]
+    );
+    assert.equal(bySub.items[0]?.genre?.parent?.name, 'Family Fantasy');
+  });
+
   test('list finds a book by its title', async () => {
     await createPublished({
       userId: ownerId,
@@ -778,7 +891,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       });
     });
 
-    test('new ranks by the earliest published chapter and leaves out books with nothing published', async () => {
+    test('new ranks by the earliest published chapter and lists books with nothing published last', async () => {
       const older = await publishedBook('Older');
       const newer = await publishedBook('Newer');
       const scheduled = await publishedBook('Scheduled only');
@@ -787,13 +900,14 @@ describe('bookRepository against real MySQL', { skip }, () => {
       await addChapters(newer.id, [daysFromNow(-2), null]);
       await addChapters(scheduled.id, [daysFromNow(1), null]);
 
+      // The two without a Release time follow, newest id first.
       assert.deepEqual(await sortedTitles('new'), {
-        titles: ['Newer', 'Older'],
-        total: 2,
+        titles: ['Newer', 'Older', 'No chapters', 'Scheduled only'],
+        total: 4,
       });
     });
 
-    test('updated ranks by the latest published chapter, a scheduled one aside', async () => {
+    test('updated ranks by the latest published chapter, a scheduled one aside, and lists books with nothing published last', async () => {
       const older = await publishedBook('Older');
       const newer = await publishedBook('Newer');
       await publishedBook('No chapters');
@@ -801,9 +915,27 @@ describe('bookRepository against real MySQL', { skip }, () => {
       await addChapters(newer.id, [daysFromNow(-2), daysFromNow(1)]);
 
       assert.deepEqual(await sortedTitles('updated'), {
-        titles: ['Older', 'Newer'],
-        total: 2,
+        titles: ['Older', 'Newer', 'No chapters'],
+        total: 3,
       });
+    });
+
+    test('a range filter still leaves out a book with nothing published, sorted or not', async () => {
+      const dated = await publishedBook('Dated');
+      await publishedBook('No chapters');
+      await addChapters(dated.id, [daysFromNow(-2)]);
+
+      const page = await listAsGuest({
+        current: 1,
+        pageSize: 20,
+        sort: 'new',
+        releasedFrom: daysFromNow(-5),
+      });
+
+      assert.deepEqual(
+        page.items.map((book) => book.title),
+        ['Dated']
+      );
     });
   });
 
@@ -939,6 +1071,195 @@ describe('bookRepository against real MySQL', { skip }, () => {
         [2, null]
       );
       assert.equal(asCoAuthor?.viewerFavoriteId, null);
+    });
+
+    test('libraryCounts count each status, leave Not interested out, and viewerReadingStatus is the viewer own', async () => {
+      const reading = await aFan();
+      const planned = await aFan();
+      const finished = await aFan();
+      const skipped = await aFan();
+      const book = await publishedBook('Shelved');
+      await LibraryEntry.create({
+        userId: reading.id,
+        bookId: book.id,
+        status: 'reading',
+      });
+      await LibraryEntry.create({
+        userId: planned.id,
+        bookId: book.id,
+        status: 'plan_to_read',
+      });
+      await LibraryEntry.create({
+        userId: finished.id,
+        bookId: book.id,
+        status: 'read',
+      });
+      await LibraryEntry.create({
+        userId: skipped.id,
+        bookId: book.id,
+        status: 'not_interested',
+      });
+
+      const asReading = await repository.findDetailById(book.id, {
+        id: reading.id,
+        role: 'user',
+      });
+      const asSkipped = await repository.findDetailById(book.id, {
+        id: skipped.id,
+        role: 'user',
+      });
+      const asGuest = await repository.findDetailById(book.id, null);
+
+      const counts = { reading: 1, planToRead: 1, read: 1, inLibraries: 3 };
+      assert.deepEqual(asReading?.libraryCounts, counts);
+      assert.deepEqual(asGuest?.libraryCounts, counts);
+      assert.deepEqual(asSkipped?.libraryCounts, counts);
+      assert.deepEqual(
+        [
+          asReading?.viewerReadingStatus,
+          asSkipped?.viewerReadingStatus,
+          asGuest?.viewerReadingStatus,
+        ],
+        ['reading', 'not_interested', null]
+      );
+    });
+
+    test('a Draft Book counts no Library, but its Co-author still sees their own status', async () => {
+      const draft = await repository.create({
+        userId: ownerId,
+        seriesId: null,
+        title: 'Hidden',
+        description: 'Hidden',
+        tags: [],
+      });
+      await LibraryEntry.create({
+        userId: ownerId,
+        bookId: draft.id,
+        status: 'reading',
+      });
+
+      const detail = await repository.findDetailById(draft.id, asOwner());
+
+      assert.deepEqual(detail?.libraryCounts, {
+        reading: 0,
+        planToRead: 0,
+        read: 0,
+        inLibraries: 0,
+      });
+      assert.equal(detail?.viewerReadingStatus, 'reading');
+    });
+
+    test('favoritedBy=me lists only the viewer own Favorites, each with its favoriteId', async () => {
+      const mine = await publishedBook('Mine');
+      const theirs = await publishedBook('Theirs');
+      await publishedBook('Nobody');
+      const fan = await aFan();
+      const other = await aFan();
+      const row = await Favorite.create({ userId: fan.id, bookId: mine.id });
+      await Favorite.create({ userId: other.id, bookId: theirs.id });
+      await Favorite.create({ userId: other.id, bookId: mine.id });
+
+      const page = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+
+      assert.deepEqual(
+        page.items.map((item) => item.id),
+        [mine.id]
+      );
+      assert.equal(page.total, 1);
+      assert.equal(
+        (page.items[0] as WithFavoriteId<PublicBook>).favoriteId,
+        row.id
+      );
+    });
+
+    test('favoritedBy=me with no Favorites, or with no viewer, matches nothing', async () => {
+      await publishedBook('Unloved');
+      const fan = await aFan();
+
+      const none = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+      const guest = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        null
+      );
+
+      assert.deepEqual([none.total, guest.total], [0, 0]);
+    });
+
+    test('favoritedBy=me combines by AND with q, the genre filter and paging', async () => {
+      const genre = await Genre.create({ name: 'Favorites Genre' });
+      const make = (title: string, genreId?: number) =>
+        createPublished({
+          userId: ownerId,
+          seriesId: null,
+          title,
+          description: title,
+          tags: [],
+          genreId,
+        });
+      const alpha = await make('Dragon Alpha', genre.id);
+      const beta = await make('Dragon Beta');
+      const gamma = await make('Quiet Gamma', genre.id);
+      await make('Dragon Delta', genre.id);
+      const fan = await aFan();
+      const viewer = { id: fan.id, role: 'user' } as const;
+      for (const book of [alpha, beta, gamma]) {
+        await Favorite.create({ userId: fan.id, bookId: book.id });
+      }
+      const base = { current: 1, pageSize: 20, favoritedBy: 'me' } as const;
+
+      const byText = await repository.list({ ...base, q: 'Dragon' }, viewer);
+      const byBoth = await repository.list(
+        { ...base, q: 'Dragon', genreId: genre.id },
+        viewer
+      );
+      const paged = await repository.list(
+        { ...base, q: 'Dragon', pageSize: 1 },
+        viewer
+      );
+
+      assert.deepEqual(
+        byText.items.map((item) => item.id).sort(),
+        [alpha.id, beta.id].sort()
+      );
+      assert.deepEqual(
+        byBoth.items.map((item) => item.id),
+        [alpha.id]
+      );
+      assert.deepEqual([paged.total, paged.items.length], [2, 1]);
+    });
+
+    test('a favorited book turned Draft leaves the reader list; its own Co-author still sees it with userId', async () => {
+      const book = await publishedBook('Withdrawn');
+      const fan = await aFan();
+      await Favorite.create({ userId: fan.id, bookId: book.id });
+      await Favorite.create({ userId: ownerId, bookId: book.id });
+      await repository.update(book.id, { status: 'draft' });
+
+      const asFan = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        { id: fan.id, role: 'user' }
+      );
+      const asOwnerAlone = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me' },
+        asOwner()
+      );
+      const asOwnerOwn = await repository.list(
+        { current: 1, pageSize: 20, favoritedBy: 'me', userId: ownerId },
+        asOwner()
+      );
+
+      assert.equal(asFan.total, 0);
+      assert.equal(asOwnerAlone.total, 0);
+      assert.deepEqual(
+        asOwnerOwn.items.map((item) => item.id),
+        [book.id]
+      );
     });
 
     test('a Draft book counts no favorites, yet names the viewer own, and republishing counts them again', async () => {
@@ -1234,6 +1555,63 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.deepEqual(await seriesTitles(), ['Two', 'One', 'Three', 'Moved in']);
   });
 
+  test('a Draft book never counts toward N, and leaving the series clears the reference', async () => {
+    const draft = await repository.create({
+      userId: ownerId,
+      seriesId,
+      title: 'Hidden',
+      description: '',
+      tags: [],
+    });
+    const published = await fileBook('Shown');
+
+    const guestView = await repository.findDetailById(published.id, null);
+    assert.equal(guestView?.series?.position, 1);
+    assert.equal(await repository.findDetailById(draft.id, null), null);
+    const own = await repository.findDetailById(draft.id, asOwner());
+    assert.equal(own?.series?.position, null);
+    assert.equal(own?.series?.id, seriesId);
+
+    const left = await repository.update(published.id, { seriesId: null });
+    assert.equal(left?.series, null);
+  });
+
+  test('publishing a Draft book shifts the later Books by one, live', async () => {
+    const first = await repository.create({
+      userId: ownerId,
+      seriesId,
+      title: 'First',
+      description: '',
+      tags: [],
+    });
+    const second = await fileBook('Second');
+    assert.equal(
+      (await repository.findDetailById(second.id, null))?.series?.position,
+      1
+    );
+
+    await repository.update(first.id, { status: 'in_progress' });
+    assert.equal(
+      (await repository.findDetailById(first.id, null))?.series?.position,
+      1
+    );
+    assert.equal(
+      (await repository.findDetailById(second.id, null))?.series?.position,
+      2
+    );
+  });
+
+  test('the list and the detail embed the same series reference', async () => {
+    const book = await fileBook('Same');
+    const listed = (await listAsGuest({ current: 1, pageSize: 20, seriesId }))
+      .items;
+    const detail = await repository.findDetailById(book.id, null);
+    assert.deepEqual(
+      listed.find((item) => item.id === book.id)?.series,
+      detail?.series
+    );
+  });
+
   test('a book keeps its place when saved into the same series, and is appended when moved to another', async () => {
     const other = await createCreditedSeries(
       { title: 'Other', description: 'x', tags: [] },
@@ -1420,6 +1798,31 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(await repository.removeCover(missingId), false);
     assert.equal(await repository.removeCover(created.id), true);
     assert.equal(await repository.getCoverData(created.id, null), null);
+  });
+
+  test('setCover answers false when the book vanishes between the lookup and the write, and rethrows other errors', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Racy',
+      description: '',
+      tags: [],
+    });
+    const missingId = created.id + 10_000;
+
+    assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
+
+    const broken = mock.method(BookCover, 'upsert', async () => {
+      throw new Error('disk full');
+    });
+    try {
+      await assert.rejects(
+        repository.setCover(created.id, Buffer.from('x')),
+        /disk full/
+      );
+    } finally {
+      broken.mock.restore();
+    }
   });
 
   test('a draft book cover is unreadable to a guest and a non-co-author, readable to a co-author and a moderator', async () => {

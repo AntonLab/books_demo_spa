@@ -93,9 +93,15 @@ export default createConfig(
     files: ['src/api/client.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
-  // Jest's CSS mapping and the CSS Modules declaration need a default export.
+  // Jest's CSS and SVG mappings and the CSS Modules and SVG declarations need
+  // a default export.
   {
-    files: ['src/test/styleMock.ts', 'src/types/css.d.ts'],
+    files: [
+      'src/test/styleMock.ts',
+      'src/test/fileMock.ts',
+      'src/types/css.d.ts',
+      'src/types/svg.d.ts',
+    ],
     rules: { 'no-restricted-exports': 'off' },
   },
   {

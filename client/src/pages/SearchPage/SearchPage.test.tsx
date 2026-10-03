@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem, publicGenre } from '@/test/genres';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import type { PublicBook } from '@/types/book';
@@ -31,11 +32,12 @@ const book: PublicBook = {
     },
   ],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -82,7 +84,7 @@ const collapsed: Partial<RootState> = {
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
   serve();
 });

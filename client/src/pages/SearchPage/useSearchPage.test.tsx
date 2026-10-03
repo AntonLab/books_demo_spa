@@ -9,6 +9,7 @@ import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import { queryKeys } from '@/queries/keys';
 import { createTestQueryClient } from '@/test/queryClient';
+import { genreItem } from '@/test/genres';
 import type { PublicBook } from '@/types/book';
 import {
   useSearchPage,
@@ -73,7 +74,7 @@ const whenLoaded = (page: () => SearchPageState) =>
 beforeEach(() => {
   jest.resetAllMocks();
   mockedGenres.listGenres.mockResolvedValue({
-    items: [{ id: 4, name: 'Gothic' }],
+    items: [genreItem(4, 'Gothic')],
   });
   serve();
 });
@@ -94,7 +95,7 @@ describe('useSearchPage reading the URL', () => {
       genre: undefined,
     });
     await waitFor(() =>
-      expect(page().genres).toEqual([{ id: 4, name: 'Gothic' }])
+      expect(page().genres).toEqual([genreItem(4, 'Gothic')])
     );
   });
 
@@ -209,6 +210,19 @@ describe('useSearchPage resolving the genre', () => {
     expect(page().form.key).toBe('genre=4|4');
   });
 
+  it('resolves ?genre=<id> of a parent whose works sit only in a Subgenre', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [genreItem(1, 'Fantasy'), genreItem(2, 'Urban Fantasy', 1)],
+    });
+    const { page } = renderSearchPage('/search?genre=1');
+
+    await whenLoaded(page);
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ genreId: 1 })
+    );
+    expect(page().form.initialValues.genre).toBe(1);
+  });
+
   it('waits for the genre list before asking for books', () => {
     mockedGenres.listGenres.mockReturnValue(new Promise<never>(() => {}));
 
@@ -320,6 +334,19 @@ describe('useSearchPage writing the URL', () => {
 
     act(() => page().form.onReset());
 
+    expect(location()).toBe('/search');
+  });
+
+  it('keeps the chosen page size on Search and drops it on Reset', async () => {
+    const { page, location } = renderSearchPage(
+      '/search?q=dragon&pageSize=50&page=2'
+    );
+    await whenLoaded(page);
+
+    act(() => page().form.onSearch({ q: 'ghost', sort: 'popular' }));
+    expect(location()).toBe('/search?q=ghost&pageSize=50');
+
+    act(() => page().form.onReset());
     expect(location()).toBe('/search');
   });
 

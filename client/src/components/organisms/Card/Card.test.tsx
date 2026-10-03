@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { Card } from './Card';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 
 const props = {
   title: 'The Ashgrove Chronicles',
@@ -54,8 +55,8 @@ describe('Card', () => {
       <Card {...props} href="/books/1" tile media={<span>Cover</span>} />
     );
 
-    // The title is the one link assistive technology meets.
-    expect(screen.getAllByRole('link')).toHaveLength(1);
+    // The title link and the author link; the media link is hidden.
+    expect(screen.getAllByRole('link')).toHaveLength(2);
     const mediaLink = screen.getByText('Cover').closest('a');
     expect(mediaLink).toHaveAttribute('href', '/books/1');
     expect(mediaLink).toHaveAttribute('aria-hidden', 'true');
@@ -68,7 +69,7 @@ describe('Card', () => {
         {...props}
         href="/books/1"
         tile
-        genre={{ id: 4, name: 'Gothic' }}
+        genre={publicGenre(4, 'Gothic')}
         tags={['epic']}
       />
     );
@@ -76,6 +77,52 @@ describe('Card', () => {
     expect(screen.queryByText('Gothic')).toBeNull();
     expect(screen.queryByText('epic')).toBeNull();
     expect(screen.getByText(props.description)).toBeInTheDocument();
+  });
+
+  it('links a Subgenre and its parent', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        genre={publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' })}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Fantasy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
+    ).toBeInTheDocument();
+  });
+
+  it('links an author to their public profile', () => {
+    renderWithProviders(<Card {...props} />);
+
+    expect(screen.getByRole('link', { name: 'Margaret Hale' })).toHaveAttribute(
+      'href',
+      '/accounts/3'
+    );
+  });
+
+  it('keeps the comma between Co-authors outside the links', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        authors={[
+          ...props.authors,
+          {
+            id: 4,
+            login: 'jdoe',
+            firstName: 'Jon',
+            lastName: 'Doe',
+            avatarUrl: null,
+          },
+        ]}
+      />
+    );
+
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(2);
+    expect(links[0]).toHaveTextContent(/^Margaret Hale$/);
+    expect(screen.getByText(/,/).closest('a')).toBeNull();
   });
 
   it('leaves out the description when it is given none', () => {

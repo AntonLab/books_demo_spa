@@ -101,6 +101,71 @@ test('listBooksQuerySchema pages by current and pageSize, defaulting to page 1 o
   }
 });
 
+test('listBooksQuerySchema reads ids as 1 to 20 distinct positive integers', () => {
+  assert.deepEqual(listBooksQuerySchema.parse({ ids: '3,1,2' }).ids, [3, 1, 2]);
+  assert.equal(listBooksQuerySchema.parse({ ids: '7' }).ids?.[0], 7);
+  assert.equal(listBooksQuerySchema.parse({}).ids, undefined);
+  const twenty = Array.from({ length: 20 }, (_, index) => index + 1);
+  assert.equal(
+    listBooksQuerySchema.parse({ ids: twenty.join(',') }).ids?.length,
+    20
+  );
+});
+
+test('listBooksQuerySchema refuses malformed ids', () => {
+  const twentyOne = Array.from({ length: 21 }, (_, index) => index + 1);
+  for (const bad of [
+    '',
+    '1,',
+    ',1',
+    '1,,2',
+    '0',
+    '-1',
+    '1.5',
+    '1e2',
+    ' 1',
+    '1, 2',
+    'abc',
+    '1,1',
+    twentyOne.join(','),
+  ]) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ ids: bad }).success,
+      false,
+      JSON.stringify(bad)
+    );
+  }
+});
+
+test('listBooksQuerySchema takes published=true and refuses any other value', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ published: 'true' }).published,
+    'true'
+  );
+  assert.equal(listBooksQuerySchema.parse({}).published, undefined);
+  for (const bad of ['false', '1', '', 'TRUE']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ published: bad }).success,
+      false,
+      bad
+    );
+  }
+});
+
+test('listBooksQuerySchema takes favoritedBy=me and refuses any other value', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ favoritedBy: 'me' }).favoritedBy,
+    'me'
+  );
+  assert.equal(listBooksQuerySchema.parse({}).favoritedBy, undefined);
+  for (const bad of ['ME', '1', '', 'you']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ favoritedBy: bad }).success,
+      false
+    );
+  }
+});
+
 test('listBooksQuerySchema trims text filters and refuses a blank or over-long one', () => {
   const parsed = listBooksQuerySchema.parse({
     q: '  dragon ',

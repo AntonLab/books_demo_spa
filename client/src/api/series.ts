@@ -1,5 +1,11 @@
 import { request } from './client';
-import type { ItemsResponse, ListResponse, SeriesPayload } from 'shared';
+import type {
+  BookSort,
+  ItemsResponse,
+  ListResponse,
+  SeriesPayload,
+  WithFavoriteId,
+} from 'shared';
 import type {
   PublicSeries,
   SeriesBookSummary,
@@ -13,6 +19,13 @@ export interface ListSeriesParams {
   limit?: number;
   // Title or description; the server refuses a blank one.
   q?: string;
+  tag?: string;
+  offset?: number;
+  // Only the caller's own Favorites; see listFavoritedSeries.
+  favoritedBy?: 'me';
+  sort?: BookSort;
+  // Only Published series, so an Owner's Drafts stay off a public list.
+  published?: 'true';
 }
 
 // `?userId=` naming the caller lists the series they co-author: the book form's
@@ -26,12 +39,26 @@ export const listSeries = (
     search.set('genreId', String(params.genreId));
   if (params.limit !== undefined) search.set('limit', String(params.limit));
   if (params.q) search.set('q', params.q);
+  if (params.tag) search.set('tag', params.tag);
+  if (params.offset !== undefined) search.set('offset', String(params.offset));
+  if (params.favoritedBy) search.set('favoritedBy', params.favoritedBy);
+  if (params.sort) search.set('sort', params.sort);
+  if (params.published) search.set('published', params.published);
 
   const query = search.toString();
   return request<ListResponse<PublicSeries>>(
     query ? `/series?${query}` : '/series'
   );
 };
+
+// The server adds `favoriteId` to each item exactly when `favoritedBy=me`, so
+// the cast holds.
+export const listFavoritedSeries = (
+  params: ListSeriesParams = {}
+): Promise<ListResponse<WithFavoriteId<PublicSeries>>> =>
+  listSeries({ ...params, favoritedBy: 'me' }) as Promise<
+    ListResponse<WithFavoriteId<PublicSeries>>
+  >;
 
 export const getSeries = (id: number): Promise<SeriesDetail> => {
   return request<SeriesDetail>(`/series/${id}`);
@@ -54,6 +81,21 @@ export const updateSeries = (
 // The series' books are not deleted with it; they stay, outside any series.
 export const deleteSeries = (id: number): Promise<void> => {
   return request<void>(`/series/${id}`, { method: 'DELETE' });
+};
+
+// The body is a Blob (a File), so request() sends it as-is.
+export const uploadSeriesCover = (
+  id: number,
+  file: File
+): Promise<PublicSeries> => {
+  return request<PublicSeries>(`/series/${id}/cover`, {
+    method: 'PUT',
+    body: file,
+  });
+};
+
+export const deleteSeriesCover = (id: number): Promise<void> => {
+  return request<void>(`/series/${id}/cover`, { method: 'DELETE' });
 };
 
 export const addSeriesCoAuthor = (

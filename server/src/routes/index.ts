@@ -3,6 +3,7 @@ import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { OnlineRegistry } from '../online/onlineRegistry.ts';
 import type { Repositories } from '../repositories/sequelizeRepositories.ts';
+import { createAccountRoutes } from './accountRoutes.ts';
 import { createAuthorRoutes } from './authorRoutes.ts';
 import { createAuthRoutes } from './authRoutes.ts';
 import { createBookRoutes } from './bookRoutes.ts';
@@ -11,7 +12,13 @@ import { createCommentRoutes } from './commentRoutes.ts';
 import { createFavoriteRoutes } from './favoriteRoutes.ts';
 import { createGenreRoutes } from './genreRoutes.ts';
 import { createLikeRoutes } from './likeRoutes.ts';
+import { createLibraryRoutes } from './libraryRoutes.ts';
 import { createNotificationRoutes } from './notificationRoutes.ts';
+import { createReadingListRoutes } from './readingListRoutes.ts';
+import {
+  createCommentReportRoutes,
+  createReportRoutes,
+} from './reportRoutes.ts';
 import { createSeriesRoutes } from './seriesRoutes.ts';
 import { createUserRoutes } from './userRoutes.ts';
 
@@ -35,6 +42,7 @@ export function createApiRouter(deps: RouteDeps): Router {
   // needs the session and user repositories alongside the resource's own.
   router.use('/auth', createAuthRoutes(deps));
   router.use('/authors', createAuthorRoutes(deps));
+  router.use('/accounts', createAccountRoutes(deps));
   router.use('/users', createUserRoutes(deps));
   router.use('/series', createSeriesRoutes(deps));
   router.use('/books', createBookRoutes(deps));
@@ -42,8 +50,12 @@ export function createApiRouter(deps: RouteDeps): Router {
   // Reference data for the catalogue: no path here collides with any above.
   router.use('/genres', createGenreRoutes(deps));
   router.use('/comments', createCommentRoutes(deps));
+  router.use('/comments', createCommentReportRoutes(deps));
+  router.use('/reports', createReportRoutes(deps));
   router.use('/likes', createLikeRoutes(deps));
   router.use('/favorites', createFavoriteRoutes(deps));
+  router.use('/library', createLibraryRoutes(deps));
+  router.use('/reading-lists', createReadingListRoutes(deps));
   router.use('/notifications', createNotificationRoutes(deps));
   return router;
 }

@@ -1,13 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createSeries,
   deleteSeries,
+  deleteSeriesCover,
   getSeries,
+  listFavoritedSeries,
   listSeries,
   listSeriesBooks,
   removeBookFromSeries,
   reorderSeriesBooks,
   updateSeries,
+  uploadSeriesCover,
+  type ListSeriesParams,
 } from '../api/series';
 import type { SeriesPayload } from 'shared';
 import type { SeriesBookSummary } from '../types/api';
@@ -21,6 +30,27 @@ export const useMySeries = (userId: number | undefined) => {
     queryKey: queryKeys.series({ userId, limit: 100 }),
     queryFn: () => listSeries({ userId, limit: 100 }),
     enabled: userId !== undefined,
+  });
+};
+
+export const useSeriesList = (params: ListSeriesParams, enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.series(params),
+    queryFn: () => listSeries(params),
+    enabled,
+  });
+};
+
+// The key carries `favoritedBy` so a favorited list never shares a cache entry
+// with the same search over all works.
+export const useFavoritedSeries = (
+  params: ListSeriesParams,
+  enabled: boolean
+) => {
+  return useQuery({
+    queryKey: queryKeys.series({ ...params, favoritedBy: 'me' }),
+    queryFn: () => listFavoritedSeries(params),
+    enabled,
   });
 };
 
@@ -44,20 +74,41 @@ export const useSeriesBooks = (id: number, enabled: boolean) => {
 // Every series write invalidates the `series` prefix and the `books` one: a
 // deleted series unlinks its books, and a book taken out of one changes what
 // that book's page shows.
+// `refreshOnError` is for a delete: one that fails because the series is
+// already gone (404) or no longer editable (403) leaves the lists stale,
+// whereas a failed update must not refetch the form's own data under the
+// user's edits.
 const useSeriesMutation = <TVariables, TResult>(
-  mutationFn: (variables: TVariables) => Promise<TResult>
+  mutationFn: (variables: TVariables) => Promise<TResult>,
+  {
+    refreshOnError = false,
+    deletedId,
+  }: { refreshOnError?: boolean; deletedId?: number } = {}
 ) => {
   const queryClient = useQueryClient();
+  const refresh = (skipDetail?: boolean) =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ['series'],
+        // A delete skips the deleted series' own detail: its page is still
+        // mounted, would refetch into a 404 and redirect with "no longer
+        // exists" before the delete's own landing page takes over.
+        ...(skipDetail &&
+          deletedId !== undefined && {
+            predicate: (query) =>
+              hashKey(query.queryKey) !==
+              hashKey(queryKeys.seriesDetail(deletedId)),
+          }),
+      }),
+      queryClient.invalidateQueries({ queryKey: ['books'] }),
+    ]);
 
   return useMutation({
     // Wrapped rather than passed straight through: TanStack calls a mutationFn
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-      ]),
+    onSuccess: () => refresh(true),
+    ...(refreshOnError && { onError: () => refresh() }),
   });
 };
 
@@ -70,7 +121,17 @@ export const useUpdateSeries = (id: number) =>
   );
 
 export const useDeleteSeries = (id: number) =>
-  useSeriesMutation(() => deleteSeries(id));
+  useSeriesMutation(() => deleteSeries(id), {
+    refreshOnError: true,
+    deletedId: id,
+  });
+
+// A Cover change invalidates every prefix a card of the Series may sit in.
+export const useUploadSeriesCover = (id: number) =>
+  useSeriesMutation((file: File) => uploadSeriesCover(id, file));
+
+export const useDeleteSeriesCover = (id: number) =>
+  useSeriesMutation(() => deleteSeriesCover(id));
 
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));

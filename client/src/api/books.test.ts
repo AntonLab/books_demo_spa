@@ -5,6 +5,7 @@ import {
   deleteBookCover,
   getBook,
   listBooks,
+  listFavoritedBooks,
   removeCoAuthor,
   updateBook,
   uploadBookCover,
@@ -51,6 +52,26 @@ describe('listBooks', () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe(
       '/api/books?q=dragon+riders&current=3&pageSize=20'
+    );
+  });
+
+  it('encodes published', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ userId: 3, published: 'true' });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?userId=3&published=true'
+    );
+  });
+
+  it('encodes ids as one comma-separated value', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ ids: '3,1,2', pageSize: 20 });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?ids=3%2C1%2C2&pageSize=20'
     );
   });
 
@@ -398,5 +419,21 @@ describe('deleteBookCover', () => {
     expect(url).toBe('/api/books/1/cover');
     expect(init.method).toBe('DELETE');
     expect(init.body).toBeUndefined();
+  });
+});
+
+describe('listFavoritedBooks', () => {
+  it('sends favoritedBy=me beside the other filters', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listFavoritedBooks({ q: 'dragon', current: 2, pageSize: 20 });
+
+    const url = new URL(callOf(fetchMock)[0], 'http://x');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      q: 'dragon',
+      current: '2',
+      pageSize: '20',
+      favoritedBy: 'me',
+    });
   });
 });

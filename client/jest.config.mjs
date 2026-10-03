@@ -27,6 +27,7 @@ export default {
     // alias. Both entries stay in step with tsconfig `paths` and webpack
     // `resolve.alias`.
     '\\.css$': '<rootDir>/src/test/styleMock.ts',
+    '\\.svg$': '<rootDir>/src/test/fileMock.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
 };

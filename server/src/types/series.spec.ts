@@ -136,6 +136,46 @@ test('updateSeriesSchema keeps an absent genreId absent and an explicit null nul
   assert.deepEqual(updateSeriesSchema.parse({ genreId: '4' }), { genreId: 4 });
 });
 
+test('listSeriesQuerySchema takes favoritedBy=me and refuses any other value', () => {
+  assert.equal(
+    listSeriesQuerySchema.parse({ favoritedBy: 'me' }).favoritedBy,
+    'me'
+  );
+  assert.equal(listSeriesQuerySchema.parse({}).favoritedBy, undefined);
+  for (const bad of ['ME', '1', '', 'you']) {
+    assert.equal(
+      listSeriesQuerySchema.safeParse({ favoritedBy: bad }).success,
+      false
+    );
+  }
+});
+
+test('listSeriesQuerySchema takes a Book sort and refuses any other', () => {
+  for (const sort of ['popular', 'new', 'updated']) {
+    assert.equal(listSeriesQuerySchema.parse({ sort }).sort, sort);
+  }
+  assert.equal(listSeriesQuerySchema.parse({}).sort, undefined);
+  assert.equal(
+    listSeriesQuerySchema.safeParse({ sort: 'oldest' }).success,
+    false
+  );
+});
+
+test('listSeriesQuerySchema takes published=true and refuses any other value', () => {
+  assert.equal(
+    listSeriesQuerySchema.parse({ published: 'true' }).published,
+    'true'
+  );
+  assert.equal(listSeriesQuerySchema.parse({}).published, undefined);
+  for (const bad of ['false', '1', '']) {
+    assert.equal(
+      listSeriesQuerySchema.safeParse({ published: bad }).success,
+      false,
+      bad
+    );
+  }
+});
+
 test('listSeriesQuerySchema takes genreId as a filter', () => {
   assert.equal(listSeriesQuerySchema.parse({ genreId: '4' }).genreId, 4);
   assert.equal(listSeriesQuerySchema.parse({}).genreId, undefined);

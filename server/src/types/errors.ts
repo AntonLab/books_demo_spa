@@ -17,8 +17,8 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(field: string) {
-    super(`${field} is already taken`, 409, { field });
+  constructor(field: string, message = `${field} is already taken`) {
+    super(message, 409, { field });
   }
 }
 

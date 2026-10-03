@@ -1,6 +1,12 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Checkbox, Form, Input } from 'antd';
+import {
+  EMAIL_MAX_LENGTH,
+  LOGIN_MAX_LENGTH,
+  LOGIN_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+} from 'shared';
 import { useRegister } from '@/queries/auth';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ApiError } from '@/api/client';
@@ -89,7 +95,11 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           label="Login"
           rules={[
             { required: true, message: 'Enter a login' },
-            { min: 3, max: 64, message: 'Login must be 3 to 64 characters' },
+            {
+              min: LOGIN_MIN_LENGTH,
+              max: LOGIN_MAX_LENGTH,
+              message: `Login must be ${LOGIN_MIN_LENGTH} to ${LOGIN_MAX_LENGTH} characters`,
+            },
           ]}
         >
           <Input autoComplete="username" />
@@ -101,18 +111,29 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           rules={[
             { required: true, message: 'Enter an email address' },
             { type: 'email', message: 'Enter a valid email address' },
-            { max: 255, message: 'Email must be at most 255 characters' },
+            {
+              max: EMAIL_MAX_LENGTH,
+              message: `Email must be at most ${EMAIL_MAX_LENGTH} characters`,
+            },
           ]}
         >
           <Input autoComplete="email" />
         </Form.Item>
 
+        {/* `required` alone lets "   " through; the server trims, then requires one character. */}
         <Form.Item
           name="firstName"
           label="First name"
           rules={[
-            { required: true, message: 'Enter your first name' },
-            { max: 64, message: 'First name must be at most 64 characters' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your first name',
+            },
+            {
+              max: NAME_MAX_LENGTH,
+              message: `First name must be at most ${NAME_MAX_LENGTH} characters`,
+            },
           ]}
         >
           <Input autoComplete="given-name" />
@@ -122,8 +143,15 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           name="lastName"
           label="Last name"
           rules={[
-            { required: true, message: 'Enter your last name' },
-            { max: 64, message: 'Last name must be at most 64 characters' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your last name',
+            },
+            {
+              max: NAME_MAX_LENGTH,
+              message: `Last name must be at most ${NAME_MAX_LENGTH} characters`,
+            },
           ]}
         >
           <Input autoComplete="family-name" />

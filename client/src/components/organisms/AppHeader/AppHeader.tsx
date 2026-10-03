@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Dropdown, Layout, Menu, Skeleton, Space } from 'antd';
+import { MenuOutlined } from '@ant-design/icons';
+import { Button, Dropdown, Grid, Layout, Menu, Skeleton, Space } from 'antd';
 import { queryKeys } from '@/queries/keys';
 import type { LoginReturnState } from '@/hooks/usePageGuard';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import type { MenuProps } from 'antd';
 import { useSession } from '@/queries/auth';
 import { isModeratorRole } from 'shared';
 import { useGenresWithBooks } from '@/queries/genres';
 import { searchPath } from '@/types/bookSearch';
+import { buildGenreTree } from '@/types/genreTree';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useSignOut } from '@/store/useUnsavedText';
@@ -19,6 +21,8 @@ import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvata
 import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
 import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
 import { NotificationBell } from '@/components/organisms/NotificationBell/NotificationBell';
+// Lives in client/public per the spec; webpack's asset/resource rule emits it as /header.svg.
+import headerImage from '../../../../public/header.svg';
 import styles from './AppHeader.module.css';
 
 export const AppHeader: FC = () => {
@@ -33,6 +37,8 @@ export const AppHeader: FC = () => {
   const dispatch = useAppDispatch();
   const theme = useAppSelector((state) => state.devicePreferences.theme);
   const queryClient = useQueryClient();
+  // `=== true`: before antd has measured, a desktop must not flash the phone layout.
+  const phone = Grid.useBreakpoint().xs === true;
   // Where usePageGuard's Guest was headed; kept until Log in resolves.
   const [returnTo, setReturnTo] = useState<string | null>(null);
 
@@ -55,22 +61,34 @@ export const AppHeader: FC = () => {
   const genres = useGenresWithBooks();
   // Empty covers all three cases the submenu must not appear in: loading,
   // failed, and a genuinely empty list.
-  const genreItems = genres.data?.items ?? [];
+  const genreNodes = buildGenreTree(genres.data?.items ?? []);
   const isModerator = isModeratorRole(user?.role);
+
+  // Keyed by its own target path, so the menu's onClick navigates to the key
+  // like every other item. The label is a real link too, for open-in-new-tab.
+  const genreLeaf = (genre: { id: number; name: string }) => {
+    const path = searchPath({ genre: String(genre.id) });
+    return { key: path, label: <Link to={path}>{genre.name}</Link> };
+  };
 
   const navItems: MenuProps['items'] = [
     { key: '/', label: 'Home' },
-    ...(genreItems.length > 0
+    ...(genreNodes.length > 0
       ? [
           {
             key: 'genres',
             label: 'Genres',
-            // Each child is keyed by its own target path, so the menu's
-            // onClick navigates to the key like every other item.
-            children: genreItems.map((genre) => ({
-              key: searchPath({ genre: String(genre.id) }),
-              label: genre.name,
-            })),
+            children: genreNodes.map(({ item, children }) =>
+              children.length === 0
+                ? genreLeaf(item)
+                : {
+                    key: `genre-${item.id}`,
+                    label: item.name,
+                    // The Genre itself stays reachable: its title only opens
+                    // the submenu.
+                    children: [item, ...children].map(genreLeaf),
+                  }
+            ),
           },
         ]
       : []),
@@ -79,17 +97,31 @@ export const AppHeader: FC = () => {
   const accountItems: MenuProps['items'] = [
     { key: '/profile', label: 'Profile' },
     { key: '/profile/favorites', label: 'Favorites' },
+    { key: '/profile/library', label: 'Library' },
+    { key: '/profile/lists', label: 'Reading lists' },
     // Only for an account holding the author Role: that is who can be credited
     // on a book, so nobody else has anything to find there.
     ...(user?.role === 'author'
-      ? [{ key: '/profile/my-books', label: 'My Books' }]
+      ? [{ key: '/profile/my-books', label: 'My works' }]
       : []),
-    // Keeping the Genre list is an Admin's (or Superadmin's) job; no other
-    // Role is offered it.
-    ...(isModerator ? [{ key: '/admin/genres', label: 'Manage genres' }] : []),
+    // The Admin panel is an Admin's (or Superadmin's); no other Role is
+    // offered it.
+    ...(isModerator ? [{ key: '/admin', label: 'Admin panel' }] : []),
     { type: 'divider' },
     { key: 'logout', label: 'Log out' },
   ];
+
+  // pathname + search, so a genre item whose key carries a query string
+  // is highlighted on its own page while / keeps working.
+  const navSelectedKey = `${location.pathname}${location.search}`;
+
+  // A click on a genre's own anchor is the Link's to handle (a
+  // modifier-click opens a new tab); a keypress or a click beside the
+  // anchor reaches only the item, so the menu navigates for those.
+  const handleNavClick: MenuProps['onClick'] = ({ key, domEvent }) => {
+    if ((domEvent.target as Element).closest('a')) return;
+    void navigate(key);
+  };
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
@@ -101,6 +133,7 @@ export const AppHeader: FC = () => {
 
   return (
     <Layout.Header className={styles.header}>
+      <img src={headerImage} alt="" className={styles.logo} />
       {/* Two props the submenu needs:
           - `disabledOverflow`: rc-menu puts every child past the first into an
             overflowDisabled context unless this is set, and such a SubMenu
@@ -112,20 +145,40 @@ export const AppHeader: FC = () => {
           - `triggerSubMenuAction="click"`: the default is hover, which a touch
             device has no way to perform and which a test can only drive
             through rc-menu's open delay. */}
-      <Menu
-        theme="dark"
-        mode="horizontal"
-        disabledOverflow
-        triggerSubMenuAction="click"
-        items={navItems}
-        // pathname + search, so a genre item whose key carries a query string
-        // is highlighted on its own page while / keeps working.
-        selectedKeys={[`${location.pathname}${location.search}`]}
-        onClick={({ key }) => void navigate(key)}
-        className={styles.nav}
-      />
+      {phone ? (
+        // The list is vertical, so a submenu opens inside the dropdown.
+        <Dropdown
+          menu={{
+            items: navItems,
+            onClick: handleNavClick,
+            selectedKeys: [navSelectedKey],
+            triggerSubMenuAction: 'click',
+          }}
+          trigger={['click']}
+        >
+          <IconButton
+            type="text"
+            className={styles.onDark}
+            label="Menu"
+            icon={<MenuOutlined />}
+          />
+        </Dropdown>
+      ) : (
+        <Menu
+          theme="dark"
+          mode="horizontal"
+          disabledOverflow
+          triggerSubMenuAction="click"
+          items={navItems}
+          selectedKeys={[navSelectedKey]}
+          onClick={handleNavClick}
+          className={styles.nav}
+        />
+      )}
 
-      <SearchBar />
+      <div className={styles.search}>
+        <SearchBar />
+      </div>
 
       {/* Offered to everyone, Guests included: a Device preference belongs
           to the device, not to an Account. The header itself stays dark in
@@ -162,14 +215,18 @@ export const AppHeader: FC = () => {
               a non-interactive element here is invisible to keyboard
               navigation. A <Button> is focusable and Enter/Space-activated
               for free. */}
-            <Button type="text" className={styles.account}>
+            <Button
+              type="text"
+              className={styles.account}
+              aria-label={phone ? user.login : undefined}
+            >
               <Space>
                 <AccountAvatar
                   avatarUrl={user.avatarUrl}
                   name={user.login}
                   size="small"
                 />
-                {user.login}
+                {!phone && user.login}
               </Space>
             </Button>
           </Dropdown>

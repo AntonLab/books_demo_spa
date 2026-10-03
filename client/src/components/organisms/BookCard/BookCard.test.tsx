@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import { BookCard } from './BookCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { formatDate } from '@/format/date';
 import type { PublicBook } from '@/types/book';
 
@@ -23,11 +24,12 @@ const book: PublicBook = {
     },
   ],
   seriesId: null,
+  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
   status: 'in_progress',
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -60,10 +62,14 @@ describe('BookCard', () => {
   it('names every co-author, in credit order', () => {
     renderWithProviders(<BookCard book={book} />);
 
-    // Each name carries a trailing comma except the last — so this also
-    // pins credit order: reversing the fixture would move the comma.
-    expect(screen.getByText('Ann Author,')).toBeInTheDocument();
-    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    // A comma follows every link but the last — so this also pins credit
+    // order: reversing the fixture would move the comma.
+    expect(
+      screen
+        .getAllByRole('link', { name: /Author|Writer/ })
+        .map((a) => a.textContent)
+    ).toEqual(['Ann Author', 'Cora Writer']);
+    expect(screen.getByText(',')).toBeInTheDocument();
   });
 
   it('shows the cover image when the book has one', () => {
@@ -161,5 +167,85 @@ describe('BookCard', () => {
 
     expect(screen.queryByText(book.createdAt)).not.toBeInTheDocument();
     expect(screen.getByText(formatDate(book.createdAt))).toBeInTheDocument();
+  });
+});
+
+describe('BookCard as a page heading', () => {
+  const headed = {
+    ...book,
+    series: { id: 2, title: 'The Scale Cycle', position: 1 },
+    description: 'Long ago, in a kingdom of scales. '.repeat(20).trim(),
+  };
+
+  it('shows the title as the level-2 heading with no link, and the whole description', () => {
+    renderWithProviders(<BookCard book={headed} heading />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeNull();
+    expect(screen.getByText(headed.description)).toBeInTheDocument();
+  });
+
+  it('keeps the series line, genre, tags, co-authors and status, and drops the date', () => {
+    renderWithProviders(<BookCard book={headed} heading />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 1' })
+    ).toHaveAttribute('href', '/series/2');
+    expect(screen.getByRole('link', { name: 'Gothic' })).toBeInTheDocument();
+    expect(screen.getByText('epic')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Cora Writer' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+    expect(screen.queryByText(formatDate(book.createdAt))).toBeNull();
+  });
+});
+
+describe('Series line', () => {
+  const inSeries = (position: number | null) => ({
+    ...book,
+    seriesId: 2,
+    series: { id: 2, title: 'The Scale Cycle', position },
+  });
+
+  it('names the series and the place of a Published book, linked to the series page', () => {
+    renderWithProviders(<BookCard book={inSeries(2)} />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 2' })
+    ).toHaveAttribute('href', '/series/2');
+  });
+
+  it('names only the series for a Draft book, which has no place', () => {
+    renderWithProviders(<BookCard book={inSeries(null)} />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle' })
+    ).toHaveAttribute('href', '/series/2');
+    expect(screen.queryByText(/Book \d/)).toBeNull();
+    expect(screen.queryByText(/null/)).toBeNull();
+  });
+
+  it('shows no line for a book in no series', () => {
+    renderWithProviders(<BookCard book={book} />);
+
+    expect(screen.queryByRole('link', { name: /Book \d/ })).toBeNull();
+    expect(
+      screen
+        .getAllByRole('link')
+        .every((link) => !link.getAttribute('href')?.startsWith('/series/'))
+    ).toBe(true);
+  });
+
+  it('shows the line in a grid tile too', () => {
+    renderWithProviders(<BookCard book={inSeries(1)} tile />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 1' })
+    ).toBeInTheDocument();
   });
 });

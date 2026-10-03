@@ -88,6 +88,9 @@ const slice = createSlice({
     readingReset(state) {
       state.reading = initialReadingPreferences;
     },
+    themeReset(state) {
+      state.theme = initialDevicePreferences.theme;
+    },
     // Another tab's write, relayed by the `storage` event: that tab's value
     // wins here too. `null` means that tab cleared the key (a corrupt value
     // is filtered out before this dispatches, so it never arrives here).

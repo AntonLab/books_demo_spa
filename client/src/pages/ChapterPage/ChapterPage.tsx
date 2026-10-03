@@ -19,6 +19,8 @@ import {
   ReadOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
+import { ApiError } from '@/api/client';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
 import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
@@ -27,6 +29,7 @@ import { useChapter, useChapters } from '@/queries/chapters';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import type { ReadingPreferences as Reading } from '@/store/devicePreferencesSlice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useRecordRecentlyViewed } from '@/store/useRecentlyViewed';
 import { READING_PALETTES, READING_SERIF_FONT } from '@/theme/tokens';
 import { publishedChapters, type ChapterSummary } from '@/types/chapter';
 import {
@@ -123,7 +126,9 @@ export const ChapterPage: FC = () => {
   // page costs no request: only the body below is fetched here.
   const { data: bookDetail } = useBook(book);
   const { data: list } = useChapters(book);
-  const { data: chapter, isPending, isError } = useChapter(id);
+  const { data: chapter, isPending, isError, error } = useChapter(id);
+  // A Chapter page opened without its Book page still counts for the Book.
+  useRecordRecentlyViewed(chapter === undefined ? undefined : bookDetail);
 
   // Destructured: react-hooks/refs reads any property of an object holding
   // refs as a ref read during render.
@@ -206,7 +211,14 @@ export const ChapterPage: FC = () => {
   };
 
   if (isError) {
-    return <Alert type="error" title="Could not load this chapter." />;
+    return error instanceof ApiError && error.status === 404 ? (
+      <GoneRedirect
+        message="This chapter no longer exists."
+        to={`/books/${book}`}
+      />
+    ) : (
+      <Alert type="error" title="Could not load this chapter." />
+    );
   }
   if (isPending) return <Skeleton active paragraph={{ rows: 8 }} />;
 

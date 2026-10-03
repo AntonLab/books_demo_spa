@@ -14,6 +14,8 @@ const mockedSeries = jest.mocked(seriesApi);
 
 const created: PublicSeries = {
   id: 9,
+  coverUrl: null,
+  bookCount: 0,
   authors: [
     {
       id: 3,

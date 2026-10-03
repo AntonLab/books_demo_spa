@@ -75,6 +75,11 @@ export function userRepositoryContract(
     );
   });
 
+  test('contract: touchLastSeen on a missing account is a quiet no-op', async () => {
+    const { repository } = await setUp();
+    await repository.touchLastSeen(MISSING_ID, new Date());
+  });
+
   test('contract: every lookup and write on a missing account answers null or false', async () => {
     const { repository } = await setUp();
 
@@ -106,6 +111,24 @@ export function userRepositoryContract(
     const hash = await repository.findPasswordHashById(created.id);
     assert.ok(hash);
     assert.equal(await verifyPassword(hash, 'another-password'), true);
+  });
+
+  test('contract: an update persists About and showLastSeen, and a new account starts empty and visible', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create(input('Writer'));
+    assert.equal(created.about, '');
+    assert.equal(created.showLastSeen, true);
+
+    const updated = await repository.update(created.id, {
+      about: 'Hello\nthere',
+      showLastSeen: false,
+    });
+    assert.equal(updated?.about, 'Hello\nthere');
+    assert.equal(updated?.showLastSeen, false);
+    assert.equal(
+      (await repository.findById(created.id))?.about,
+      'Hello\nthere'
+    );
   });
 
   test('contract: updateRole answers with the public user holding the new role', async () => {

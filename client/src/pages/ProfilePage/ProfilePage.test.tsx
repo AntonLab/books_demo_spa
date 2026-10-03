@@ -4,25 +4,35 @@ import { useLocation } from 'react-router';
 import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
-import * as favoritesApi from '@/api/favorites';
+import * as genresApi from '@/api/genres';
+import * as libraryApi from '@/api/library';
 import * as notificationsApi from '@/api/notifications';
+import * as readingListsApi from '@/api/readingLists';
 import * as seriesApi from '@/api/series';
-import type { PublicUser } from '@/types/api';
+import * as usersApi from '@/api/users';
+import type { PublicUser, SessionUser } from '@/types/api';
 
+jest.mock('@/api/users');
 jest.mock('@/api/auth');
 jest.mock('@/api/books');
-jest.mock('@/api/favorites');
+jest.mock('@/api/genres');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
+jest.mock('@/api/library');
+jest.mock('@/api/readingLists');
+const mockedReadingLists = jest.mocked(readingListsApi);
+const mockedLibrary = jest.mocked(libraryApi);
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
-const mockedFavorites = jest.mocked(favoritesApi);
+const mockedGenres = jest.mocked(genresApi);
 const mockedNotifications = jest.mocked(notificationsApi);
 const mockedSeries = jest.mocked(seriesApi);
+const mockedUsers = jest.mocked(usersApi);
 
 const session: PublicUser = {
   id: 1,
@@ -33,6 +43,8 @@ const session: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -41,7 +53,9 @@ const author: PublicUser = { ...session, role: 'author' };
 
 const LocationProbe = () => {
   const location = useLocation();
-  return <div data-testid="location">{location.pathname}</div>;
+  return (
+    <div data-testid="location">{location.pathname + location.search}</div>
+  );
 };
 
 // Seeds the session cache directly, so a test settles without waiting on
@@ -61,34 +75,23 @@ const renderWithSession = (data: PublicUser | null, route = '/profile') => {
 
 beforeEach(() => {
   jest.resetAllMocks();
-  mockedAuth.me.mockResolvedValue(session);
+  mockedAuth.me.mockResolvedValue(sessionOf(session));
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
   });
-  mockedFavorites.listFavoriteBooks.mockResolvedValue({
-    items: [],
-    total: 0,
-    limit: 20,
-    offset: 0,
-  });
-  mockedBooks.listBooks.mockResolvedValue({
-    items: [],
-    total: 0,
-    current: 1,
-    pageSize: 100,
-  });
-  mockedSeries.listSeries.mockResolvedValue({
-    items: [],
-    total: 0,
-    limit: 100,
-    offset: 0,
-  });
+  const bookPage = { items: [], total: 0, current: 1, pageSize: 20 };
+  const seriesPage = { items: [], total: 0, limit: 20, offset: 0 };
+  mockedBooks.listFavoritedBooks.mockResolvedValue(bookPage);
+  mockedBooks.listBooks.mockResolvedValue(bookPage);
+  mockedSeries.listSeries.mockResolvedValue(seriesPage);
+  mockedSeries.listFavoritedSeries.mockResolvedValue(seriesPage);
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
 });
 
 describe('ProfilePage while the session is loading', () => {
   it('shows only a spinner and redirects nowhere', () => {
     // Never resolves, so the session query stays pending for the assertion.
-    mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
+    mockedAuth.me.mockReturnValue(new Promise<SessionUser>(() => {}));
 
     renderWithProviders(
       <>
@@ -137,6 +140,27 @@ describe('ProfilePage, signed out', () => {
   });
 });
 
+describe('ProfilePage after a password change', () => {
+  it('sends the user home, which ends the session', async () => {
+    mockedUsers.updateUser.mockResolvedValue(session);
+    const user = userEvent.setup();
+    renderWithSession(session);
+
+    await user.type(screen.getByLabelText('Current password'), 'old-secret1');
+    await user.type(screen.getByLabelText('New password'), 'new-secret1');
+    await user.type(screen.getByLabelText('Confirm password'), 'new-secret1');
+    await user.click(screen.getByRole('button', { name: 'Change password' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(
+      screen.getByText('Password changed. Sign in with your new password.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+  });
+});
+
 describe('ProfilePage tabs', () => {
   it('opens the Account tab at /profile', async () => {
     renderWithSession(session, '/profile');
@@ -167,12 +191,139 @@ describe('ProfilePage tabs', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the My Books tab at /profile/my-books for an author', async () => {
+  it('opens the Library tab at /profile/library', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile/library');
+
+    expect(
+      await screen.findByText('Your Library is empty.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Library', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('lists the Library tab after Favorites for a plain reader', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    const names = screen.getAllByRole('tab').map((tab) => tab.textContent);
+    expect(names).toEqual(['Account', 'Favorites', 'Library', 'Reading lists']);
+  });
+
+  it('opens the Reading lists tab at /profile/lists', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile/lists');
+
+    expect(
+      await screen.findByText('You have no reading lists yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Reading lists', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('does not fetch Reading lists while another tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch the Library while another tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedLibrary.listLibrary).not.toHaveBeenCalled();
+  });
+
+  it('navigates to /profile/library when the Library tab is clicked', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile');
+    await screen.findByRole('switch', { name: 'Email notifications' });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Library' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      /^\/profile\/library$/
+    );
+  });
+
+  it('sends a Guest at /profile/library home and asks for no Library', async () => {
+    renderWithSession(null, '/profile/library');
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(mockedLibrary.listLibrary).not.toHaveBeenCalled();
+  });
+
+  it('opens the My works tab at /profile/my-books for an author', async () => {
     renderWithSession(author, '/profile/my-books');
 
     expect(
       await screen.findByRole('button', { name: 'Create book' })
     ).toBeInTheDocument();
+  });
+
+  it('does not fetch Favorites while the Account tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+    expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+  });
+
+  it('leaves My works with no filters when the Favorites tab is clicked', async () => {
+    renderWithSession(author, '/profile/my-books?tab=series&q=x&page=2');
+    await screen.findByRole('button', { name: 'Create series' });
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Favorites' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      /^\/profile\/favorites$/
+    );
+    await waitFor(() =>
+      expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledTimes(1)
+    );
+    expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledWith(
+      expect.not.objectContaining({ q: 'x' })
+    );
+  });
+
+  it('unmounts the Favorites panel when another tab is opened', async () => {
+    renderWithSession(session, '/profile/favorites');
+    await screen.findByText('No book is in your favorites yet.');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Account' }));
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(screen.queryByText('No book is in your favorites yet.')).toBeNull();
+  });
+
+  it('lists the author’s own works with the viewer as userId', async () => {
+    renderWithSession(author, '/profile/my-books');
+
+    await waitFor(() =>
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 1 })
+      )
+    );
   });
 
   it('navigates to a tab’s path when it is clicked', async () => {
@@ -185,22 +336,26 @@ describe('ProfilePage tabs', () => {
     );
   });
 
-  it('shows My Books to an author', () => {
+  it('shows My works to an author', () => {
     renderWithSession(author);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Account',
       'Favorites',
-      'My Books',
+      'Library',
+      'Reading lists',
+      'My works',
     ]);
   });
 
-  it('hides My Books from every other role', () => {
+  it('hides My works from every other role', () => {
     renderWithSession(session);
 
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Account',
       'Favorites',
+      'Library',
+      'Reading lists',
     ]);
   });
 

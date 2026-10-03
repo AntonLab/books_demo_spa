@@ -5,9 +5,11 @@ import {
   where as sequelizeWhere,
 } from 'sequelize';
 import type { Transaction, WhereOptions } from 'sequelize';
+import { LAST_ONLINE_WINDOW_MS, OPEN_REPORT_STATUSES } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
+import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
@@ -62,6 +64,10 @@ export interface UserRepository {
   setAvatar(id: number, data: Buffer): Promise<boolean>;
   removeAvatar(id: number): Promise<void>;
   getAvatarData(id: number): Promise<{ data: Buffer; updatedAt: Date } | null>;
+  // A throttled stamp, never an edit: it writes lastSeenAt only when the
+  // stored value is null or older than LAST_ONLINE_WINDOW_MS, and leaves
+  // updatedAt alone. A missing id is a silent no-op.
+  touchLastSeen(id: number, now: Date): Promise<void>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -309,6 +315,8 @@ export function createSequelizeUserRepository(): UserRepository {
     // works are locked before they are counted, the same lock each
     // repository's removeCoAuthor takes, so a co-author leaving at the same
     // moment cannot leave a work credited to nobody.
+    //
+    // Open Reports on its comments are dismissed with the delete.
     async remove(id) {
       const sequelize = User.sequelize;
       if (!sequelize) {
@@ -408,6 +416,30 @@ export function createSequelizeUserRepository(): UserRepository {
           transaction
         );
 
+        // Comment rows are locked before any Report row, the order
+        // reportRepository and commentRepository use, so a concurrent report
+        // create cannot deadlock with this delete.
+        const commentIds = (
+          await Comment.findAll({
+            where: { userId: id },
+            attributes: ['id'],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+          })
+        ).map((comment) => comment.id);
+        if (commentIds.length > 0) {
+          await Report.update(
+            { status: 'dismissed', moderatorId: null, settledAt: new Date() },
+            {
+              where: {
+                commentId: commentIds,
+                status: [...OPEN_REPORT_STATUSES],
+              },
+              transaction,
+            }
+          );
+        }
+
         // silent, or every tombstone this leaves shares one updatedAt — a
         // stamp linking them to each other and to the moment of the delete.
         await Comment.update(
@@ -470,6 +502,26 @@ export function createSequelizeUserRepository(): UserRepository {
         attributes: ['data', 'updatedAt'],
       });
       return avatar ? { data: avatar.data, updatedAt: avatar.updatedAt } : null;
+    },
+
+    // One statement, so two concurrent requests cannot both pass a
+    // read-then-write check. silent keeps updatedAt still: an Account's "last
+    // edited" must not move on every page view.
+    async touchLastSeen(id, now) {
+      const staleBefore = new Date(now.getTime() - LAST_ONLINE_WINDOW_MS);
+      await User.update(
+        { lastSeenAt: now },
+        {
+          where: {
+            id,
+            [Op.or]: [
+              { lastSeenAt: null },
+              { lastSeenAt: { [Op.lt]: staleBefore } },
+            ],
+          },
+          silent: true,
+        }
+      );
     },
   };
 }

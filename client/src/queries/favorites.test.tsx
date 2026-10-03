@@ -1,9 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
-import {
-  useFavoriteBooks,
-  useRemoveFavorite,
-  useToggleFavorite,
-} from './favorites';
+import { useRemoveFavorite, useToggleFavorite } from './favorites';
 import { queryKeys } from './keys';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import { ApiError } from '../api/client';
@@ -74,25 +70,6 @@ describe('useToggleFavorite', () => {
     await waitFor(() =>
       expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.book(7) })
     );
-  });
-});
-
-describe('useFavoriteBooks', () => {
-  it('asks for the page and size it is given', async () => {
-    mockedFavorites.listFavoriteBooks.mockResolvedValue({
-      items: [],
-      total: 41,
-      limit: 20,
-      offset: 40,
-    });
-
-    const { result } = renderHookWithProviders(() => useFavoriteBooks(3, 20));
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockedFavorites.listFavoriteBooks).toHaveBeenCalledWith({
-      limit: 20,
-      offset: 40,
-    });
   });
 });
 

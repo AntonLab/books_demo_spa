@@ -1,5 +1,12 @@
-import { createGenre, deleteGenre, listGenres, renameGenre } from './genres';
+import {
+  createGenre,
+  deleteGenre,
+  listGenreCounts,
+  listGenres,
+  updateGenre,
+} from './genres';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
+import { genreItem } from '../test/genres';
 
 // A 204 carries no body, so it gets the fixture whose json() rejects.
 const mockFetch = (body: unknown, status = 200): jest.Mock => {
@@ -42,7 +49,7 @@ describe('listGenres', () => {
   });
 
   it('returns the items wrapper as sent, with no paging fields', async () => {
-    const page = { items: [{ id: 1, name: 'Gothic' }] };
+    const page = { items: [genreItem(1, 'Gothic')] };
     mockFetch(page);
 
     await expect(listGenres()).resolves.toEqual(page);
@@ -53,7 +60,32 @@ describe('listGenres', () => {
 
     await listGenres({ nonEmpty: true });
 
-    expect(callOf(fetchMock)[0]).toBe('/api/genres?nonEmpty=true');
+    expect(callOf(fetchMock)[0]).toBe('/api/genres?nonEmpty=1');
+  });
+});
+
+describe('listGenreCounts', () => {
+  it('gets the admin list with the counts flag', async () => {
+    const fetchMock = mockFetch({ items: [] });
+
+    await listGenreCounts();
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/genres?counts=1');
+    expect(init).toMatchObject({ method: 'GET' });
+  });
+});
+
+describe('updateGenre', () => {
+  it('patches only the fields it is given, a null parent included', async () => {
+    const fetchMock = mockFetch({ id: 7, name: 'Gothic', parent: null });
+
+    await updateGenre(7, { parentId: null });
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/genres/7');
+    expect(init).toMatchObject({ method: 'PATCH', headers: jsonWrite });
+    expect(JSON.parse(init.body as string)).toEqual({ parentId: null });
   });
 });
 
@@ -80,32 +112,6 @@ describe('createGenre', () => {
       name: 'ApiError',
       status: 409,
       message: 'A genre with that name already exists',
-    });
-  });
-});
-
-describe('renameGenre', () => {
-  it('patches the one genre named by the id', async () => {
-    const fetchMock = mockFetch({ id: 1, name: 'Gothic Revival' });
-
-    await expect(renameGenre(1, { name: 'Gothic Revival' })).resolves.toEqual({
-      id: 1,
-      name: 'Gothic Revival',
-    });
-
-    const [url, init] = callOf(fetchMock);
-    expect(url).toBe('/api/genres/1');
-    expect(init.method).toBe('PATCH');
-    expect(init.body).toBe('{"name":"Gothic Revival"}');
-    expect(init.headers).toEqual(jsonWrite);
-  });
-
-  it('rejects with the 404 of a genre that is gone', async () => {
-    mockFetch({ error: 'Genre 9 not found' }, 404);
-
-    await expect(renameGenre(9, { name: 'Horror' })).rejects.toMatchObject({
-      status: 404,
-      message: 'Genre 9 not found',
     });
   });
 });

@@ -1,11 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteAvatar, uploadAvatar } from '../api/users';
+import { deleteAvatar, updateUser, uploadAvatar } from '../api/users';
+import type { AccountChanges } from '../api/users';
 import { queryKeys } from './keys';
 
-// An Avatar change touches every place an AuthorSummary or a PublicUser is
+// An Account change touches every place an AuthorSummary or a PublicUser is
 // embedded: the session itself, and every books/series/comments list
 // or detail that names its owner, plus the author-picker's search cache.
-const useAvatarMutation = <TVariables, TResult>(
+// These endpoints answer a bare PublicUser, so the hook never writes it into
+// the session (that would drop `permissions`): it invalidates, and /auth/me
+// answers the whole SessionUser again.
+const useAccountMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>
 ) => {
   const queryClient = useQueryClient();
@@ -22,12 +26,16 @@ const useAvatarMutation = <TVariables, TResult>(
         queryClient.invalidateQueries({ queryKey: ['series'] }),
         queryClient.invalidateQueries({ queryKey: ['comments'] }),
         queryClient.invalidateQueries({ queryKey: ['authors'] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
       ]),
   });
 };
 
+export const useUpdateAccount = (userId: number) =>
+  useAccountMutation((changes: AccountChanges) => updateUser(userId, changes));
+
 export const useUploadAvatar = (userId: number) =>
-  useAvatarMutation((file: File) => uploadAvatar(userId, file));
+  useAccountMutation((file: File) => uploadAvatar(userId, file));
 
 export const useDeleteAvatar = (userId: number) =>
-  useAvatarMutation(() => deleteAvatar(userId));
+  useAccountMutation(() => deleteAvatar(userId));

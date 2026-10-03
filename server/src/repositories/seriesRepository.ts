@@ -1,9 +1,17 @@
-import { col, fn, Op, where as sequelizeWhere } from 'sequelize';
-import type { Sequelize, Transaction, WhereOptions } from 'sequelize';
+import {
+  col,
+  ForeignKeyConstraintError,
+  fn,
+  literal,
+  Op,
+  where as sequelizeWhere,
+} from 'sequelize';
+import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { SeriesCover } from '../models/SeriesCover.ts';
 import { User } from '../models/User.ts';
 import {
   addCoAuthor,
@@ -13,9 +21,19 @@ import {
   removeCoAuthor,
   type CreditTable,
 } from './coAuthors.ts';
-import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import {
+  assertGenreExists,
+  genreFamilyIds,
+  genreOf,
+  loadGenres,
+} from './genreRepository.ts';
 import { NotFoundError } from '../types/errors.ts';
-import type { ListResponse, PublicSeries, SeriesDetail } from 'shared';
+import type {
+  BookSort,
+  ListResponse,
+  PublicSeries,
+  SeriesDetail,
+} from 'shared';
 import type {
   CreateSeriesInput,
   ListSeriesQuery,
@@ -23,7 +41,11 @@ import type {
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
-import { visibleSeriesWhere, type Viewer } from './visibility.ts';
+import {
+  publishedSeriesWhere,
+  visibleSeriesWhere,
+  type Viewer,
+} from './visibility.ts';
 
 export type SeriesListResult = Pick<
   ListResponse<PublicSeries>,
@@ -66,6 +88,17 @@ export interface SeriesRepository {
   // The cheapest question the ownership check can ask: one indexed lookup, no
   // eager loads, no serialisation. null when the series is not there.
   findCoAuthorIds(id: number): Promise<number[] | null>;
+  // The Cover's bytes never ride along with any other read: these three are
+  // the only place series_covers is touched. false/null mean "no such series",
+  // removeCover included, so a caller can tell that from "no Cover to remove",
+  // which is a silent no-op. getCoverData also answers null for a series the
+  // viewer may not see.
+  setCover(seriesId: number, data: Buffer): Promise<boolean>;
+  removeCover(seriesId: number): Promise<boolean>;
+  getCoverData(
+    seriesId: number,
+    viewer: Viewer
+  ): Promise<{ data: Buffer; updatedAt: Date } | null>;
 }
 
 function sequelizeOf(): Sequelize {
@@ -91,18 +124,68 @@ const credits: CreditTable = {
     SeriesAuthor.destroy({ where: { seriesId, userId }, transaction }),
 };
 
+// Every Cover's URL for the series named, in one query, as a Book's.
+async function loadCoverUrls(
+  seriesIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, string>> {
+  if (seriesIds.length === 0) return new Map();
+
+  const covers = await SeriesCover.findAll({
+    where: { seriesId: seriesIds },
+    attributes: ['seriesId', 'updatedAt'],
+    transaction,
+  });
+  return new Map(
+    covers.map((cover) => [
+      cover.seriesId,
+      `/api/series/${cover.seriesId}/cover?v=${cover.updatedAt.getTime()}`,
+    ])
+  );
+}
+
+// Published Books per series, in one grouped query. Drafts are left out so a
+// reader's count never reveals one.
+async function loadBookCounts(
+  seriesIds: number[],
+  transaction?: Transaction
+): Promise<Map<number, number>> {
+  if (seriesIds.length === 0) return new Map();
+
+  const rows = await Book.findAll({
+    where: { seriesId: seriesIds, status: { [Op.ne]: 'draft' } },
+    attributes: ['seriesId', [fn('COUNT', col('id')), 'count']],
+    group: ['seriesId'],
+    raw: true,
+    transaction,
+  });
+  return new Map(
+    rows.flatMap((row) => {
+      const { seriesId, count } = row as unknown as {
+        seriesId: number;
+        count: number | string;
+      };
+      return [[seriesId, Number(count)]];
+    })
+  );
+}
+
 async function withAuthors(
   series: Series,
   transaction?: Transaction
 ): Promise<PublicSeries> {
-  const [authors, genres] = await Promise.all([
+  const [authors, genres, coverUrls, bookCounts] = await Promise.all([
     loadAuthors(credits, [series.id], transaction),
     loadGenres([series.genreId], transaction),
+    loadCoverUrls([series.id], transaction),
+    loadBookCounts([series.id], transaction),
   ]);
   return toPublicSeries(
     series,
     authors.get(series.id) ?? [],
-    genreOf(series.genreId, genres)
+    genreOf(series.genreId, genres),
+    coverUrls.get(series.id) ?? null,
+    bookCounts.get(series.id) ?? 0
   );
 }
 
@@ -110,15 +193,21 @@ async function withAuthors(
 // in one query each. Exported for favoriteRepository, whose rows embed the
 // series they point at.
 export async function publicSeriesOf(rows: Series[]): Promise<PublicSeries[]> {
-  const [authors, genres] = await Promise.all([
-    loadAuthors(
-      credits,
-      rows.map((row) => row.id)
-    ),
+  const ids = rows.map((row) => row.id);
+  const [authors, genres, coverUrls, bookCounts] = await Promise.all([
+    loadAuthors(credits, ids),
     loadGenres(rows.map((row) => row.genreId)),
+    loadCoverUrls(ids),
+    loadBookCounts(ids),
   ]);
   return rows.map((row) =>
-    toPublicSeries(row, authors.get(row.id) ?? [], genreOf(row.genreId, genres))
+    toPublicSeries(
+      row,
+      authors.get(row.id) ?? [],
+      genreOf(row.genreId, genres),
+      coverUrls.get(row.id) ?? null,
+      bookCounts.get(row.id) ?? 0
+    )
   );
 }
 
@@ -131,11 +220,43 @@ export async function findSeriesCoAuthorIds(
   return series ? creditedIds(credits, seriesId) : null;
 }
 
+async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
+  if (viewer === null) return new Map();
+  const rows = await Favorite.findAll({
+    where: { userId: viewer.id, seriesId: { [Op.ne]: null } },
+    attributes: ['id', 'seriesId'],
+  });
+  return new Map(
+    rows.flatMap((row) =>
+      row.seriesId === null ? [] : [[row.seriesId, row.id]]
+    )
+  );
+}
+
+// What `?sort=` ranks a series row by: the Book sorts over its non-Draft Books,
+// as correlated subqueries (NULL for a series with no Published Chapter, 0 Likes
+// for `popular`). Chapters count once their Publication time has passed, as
+// bookRepository's publicationEdge judges them; the escaped Date is the only
+// value spliced in.
+function seriesRankOf(sort: BookSort): Utils.Literal {
+  if (sort === 'popular') {
+    return literal(
+      "(SELECT COUNT(*) FROM `likes` JOIN `books` ON `books`.`id` = `likes`.`bookId` WHERE `books`.`seriesId` = `Series`.`id` AND `books`.`status` <> 'draft' AND `likes`.`isLike` = true)"
+    );
+  }
+  const now = sequelizeOf().escape(new Date());
+  return literal(
+    `(SELECT ${sort === 'new' ? 'MIN' : 'MAX'}(\`chapters\`.\`publishedAt\`) FROM \`chapters\` JOIN \`books\` ON \`books\`.\`id\` = \`chapters\`.\`bookId\` WHERE \`books\`.\`seriesId\` = \`Series\`.\`id\` AND \`books\`.\`status\` <> 'draft' AND \`chapters\`.\`publishedAt\` <= ${now})`
+  );
+}
+
 // creditedSeriesIds is the series `?userId=` names, looked up beforehand so the
 // LIMIT keeps paging over series rather than credit rows.
 function buildWhere(
   query: ListSeriesQuery,
-  creditedSeriesIds: number[] | undefined
+  creditedSeriesIds: number[] | undefined,
+  genreIds: number[] | undefined,
+  favorites: Map<number, number> | undefined
 ): WhereOptions {
   const clauses: WhereOptions[] = [];
 
@@ -144,10 +265,15 @@ function buildWhere(
     clauses.push({ id: creditedSeriesIds });
   }
 
-  // ANDed with the other filters. An id that names no Genre matches
-  // nothing and yields an empty list, as an unknown `?tag=` does.
-  if (query.genreId !== undefined) {
-    clauses.push({ genreId: query.genreId });
+  if (favorites !== undefined) {
+    clauses.push({ id: [...favorites.keys()] });
+  }
+
+  // genreIds is the Genre `?genreId=` names plus its Subgenres, looked up
+  // beforehand. ANDed with the other filters. An empty list (an id that names
+  // no Genre) matches nothing, as an unknown `?tag=` does.
+  if (genreIds !== undefined) {
+    clauses.push({ genreId: genreIds });
   }
 
   if (query.tag) {
@@ -208,19 +334,44 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
               })
             ).map((credit) => credit.seriesId);
 
+      const genreIds =
+        query.genreId === undefined
+          ? undefined
+          : await genreFamilyIds(query.genreId);
+
+      const favorites =
+        query.favoritedBy === undefined ? undefined : await favoritesOf(viewer);
+
       const { rows, count } = await Series.findAndCountAll({
         where: {
           [Op.and]: [
-            buildWhere(query, creditedSeriesIds),
-            await visibleSeriesWhere(viewer),
+            buildWhere(query, creditedSeriesIds, genreIds, favorites),
+            query.published
+              ? publishedSeriesWhere()
+              : await visibleSeriesWhere(viewer),
           ],
         },
         limit: query.limit,
         offset: query.offset,
-        order: [['id', 'ASC']],
+        order: query.sort
+          ? [
+              [seriesRankOf(query.sort), 'DESC'],
+              ['id', 'DESC'],
+            ]
+          : [['id', 'ASC']],
       });
 
-      return { items: await publicSeriesOf(rows), total: count };
+      const items = await publicSeriesOf(rows);
+      return {
+        items:
+          favorites === undefined
+            ? items
+            : items.map((item) => ({
+                ...item,
+                favoriteId: favorites.get(item.id),
+              })),
+        total: count,
+      };
     },
 
     async findById(id, viewer) {
@@ -339,6 +490,40 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
 
     async findCoAuthorIds(id) {
       return findSeriesCoAuthorIds(id);
+    },
+
+    async setCover(seriesId, data) {
+      // The cover row's foreign key is the existence check, so a series deleted
+      // mid-upload reads as not found (as commentRepository maps it).
+      try {
+        await SeriesCover.upsert({ seriesId, data });
+        return true;
+      } catch (error) {
+        if (error instanceof ForeignKeyConstraintError) return false;
+        throw error;
+      }
+    },
+
+    async removeCover(seriesId) {
+      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
+      if (!series) return false;
+      await SeriesCover.destroy({ where: { seriesId } });
+      return true;
+    },
+
+    async getCoverData(seriesId, viewer) {
+      const series = await Series.findOne({
+        where: {
+          [Op.and]: [{ id: seriesId }, await visibleSeriesWhere(viewer)],
+        },
+        attributes: ['id'],
+      });
+      if (!series) return null;
+
+      const cover = await SeriesCover.findByPk(seriesId, {
+        attributes: ['data', 'updatedAt'],
+      });
+      return cover ? { data: cover.data, updatedAt: cover.updatedAt } : null;
     },
   };
 }

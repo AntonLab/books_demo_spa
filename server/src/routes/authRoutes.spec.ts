@@ -14,7 +14,7 @@ import type { MailMessage } from '../delivery/mailDelivery.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
 import { recordLogs } from '../logger.testkit.ts';
-import type { PublicUser } from 'shared';
+import type { PublicUser, SessionUser } from 'shared';
 
 const registration = {
   login: 'Bob',
@@ -273,6 +273,29 @@ test('POST /register refuses to make an admin', async () => {
   });
 });
 
+test('register trims names and refuses a name that is only whitespace', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    for (const field of ['firstName', 'lastName'] as const) {
+      const blank = await post(base, 'register', {
+        ...registration,
+        [field]: '   ',
+      });
+      assert.equal(blank.status, 400, field);
+    }
+
+    const padded = await post(base, 'register', {
+      ...registration,
+      firstName: '  Bob ',
+      lastName: ' Bobsson  ',
+    });
+    assert.equal(padded.status, 201);
+    const body = await json<PublicUser>(padded);
+    assert.equal(body.firstName, 'Bob');
+    assert.equal(body.lastName, 'Bobsson');
+  });
+});
+
 test('the session cookie is httpOnly and same-site lax', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
@@ -369,6 +392,34 @@ test('GET /me returns the signed-in user', async () => {
 
     assert.equal(response.status, 200);
     assert.equal((await json<PublicUser>(response)).login, 'Bob');
+  });
+});
+
+test('register, login and /me all carry the Account permissions', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const registered = await json<SessionUser>(
+      await post(base, 'register', registration)
+    );
+    assert.equal(registered.permissions.users.update, 'own');
+
+    const loginResponse = await post(base, 'login', {
+      login: 'Bob',
+      password: 'hunter2hunter2',
+    });
+    const token = sessionCookie(loginResponse);
+    assert.equal(
+      (await json<SessionUser>(loginResponse)).permissions.users.update,
+      'own'
+    );
+
+    const me = await json<SessionUser>(
+      await fetch(`${base}/api/auth/me`, {
+        headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+      })
+    );
+    assert.equal(me.permissions.users.update, 'own');
+    assert.equal(me.permissions.users.read, 'any');
   });
 });
 

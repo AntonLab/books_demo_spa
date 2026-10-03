@@ -1,9 +1,4 @@
-import {
-  createFavorite,
-  deleteFavorite,
-  listFavoriteBooks,
-  listFavoriteSeries,
-} from './favorites';
+import { createFavorite, deleteFavorite } from './favorites';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (response: Response): jest.Mock => {
@@ -74,35 +69,5 @@ describe('deleteFavorite', () => {
     expect(url).toBe('/api/favorites/5');
     expect(init.method).toBe('DELETE');
     expect(init.headers).toEqual({ 'X-XSRF-Token': 'tok-123' });
-  });
-});
-
-describe('listFavoriteBooks', () => {
-  it('asks for one page, with no body or token', async () => {
-    const envelope = { items: [], total: 0, limit: 20, offset: 40 };
-    const fetchMock = mockFetch(jsonResponse(envelope));
-
-    await expect(listFavoriteBooks({ limit: 20, offset: 40 })).resolves.toEqual(
-      envelope
-    );
-
-    const [url, init] = callOf(fetchMock);
-    expect(url).toBe('/api/favorites/books?limit=20&offset=40');
-    expect(init.method).toBe('GET');
-    expect(init.headers).toEqual({});
-  });
-});
-
-describe('listFavoriteSeries', () => {
-  it('asks for one page of Favorite series', async () => {
-    const fetchMock = mockFetch(
-      jsonResponse({ items: [], total: 0, limit: 20, offset: 0 })
-    );
-
-    await listFavoriteSeries({ limit: 20, offset: 0 });
-
-    expect(callOf(fetchMock)[0]).toBe(
-      '/api/favorites/series?limit=20&offset=0'
-    );
   });
 });

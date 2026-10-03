@@ -28,15 +28,14 @@ interface NotificationBellProps {
 
 const WORK_LABELS = { book: 'the book', series: 'the series' } as const;
 
-// A book opens on its page; a series on its editor, since the public series
-// page is still a stub. A New chapter opens its first new Chapter, or the Book
-// once that Chapter is gone.
+// A Book and a Series open on their own pages; a New chapter opens its
+// Chapter, or the Book once that Chapter is gone.
 const hrefOf = (notification: PublicNotification): string | null => {
   const { work } = notification;
   if (work.id === null) return null;
   if (notification.kind === 'new_chapter' && notification.chapter.id !== null)
     return `/books/${work.id}/chapters/${notification.chapter.id}`;
-  return work.type === 'book' ? `/books/${work.id}` : `/series/${work.id}/edit`;
+  return work.type === 'book' ? `/books/${work.id}` : `/series/${work.id}`;
 };
 
 const actorOf = ({ actor }: CreditNotification): string => {

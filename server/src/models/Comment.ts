@@ -147,7 +147,8 @@ export function toCommentWithAuthor(
   comment: Comment,
   author: AuthorSummary | null,
   likeCount: number,
-  viewerLikeId: number | null
+  viewerLikeId: number | null,
+  reports: Pick<CommentWithAuthor, 'hasOpenReport' | 'viewerReportedId'>
 ): CommentWithAuthor {
   return {
     ...toPublicComment(comment),
@@ -156,5 +157,6 @@ export function toCommentWithAuthor(
     author: (comment.tombstone ?? null) === null ? author : null,
     likeCount,
     viewerLikeId,
+    ...reports,
   };
 }

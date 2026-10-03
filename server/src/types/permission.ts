@@ -1,4 +1,5 @@
 import { USER_ROLES } from 'shared';
+import type { Action, Module, PermissionScope } from 'shared';
 
 // `as const` unions rather than enums, per the repository rules — the same
 // shape as USER_STATUSES in types/user.ts.
@@ -10,27 +11,8 @@ import { USER_ROLES } from 'shared';
 export const ROLES = ['guest', ...USER_ROLES] as const;
 export type Role = (typeof ROLES)[number];
 
-export const MODULES = [
-  'users',
-  'series',
-  'books',
-  'chapters',
-  'comments',
-  'likes',
-  'favorites',
-  'genres',
-  'reports',
-] as const;
-export type Module = (typeof MODULES)[number];
-
-export const ACTIONS = ['create', 'read', 'update', 'delete'] as const;
-export type Action = (typeof ACTIONS)[number];
-
-// `none` refuses outright; `own` allows the caller's own rows; `any` allows
-// every row. A boolean could not tell author-updates-own from
-// admin-updates-any, and that distinction would fall back into controllers.
-export const PERMISSION_SCOPES = ['none', 'own', 'any'] as const;
-export type PermissionScope = (typeof PERMISSION_SCOPES)[number];
+export { MODULES, ACTIONS, PERMISSION_SCOPES } from 'shared';
+export type { Module, Action, PermissionScope } from 'shared';
 
 export interface PublicPermission {
   role: Role;

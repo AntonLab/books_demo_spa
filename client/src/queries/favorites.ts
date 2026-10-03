@@ -1,18 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryKey } from '@tanstack/react-query';
-import {
-  createFavorite,
-  deleteFavorite,
-  listFavoriteBooks,
-  listFavoriteSeries,
-} from '../api/favorites';
+import { createFavorite, deleteFavorite } from '../api/favorites';
 import type { CreateFavoritePayload } from 'shared';
 import { queryKeys } from './keys';
-
-const pageParams = (page: number, pageSize: number) => ({
-  limit: pageSize,
-  offset: (page - 1) * pageSize,
-});
 
 // One hook for both directions, as useToggleLike: `existingId` is the
 // viewerFavoriteId the caller holds (null adds, a number removes that row),
@@ -39,21 +29,6 @@ export const useToggleFavorite = (invalidates: QueryKey) => {
         queryClient.invalidateQueries({ queryKey: invalidates }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allFavorites }),
       ]),
-  });
-};
-
-// `page` is 1-based, as antd's Pagination counts.
-export const useFavoriteBooks = (page: number, pageSize: number) => {
-  return useQuery({
-    queryKey: queryKeys.favoriteBooks(page, pageSize),
-    queryFn: () => listFavoriteBooks(pageParams(page, pageSize)),
-  });
-};
-
-export const useFavoriteSeries = (page: number, pageSize: number) => {
-  return useQuery({
-    queryKey: queryKeys.favoriteSeries(page, pageSize),
-    queryFn: () => listFavoriteSeries(pageParams(page, pageSize)),
   });
 };
 

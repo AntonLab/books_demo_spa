@@ -2,13 +2,16 @@ import {
   addSeriesCoAuthor,
   createSeries,
   deleteSeries,
+  deleteSeriesCover,
   getSeries,
+  listFavoritedSeries,
   listSeries,
   listSeriesBooks,
   removeBookFromSeries,
   removeSeriesCoAuthor,
   reorderSeriesBooks,
   updateSeries,
+  uploadSeriesCover,
 } from './series';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
@@ -95,6 +98,24 @@ describe('listSeries', () => {
     mockFetch(page);
 
     await expect(listSeries({ limit: 5 })).resolves.toEqual(page);
+  });
+});
+
+describe('listSeries sort and published', () => {
+  it('encodes sort and published after the other params', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({
+      userId: 3,
+      limit: 20,
+      offset: 40,
+      sort: 'new',
+      published: 'true',
+    });
+
+    expect(callOf(fetchMock)[0]).toBe(
+      '/api/series?userId=3&limit=20&offset=40&sort=new&published=true'
+    );
   });
 });
 
@@ -338,5 +359,73 @@ describe('removeBookFromSeries', () => {
     expect(init.method).toBe('DELETE');
     expect(init.body).toBeUndefined();
     expect(init.headers).toEqual({ 'X-XSRF-Token': 'tok-123' });
+  });
+});
+
+describe('listSeries paging, tag and favorites', () => {
+  it('encodes tag and offset, keeping an offset of 0', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({ tag: 'epic', limit: 20, offset: 0 });
+
+    const url = new URL(callOf(fetchMock)[0], 'http://x');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      tag: 'epic',
+      limit: '20',
+      offset: '0',
+    });
+  });
+
+  it('listFavoritedSeries sends favoritedBy=me beside the other filters', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listFavoritedSeries({ genreId: 4, limit: 50, offset: 50 });
+
+    const url = new URL(callOf(fetchMock)[0], 'http://x');
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      genreId: '4',
+      limit: '50',
+      offset: '50',
+      favoritedBy: 'me',
+    });
+  });
+});
+
+describe('uploadSeriesCover', () => {
+  it('PUTs the file as-is to /series/:id/cover and returns the series', async () => {
+    const fetchMock = mockFetch({
+      id: 12,
+      coverUrl: '/api/series/12/cover?v=2',
+    });
+    const file = new File([new Uint8Array([1, 2, 3])], 'cover.webp', {
+      type: 'image/webp',
+    });
+
+    const result = await uploadSeriesCover(12, file);
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/series/12/cover');
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBe(file);
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe(
+      'image/webp'
+    );
+    expect((init.headers as Record<string, string>)['X-XSRF-Token']).toBe(
+      'tok-123'
+    );
+    expect(result.coverUrl).toBe('/api/series/12/cover?v=2');
+  });
+});
+
+describe('deleteSeriesCover', () => {
+  it('DELETEs /series/:id/cover with no body', async () => {
+    const fetchMock = mockFetch(undefined, 204);
+
+    await deleteSeriesCover(12);
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/series/12/cover');
+    expect(init.method).toBe('DELETE');
+    expect(init.body).toBeUndefined();
   });
 });

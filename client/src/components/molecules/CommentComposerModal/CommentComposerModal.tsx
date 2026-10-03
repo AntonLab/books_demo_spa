@@ -67,6 +67,11 @@ export const CommentComposerModal: FC<CommentComposerModalProps> = ({
             onEdit={noop}
             onDelete={noop}
             onLike={noop}
+            canReport={false}
+            onReport={noop}
+            canModerate={false}
+            onRemove={noop}
+            onRestore={noop}
           />
         </div>
       )}

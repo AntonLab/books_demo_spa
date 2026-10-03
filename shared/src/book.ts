@@ -1,4 +1,5 @@
 import type { PublicGenre } from './genre.ts';
+import type { LibraryCounts, ReadingStatus } from './library.ts';
 import type { AuthorSummary } from './user.ts';
 
 // The Book status (CONTEXT.md): only `draft` keeps a book from readers;
@@ -11,6 +12,19 @@ export type BookStatus = (typeof BOOK_STATUSES)[number];
 export const BOOK_SORTS = ['popular', 'new', 'updated'] as const;
 export type BookSort = (typeof BOOK_SORTS)[number];
 
+// The most Book ids one `GET /api/books?ids=` names, and the cap of a device's
+// Recently viewed history.
+export const BOOK_IDS_MAX = 20;
+
+// The Series a Book is filed in, with the Book's place in it. N is derived and
+// counts Published Books only, so it never reveals a Draft book; null for a
+// Draft book itself.
+export interface BookSeriesRef {
+  id: number;
+  title: string;
+  position: number | null;
+}
+
 // No userId: a book has no single owner (ADR-0005).
 export interface PublicBook {
   id: number;
@@ -19,6 +33,7 @@ export interface PublicBook {
   // to /api/users, which is guarded.
   authors: AuthorSummary[];
   seriesId: number | null;
+  series: BookSeriesRef | null;
   title: string;
   description: string;
   tags: string[];
@@ -44,12 +59,10 @@ export type SeriesBookSummary = Pick<
   'id' | 'title' | 'status' | 'authors'
 >;
 
-// What GET /api/books/:id returns: the record plus the series name a book page
-// has to show and the like state it renders. Additive over PublicBook, so the
-// endpoint's existing readers are unaffected. The Co-authors come with
-// PublicBook itself.
+// What GET /api/books/:id returns: the record plus the like state a book page
+// renders. Additive over PublicBook, so the endpoint's existing readers are
+// unaffected. The Co-authors and the Series come with PublicBook itself.
 export interface BookDetail extends PublicBook {
-  series: { id: number; title: string } | null;
   likeCount: number;
   // null both for an anonymous visitor and for a signed-in one who has not
   // liked this book. The client needs no third state: with no session it hides
@@ -68,6 +81,12 @@ export interface BookDetail extends PublicBook {
   // for a Guest and for an account without one. Reported on a Draft too, so
   // the button a Co-author sees matches the row that exists.
   viewerFavoriteId: number | null;
+  // The viewer's own Reading status for this book (CONTEXT.md, Library); null
+  // for a Guest and for an account with no entry. Reported on a Draft too.
+  viewerReadingStatus: ReadingStatus | null;
+  // How many Accounts hold the book in a Library (CONTEXT.md, Library), never
+  // counting Not interested. All zero while the book is a Draft.
+  libraryCounts: LibraryCounts;
 }
 
 // The Book statuses a search may ask for: a Draft book never appears in one.

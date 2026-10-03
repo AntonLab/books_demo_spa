@@ -600,4 +600,49 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     assert.equal(metadata.width, 600);
     assert.equal(metadata.height, 900);
   });
+
+  test('a co-author uploads a series cover through the real CSRF handshake, and reads it back as WebP', async () => {
+    const author = await signUp('seriesCoverAuthor', 'author');
+    const series = await author.browser.send<PublicSeries>('POST', '/series', {
+      title: 'Cover Series',
+      description: 'A trilogy',
+    });
+    assert.equal(series.status, 201);
+
+    const cover = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: '#336699' },
+    })
+      .jpeg()
+      .toBuffer();
+
+    const upload = await fetch(`${base}/api/series/${series.body.id}/cover`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'image/jpeg',
+        origin: trustedOrigin,
+        cookie: author.browser.cookieHeader(),
+        [XSRF_HEADER_NAME]: author.browser.xsrfToken(),
+      },
+      body: cover,
+    });
+    assert.equal(upload.status, 200);
+    const updated = (await upload.json()) as PublicSeries;
+    assert.match(
+      updated.coverUrl ?? '',
+      new RegExp(`^/api/series/${series.body.id}/cover\\?v=\\d+$`)
+    );
+
+    // An empty series is visible to its Co-author only, so read it back as one.
+    const read = await fetch(`${base}/api/series/${series.body.id}/cover`, {
+      headers: { cookie: author.browser.cookieHeader() },
+    });
+    assert.equal(read.status, 200);
+    assert.equal(read.headers.get('content-type'), 'image/webp');
+    const metadata = await sharp(
+      Buffer.from(await read.arrayBuffer())
+    ).metadata();
+    assert.equal(metadata.format, 'webp');
+    assert.equal(metadata.width, 600);
+    assert.equal(metadata.height, 900);
+  });
 });

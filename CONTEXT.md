@@ -29,6 +29,18 @@ text, when it was last Online (unless it hides that), totals across its
 Published works, and its Published Series and Books.
 _Avoid_: Profile (that one is private), author page
 
+**Last online**:
+When an Account was last seen signed in, accurate to five minutes. A Public
+profile shows it as "Online now", "Last online today", "Last online yesterday"
+or "Last online" with a date, and omits it when the Account hides it. Not the
+same as Online, which is a live connection.
+_Avoid_: Last seen, last active
+
+**About**:
+The plain text an Account writes about itself, up to 1000 characters, shown on
+its Public profile. Empty means the Public profile has no About block.
+_Avoid_: Bio, description (a Book or Series has one of those)
+
 **Role**:
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
 role assumed for someone with no session; no Account holds it.
@@ -263,6 +275,18 @@ A New or In review Report. While a Comment has one, everyone sees it marked as
 under review and nobody can report it again. When a Dismissed Comment's text is
 later changed beyond small corrections, a New Report is opened on it again.
 
+**System report**:
+The New Report the platform itself opens when a Dismissed Comment's text is
+changed beyond small corrections. It has no reporter and repeats the reason of
+the Dismissed Report it follows.
+_Avoid_: Auto report, bot report
+
+**Ban mark**:
+The flag Moderators see on an Account that owns 10 or more Comments with at
+least one Upheld Report each; a restored Comment still counts. It only suggests
+blocking the Account: a Moderator decides.
+_Avoid_: Strike, automatic ban
+
 ### Notifications
 
 **Notification**:
@@ -338,7 +362,7 @@ _Avoid_: Collection (that is not a Series either), selection, shelf
 
 **Recently viewed**:
 The last six Books whose page or Chapter was opened on one device. Like a
-Device preference, the server never sees it. A Guest's views carry over to the
+Device preference, the server keeps no copy of it. A Guest's views carry over to the
 Account that signs in; it is cleared only when a different Account from the
 last one signs in on that device.
 
@@ -347,7 +371,7 @@ last one signs in on that device.
 **Release time**:
 The Publication time of a Book's earliest Published Chapter: the moment it
 first had something to read. A Book with no Published Chapter has none, so it
-is not a New release. Its Book status and creation time do not enter into it.
+is listed after every New release. Its Book status and creation time do not enter into it.
 _Avoid_: Created at, publish date (for a Book)
 
 **New release**:

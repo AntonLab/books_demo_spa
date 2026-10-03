@@ -7,19 +7,33 @@ import { z } from 'zod';
 // unique index — not this schema — is what refuses another casing of it.
 const nameSchema = z.string().trim().min(1).max(GENRE_NAME_MAX_LENGTH);
 
-// One schema for both writes, unlike the create/update pairs elsewhere in this
-// directory: create and rename take the same body — one required name — and there is
-// no `.default()` here for `.partial()` to undo, which is the reason those
-// pairs are spelled out separately.
+// null is a top-level Genre; a number names the parent of a Subgenre.
+const parentIdSchema = z.int().positive().nullable();
+
 export const genreBodySchema = z.object({
   name: nameSchema,
+  parentId: parentIdSchema.optional(),
 });
 
 export type GenreInput = z.infer<typeof genreBodySchema>;
 
+// Any subset of the create body, but not nothing: an empty PATCH is a client
+// mistake, not a no-op worth a round trip.
+export const genreUpdateSchema = z
+  .object({
+    name: nameSchema.optional(),
+    parentId: parentIdSchema.optional(),
+  })
+  .refine((body) => Object.keys(body).length > 0, {
+    message: 'Provide at least one field to change',
+  });
+
+export type GenreUpdateInput = z.infer<typeof genreUpdateSchema>;
+
 // stringbool, not z.coerce.boolean(): coercion turns "false" into true.
 export const listGenresQuerySchema = z.object({
   nonEmpty: z.stringbool().optional(),
+  counts: z.stringbool().optional(),
 });
 
 export type ListGenresQuery = z.infer<typeof listGenresQuerySchema>;

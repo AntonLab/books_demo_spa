@@ -80,7 +80,10 @@ export function commentRepositoryContract(
 
     assert.equal(await repository.findById(MISSING_ID, null), null);
     assert.equal(await repository.update(MISSING_ID, { text: 'Nobody' }), null);
-    assert.equal(await repository.remove(MISSING_ID, 'deleted'), false);
+    assert.equal(
+      await repository.remove(MISSING_ID, 'deleted', MISSING_ID),
+      false
+    );
     assert.equal(await repository.restore(MISSING_ID), null);
   });
 
@@ -115,6 +118,20 @@ export function commentRepositoryContract(
     assert.equal(page.total, 2);
   });
 
+  test('contract: listed comments carry no report flags while nothing is reported', async () => {
+    const { repository, anAccount, aBook } = await setUp();
+    const actorId = await anAccount();
+    const bookId = await aBook();
+    await repository.create({ bookId, parentId: null, text: 'Plain' }, actorId);
+    const query = { limit: 20, offset: 0, bookId };
+
+    for (const viewer of [null, { id: actorId, role: 'user' as const }]) {
+      const item = (await repository.list(query, viewer)).items[0];
+      assert.equal(item?.hasOpenReport, false);
+      assert.equal(item?.viewerReportedId, null);
+    }
+  });
+
   test('contract: an update rewrites the text and keeps the owner', async () => {
     const { repository, anAccount, aBook } = await setUp();
     const actorId = await anAccount();
@@ -141,7 +158,7 @@ export function commentRepositoryContract(
         actorId
       );
 
-      assert.equal(await repository.remove(created.id, kind), true);
+      assert.equal(await repository.remove(created.id, kind, actorId), true);
       assert.equal(
         (await repository.findById(created.id, null))?.tombstone,
         kind
@@ -156,7 +173,7 @@ export function commentRepositoryContract(
       { bookId: await aBook(), parentId: null, text: 'Moderated' },
       actorId
     );
-    await repository.remove(created.id, 'removed');
+    await repository.remove(created.id, 'removed', actorId);
 
     const restored = await repository.restore(created.id);
 

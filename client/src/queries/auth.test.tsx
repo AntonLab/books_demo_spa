@@ -13,6 +13,7 @@ import {
 } from './auth';
 import { queryKeys } from './keys';
 import { createTestQueryClient } from '../test/queryClient';
+import { sessionOf } from '../test/session';
 import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
 import type { PublicUser } from '../types/api';
@@ -30,6 +31,8 @@ const user: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -48,7 +51,7 @@ beforeEach(() => {
 
 describe('useSession', () => {
   it('resolves the signed-in user', async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useSession(), {
@@ -58,7 +61,7 @@ describe('useSession', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(result.current.data).toEqual(user);
+    expect(result.current.data).toEqual(sessionOf(user));
   });
 
   it('treats a 401 as "nobody is signed in", not as an error', async () => {
@@ -96,7 +99,7 @@ describe('useSession', () => {
 
 describe('useLogin', () => {
   it('writes the returned user into the session cache', async () => {
-    mockedAuth.login.mockResolvedValue(user);
+    mockedAuth.login.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useLogin(), {
@@ -104,7 +107,7 @@ describe('useLogin', () => {
     });
     await result.current.mutateAsync({ login: 'bob', password: 'secret123' });
 
-    expect(client.getQueryData(queryKeys.session)).toEqual(user);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
     expect(mockedAuth.login).toHaveBeenCalledWith({
       login: 'bob',
       password: 'secret123',
@@ -132,7 +135,7 @@ describe('useLogin', () => {
 
 describe('useRegister', () => {
   it('writes the new user into the session cache', async () => {
-    mockedAuth.register.mockResolvedValue(user);
+    mockedAuth.register.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useRegister(), {
@@ -146,7 +149,7 @@ describe('useRegister', () => {
       lastName: 'Bobson',
     });
 
-    expect(client.getQueryData(queryKeys.session)).toEqual(user);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
   });
 
   it('preserves the 409 conflict field on the rejection', async () => {
@@ -202,8 +205,28 @@ describe('watchSession', () => {
     };
   };
 
+  it("drops the last Account's Reports and statistics rather than refetching them", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, sessionOf(user));
+    const listKey = queryKeys.reports({
+      from: 'a',
+      to: 'b',
+      limit: 20,
+      offset: 0,
+    });
+    const statisticsKey = queryKeys.reportStatistics({ from: 'a', to: 'b' });
+    client.setQueryData(listKey, { items: [] });
+    client.setQueryData(statisticsKey, {});
+
+    client.setQueryData(queryKeys.session, null);
+
+    expect(client.getQueryState(listKey)).toBe(undefined);
+    expect(client.getQueryState(statisticsKey)).toBe(undefined);
+  });
+
   it('announces a session its own mutation wrote, not one it fetched', async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     mockedAuth.logout.mockResolvedValue(undefined);
     const client = createTestQueryClient();
     const channel = fakeChannel();
@@ -216,7 +239,7 @@ describe('watchSession', () => {
       }
     );
     await waitFor(() => {
-      expect(result.current.session.data).toEqual(user);
+      expect(result.current.session.data).toEqual(sessionOf(user));
     });
     expect(channel.postMessage).not.toHaveBeenCalled();
 
@@ -226,7 +249,7 @@ describe('watchSession', () => {
   });
 
   it("asks /auth/me again on another tab's announcement", async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
     const channel = fakeChannel();
     watchSession(client, channel);
@@ -234,7 +257,7 @@ describe('watchSession', () => {
       wrapper: wrapper(client),
     });
     await waitFor(() => {
-      expect(result.current.data).toEqual(user);
+      expect(result.current.data).toEqual(sessionOf(user));
     });
 
     mockedAuth.me.mockRejectedValue(
@@ -277,6 +300,84 @@ describe('watchSession', () => {
     expect(client.getQueryState(queryKeys.notifications(user.id))).toBe(
       undefined
     );
+  });
+
+  it("drops the last Account's Library and Favorites, and keeps them while the Account stays", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const libraryKey = [...queryKeys.allLibrary, { page: 1 }];
+    const favoritesKey = [...queryKeys.allFavorites, { page: 1 }];
+    client.setQueryData(libraryKey, { items: [] });
+    client.setQueryData(favoritesKey, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    expect(client.getQueryState(libraryKey)).toBeDefined();
+    expect(client.getQueryState(favoritesKey)).toBeDefined();
+
+    client.setQueryData(queryKeys.session, null);
+    expect(client.getQueryState(libraryKey)).toBe(undefined);
+    expect(client.getQueryState(favoritesKey)).toBe(undefined);
+  });
+
+  it("drops the last Account's own Reading lists, and keeps them while the Account stays", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const key = queryKeys.myListsForWork({ bookId: 7 });
+    client.setQueryData(key, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    expect(client.getQueryState(key)).toBeDefined();
+
+    client.setQueryData(queryKeys.session, null);
+    expect(client.getQueryState(key)).toBe(undefined);
+  });
+
+  it("drops the last Account's Favorites and My works lists, and keeps everyone else's", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
+    const favoriteSeries = queryKeys.series({ favoritedBy: 'me', limit: 20 });
+    const myBooks = queryKeys.books({ userId: user.id, pageSize: 20 });
+    const mySeries = queryKeys.series({ userId: user.id, limit: 100 });
+    const someoneElsesBooks = queryKeys.books({ userId: 99, pageSize: 20 });
+    const mainPageBooks = queryKeys.books({ sort: 'popular', pageSize: 20 });
+    const bookDetail = queryKeys.book(7);
+    const all = [
+      favoriteBooks,
+      favoriteSeries,
+      myBooks,
+      mySeries,
+      someoneElsesBooks,
+      mainPageBooks,
+      bookDetail,
+    ];
+    all.forEach((key) => client.setQueryData(key, { items: [] }));
+
+    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    all.forEach((key) => expect(client.getQueryState(key)).toBeDefined());
+
+    client.setQueryData(queryKeys.session, null);
+    [favoriteBooks, favoriteSeries, myBooks, mySeries].forEach((key) =>
+      expect(client.getQueryState(key)).toBe(undefined)
+    );
+    [someoneElsesBooks, mainPageBooks, bookDetail].forEach((key) =>
+      expect(client.getQueryState(key)).toBeDefined()
+    );
+  });
+
+  it("drops Account A's lists when Account B signs in directly", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, user);
+    const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
+    client.setQueryData(favoriteBooks, { items: [] });
+
+    client.setQueryData(queryKeys.session, { ...user, id: 2, login: 'amy' });
+
+    expect(client.getQueryState(favoriteBooks)).toBe(undefined);
   });
 
   describe('a failed request', () => {

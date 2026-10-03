@@ -1,25 +1,26 @@
+import { useState } from 'react';
 import type { FC } from 'react';
 import {
-  Alert,
-  Divider,
-  Empty,
-  Flex,
-  Skeleton,
-  Space,
-  Tabs,
-  Tag,
-  theme,
-  Typography,
-} from 'antd';
-import { Link, useParams } from 'react-router';
+  CommentOutlined,
+  EditOutlined,
+  UnorderedListOutlined,
+} from '@ant-design/icons';
+import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
+import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
-import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
-import { BookCover } from '@/components/molecules/BookCover/BookCover';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
+import { IconButton } from '@/components/molecules/IconButton/IconButton';
+import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
+import { ReadingStatusSelect } from '@/components/molecules/ReadingStatusSelect/ReadingStatusSelect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
-import { TagList } from '@/components/molecules/TagList/TagList';
+import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
+import { BookCard } from '@/components/organisms/BookCard/BookCard';
+import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
+import { BookReadingListsTab } from '@/components/organisms/BookReadingListsTab/BookReadingListsTab';
+import { useBookReadingLists } from '@/components/organisms/BookReadingListsTab/useBookReadingLists';
 import { ChapterList } from '@/components/organisms/ChapterList/ChapterList';
 import { CommentSection } from '@/components/organisms/CommentSection/CommentSection';
 import { useSession } from '@/queries/auth';
@@ -27,13 +28,20 @@ import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
 import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
+import { useSetReadingStatus } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
-import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
-import { searchPath } from '@/types/bookSearch';
-import { bookCapabilities } from '@/types/capabilities';
+import {
+  bookCapabilities,
+  mayAddBookToReadingList,
+} from '@/types/capabilities';
+import { entriesOfBook } from '@/store/unsavedTextSlice';
+import { useRecordRecentlyViewed } from '@/store/useRecentlyViewed';
+import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
+
+const BOOK_GONE = 'This book no longer exists.';
 
 export const BookPage: FC = () => {
   const bookId = Number(useParams().id);
@@ -42,22 +50,36 @@ export const BookPage: FC = () => {
   return Number.isInteger(bookId) && bookId > 0 ? (
     <BookView bookId={bookId} />
   ) : (
-    <Empty description="This book no longer exists." />
+    <GoneRedirect message={BOOK_GONE} />
   );
 };
 
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
+  const navigate = useNavigate();
+  const [editing, setEditing] = useState(false);
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
+  useRecordRecentlyViewed(book);
   // Fetched in parallel with the book rather than after it: neither section
   // needs the detail response to know what to ask for.
   const chapters = useChapters(bookId);
+  const readingLists = useBookReadingLists(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
   const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
+  const setStatus = useSetReadingStatus();
+  const { message } = App.useApp();
+  const toastError = (error: Error) => void message.error(error.message);
+
+  const unsavedEntries = useOwnUnsavedEntries();
+  const hasUnsavedText = entriesOfBook(unsavedEntries, bookId).length > 0;
 
   if (isError) {
+    const isGone = error instanceof ApiError && error.status === 404;
+    // Its Unsaved text keeps the page open: the notices are the only way to
+    // copy it out.
+    if (isGone && !hasUnsavedText) return <GoneRedirect message={BOOK_GONE} />;
     return (
       <>
         <Alert
@@ -65,9 +87,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           title="Could not load this book."
           className={spacing.gapBelow}
         />
-        {error instanceof ApiError && error.status === 404 && (
-          <BookUnsavedTextNotices bookId={bookId} />
-        )}
+        {isGone && <BookUnsavedTextNotices bookId={bookId} />}
       </>
     );
   }
@@ -75,119 +95,91 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
   // Nobody comments on a Draft book; the server answers 403 either way.
   const isDraft = book.status === 'draft';
-  const { isCoAuthor, mayEdit, mayLike, mayFavorite } = bookCapabilities(
-    book,
-    session
-  );
+  const { isCoAuthor, mayEdit, mayLike, mayFavorite, mayKeepInLibrary } =
+    bookCapabilities(book, session);
   // The public list: only what is out, even for a Co-author, who manages the
-  // rest from the edit page. The Chapters and Statistics tabs share it, so
+  // rest from the Edit modal. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
   const published = publishedChapters(chapters.data?.items ?? []);
+  // No count until the first response is in, so no false (0) flashes.
+  const readingListsLabel =
+    readingLists.isPending || readingLists.error !== null
+      ? 'Reading lists'
+      : `Reading lists (${readingLists.total})`;
 
   return (
     <article>
       {/* The chapter pages turn this Account away, so this is the only place
           its Unsaved text shows. */}
       {!mayEdit && <BookUnsavedTextNotices bookId={bookId} />}
-      {/* Flex, not Space: Space wraps each child in a div.ant-space-item
-          that carries no flex rule of its own, so a flex style on a child
-          beneath it does nothing. Flex's children are the flex items
-          themselves. */}
-      <Flex align="start" gap={token.margin} className={styles.row}>
-        <BookCover coverUrl={book.coverUrl} title={book.title} />
-        {/* flex: 1 lets this column take the rest of the row; minWidth: 0
-            overrides the flex item's default content-based floor, so long
-            text wraps instead of forcing horizontal scroll at phone
-            width. */}
-        <div className={styles.body}>
-          <Typography.Title level={2} className={styles.title}>
-            {book.title}
-          </Typography.Title>
+      <BookCard book={book} heading />
 
-          <Space size={token.marginSM} wrap>
-            <Space size={4} wrap>
-              {book.authors.map((author, index) => (
-                <Space key={author.id} size={4}>
-                  <AccountAvatar
-                    avatarUrl={author.avatarUrl}
-                    name={`${author.firstName} ${author.lastName}`}
-                    size="small"
-                  />
-                  <Typography.Text>
-                    {`${author.firstName} ${author.lastName}${
-                      index < book.authors.length - 1 ? ',' : ''
-                    }`}
-                  </Typography.Text>
-                </Space>
-              ))}
-            </Space>
-            <Tag color={BOOK_STATUS_COLORS[book.status]}>
-              {BOOK_STATUS_LABELS[book.status]}
-            </Tag>
-            {/* Only for a Co-author: a Moderator reaches the edit page by
-                its address, the way they reach a draft. */}
-            {isCoAuthor && <Link to={`/books/${book.id}/edit`}>Edit</Link>}
-            {book.series && (
-              <Link to={`/series/${book.series.id}`}>{book.series.title}</Link>
-            )}
-            {book.genre !== null && (
-              <Link to={searchPath({ genre: String(book.genre.id) })}>
-                {book.genre.name}
-              </Link>
-            )}
-            {mayLike && (
-              <LikeButton
-                count={book.likeCount}
-                likedId={book.viewerLikeId}
-                onToggle={(existingId) =>
-                  toggleLike.mutate({
-                    existingId,
-                    payload: { bookId: book.id, isLike: true },
-                  })
-                }
-              />
-            )}
-            {mayFavorite && (
-              <FavoriteButton
-                count={book.favoriteCount}
-                favoriteId={book.viewerFavoriteId}
-                // A second click before the refetch lands would send the
-                // same add twice and meet a 409.
-                disabled={toggleFavorite.isPending}
-                onToggle={(existingId) =>
-                  toggleFavorite.mutate({
-                    existingId,
-                    payload: { bookId: book.id },
-                  })
-                }
-              />
-            )}
-          </Space>
+      <Space size={token.marginSM} wrap>
+        {mayLike && (
+          <LikeButton
+            count={book.likeCount}
+            likedId={book.viewerLikeId}
+            onToggle={(existingId) =>
+              toggleLike.mutate({
+                existingId,
+                payload: { bookId: book.id, isLike: true },
+              })
+            }
+          />
+        )}
+        {mayFavorite && (
+          <FavoriteButton
+            count={book.favoriteCount}
+            favoriteId={book.viewerFavoriteId}
+            // A second click before the refetch lands would send the
+            // same add twice and meet a 409.
+            disabled={toggleFavorite.isPending}
+            onToggle={(existingId) =>
+              toggleFavorite.mutate({
+                existingId,
+                payload: { bookId: book.id },
+              })
+            }
+          />
+        )}
+        {mayKeepInLibrary && (
+          <ReadingStatusSelect
+            // Its own id: rc-component's generated ids all read `test-id`
+            // under Jest, and this select would then name any modal whose
+            // title is labelled by that id.
+            id="book-reading-status"
+            value={book.viewerReadingStatus}
+            disabled={setStatus.isPending}
+            onChange={(status) =>
+              setStatus.mutate(
+                { bookId: book.id, status },
+                { onError: toastError }
+              )
+            }
+          />
+        )}
+        {mayAddBookToReadingList(book, session) && (
+          <AddToReadingList target={{ bookId: book.id }} />
+        )}
+        {mayEdit && (
+          <IconButton
+            type="text"
+            size="small"
+            label="Edit"
+            icon={<EditOutlined aria-hidden />}
+            onClick={() => setEditing(true)}
+          />
+        )}
+      </Space>
 
-          {book.tags.length > 0 && (
-            <div className={styles.tags}>
-              <TagList tags={book.tags} />
-            </div>
-          )}
-        </div>
-      </Flex>
+      <BookLibraryCounts counts={book.libraryCounts} />
 
       {/* Uncontrolled: the open tab is this page's own state (ADR-0010) and
-          never reaches the URL, so a reload opens Description. */}
+          never reaches the URL, so a reload opens Chapters. */}
       <Tabs
         className={styles.tabs}
         classNames={{ body: styles.tabsBody }}
         items={[
-          {
-            key: 'description',
-            label: 'Description',
-            children:
-              book.description.trim() === '' ? (
-                <Empty description="No description yet." />
-              ) : (
-                <Typography.Paragraph>{book.description}</Typography.Paragraph>
-              ),
-          },
           {
             key: 'chapters',
             label: 'Chapters',
@@ -217,7 +209,35 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
       <Divider />
 
-      <CommentSection bookId={bookId} closed={isDraft} />
+      {/* Uncontrolled like the set above: the open tab is page state
+          (ADR-0010), so a reload opens Comments. No fixed body height: the
+          thread grows with the page. A tab is named by its content, so the
+          icon stays aria-hidden and the text stays inside the tab; rc-tabs
+          has no hook for an aria-label on the tab. */}
+      <Tabs
+        items={[
+          {
+            key: 'comments',
+            icon: <CommentOutlined aria-hidden />,
+            label: `Comments (${book.commentCount})`,
+            children: <CommentSection bookId={bookId} closed={isDraft} />,
+          },
+          {
+            key: 'readingLists',
+            icon: <UnorderedListOutlined aria-hidden />,
+            label: readingListsLabel,
+            children: <BookReadingListsTab list={readingLists} />,
+          },
+        ]}
+      />
+
+      {editing && (
+        <BookEditDetailsModal
+          bookId={bookId}
+          onClose={() => setEditing(false)}
+          onGone={() => void navigate(isCoAuthor ? '/profile/my-books' : '/')}
+        />
+      )}
     </article>
   );
 };

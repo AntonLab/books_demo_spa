@@ -3,6 +3,7 @@ import {
   createComment,
   deleteComment,
   listComments,
+  restoreComment,
   updateComment,
 } from '../api/comments';
 import type { CreateCommentPayload } from 'shared';
@@ -34,6 +35,9 @@ const useCommentMutation = <TVariables>(
     mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.book(bookId) });
+      // An Owner's edit or delete settles or reopens Reports. Create fires it
+      // too; the extra refetch only runs while a Reports tab is mounted.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allReports });
       return queryClient.invalidateQueries({
         queryKey: queryKeys.comments(bookId),
       });
@@ -54,4 +58,8 @@ export const useUpdateComment = (bookId: number) => {
 
 export const useDeleteComment = (bookId: number) => {
   return useCommentMutation<number>(bookId, deleteComment);
+};
+
+export const useRestoreComment = (bookId: number) => {
+  return useCommentMutation<number>(bookId, restoreComment);
 };

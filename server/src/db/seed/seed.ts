@@ -17,7 +17,7 @@
 // (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
 // looks like an abandoned project.
 //
-// Destructive by design: with --force it deletes every row in the eleven
+// Destructive by design: with --force it deletes every row in the
 // content tables before inserting. Without --force it reports what it found
 // and exits without writing.
 
@@ -28,10 +28,14 @@ import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
+import { Report } from '../../models/Report.ts';
 import { Favorite } from '../../models/Favorite.ts';
-import { Genre } from '../../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../../models/Genre.ts';
+import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
+import { ReadingList } from '../../models/ReadingList.ts';
+import { ReadingListItem } from '../../models/ReadingListItem.ts';
 import { Series } from '../../models/Series.ts';
 import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
 import { User } from '../../models/User.ts';
@@ -40,11 +44,14 @@ import { createChapterSchema } from '../../types/chapter.ts';
 import { createCommentSchema } from '../../types/comment.ts';
 import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
+import { setReadingStatusSchema } from '../../types/library.ts';
+import { createReadingListSchema } from '../../types/readingList.ts';
+import { createReportSchema } from '../../types/report.ts';
 import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
-import { GENRE_NAMES } from './content.ts';
+import { GENRE_TREE, parentGenreOf } from './content.ts';
 import {
   DAY_MS,
   buildPlan,
@@ -82,8 +89,12 @@ const INSERT_BATCH = 200;
 // syncPermissions() derives from code, not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  ReadingListItem,
+  ReadingList,
   Favorite,
+  LibraryEntry,
   Like,
+  Report,
   Comment,
   Chapter,
   BookAuthor,
@@ -111,10 +122,11 @@ async function writeAccounts(
 ): Promise<number[]> {
   const ids: number[] = [];
 
-  for (const { spec, createdAt } of plan.accounts) {
+  for (const { spec, createdAt, lastSeenAt } of plan.accounts) {
     // createUserSchema carries no `role` on purpose: the role travels
     // separately so a PATCH body can never smuggle one in. The seed follows
-    // that split rather than working around it.
+    // that split rather than working around it. lastSeenAt is attached the
+    // same way, after parsing: no request body may set it.
     const fields = createUserSchema.parse({
       login: spec.login,
       email: `${spec.login}@example.com`,
@@ -122,13 +134,21 @@ async function writeAccounts(
       firstName: spec.firstName,
       lastName: spec.lastName,
       status: 'active',
+      about: spec.about,
+      showLastSeen: spec.showLastSeen,
     });
 
     // create(), not bulkCreate: bulkCreate defaults to individualHooks: false,
     // which would skip User.beforeSave and store the password in clear text.
     // `silent` is what stops save() from overwriting the backdated updatedAt.
     const user = await User.create(
-      { ...fields, role: spec.role, createdAt, updatedAt: createdAt },
+      {
+        ...fields,
+        role: spec.role,
+        lastSeenAt,
+        createdAt,
+        updatedAt: createdAt,
+      },
       { transaction, silent: true }
     );
     ids.push(user.id);
@@ -141,18 +161,26 @@ async function writeAccounts(
 // under one. Returned as a name → id map, which is how a content bank's
 // genreName becomes a genreId.
 //
-// create() in a loop rather than bulkCreate: five rows are nothing, and the ids
-// have to come back — a loop gets them without depending on MySQL back-filling
-// them from the insert's first id (see writeThreads, where that assumption does
-// live and is checked).
+// create() in a loop rather than bulkCreate: a dozen rows are nothing, and the
+// ids have to come back — a loop gets them without depending on MySQL
+// back-filling them from the insert's first id (see writeThreads, where that
+// assumption does live and is checked). A parent is written before its
+// Subgenres, which need its id.
 async function writeGenres(
   transaction: Transaction
 ): Promise<Map<string, number>> {
   const ids = new Map<string, number>();
 
-  for (const name of GENRE_NAMES) {
-    const row = await Genre.create({ name }, { transaction });
-    ids.set(name, row.id);
+  for (const { name, subgenres } of GENRE_TREE) {
+    const parent = await Genre.create({ name }, { transaction });
+    ids.set(name, parent.id);
+    for (const subgenre of subgenres) {
+      const row = await Genre.create(
+        { name: subgenre, parentId: parent.id },
+        { transaction }
+      );
+      ids.set(subgenre, row.id);
+    }
   }
 
   return ids;
@@ -222,11 +250,16 @@ async function writeContent(
 
   for (const author of plan.authors) {
     // Every Book and Series drawn from this author's bank is filed under the
-    // bank's Genre. A co-authored work keeps the Genre of the author it was
+    // bank's Subgenre (the odd-numbered works: first, third, …) or its parent
+    // Genre (the even-numbered ones), so both levels hold work. Counted from position, not drawn, to leave the seed's RNG
+    // sequence alone. A co-authored work keeps the Genre of the author it was
     // planned under — the only author whose bank it came from.
-    const genreId = genreIdOf(author.spec.bank.genreName);
+    const subgenre = author.spec.bank.genreName;
+    const genreIdAt = (position: number): number =>
+      genreIdOf(position % 2 === 0 ? subgenre : parentGenreOf(subgenre));
     const seriesIds: number[] = [];
-    for (const entry of author.series) {
+    for (const [seriesPosition, entry] of author.series.entries()) {
+      const genreId = genreIdAt(seriesPosition);
       const fields = createSeriesSchema.parse({ ...entry, genreId });
       const row = await Series.create(
         { ...fields, createdAt: entry.createdAt, updatedAt: entry.createdAt },
@@ -247,10 +280,10 @@ async function writeContent(
     // Each series' books take their places in the order the plan lists them,
     // as bookRepository would append them one by one.
     const filedSoFar = new Map<number, number>();
-    for (const book of author.books) {
+    for (const [bookPosition, book] of author.books.entries()) {
       const fields = createBookSchema.parse({
         ...book,
-        genreId,
+        genreId: genreIdAt(bookPosition),
         seriesId:
           book.seriesIndex === null
             ? null
@@ -444,7 +477,11 @@ async function writeThreads(
   accountIds: readonly number[],
   bookIds: Map<PlannedBook, number>,
   transaction: Transaction
-): Promise<{ comments: number; likes: number }> {
+): Promise<{
+  comments: number;
+  likes: number;
+  commentIds: Map<PlannedComment, number>;
+}> {
   const bookIdOf = (book: PlannedBook): number => {
     const id = bookIds.get(book);
     if (id === undefined) {
@@ -514,7 +551,46 @@ async function writeThreads(
     Like.bulkCreate(batch, { transaction })
   );
 
-  return { comments: plan.comments.length, likes: likeRows.length };
+  return { comments: plan.comments.length, likes: likeRows.length, commentIds };
+}
+
+async function writeReports(
+  plan: Plan,
+  accountIds: readonly number[],
+  commentIds: ReadonlyMap<PlannedComment, number>,
+  transaction: Transaction
+): Promise<number> {
+  const accountIdAt = (index: number | null): number | null =>
+    index === null ? null : itemAt(accountIds, index, 'account id');
+
+  const rows = plan.reports.map((report) => {
+    const commentId = commentIds.get(report.comment);
+    if (commentId === undefined) {
+      throw new Error('No row was created for a reported comment');
+    }
+    const settledOrFiled = report.settledAt ?? report.createdAt;
+    return {
+      ...createReportSchema.parse({
+        reason: report.reason,
+        explanation: report.explanation ?? undefined,
+      }),
+      commentId,
+      reporterId: accountIdAt(report.reporterIndex),
+      isSystem: report.reporterIndex === null,
+      reportedAccountId: accountIdAt(report.comment.accountIndex),
+      status: report.status,
+      moderatorId: accountIdAt(report.moderatorIndex),
+      settledText: report.settledText,
+      takenAt: report.takenAt,
+      settledAt: report.settledAt,
+      createdAt: report.createdAt,
+      updatedAt: settledOrFiled,
+    };
+  });
+
+  // A few dozen rows: far below INSERT_BATCH, so one insert.
+  await Report.bulkCreate(rows, { transaction });
+  return rows.length;
 }
 
 async function writeFavorites(
@@ -550,8 +626,78 @@ async function writeFavorites(
   return rows.length;
 }
 
+async function writeLibrary(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  transaction: Transaction
+): Promise<number> {
+  const rows = plan.library.map((entry) => {
+    const bookId = bookIds.get(entry.book);
+    if (bookId === undefined) {
+      throw new Error(`No row was created for "${entry.book.title}"`);
+    }
+    return {
+      ...setReadingStatusSchema.parse({ status: entry.status }),
+      userId: itemAt(accountIds, entry.accountIndex, 'account id'),
+      bookId,
+      createdAt: entry.updatedAt,
+      updatedAt: entry.updatedAt,
+    };
+  });
+
+  // About 25 rows: far below INSERT_BATCH, so one insert.
+  await LibraryEntry.bulkCreate(rows, { transaction });
+  return rows.length;
+}
+
+async function writeReadingLists(
+  plan: Plan,
+  accountIds: readonly number[],
+  bookIds: Map<PlannedBook, number>,
+  seriesIds: Map<PlannedSeries, number>,
+  transaction: Transaction
+): Promise<{ readingLists: number; readingListItems: number }> {
+  const idOf = <T extends { title: string }>(
+    ids: Map<T, number>,
+    work: T
+  ): number => {
+    const id = ids.get(work);
+    if (id === undefined) {
+      throw new Error(`No row was created for "${work.title}"`);
+    }
+    return id;
+  };
+
+  const lists = await ReadingList.bulkCreate(
+    plan.readingLists.map((list) => ({
+      ...createReadingListSchema.parse({
+        title: list.title,
+        description: list.description,
+        tags: list.tags,
+      }),
+      userId: itemAt(accountIds, list.accountIndex, 'account id'),
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+    })),
+    { transaction }
+  );
+
+  // bulkCreate returns the rows in input order, so index i is plan list i.
+  const items = plan.readingLists.flatMap((list, listIndex) =>
+    list.items.map((item, position) => ({
+      listId: itemAt(lists, listIndex, 'reading list').id,
+      bookId: item.book === null ? null : idOf(bookIds, item.book),
+      seriesId: item.series === null ? null : idOf(seriesIds, item.series),
+      position,
+    }))
+  );
+  await ReadingListItem.bulkCreate(items, { transaction });
+  return { readingLists: lists.length, readingListItems: items.length };
+}
+
 /* -------------------------------------------------------------------------- */
-/* Entry point                                                                */
+/* Entry point                                                              */
 /* -------------------------------------------------------------------------- */
 
 async function countExisting(): Promise<Record<string, number>> {
@@ -592,7 +738,8 @@ async function main(): Promise<void> {
     // worse than no demo, and a failure here leaves the previous one intact.
     const totals = await sequelize.transaction(async (transaction) => {
       for (const model of CONTENT_MODELS) {
-        await model.destroy({ where: {}, transaction });
+        if (model === Genre) await destroyAllGenres(transaction);
+        else await model.destroy({ where: {}, transaction });
       }
 
       const accountIds = await writeAccounts(plan, transaction);
@@ -616,11 +763,31 @@ async function main(): Promise<void> {
         content.seriesIds,
         transaction
       );
+      const library = await writeLibrary(
+        plan,
+        accountIds,
+        content.bookIds,
+        transaction
+      );
+      const readingLists = await writeReadingLists(
+        plan,
+        accountIds,
+        content.bookIds,
+        content.seriesIds,
+        transaction
+      );
       const notifications = await writeNotifications(
         plan,
         accountIds,
         content.bookIds,
         content.seriesIds,
+        transaction
+      );
+
+      const reports = await writeReports(
+        plan,
+        accountIds,
+        threads.commentIds,
         transaction
       );
 
@@ -630,9 +797,13 @@ async function main(): Promise<void> {
         series: content.series,
         books: content.bookIds.size,
         chapters: content.chapters,
-        ...threads,
+        comments: threads.comments,
+        likes: threads.likes,
         favorites,
+        library,
+        ...readingLists,
         notifications,
+        reports,
       };
     });
 

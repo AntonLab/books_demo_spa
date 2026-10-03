@@ -26,6 +26,10 @@ export interface FavoriteSeries {
   series: PublicSeries;
 }
 
+// What each item of a `?favoritedBy=me` list carries: `favoriteId` is the id
+// DELETE /api/favorites/:id takes.
+export type WithFavoriteId<T> = T & { favoriteId: number };
+
 // The body of POST /api/favorites: exactly one target, as the server's schema
 // demands; no userId, since the server takes the Account from the session.
 export type CreateFavoritePayload = { bookId: number } | { seriesId: number };

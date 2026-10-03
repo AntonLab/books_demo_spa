@@ -7,15 +7,19 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Provider } from 'react-redux';
 import {
   BrowserRouter,
+  Link,
   Navigate,
   Route,
   Routes,
   useLocation,
+  useParams,
 } from 'react-router';
 import { PASSWORD_RESET_PATH } from 'shared';
 import { queryClient } from '@/queries/queryClient';
 import { store } from '@/store';
+import { useRecentlyViewedAccountBinding } from '@/store/useRecentlyViewed';
 import { useUnsavedTextAccountBinding } from '@/store/useUnsavedText';
+import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { AppHeader } from '@/components/organisms/AppHeader/AppHeader';
 import { ErrorBoundary } from '@/components/organisms/ErrorBoundary/ErrorBoundary';
@@ -26,9 +30,9 @@ import styles from './App.module.css';
 // render on every route, so splitting them would buy nothing. Each page is a
 // named export, so `lazy` has to remap it onto `default` — see
 // .claude/rules/client/pages.md.
-const AdminGenresPage = lazy(() =>
-  import('@/pages/AdminGenresPage/AdminGenresPage').then((m) => ({
-    default: m.AdminGenresPage,
+const AdminPage = lazy(() =>
+  import('@/pages/AdminPage/AdminPage').then((m) => ({
+    default: m.AdminPage,
   }))
 );
 const BookPage = lazy(() =>
@@ -39,42 +43,27 @@ const ChapterPage = lazy(() =>
     default: m.ChapterPage,
   }))
 );
-const EditChapterPage = lazy(() =>
-  import('@/pages/EditChapterPage/EditChapterPage').then((m) => ({
-    default: m.EditChapterPage,
-  }))
-);
-const EditSeriesPage = lazy(() =>
-  import('@/pages/EditSeriesPage/EditSeriesPage').then((m) => ({
-    default: m.EditSeriesPage,
-  }))
-);
-const EditBookPage = lazy(() =>
-  import('@/pages/EditBookPage/EditBookPage').then((m) => ({
-    default: m.EditBookPage,
-  }))
-);
 const MainPage = lazy(() =>
   import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage }))
-);
-const NewChapterPage = lazy(() =>
-  import('@/pages/NewChapterPage/NewChapterPage').then((m) => ({
-    default: m.NewChapterPage,
-  }))
-);
-const NotFoundPage = lazy(() =>
-  import('@/pages/NotFoundPage/NotFoundPage').then((m) => ({
-    default: m.NotFoundPage,
-  }))
 );
 const ProfilePage = lazy(() =>
   import('@/pages/ProfilePage/ProfilePage').then((m) => ({
     default: m.ProfilePage,
   }))
 );
+const PublicProfilePage = lazy(() =>
+  import('@/pages/PublicProfilePage/PublicProfilePage').then((m) => ({
+    default: m.PublicProfilePage,
+  }))
+);
 const SearchPage = lazy(() =>
   import('@/pages/SearchPage/SearchPage').then((m) => ({
     default: m.SearchPage,
+  }))
+);
+const ReadingListPage = lazy(() =>
+  import('@/pages/ReadingListPage/ReadingListPage').then((m) => ({
+    default: m.ReadingListPage,
   }))
 );
 const SeriesPage = lazy(() =>
@@ -83,17 +72,25 @@ const SeriesPage = lazy(() =>
   }))
 );
 
+const BookRedirect: FC = () => {
+  const { bookId } = useParams();
+  return <Navigate to={`/books/${bookId}`} replace />;
+};
+
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
 // test cannot point at an arbitrary path. Route tests wrap this in
 // MemoryRouter instead.
 export const AppShell: FC = () => {
   const { pathname } = useLocation();
   useUnsavedTextAccountBinding();
+  useRecentlyViewedAccountBinding();
   // The Profile routes all render ProfilePage and only switch its outer Tabs;
   // keying the boundary by the bare pathname would remount it, and every antd
-  // pane it has mounted, on each tab click. They share one key instead.
+  // pane it has mounted, on each tab click. They share one key instead, and so
+  // do the Admin panel's routes.
   const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
-  const boundaryKey = isProfile ? '/profile' : pathname;
+  const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
+  const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
 
   return (
     <Layout className={styles.layout}>
@@ -111,27 +108,29 @@ export const AppShell: FC = () => {
                   token and opens the confirm modal over the home page. */}
               <Route path={PASSWORD_RESET_PATH} element={<MainPage />} />
               <Route path="/books/:id" element={<BookPage />} />
-              <Route path="/books/:id/edit" element={<EditBookPage />} />
               <Route
                 path="/books/:bookId/chapters/:chapterId"
                 element={<ChapterPage />}
               />
-              {/* The static `new` segment outranks `:chapterId`. */}
+              {/* The static `new` segment outranks `:chapterId`. The old
+                  Chapter pages are gone, and a bookmark lands on the Book. */}
               <Route
                 path="/books/:bookId/chapters/new"
-                element={<NewChapterPage />}
+                element={<BookRedirect />}
               />
               <Route
                 path="/books/:bookId/chapters/:chapterId/edit"
-                element={<EditChapterPage />}
+                element={<BookRedirect />}
               />
               <Route path="/search" element={<SearchPage />} />
-              {/* A bare /series stays NotFoundPage. */}
               <Route path="/series/:id" element={<SeriesPage />} />
-              <Route path="/series/:id/edit" element={<EditSeriesPage />} />
+              <Route path="/lists/:id" element={<ReadingListPage />} />
+              <Route path="/accounts/:id" element={<PublicProfilePage />} />
               {/* One page whose tabs are paths; see ProfilePage. */}
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/profile/favorites" element={<ProfilePage />} />
+              <Route path="/profile/library" element={<ProfilePage />} />
+              <Route path="/profile/lists" element={<ProfilePage />} />
               <Route path="/profile/my-books" element={<ProfilePage />} />
               {/* The paths these tabs had as pages of their own. */}
               <Route
@@ -142,12 +141,24 @@ export const AppShell: FC = () => {
                 path="/my-books"
                 element={<Navigate replace to="/profile/my-books" />}
               />
-              <Route path="/admin/genres" element={<AdminGenresPage />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route
+                path="/admin"
+                element={<Navigate replace to="/admin/reports" />}
+              />
+              <Route path="/admin/reports" element={<AdminPage />} />
+              <Route path="/admin/genres" element={<AdminPage />} />
+              <Route
+                path="*"
+                element={<GoneRedirect message="Page not found." />}
+              />
             </Routes>
           </Suspense>
         </ErrorBoundary>
       </Layout.Content>
+      <Layout.Footer className={styles.footer}>
+        <span>© 2026 Books Demo</span>
+        <Link to="/search">Search</Link>
+      </Layout.Footer>
     </Layout>
   );
 };

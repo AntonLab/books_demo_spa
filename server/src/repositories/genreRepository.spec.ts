@@ -2,19 +2,24 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import {
+  ForeignKeyConstraintError,
+  UniqueConstraintError,
+  type Sequelize,
+} from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
 import { Series } from '../models/Series.ts';
 import { createSequelizeBookRepository } from './bookRepository.ts';
 import {
   assertGenreExists,
   createSequelizeGenreRepository,
+  loadGenres,
 } from './genreRepository.ts';
 import { genreRepositoryContract } from './genreRepository.contract.testkit.ts';
 
@@ -57,7 +62,53 @@ describe('genreRepository against real MySQL', { skip }, () => {
   beforeEach(async () => {
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
+  });
+
+  test('sibling names are unique, case-insensitively, per parent — enforced by the database', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const horror = await Genre.create({ name: 'Horror' });
+    await Genre.create({ name: 'Urban', parentId: fantasy.id });
+
+    await assert.rejects(
+      Genre.create({ name: 'urban', parentId: fantasy.id }),
+      UniqueConstraintError
+    );
+    // Another parent, and the top level, are other scopes.
+    await Genre.create({ name: 'Urban', parentId: horror.id });
+    await Genre.create({ name: 'Urban' });
+    await assert.rejects(
+      Genre.create({ name: 'URBAN' }),
+      UniqueConstraintError
+    );
+    await assert.rejects(
+      Genre.create({ name: 'fantasy' }),
+      UniqueConstraintError
+    );
+  });
+
+  test('the database refuses to delete a Genre that still has a Subgenre', async () => {
+    const parent = await Genre.create({ name: 'Fantasy' });
+    await Genre.create({ name: 'Urban', parentId: parent.id });
+    await assert.rejects(
+      Genre.destroy({ where: { id: parent.id } }),
+      ForeignKeyConstraintError
+    );
+  });
+
+  test('loadGenres embeds the parent of a Subgenre, and null for a top-level Genre', async () => {
+    const parent = await Genre.create({ name: 'Fantasy' });
+    const child = await Genre.create({ name: 'Urban', parentId: parent.id });
+    const map = await loadGenres([parent.id, child.id, null]);
+    assert.deepEqual(map.get(parent.id), {
+      id: parent.id,
+      name: 'Fantasy',
+      parent: null,
+    });
+    assert.deepEqual(map.get(child.id)?.parent, {
+      id: parent.id,
+      name: 'Fantasy',
+    });
   });
 
   // The one rule here that only MySQL can prove: the deletion and the
@@ -145,6 +196,80 @@ describe('genreRepository against real MySQL', { skip }, () => {
       ['A Ongoing', 'B Complete']
     );
     assert.equal((await repository.list()).length, 4);
+  });
+
+  const makeBook = (
+    genreId: number,
+    status: 'draft' | 'in_progress' | 'complete'
+  ) =>
+    Book.create({
+      title: `b${genreId}${status}`,
+      description: 'x',
+      tags: [],
+      genreId,
+      status,
+    });
+
+  test('nonEmpty adds the parent of a qualifying Subgenre; a Draft reveals neither', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    const horror = await Genre.create({ name: 'Horror' });
+    const gothic = await Genre.create({ name: 'Gothic', parentId: horror.id });
+    const romance = await Genre.create({ name: 'Romance' });
+    await Genre.create({ name: 'Mystery' });
+    await makeBook(urban.id, 'complete');
+    await makeBook(gothic.id, 'draft');
+    await makeBook(romance.id, 'in_progress');
+
+    const items = await repository.list({ nonEmpty: true });
+    assert.deepEqual(
+      items.map((g) => g.name),
+      ['Fantasy', 'Romance', 'Urban']
+    );
+    assert.equal(items.find((g) => g.name === 'Urban')?.parentId, fantasy.id);
+  });
+
+  test('nonEmpty lists a parent holding its own Book once, beside its qualifying Subgenre', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    await makeBook(fantasy.id, 'complete');
+    await makeBook(urban.id, 'in_progress');
+
+    assert.deepEqual(
+      (await repository.list({ nonEmpty: true })).map((g) => g.name),
+      ['Fantasy', 'Urban']
+    );
+  });
+
+  test('listWithCounts counts a Genre’s own Books and Series, Drafts included, with no roll-up', async () => {
+    const fantasy = await Genre.create({ name: 'Fantasy' });
+    const urban = await Genre.create({ name: 'Urban', parentId: fantasy.id });
+    await makeBook(urban.id, 'draft');
+    await makeBook(urban.id, 'complete');
+    await makeBook(fantasy.id, 'in_progress');
+    await Series.create({
+      title: 'S',
+      description: 'x',
+      tags: [],
+      genreId: urban.id,
+    });
+
+    assert.deepEqual(await repository.listWithCounts(), [
+      {
+        id: fantasy.id,
+        name: 'Fantasy',
+        parentId: null,
+        bookCount: 1,
+        seriesCount: 0,
+      },
+      {
+        id: urban.id,
+        name: 'Urban',
+        parentId: fantasy.id,
+        bookCount: 2,
+        seriesCount: 1,
+      },
+    ]);
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---

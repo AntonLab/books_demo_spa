@@ -8,7 +8,7 @@ import {
 } from '../repositories/userRepository.fake.testkit.ts';
 import { hashPassword } from '../password.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
-import type { PublicUser } from 'shared';
+import { ABOUT_MAX_LENGTH, type PublicUser } from 'shared';
 import {
   AUTH_COOKIE,
   json,
@@ -43,6 +43,8 @@ function seedPersonaRows(): FakeUserRow[] {
     status: 'active',
     role,
     avatarUrl: null,
+    about: '',
+    showLastSeen: true,
     password: PASSWORD_HASH,
     createdAt: now,
     updatedAt: now,
@@ -264,6 +266,76 @@ test('PATCH updates one field', async () => {
       assert.equal(response.status, 200);
       assert.equal(body.firstName, 'Robert');
       assert.equal(body.lastName, 'Bobsson');
+    }
+  );
+});
+
+test('PATCH trims a name and refuses one that is only whitespace', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const as = ROLE_COOKIES.superadmin;
+
+      assert.equal(
+        (await patch(base, created.id, { firstName: '   ' }, as)).status,
+        400
+      );
+      assert.equal(
+        (await patch(base, created.id, { lastName: '' }, as)).status,
+        400
+      );
+
+      const trimmed = await patch(
+        base,
+        created.id,
+        { firstName: ' Robert ' },
+        as
+      );
+      assert.equal(trimmed.status, 200);
+      assert.equal(
+        (await json<{ firstName: string }>(trimmed)).firstName,
+        'Robert'
+      );
+    }
+  );
+});
+
+test('POST (administrative create) refuses a whitespace-only name', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await post(base, { ...valid, lastName: '  ' })).status,
+        400
+      );
+    }
+  );
+});
+
+test('PATCH stores About and showLastSeen, and refuses an About over the limit', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const patch = (body: object) =>
+        fetch(`${base}/api/users/${created.id}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json', cookie: AUTH_COOKIE },
+          body: JSON.stringify(body),
+        });
+
+      const ok = await patch({
+        about: 'Line one\nLine two',
+        showLastSeen: false,
+      });
+      const body = await json<{ about: string; showLastSeen: boolean }>(ok);
+      assert.equal(ok.status, 200);
+      assert.equal(body.about, 'Line one\nLine two');
+      assert.equal(body.showLastSeen, false);
+
+      const tooLong = await patch({ about: 'x'.repeat(ABOUT_MAX_LENGTH + 1) });
+      assert.equal(tooLong.status, 400);
     }
   );
 });

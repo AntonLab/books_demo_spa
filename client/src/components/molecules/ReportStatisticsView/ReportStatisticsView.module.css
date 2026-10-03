@@ -1,0 +1,11 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}

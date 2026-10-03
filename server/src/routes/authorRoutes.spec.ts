@@ -41,6 +41,8 @@ function createFakeUsers(queries: ListAuthorsQuery[]): UserRepository {
       email: `${author.login}@example.com`,
       status: 'active',
       role: 'author',
+      about: '',
+      showLastSeen: true,
       // Never verified: nothing here signs in with a password.
       password: 'not-a-hash',
       createdAt: now,

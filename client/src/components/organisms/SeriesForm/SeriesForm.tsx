@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Alert, Button, Form } from 'antd';
 import type { FormInstance } from 'antd';
 import { WorkFields } from '@/components/molecules/WorkFields/WorkFields';
-import type { PublicGenre } from 'shared';
+import type { GenreListItem } from 'shared';
 import spacing from '@/theme/spacing.module.css';
 
 export interface SeriesFormValues {
@@ -13,7 +13,7 @@ export interface SeriesFormValues {
 }
 
 interface SeriesFormProps {
-  genreOptions: PublicGenre[];
+  genreOptions: GenreListItem[];
   submitLabel: string;
   onSubmit: (values: SeriesFormValues) => void;
   initialValues?: SeriesFormValues;

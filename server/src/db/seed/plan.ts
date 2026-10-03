@@ -13,7 +13,16 @@ import {
   type AuthorSpec,
 } from './personas.ts';
 import { itemAt, type Rng } from './rng.ts';
-import type { BookStatus, Tombstone } from 'shared';
+import {
+  BAN_MARK_THRESHOLD,
+  READING_STATUSES,
+  REPORT_REASONS,
+  type BookStatus,
+  type ReadingStatus,
+  type ReportReason,
+  type ReportStatus,
+  type Tombstone,
+} from 'shared';
 
 // The span each author's back catalogue is stretched over, ending a few days
 // ago. The chapter cadence is *derived* from this rather than fixed: an author
@@ -84,6 +93,39 @@ interface PlannedFavorite {
   createdAt: Date;
 }
 
+export interface PlannedLibraryEntry {
+  book: PlannedBook;
+  accountIndex: number;
+  status: ReadingStatus;
+  updatedAt: Date;
+}
+
+export interface PlannedReadingList {
+  accountIndex: number;
+  title: string;
+  description: string;
+  tags: string[];
+  // Exactly one of book / series per item, in list order.
+  items: (
+    { book: PlannedBook; series: null } | { book: null; series: PlannedSeries }
+  )[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PlannedReport {
+  comment: PlannedComment;
+  reporterIndex: number | null; // null: a System report
+  reason: ReportReason;
+  explanation: string | null;
+  status: ReportStatus;
+  moderatorIndex: number | null;
+  settledText: string | null;
+  createdAt: Date;
+  takenAt: Date | null;
+  settledAt: Date | null;
+}
+
 export interface PlannedAuthor {
   spec: AuthorSpec;
   createdAt: Date;
@@ -92,7 +134,7 @@ export interface PlannedAuthor {
 }
 
 export interface Plan {
-  accounts: { spec: AccountSpec; createdAt: Date }[];
+  accounts: { spec: AccountSpec; createdAt: Date; lastSeenAt: Date | null }[];
   authors: PlannedAuthor[];
   comments: PlannedComment[];
   // Kept beside the comments rather than on them, so a PlannedComment stays a
@@ -101,6 +143,9 @@ export interface Plan {
   tombstones: Map<PlannedComment, Tombstone>;
   likes: PlannedLike[];
   favorites: PlannedFavorite[];
+  library: PlannedLibraryEntry[];
+  readingLists: PlannedReadingList[];
+  reports: PlannedReport[];
 }
 
 // Lays an author's whole history out over PUBLICATION_WINDOW_DAYS, ending a few
@@ -476,15 +521,8 @@ function planThreads(
   return { comments, tombstones, likes };
 }
 
-// Readers only: each keeps 2-4 books and one series. A reader is never
-// credited, so no Favorite lands on the holder's own work, and the API would
-// answer a reader's Favorite on a Draft book, or on a series with no
-// non-draft book, with a 404, so the seed writes neither.
-function planFavorites(
-  rng: Rng,
-  authors: readonly PlannedAuthor[],
-  accounts: Plan['accounts']
-): PlannedFavorite[] {
+// What a reader can see: Books that are not Drafts, and Series holding one.
+function shownWorks(rng: Rng, authors: readonly PlannedAuthor[]) {
   const now = Date.now();
   const books = authors
     .flatMap((author) => author.books)
@@ -504,6 +542,19 @@ function planFavorites(
         now
       )
     );
+  return { books, series, heldSince, now };
+}
+
+// Readers only: each keeps 2-4 books and one series. A reader is never
+// credited, so no Favorite lands on the holder's own work, and the API would
+// answer a reader's Favorite on a Draft book, or on a series with no
+// non-draft book, with a 404, so the seed writes neither.
+function planFavorites(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedFavorite[] {
+  const { books, series, heldSince } = shownWorks(rng, authors);
 
   return accounts.flatMap((account, accountIndex) => {
     if (account.spec.role !== 'user') return [];
@@ -526,6 +577,310 @@ function planFavorites(
   });
 }
 
+// Readers only: each shelves 4-6 Published books. The statuses rotate from a
+// random start, so a reader with four or more books holds every status.
+function planLibrary(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedLibraryEntry[] {
+  const now = Date.now();
+  const books = authors
+    .flatMap((author) => author.books)
+    .filter((book) => book.status !== 'draft');
+
+  return accounts.flatMap((account, accountIndex) => {
+    if (account.spec.role !== 'user') return [];
+
+    const start = rng.int(0, READING_STATUSES.length - 1);
+    return rng.sample(books, rng.int(4, 6)).map((book, position) => ({
+      book,
+      accountIndex,
+      status: itemAt(
+        READING_STATUSES,
+        (start + position) % READING_STATUSES.length,
+        'reading status'
+      ),
+      updatedAt: new Date(
+        rng.float(
+          Math.max(account.createdAt.getTime(), book.createdAt.getTime()),
+          now
+        )
+      ),
+    }));
+  });
+}
+
+const LIST_TITLES = [
+  'Rainy-day reads',
+  'Next on my shelf',
+  'Worlds worth getting lost in',
+  'Comfort re-reads',
+  'Slow burns',
+  'Weekend binge',
+  'Found by accident',
+  'Recommended to everyone',
+] as const;
+
+const LIST_DESCRIPTIONS = [
+  'Things I keep coming back to.',
+  'A pile I mean to get through this season.',
+  'Picked for mood rather than genre.',
+  'Short on time? Start here.',
+] as const;
+
+const LIST_TAGS = [
+  'cozy',
+  'epic',
+  'slow-burn',
+  'favorites',
+  'to-read',
+] as const;
+
+// Readers only: each curates 1-2 lists of 3-6 shown works, one or two of them
+// Series so most lists mix both kinds.
+function planReadingLists(
+  rng: Rng,
+  authors: readonly PlannedAuthor[],
+  accounts: Plan['accounts']
+): PlannedReadingList[] {
+  const { books, series, now, heldSince } = shownWorks(rng, authors);
+
+  return accounts.flatMap((account, accountIndex) => {
+    if (account.spec.role !== 'user') return [];
+
+    return rng
+      .sample(LIST_TITLES, rng.int(1, 2))
+      .map((title): PlannedReadingList => {
+        const size = rng.int(3, 6);
+        const seriesCount = Math.min(rng.int(1, 2), series.length);
+        const items = [
+          ...rng.sample(series, seriesCount).map((entry) => ({
+            book: null,
+            series: entry,
+          })),
+          ...rng.sample(books, size - seriesCount).map((book) => ({
+            book,
+            series: null,
+          })),
+        ];
+        const newest = Math.max(
+          ...items.map((item) => (item.book ?? item.series).createdAt.getTime())
+        );
+        const createdAt = heldSince(account.createdAt, new Date(newest));
+        return {
+          accountIndex,
+          title,
+          description: itemAt(
+            LIST_DESCRIPTIONS,
+            rng.int(0, LIST_DESCRIPTIONS.length - 1),
+            'list description'
+          ),
+          tags: rng.sample(LIST_TAGS, rng.int(0, 3)),
+          items: rng.shuffle(items),
+          createdAt,
+          updatedAt: new Date(rng.float(createdAt.getTime(), now)),
+        };
+      });
+  });
+}
+
+const REPORT_EXPLANATIONS = [
+  'Posts the same link under every book.',
+  'Not spam or spoilers, but it reads as aimed at the author.',
+  'Looks like an advert for another site.',
+] as const;
+
+const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+// One reader gets exactly BAN_MARK_THRESHOLD Upheld Comments, so the Reports
+// page has an Account at the ban mark; around it sits one Report of each
+// status, a System report on a Comment that was dismissed before an edit, and
+// an Upheld one on another Account. Plans no Comment and no Tombstone of its
+// own: a Tombstone is only ever on a Comment with a reply.
+function planReports(
+  rng: Rng,
+  comments: readonly PlannedComment[],
+  tombstones: ReadonlyMap<PlannedComment, Tombstone>,
+  accounts: Plan['accounts']
+): PlannedReport[] {
+  const now = Date.now();
+  const moderatorIndex = accounts.findIndex(
+    (account) => account.spec.login === 'admin'
+  );
+  if (moderatorIndex === -1) {
+    throw new Error('Seed plan has no admin account to moderate Reports');
+  }
+  const roleOf = (index: number) =>
+    itemAt(accounts, index, 'account').spec.role;
+  const isStaff = (index: number) =>
+    roleOf(index) === 'admin' || roleOf(index) === 'superadmin';
+  const isLive = (comment: PlannedComment) =>
+    tombstones.get(comment) === undefined;
+
+  const reporterFor = (comment: PlannedComment): number =>
+    rng.pick(
+      accounts.flatMap((account, index) =>
+        index !== comment.accountIndex &&
+        index !== moderatorIndex &&
+        account.createdAt <= comment.createdAt
+          ? [index]
+          : []
+      )
+    );
+  // An hour after the Comment at the earliest, and early enough that the
+  // stamps that follow it still lie in the past.
+  const filedAt = (comment: PlannedComment): Date =>
+    new Date(
+      Math.min(
+        comment.createdAt.getTime() + HOUR_MS + rng.float(0, 24 * HOUR_MS),
+        now - 3 * HOUR_MS
+      )
+    );
+  const explanationFor = (reason: ReportReason): string | null =>
+    reason === 'other' ? rng.pick(REPORT_EXPLANATIONS) : null;
+
+  const report = (
+    comment: PlannedComment,
+    fields: Pick<PlannedReport, 'status' | 'reason' | 'createdAt'> &
+      Partial<PlannedReport>
+  ): PlannedReport => ({
+    comment,
+    reporterIndex: reporterFor(comment),
+    explanation: explanationFor(fields.reason),
+    moderatorIndex: null,
+    settledText: null,
+    takenAt: null,
+    settledAt: null,
+    ...fields,
+  });
+  const settledBy = (createdAt: Date) => ({
+    moderatorIndex,
+    takenAt: new Date(createdAt.getTime() + 30 * MINUTE_MS),
+    settledAt: new Date(createdAt.getTime() + 2 * HOUR_MS),
+  });
+
+  let offender = -1;
+  let offenderPool: PlannedComment[] = [];
+  accounts.forEach((_, index) => {
+    if (roleOf(index) !== 'user') return;
+    const owned = comments.filter(
+      (comment) =>
+        comment.accountIndex === index && tombstones.get(comment) !== 'deleted'
+    );
+    if (owned.length > offenderPool.length) {
+      offender = index;
+      offenderPool = owned;
+    }
+  });
+  if (offenderPool.length < BAN_MARK_THRESHOLD) {
+    throw new Error(
+      `Seed plan: the busiest reader holds ${String(offenderPool.length)} Comments, ${String(BAN_MARK_THRESHOLD)} needed for the ban mark`
+    );
+  }
+
+  const reports = rng
+    .sample(offenderPool, BAN_MARK_THRESHOLD)
+    .map((comment, position) => {
+      const createdAt = filedAt(comment);
+      return report(comment, {
+        status: 'upheld',
+        reason: itemAt(
+          REPORT_REASONS,
+          position % REPORT_REASONS.length,
+          'report reason'
+        ),
+        createdAt,
+        ...settledBy(createdAt),
+      });
+    });
+
+  const shown = comments.filter(
+    (comment) =>
+      !isStaff(comment.accountIndex) &&
+      comment.accountIndex !== offender &&
+      tombstones.get(comment) !== 'deleted'
+  );
+  const live = rng.sample(shown.filter(isLive), 4);
+  const fresh = itemAt(live, 0, 'live Comment');
+  const taken = itemAt(live, 1, 'live Comment');
+  const dismissed = itemAt(live, 2, 'live Comment');
+  const edited = itemAt(live, 3, 'live Comment');
+
+  const freshAt = new Date(now - 10 * MINUTE_MS);
+  reports.push(
+    report(fresh, { status: 'new', reason: 'other', createdAt: freshAt })
+  );
+
+  const takenAt = new Date(now - 95 * MINUTE_MS);
+  reports.push(
+    report(taken, {
+      status: 'in_review',
+      reason: 'harassment',
+      createdAt: takenAt,
+      moderatorIndex,
+      takenAt: new Date(takenAt.getTime() + 30 * MINUTE_MS),
+    })
+  );
+
+  const dismissedAt = filedAt(dismissed);
+  reports.push(
+    report(dismissed, {
+      status: 'dismissed',
+      reason: 'spoilers',
+      createdAt: dismissedAt,
+      settledText: dismissed.text,
+      ...settledBy(dismissedAt),
+    })
+  );
+
+  // Dismissed, then edited past the reopen distance: the System files a new
+  // Report on the new text, and the dismissal keeps the text it judged.
+  const editedAt = filedAt(edited);
+  const editedReason = 'spam';
+  reports.push(
+    report(edited, {
+      status: 'dismissed',
+      reason: editedReason,
+      createdAt: editedAt,
+      settledText: itemAt(
+        TOP_LEVEL_COMMENTS.filter((text) => text !== edited.text),
+        0,
+        'earlier text'
+      ),
+      ...settledBy(editedAt),
+    }),
+    report(edited, {
+      status: 'new',
+      reason: editedReason,
+      reporterIndex: null,
+      createdAt: new Date(now - 20 * MINUTE_MS),
+    })
+  );
+
+  // One more Account with an Upheld Comment, below the ban mark. A Comment a
+  // Moderator already removed is preferred: that is what an Uphold leaves.
+  const rest = shown.filter(
+    (comment) => !reports.some((r) => r.comment === comment)
+  );
+  const removed = rest.filter(
+    (comment) => tombstones.get(comment) === 'removed'
+  );
+  const upheld = rng.pick(removed.length > 0 ? removed : rest);
+  const upheldAt = filedAt(upheld);
+  reports.push(
+    report(upheld, {
+      status: 'upheld',
+      reason: 'harassment',
+      createdAt: upheldAt,
+      ...settledBy(upheldAt),
+    })
+  );
+
+  return reports;
+}
+
 export function buildPlan(rng: Rng): Plan {
   const authors = shareSeries(
     shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
@@ -536,19 +891,29 @@ export function buildPlan(rng: Rng): Plan {
 
   // Staff predate every author; readers arrive across the whole period, so the
   // users list is not ten accounts created the same afternoon.
+  // lastSeenAt draws nothing from rng, and is clamped so no account is last
+  // seen before it existed.
+  const withLastSeen = (spec: AccountSpec, createdAt: Date) => ({
+    spec,
+    createdAt,
+    lastSeenAt:
+      spec.lastSeenAgoMs === null
+        ? null
+        : new Date(
+            Math.max(Date.now() - spec.lastSeenAgoMs, createdAt.getTime())
+          ),
+  });
   const accounts: Plan['accounts'] = [
-    ...STAFF.map((spec) => ({
-      spec,
-      createdAt: new Date(earliest - rng.int(30, 90) * DAY_MS),
-    })),
-    ...authors.map((author) => ({
-      spec: author.spec,
-      createdAt: author.createdAt,
-    })),
-    ...READERS.map((spec) => ({
-      spec,
-      createdAt: new Date(rng.float(earliest, Date.now() - 30 * DAY_MS)),
-    })),
+    ...STAFF.map((spec) =>
+      withLastSeen(spec, new Date(earliest - rng.int(30, 90) * DAY_MS))
+    ),
+    ...authors.map((author) => withLastSeen(author.spec, author.createdAt)),
+    ...READERS.map((spec) =>
+      withLastSeen(
+        spec,
+        new Date(rng.float(earliest, Date.now() - 30 * DAY_MS))
+      )
+    ),
   ];
 
   const threads = planThreads(
@@ -560,5 +925,27 @@ export function buildPlan(rng: Rng): Plan {
   // the chapters, comments and likes of the demo as they were.
   const favorites = planFavorites(rng, authors, accounts);
 
-  return { accounts, authors, ...threads, favorites };
+  // Drawn after favorites for the same reason: every earlier draw stays as it was.
+  const library = planLibrary(rng, authors, accounts);
+
+  // Drawn after the library, so every earlier draw stays as it was.
+  const readingLists = planReadingLists(rng, authors, accounts);
+
+  // Drawn after the reading lists, so every earlier draw stays as it was.
+  const reports = planReports(
+    rng,
+    threads.comments,
+    threads.tombstones,
+    accounts
+  );
+
+  return {
+    accounts,
+    authors,
+    ...threads,
+    favorites,
+    library,
+    readingLists,
+    reports,
+  };
 }

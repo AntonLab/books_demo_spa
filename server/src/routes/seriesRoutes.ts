@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import { createBookController } from '../controllers/bookController.ts';
 import { createSeriesController } from '../controllers/seriesController.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
@@ -79,6 +80,31 @@ export function createSeriesRoutes(deps: RouteDeps): Router {
     requirePermission('series', 'update'),
     validate({ params: seriesBookParamSchema }),
     controller.removeBook
+  );
+
+  // The raw body parser is mounted on this PUT alone, after requirePermission
+  // so a refused request's 2 MiB is never read.
+  router.put(
+    '/:id/cover',
+    requirePermission('series', 'update'),
+    validate({ params: idParamSchema }),
+    express.raw({
+      type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
+      limit: IMAGE_MAX_BYTES,
+    }),
+    controller.uploadCover
+  );
+  router.delete(
+    '/:id/cover',
+    requirePermission('series', 'update'),
+    validate({ params: idParamSchema }),
+    controller.removeCover
+  );
+  router.get(
+    '/:id/cover',
+    requirePermission('series', 'read'),
+    validate({ params: idParamSchema }),
+    controller.getCover
   );
 
   // The books of a series as its editor works with them — the full list,

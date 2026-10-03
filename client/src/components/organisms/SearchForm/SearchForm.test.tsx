@@ -11,6 +11,7 @@ import {
   type SearchFormHandle,
 } from './SearchForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
@@ -53,10 +54,7 @@ beforeEach(() => {
   jest.resetAllMocks();
 });
 
-const genres = [
-  { id: 4, name: 'Gothic' },
-  { id: 5, name: 'Hard SF' },
-];
+const genres = [genreItem(4, 'Gothic'), genreItem(5, 'Hard SF')];
 
 const preferences = (expanded: boolean) => ({
   devicePreferences: {
@@ -253,6 +251,20 @@ describe('SearchForm', () => {
     );
   });
 
+  it('submits a top-level parent Genre by its id', async () => {
+    const { onSearch } = renderForm({
+      genres: [genreItem(1, 'Fantasy'), genreItem(2, 'Urban Fantasy', 1)],
+    });
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Genre' }));
+    await userEvent.click(await screen.findByText('Fantasy'));
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ genre: 1 })
+    );
+  });
+
   it('resets through its caller', async () => {
     const { onReset } = renderForm();
 
@@ -415,5 +427,82 @@ describe('SearchFiltersToggle', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Filters' }));
 
     expect(store.getState().devicePreferences.searchFormExpanded).toBe(false);
+  });
+});
+
+describe('SearchForm in series mode', () => {
+  it('offers Text, Genre and Tag only', () => {
+    renderForm({ mode: 'series' });
+
+    expect(screen.getByLabelText('Text')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tag')).toBeInTheDocument();
+    expect(screen.getByText('Genre')).toBeInTheDocument();
+    for (const label of ['Author', 'Series', 'Status', 'Released from']) {
+      expect(screen.queryByLabelText(label)).toBeNull();
+    }
+    expect(screen.queryByLabelText('Updated from')).toBeNull();
+  });
+
+  it('searches with the typed text and the tag, and suggests no books', async () => {
+    const { onSearch } = renderForm({
+      mode: 'series',
+      initialValues: { q: 'saga', tag: 'epic', sort: 'popular' },
+    });
+
+    await userEvent.type(screen.getByLabelText('Text'), ' two');
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'saga two', tag: 'epic' })
+    );
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+
+  it('shows a 400 issue on the Tag field', async () => {
+    renderForm({
+      mode: 'series',
+      fieldErrors: [{ name: 'tag', errors: ['Too long.'] }],
+    });
+
+    expect(await screen.findByText('Too long.')).toBeInTheDocument();
+  });
+
+  it('shows no Tag field in books mode', () => {
+    renderForm();
+
+    expect(screen.queryByLabelText('Tag')).toBeNull();
+  });
+});
+
+describe('SearchForm with the Author field hidden', () => {
+  it('shows every other books field and no Author', () => {
+    renderForm({ hideAuthor: true });
+
+    expect(screen.queryByLabelText('Author')).toBeNull();
+    for (const label of ['Text', 'Series', 'Status']) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByText('Genre')).toBeInTheDocument();
+  });
+
+  it('searches without an author and asks for no suggestions', async () => {
+    const { onSearch } = renderForm({
+      hideAuthor: true,
+      initialValues: { q: 'dragon', sort: 'popular' },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+    expect(onSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'dragon' })
+    );
+    expect(onSearch.mock.calls[0][0]).not.toHaveProperty('author');
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+
+  it('still shows Author by default', () => {
+    renderForm();
+
+    expect(screen.getByLabelText('Author')).toBeInTheDocument();
   });
 });

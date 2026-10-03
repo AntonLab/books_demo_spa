@@ -4,6 +4,8 @@ import {
   initialDevicePreferences,
   initialReadingPreferences,
 } from './devicePreferencesSlice';
+import { BOOK_IDS_MAX } from 'shared';
+import { recentlyViewed } from './recentlyViewedSlice';
 import { unsavedText } from './unsavedTextSlice';
 import {
   STORAGE_KEYS,
@@ -267,6 +269,64 @@ describe('persistence', () => {
     expect(
       JSON.parse(localStorage.getItem(STORAGE_KEYS.unsavedText)!)
     ).toMatchObject({ entries: {} });
+  });
+
+  it('reads a stored history back under the v1 key', () => {
+    localStorage.setItem(
+      'books.recentlyViewed.v1',
+      JSON.stringify({ accountId: 3, ids: [5, 2] })
+    );
+
+    expect(loadPersistedState().recentlyViewed).toEqual({
+      accountId: 3,
+      ids: [5, 2],
+    });
+  });
+
+  it('cleans stored ids: integers above zero only, no repeats, at most BOOK_IDS_MAX', () => {
+    const many = Array.from({ length: BOOK_IDS_MAX + 5 }, (_, i) => i + 10);
+    const parse = (ids: unknown[]) =>
+      parsePersisted(
+        STORAGE_KEYS.recentlyViewed,
+        JSON.stringify({ accountId: null, ids })
+      )?.recentlyViewed?.ids;
+
+    expect(parse([3, 3, 0, -1, 1.5, '7', null, 4])).toEqual([3, 4]);
+    expect(parse(many)).toEqual(many.slice(0, BOOK_IDS_MAX));
+  });
+
+  it('ignores a stored history of the wrong shape or corrupt JSON', () => {
+    for (const raw of [
+      'not json',
+      JSON.stringify({ accountId: 'x', ids: [1] }),
+      JSON.stringify({ accountId: null, ids: 'x' }),
+      JSON.stringify([1, 2]),
+      'null',
+    ]) {
+      localStorage.setItem(STORAGE_KEYS.recentlyViewed, raw);
+      expect(loadPersistedState().recentlyViewed).toBeUndefined();
+    }
+  });
+
+  it('writes the history at once, with no throttle', () => {
+    const store = createAppStore({});
+
+    store.dispatch(recentlyViewed.record(4));
+
+    expect(
+      JSON.parse(localStorage.getItem(STORAGE_KEYS.recentlyViewed)!)
+    ).toEqual({ accountId: null, ids: [4] });
+  });
+
+  it("does not write back another tab's history", () => {
+    const setItem = jest.spyOn(Storage.prototype, 'setItem');
+    const store = createAppStore({});
+
+    store.dispatch(recentlyViewed.replaced({ accountId: 3, ids: [9] }));
+
+    expect(
+      setItem.mock.calls.filter(([key]) => key === STORAGE_KEYS.recentlyViewed)
+    ).toHaveLength(0);
   });
 
   it('writes both slices at once when the page is hidden', () => {

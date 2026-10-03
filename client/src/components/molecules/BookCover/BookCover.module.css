@@ -10,6 +10,16 @@
   justify-content: center;
 }
 
+.large {
+  width: calc(var(--ant-app-book-cover-width) * 2);
+}
+
+@media (max-width: 575px) {
+  .large {
+    width: var(--ant-app-book-cover-width);
+  }
+}
+
 .fullWidth {
   width: 100%;
 }

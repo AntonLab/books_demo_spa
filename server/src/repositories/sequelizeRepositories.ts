@@ -1,4 +1,8 @@
 import {
+  createSequelizeAccountRepository,
+  type AccountRepository,
+} from './accountRepository.ts';
+import {
   createSequelizeBookRepository,
   type BookRepository,
 } from './bookRepository.ts';
@@ -19,6 +23,10 @@ import {
   type FavoriteRepository,
 } from './favoriteRepository.ts';
 import {
+  createSequelizeLibraryRepository,
+  type LibraryRepository,
+} from './libraryRepository.ts';
+import {
   createSequelizeLikeRepository,
   type LikeRepository,
 } from './likeRepository.ts';
@@ -30,6 +38,14 @@ import {
   createSequelizePasswordResetRepository,
   type PasswordResetRepository,
 } from './passwordResetRepository.ts';
+import {
+  createSequelizeReadingListRepository,
+  type ReadingListRepository,
+} from './readingListRepository.ts';
+import {
+  createSequelizeReportRepository,
+  type ReportRepository,
+} from './reportRepository.ts';
 import {
   createSequelizeSeriesRepository,
   type SeriesRepository,
@@ -48,6 +64,7 @@ import {
 // kit builds.
 export interface Repositories {
   userRepository: UserRepository;
+  accountRepository: AccountRepository;
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
@@ -56,6 +73,9 @@ export interface Repositories {
   likeRepository: LikeRepository;
   notificationRepository: NotificationRepository;
   favoriteRepository: FavoriteRepository;
+  libraryRepository: LibraryRepository;
+  readingListRepository: ReadingListRepository;
+  reportRepository: ReportRepository;
   sessionRepository: SessionRepository;
   passwordResetRepository: PasswordResetRepository;
 }
@@ -65,6 +85,7 @@ export interface Repositories {
 export function createSequelizeRepositories(): Repositories {
   return {
     userRepository: createSequelizeUserRepository(),
+    accountRepository: createSequelizeAccountRepository(),
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),
@@ -73,6 +94,9 @@ export function createSequelizeRepositories(): Repositories {
     likeRepository: createSequelizeLikeRepository(),
     notificationRepository: createSequelizeNotificationRepository(),
     favoriteRepository: createSequelizeFavoriteRepository(),
+    libraryRepository: createSequelizeLibraryRepository(),
+    readingListRepository: createSequelizeReadingListRepository(),
+    reportRepository: createSequelizeReportRepository(),
     sessionRepository: createSequelizeSessionRepository(),
     passwordResetRepository: createSequelizePasswordResetRepository(),
   };

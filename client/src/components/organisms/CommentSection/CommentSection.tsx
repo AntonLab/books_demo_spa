@@ -1,18 +1,22 @@
-import { useState, type FC, type ReactNode } from 'react';
-import { Alert, Button, Empty, Flex, Skeleton, Typography } from 'antd';
+import { useRef, useState, type FC, type ReactNode } from 'react';
+import { Alert, App, Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
 import { CommentComposerModal } from '@/components/molecules/CommentComposerModal/CommentComposerModal';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
+import { ReportCommentModal } from '@/components/molecules/ReportCommentModal/ReportCommentModal';
+import { ApiError } from '@/api/client';
 import { useSession } from '@/queries/auth';
 import {
   useComments,
   useCreateComment,
   useDeleteComment,
+  useRestoreComment,
   useUpdateComment,
 } from '@/queries/comments';
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
+import { useReportComment } from '@/queries/reports';
 import { useAppDispatch } from '@/store/hooks';
 import {
   entriesOfBook,
@@ -20,6 +24,7 @@ import {
   unsavedTextKeys,
 } from '@/store/unsavedTextSlice';
 import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
+import { isModeratorRole } from 'shared';
 import type { CommentWithAuthor } from '@/types/api';
 import styles from './CommentSection.module.css';
 
@@ -48,20 +53,25 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const create = useCreateComment(bookId);
   const update = useUpdateComment(bookId);
   const remove = useDeleteComment(bookId);
+  const restore = useRestoreComment(bookId);
   const toggleLike = useToggleLike(queryKeys.comments(bookId));
 
   const dispatch = useAppDispatch();
   const entries = useOwnUnsavedEntries();
 
-  const [composing, setComposing] = useState<Composing | null>(null);
+  const report = useReportComment(bookId);
+  const sending = useRef(false);
+  const acting = useRef(new Set<number>());
+  const { message } = App.useApp();
 
-  // The heading is rendered by every branch rather than only the loaded one,
-  // so the section keeps its place on the page while the thread is in flight.
+  const [composing, setComposing] = useState<Composing | null>(null);
+  const [reporting, setReporting] = useState<number | null>(null);
+
+  // The Book page's tab label names the region, so no heading here. Every
+  // branch renders the row, so the section keeps its height while the thread
+  // is in flight.
   const header = (action?: ReactNode) => (
-    <Flex justify="space-between" align="center" className={styles.header}>
-      <Typography.Title level={3} className={styles.title}>
-        Comments
-      </Typography.Title>
+    <Flex justify="flex-end" align="center" className={styles.header}>
       {action}
     </Flex>
   );
@@ -85,23 +95,31 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const all = data?.items ?? [];
 
+  // A closed thread offers no action at all: every one of them either writes
+  // through the composer or reacts, and neither is open on a draft.
+  const canAct = Boolean(session) && !closed;
+  const moderating = canAct && isModeratorRole(session?.role);
+
   // The server returns a flat list; the two-level tree is assembled here, in
   // one pass over it. Only roots and their direct replies render, so a
   // tombstone earns its place only as a root keeping at least one live reply
   // in its thread. Every other tombstone — a reply, or a root whose replies
   // are all tombstones too — is noise, and is dropped here rather than on the
   // server: this is the only place that already knows what hangs off what.
+  // The exception is a Moderator, who keeps every Removed tombstone, as a
+  // reply and as a root, so Restore stays reachable.
+  const shows = (item: CommentWithAuthor) =>
+    item.tombstone === null || (moderating && item.tombstone === 'removed');
   const liveReplies = new Map<number, CommentWithAuthor[]>();
   for (const item of all) {
-    if (item.parentId === null || item.tombstone !== null) continue;
+    if (item.parentId === null || !shows(item)) continue;
     const siblings = liveReplies.get(item.parentId) ?? [];
     siblings.push(item);
     liveReplies.set(item.parentId, siblings);
   }
   const roots = all.filter(
     (item) =>
-      item.parentId === null &&
-      (item.tombstone === null || liveReplies.has(item.id))
+      item.parentId === null && (shows(item) || liveReplies.has(item.id))
   );
 
   const find = (id: number) => all.find((item) => item.id === id);
@@ -187,17 +205,33 @@ export const CommentSection: FC<CommentSectionProps> = ({
     setComposing(next);
   };
 
-  const deleteComment = (id: number) => {
-    // mutateAsync over mutate's per-call onSuccess: see submit() above.
-    void remove.mutateAsync(id).then(
-      // The Account chose to delete it; its edit text is not worth offering.
-      () =>
-        dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id))),
-      // Neither error is rendered anywhere in this section yet; this handler
-      // exists only so the rejection is not left unhandled.
-      () => {}
-    );
+  // A ref, not isPending: TanStack notifies it on a later tick, so a double
+  // click would send two requests. mutateAsync over mutate's per-call
+  // onSuccess: see submit() above. Remove is a delete too: the server makes a
+  // Removed comment when another Account calls it.
+  const act = (
+    mutation: typeof remove,
+    id: number,
+    failure: string,
+    onDone?: () => void
+  ) => {
+    if (acting.current.has(id)) return;
+    acting.current.add(id);
+    void mutation
+      .mutateAsync(id)
+      .then(onDone, (error: unknown) => {
+        void message.error(error instanceof ApiError ? error.message : failure);
+      })
+      .finally(() => {
+        acting.current.delete(id);
+      });
   };
+
+  const deleteComment = (id: number) =>
+    act(remove, id, 'Could not delete the comment.', () =>
+      // The Account chose to delete it; its edit text is not worth offering.
+      dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id)))
+    );
 
   const like = (comment: CommentWithAuthor) => {
     toggleLike.mutate({
@@ -206,9 +240,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
     });
   };
 
-  // A closed thread offers no action at all: every one of them either writes
-  // through the composer or reacts, and neither is open on a draft.
-  const canAct = Boolean(session) && !closed;
+  const removeComment = (id: number) =>
+    act(remove, id, 'Could not remove the comment.');
+
+  const restoreComment = (id: number) =>
+    act(restore, id, 'Could not restore the comment.');
+
+  const busyId = (id: number) =>
+    (remove.isPending && remove.variables === id) ||
+    (restore.isPending && restore.variables === id);
 
   const renderComment = (comment: CommentWithAuthor, canReply: boolean) => (
     <Comment
@@ -224,6 +264,17 @@ export const CommentSection: FC<CommentSectionProps> = ({
       onEdit={(id) => open({ mode: 'edit', id })}
       onDelete={deleteComment}
       onLike={like}
+      canReport={canAct && session?.id !== comment.userId}
+      onReport={(id) => {
+        report.reset();
+        setReporting(id);
+      }}
+      // The server's rule: a Moderator's own Comment gets Delete, not Remove.
+      // A Tombstone has no userId, so it passes.
+      canModerate={moderating && session?.id !== comment.userId}
+      onRemove={removeComment}
+      onRestore={restoreComment}
+      busy={busyId(comment.id)}
     />
   );
 
@@ -319,6 +370,37 @@ export const CommentSection: FC<CommentSectionProps> = ({
                 : null
           }
           replyTo={replyTarget}
+        />
+      )}
+
+      {canAct && reporting !== null && (
+        <ReportCommentModal
+          onSubmit={(payload) => {
+            // A ref, not report.isPending: a double click lands both clicks
+            // before the pending state renders.
+            if (sending.current) return;
+            // The modal shows the failure from the mutation's own state; the
+            // empty handler only keeps the rejection from going unhandled.
+            sending.current = true;
+            void report
+              .mutateAsync({ commentId: reporting, payload })
+              .then(
+                () => setReporting(null),
+                () => {}
+              )
+              .finally(() => {
+                sending.current = false;
+              });
+          }}
+          onCancel={() => setReporting(null)}
+          pending={report.isPending}
+          error={
+            !report.isError
+              ? null
+              : report.error instanceof ApiError && report.error.status === 409
+                ? report.error.message
+                : 'Could not send the report.'
+          }
         />
       )}
     </section>

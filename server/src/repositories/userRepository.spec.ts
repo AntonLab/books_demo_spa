@@ -4,6 +4,7 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { DatabaseError, type Sequelize } from 'sequelize';
+import { LAST_ONLINE_WINDOW_MS } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -14,6 +15,7 @@ import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
 import { Comment } from '../models/Comment.ts';
 import { Like } from '../models/Like.ts';
+import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
@@ -91,6 +93,34 @@ describe('userRepository against real MySQL', { skip }, () => {
     const created = await repository.create({ ...base });
 
     assert.equal('password' in created, false);
+  });
+
+  test('touchLastSeen stamps a never-seen Account, then at most once per window, without moving updatedAt', async () => {
+    const created = await repository.create({ ...base });
+    const longAgo = new Date('2026-01-01T00:00:00Z');
+    // Raw SQL: Model.update re-stamps updatedAt even with silent when the
+    // value is passed in.
+    await sequelize.query('UPDATE users SET updatedAt = ? WHERE id = ?', {
+      replacements: ['2026-01-01 00:00:00', created.id],
+    });
+    const stored = async () => {
+      const row = await User.findByPk(created.id);
+      assert.ok(row);
+      return row;
+    };
+    const t0 = new Date('2026-06-01T12:00:00Z');
+
+    await repository.touchLastSeen(created.id, t0);
+    assert.equal((await stored()).lastSeenAt?.getTime(), t0.getTime());
+
+    await repository.touchLastSeen(created.id, new Date(t0.getTime() + 60_000));
+    assert.equal((await stored()).lastSeenAt?.getTime(), t0.getTime());
+
+    const later = new Date(t0.getTime() + LAST_ONLINE_WINDOW_MS + 1);
+    await repository.touchLastSeen(created.id, later);
+    const after = await stored();
+    assert.equal(after.lastSeenAt?.getTime(), later.getTime());
+    assert.equal(after.updatedAt.getTime(), longAgo.getTime());
   });
 
   test('Bob and bob are different logins', async () => {
@@ -373,6 +403,90 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(tombstone?.tombstone, 'deleted');
     assert.equal(tombstone?.userId, null);
     assert.equal((await Comment.findByPk(reply.id))?.parentId, comment.id);
+  });
+
+  test('deleting an account dismisses the Open reports on its comments and leaves everything else', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Leaving',
+      email: 'leaving@example.com',
+    });
+    const host = await repository.create({
+      ...base,
+      login: 'Host',
+      email: 'host@example.com',
+    });
+    const book = await createCreditedBook(
+      { title: 'Host Book', description: 'Hosts the thread', tags: [] },
+      [host.id]
+    );
+    const mine = await Comment.create({
+      bookId: book.id,
+      userId: leaving.id,
+      text: 'Mine',
+    });
+    const theirs = await Comment.create({
+      bookId: book.id,
+      userId: host.id,
+      text: 'Theirs',
+    });
+    const report = (
+      commentId: number,
+      accountId: number,
+      extra: Partial<Report['dataValues']>
+    ) =>
+      Report.create({
+        commentId,
+        reporterId: null,
+        isSystem: true,
+        reportedAccountId: accountId,
+        reason: 'harassment',
+        explanation: null,
+        ...extra,
+      });
+    await report(mine.id, leaving.id, {});
+    await report(mine.id, leaving.id, {
+      status: 'in_review',
+      moderatorId: host.id,
+    });
+    const settledAt = new Date(Date.now() - 3_600_000);
+    // A DATETIME column keeps whole seconds, so compare against the reloaded row.
+    const upheld = await (
+      await report(mine.id, leaving.id, {
+        status: 'upheld',
+        moderatorId: host.id,
+        settledAt,
+      })
+    ).reload();
+    const other = await report(theirs.id, host.id, {});
+
+    assert.equal(await repository.remove(leaving.id), true);
+
+    const rows = await Report.findAll({
+      where: { commentId: mine.id },
+      order: [['id', 'ASC']],
+    });
+    assert.deepEqual(
+      rows.map((row) => row.status),
+      ['dismissed', 'dismissed', 'upheld']
+    );
+    for (const row of rows.slice(0, 2)) {
+      assert.equal(row.moderatorId, null);
+      assert.equal(row.settledText, null);
+      assert.notEqual(row.settledAt, null);
+    }
+    assert.equal(rows[2]?.moderatorId, host.id);
+    assert.equal(rows[2]?.settledAt?.getTime(), upheld.settledAt?.getTime());
+    assert.equal((await other.reload()).status, 'new');
+  });
+
+  test('deleting an account with no reported comments still succeeds', async () => {
+    const leaving = await repository.create({
+      ...base,
+      login: 'Quiet',
+      email: 'quiet@example.com',
+    });
+    assert.equal(await repository.remove(leaving.id), true);
   });
 
   test('deleting an account keeps its shared books and deletes the ones it alone was credited on', async () => {

@@ -1,4 +1,11 @@
-import { col, fn, literal, Op, where as sequelizeWhere } from 'sequelize';
+import {
+  col,
+  ForeignKeyConstraintError,
+  fn,
+  literal,
+  Op,
+  where as sequelizeWhere,
+} from 'sequelize';
 import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
@@ -6,7 +13,13 @@ import { BookCover } from '../models/BookCover.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Comment } from '../models/Comment.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { assertGenreExists, genreOf, loadGenres } from './genreRepository.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
+import {
+  assertGenreExists,
+  genreFamilyIds,
+  genreOf,
+  loadGenres,
+} from './genreRepository.ts';
 import { findSeriesCoAuthorIds } from './seriesRepository.ts';
 import {
   listedBookWhere,
@@ -27,8 +40,11 @@ import {
 import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import type {
   BookDetail,
+  BookSeriesRef,
   BookSort,
+  LibraryCounts,
   PublicBook,
+  ReadingStatus,
   SeriesBookSummary,
 } from 'shared';
 import type {
@@ -175,20 +191,74 @@ async function loadCoverUrls(
   );
 }
 
+// Each Book's Series and its place N in it, in one Series query and one Books
+// query however many Books there are. N counts Published Books in Series order
+// only, so a Draft book never shifts anyone's N; a Draft row itself gets null.
+async function loadSeriesRefs(
+  rows: Pick<Book, 'id' | 'seriesId' | 'status'>[],
+  transaction?: Transaction
+): Promise<Map<number, BookSeriesRef>> {
+  const seriesIds = [
+    ...new Set(
+      rows.flatMap((row) => (row.seriesId === null ? [] : [row.seriesId]))
+    ),
+  ];
+  const refs = new Map<number, BookSeriesRef>();
+  if (seriesIds.length === 0) return refs;
+
+  const [seriesRows, published] = await Promise.all([
+    Series.findAll({
+      where: { id: seriesIds },
+      attributes: ['id', 'title'],
+      transaction,
+    }),
+    Book.findAll({
+      where: { seriesId: seriesIds, status: { [Op.ne]: 'draft' } },
+      attributes: ['id', 'seriesId'],
+      order: [
+        ['seriesId', 'ASC'],
+        ['seriesPosition', 'ASC'],
+        ['id', 'ASC'],
+      ],
+      transaction,
+    }),
+  ]);
+  const titles = new Map(seriesRows.map((row) => [row.id, row.title]));
+  const placeOf = new Map<number, number>();
+  const counted = new Map<number, number>();
+  for (const row of published) {
+    const place = (counted.get(row.seriesId as number) ?? 0) + 1;
+    counted.set(row.seriesId as number, place);
+    placeOf.set(row.id, place);
+  }
+  for (const row of rows) {
+    const title = row.seriesId === null ? undefined : titles.get(row.seriesId);
+    if (row.seriesId === null || title === undefined) continue;
+    refs.set(row.id, {
+      id: row.seriesId,
+      title,
+      position: row.status === 'draft' ? null : (placeOf.get(row.id) ?? null),
+    });
+  }
+  return refs;
+}
+
 async function withAuthors(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  const [authors, coverUrls, genres] = await Promise.all([
+  const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
     loadAuthors(credits, [book.id], transaction),
     loadCoverUrls([book.id], transaction),
     loadGenres([book.genreId], transaction),
+    loadSeriesRefs([book], transaction),
   ]);
   return toPublicBook(
     book,
     authors.get(book.id) ?? [],
     coverUrls.get(book.id) ?? null,
-    genreOf(book.genreId, genres)
+    genreOf(book.genreId, genres),
+    seriesRefs.get(book.id) ?? null
   );
 }
 
@@ -197,17 +267,19 @@ async function withAuthors(
 // favoriteRepository, whose rows embed the books they point at.
 export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
   const ids = rows.map((row) => row.id);
-  const [authors, coverUrls, genres] = await Promise.all([
+  const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
     loadAuthors(credits, ids),
     loadCoverUrls(ids),
     loadGenres(rows.map((row) => row.genreId)),
+    loadSeriesRefs(rows),
   ]);
   return rows.map((row) =>
     toPublicBook(
       row,
       authors.get(row.id) ?? [],
       coverUrls.get(row.id) ?? null,
-      genreOf(row.genreId, genres)
+      genreOf(row.genreId, genres),
+      seriesRefs.get(row.id) ?? null
     )
   );
 }
@@ -252,6 +324,8 @@ interface IdLookups {
   creditedBookIds?: number[];
   authorBookIds?: number[];
   seriesIds?: number[];
+  // bookId to the viewer's Favorite id, set by `?favoritedBy=me`.
+  favorites?: Map<number, number>;
 }
 
 // The books any of whose Co-authors matches by login, first or last name.
@@ -293,19 +367,27 @@ async function seriesTitled(title: string): Promise<number[]> {
   return series.map((entry) => entry.id);
 }
 
+async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
+  if (viewer === null) return new Map();
+  const rows = await Favorite.findAll({
+    where: { userId: viewer.id, bookId: { [Op.ne]: null } },
+    attributes: ['id', 'bookId'],
+  });
+  return new Map(
+    rows.flatMap((row) => (row.bookId === null ? [] : [[row.bookId, row.id]]))
+  );
+}
+
 function buildWhere(
   query: ListBooksQuery,
   lookups: IdLookups,
   viewer: Viewer,
-  rank: Utils.Literal | undefined
+  genreIds: number[] | undefined
 ): WhereOptions {
+  // No clause for a sort: a Book with nothing published has no Release time
+  // or Last update, so `ORDER BY ... DESC` puts it last and `total` matches
+  // what the pages list.
   const clauses: WhereOptions[] = [];
-
-  // A Book with no Published Chapter has no Release time or Last update, so
-  // those two rankings leave it out; Popularity ranks every Book.
-  if (rank !== undefined && query.sort !== 'popular') {
-    clauses.push(sequelizeWhere(rank, Op.ne, null));
-  }
 
   // `?userId=`: a book matches through any of its Co-authors.
   if (lookups.creditedBookIds !== undefined) {
@@ -316,6 +398,9 @@ function buildWhere(
   }
   if (lookups.seriesIds !== undefined) {
     clauses.push({ seriesId: lookups.seriesIds });
+  }
+  if (lookups.favorites !== undefined) {
+    clauses.push({ id: [...lookups.favorites.keys()] });
   }
 
   if (query.status !== undefined) {
@@ -340,17 +425,29 @@ function buildWhere(
     }
   }
 
-  const listed = listedBookWhere(viewer, query.userId);
+  if (query.ids !== undefined) {
+    clauses.push({ id: query.ids });
+  }
+
+  // Mirrors the non-Owner branch of `listedBookWhere`, which the private
+  // Profile still needs for the Owner's Drafts. `ids` is a public lookup, never
+  // a Draft, even the viewer's own.
+  const listed =
+    query.published === undefined && query.ids === undefined
+      ? listedBookWhere(viewer, query.userId)
+      : { status: { [Op.ne]: 'draft' } };
   if (listed !== null) clauses.push(listed);
 
   if (query.seriesId !== undefined) {
     clauses.push({ seriesId: query.seriesId });
   }
 
-  // Combined with the other filters by AND. An id that names no Genre
-  // matches nothing and yields an empty list, as an unknown `?tag=` does.
-  if (query.genreId !== undefined) {
-    clauses.push({ genreId: query.genreId });
+  // genreIds is the Genre `?genreId=` names plus its Subgenres, looked up
+  // beforehand. Combined with the other filters by AND. An empty list (an id
+  // that names no Genre) becomes `IN (NULL)`, matching nothing, as an unknown
+  // `?tag=` does.
+  if (genreIds !== undefined) {
+    clauses.push({ genreId: genreIds });
   }
 
   if (query.tag) {
@@ -381,6 +478,25 @@ function buildWhere(
   }
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
+}
+
+// Not interested is never read, so it can never reach a reader.
+function toLibraryCounts(
+  rows: { status?: unknown; count: number }[]
+): LibraryCounts {
+  const of = (status: ReadingStatus) =>
+    rows.find((row) => row.status === status)?.count ?? 0;
+  const [reading, planToRead, read] = [
+    of('reading'),
+    of('plan_to_read'),
+    of('read'),
+  ];
+  return {
+    reading,
+    planToRead,
+    read,
+    inLibraries: reading + planToRead + read,
+  };
 }
 
 export function createSequelizeBookRepository(): BookRepository {
@@ -426,10 +542,18 @@ export function createSequelizeBookRepository(): BookRepository {
           query.seriesTitle === undefined
             ? undefined
             : await seriesTitled(query.seriesTitle),
+        favorites:
+          query.favoritedBy === undefined
+            ? undefined
+            : await favoritesOf(viewer),
       };
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);
-      const where = buildWhere(query, lookups, viewer, rank);
+      const genreIds =
+        query.genreId === undefined
+          ? undefined
+          : await genreFamilyIds(query.genreId);
+      const where = buildWhere(query, lookups, viewer, genreIds);
       // Counted first, so a page past the end can be served as the last
       // non-empty one (page 1 when nothing matches) rather than as an empty
       // page the client would have to page back from.
@@ -458,7 +582,19 @@ export function createSequelizeBookRepository(): BookRepository {
                 ],
       });
 
-      return { items: await publicBooksOf(rows), total, current };
+      const items = await publicBooksOf(rows);
+      const { favorites } = lookups;
+      return {
+        items:
+          favorites === undefined
+            ? items
+            : items.map((item) => ({
+                ...item,
+                favoriteId: favorites.get(item.id),
+              })),
+        total,
+        current,
+      };
     },
 
     async findById(id) {
@@ -470,7 +606,6 @@ export function createSequelizeBookRepository(): BookRepository {
       const viewerId = viewer?.id ?? null;
       const book = await Book.findOne({
         where: { [Op.and]: [{ id }, await readableBookWhere(viewer)] },
-        include: [{ model: Series, as: 'series' }],
       });
       if (!book) return null;
 
@@ -490,6 +625,8 @@ export function createSequelizeBookRepository(): BookRepository {
         wordCount,
         favoriteCount,
         viewerFavorite,
+        statusRows,
+        viewerEntry,
       ] = await Promise.all([
         Like.count({ where: { bookId: id, isLike: true } }),
         viewerId === null
@@ -509,19 +646,29 @@ export function createSequelizeBookRepository(): BookRepository {
               where: { bookId: id, userId: viewerId },
               attributes: ['id'],
             }),
+        // Like a Draft's Favorites, its Library entries are kept but not
+        // counted; the viewer's own entry is still named.
+        book.status === 'draft'
+          ? []
+          : LibraryEntry.count({ where: { bookId: id }, group: ['status'] }),
+        viewerId === null
+          ? null
+          : LibraryEntry.findOne({
+              where: { bookId: id, userId: viewerId },
+              attributes: ['status'],
+            }),
       ]);
 
       return {
         ...(await withAuthors(book)),
-        series: book.series
-          ? { id: book.series.id, title: book.series.title }
-          : null,
         likeCount,
         viewerLikeId: viewerLike?.id ?? null,
         commentCount,
         wordCount: wordCount ?? 0,
         favoriteCount,
         viewerFavoriteId: viewerFavorite?.id ?? null,
+        viewerReadingStatus: viewerEntry?.status ?? null,
+        libraryCounts: toLibraryCounts(statusRows),
       };
     },
 
@@ -710,10 +857,15 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async setCover(bookId, data) {
-      const book = await Book.findByPk(bookId, { attributes: ['id'] });
-      if (!book) return false;
-      await BookCover.upsert({ bookId, data });
-      return true;
+      // The cover row's foreign key is the existence check, so a book deleted
+      // mid-upload reads as not found (as commentRepository maps it).
+      try {
+        await BookCover.upsert({ bookId, data });
+        return true;
+      } catch (error) {
+        if (error instanceof ForeignKeyConstraintError) return false;
+        throw error;
+      }
     },
 
     async removeCover(bookId) {

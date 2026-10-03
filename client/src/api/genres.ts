@@ -1,26 +1,42 @@
 import { request } from './client';
-import type { GenrePayload, ItemsResponse, PublicGenre } from 'shared';
+import type {
+  AdminGenreListItem,
+  GenreListItem,
+  GenrePayload,
+  GenreUpdatePayload,
+  ItemsResponse,
+  PublicGenre,
+} from 'shared';
 
-// Sorted by name, with no paging: the list is short and the header's submenu
-// shows all of it, so the response is `{ items }` rather than a paged
-// envelope. `nonEmpty` keeps only Genres with a Book in progress or complete.
+// Flat, sorted by name, with no paging: the client builds the tree from each
+// item's `parentId`. The response is `{ items }` rather than a paged envelope.
+// `nonEmpty` keeps only Genres with a Book in progress or complete, plus their
+// parents.
 export const listGenres = (
   params: { nonEmpty?: boolean } = {}
-): Promise<ItemsResponse<PublicGenre>> => {
-  return request<ItemsResponse<PublicGenre>>(
-    params.nonEmpty ? '/genres?nonEmpty=true' : '/genres'
+): Promise<ItemsResponse<GenreListItem>> => {
+  return request<ItemsResponse<GenreListItem>>(
+    params.nonEmpty ? '/genres?nonEmpty=1' : '/genres'
   );
+};
+
+// The admin list: every Genre, with how many Books and Series point at it.
+export const listGenreCounts = (): Promise<
+  ItemsResponse<AdminGenreListItem>
+> => {
+  return request<ItemsResponse<AdminGenreListItem>>('/genres?counts=1');
 };
 
 export const createGenre = (payload: GenrePayload): Promise<PublicGenre> => {
   return request<PublicGenre>('/genres', { method: 'POST', body: payload });
 };
 
-// A rename is the only update a Genre has: the server answers 409 when another
-// Genre already holds the name, case-insensitively.
-export const renameGenre = (
+// Renames, moves, promotes (`parentId: null`) or demotes a Genre; the body
+// carries only the fields that change. The server answers 409 when a sibling
+// already holds the name, case-insensitively.
+export const updateGenre = (
   id: number,
-  payload: GenrePayload
+  payload: GenreUpdatePayload
 ): Promise<PublicGenre> => {
   return request<PublicGenre>(`/genres/${id}`, {
     method: 'PATCH',

@@ -13,9 +13,10 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
 - `SeriesPage` (`/series/:id`) shows the `SeriesCard`, then the series' books
   in Series order: one page at `PAGE_SIZE_MAX`, no pagination, drafts left
   out by the server. The books are asked for only once the series loads, so a
-  404, like an id that is not a positive integer, shows "This series no
-  longer exists." and nothing else is requested. "Edit series" shows for its
-  Co-authors and Moderators. A bare `/series` is `NotFoundPage`; every series
+  404, like an id that is not a positive integer, redirects Home (`replace`)
+  with "This series no longer exists." through `GoneRedirect`, and nothing
+  else is requested for a bad id. "Edit series" opens the
+  Series edit modal and shows for its Co-authors and Moderators. Every series
   link points here, and old `/search?series=` links are not redirected.
 - `SearchPage` is one form (`SearchForm`) whose fields combine by AND, over
   paginated book results. The URL is its only state, read and written through
@@ -47,38 +48,40 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   value (it is controlled by the URL) and the form is expanded and scrolled
   to its first broken field (expanded synchronously first, or a hidden field
   has nowhere to scroll to). The result count is in the title, which keeps the
-  last count while the next search runs ("Searching…" only before any). Results show as tiles or a list by `resultsLayout`
-  (`ResultsLayoutSwitch`, also on `SeriesPage`). `MainPage`'s sections are
-  always tiles (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep
-  their default columns.
+  last count while the next search runs ("Searching…" only before any).
+  Results show as tiles or a list by `resultsLayout` (`ResultsLayoutSwitch`,
+  also on `SeriesPage`). `MainPage`'s sections are always tiles
+  (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep their default
+  columns.
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
   the section has loaded more than six.
-- Pages that gate on Role (`AdminGenresPage`) read the session
-  with no `isPending` branch, so the "not for you" `Alert` shows briefly until
-  the session resolves, even for someone allowed in.
+- `AdminPage` has Reports and Genres path tabs (`/admin/reports`,
+  `/admin/genres`); `/admin` redirects to Reports.
+- The Reports tab lists Reports newest first for a local-day range, paged
+  server-side; rows of one Comment highlight together. `ReportsPanel` is an
+  organism holding the filters. Statistics for the chosen range sit above the
+  table and ignore the status filter.
+- `GenreManager` (an organism under `AdminPage`'s Genres tab) is a two-level
+  `Tree` of the counts list, with a search box, a usage filter and per-row Add
+  subgenre / Edit / Delete (`GenreFormModal`; there is no rename in place). A
+  top-level row shows its own works plus its Subgenres'; the totals and the
+  Delete lock (a Genre with Subgenres cannot be deleted) read the unfiltered
+  tree, so a filter never changes them. A typed query expands every shown
+  parent. Rows are draggable (`dropParentOf`, fed the unfiltered tree): a drop
+  that keeps the parent, targets a Subgenre, or demotes a Genre that has
+  Subgenres is refused and sends nothing; no optimistic move, a 409 lands in
+  the page Alert.
+- `AdminPage` gates on Role through `usePageGuard`; its `'pending'` state shows
+  `PageSpinner`.
 - What the viewer may do with a work comes from `bookCapabilities` /
   `seriesCapabilities` (`types/capabilities.ts`), never from `authors` and the
   Role combined in the page. A Moderator gets a work's form but a read-only
-  byline, and no "Add chapter". `BookPage`'s "Edit" link reads `isCoAuthor`,
-  not `mayEdit`, on purpose.
-- `EditChapterPage` is layout and button wiring; its rules live in
-  `useChapterEdit` beside it and are tested there. It saves against the
-  Unsaved text's `baseUpdatedAt`, the version the typing started from, and
-  against the loaded `updatedAt` only when nothing was typed; otherwise a
-  reload would refetch a Co-author's save and overwrite it with no 409. After
-  a save, the version comes from its response, since `chapter.data` lags until
-  the refetch; a landed save dispatches `saved`, which keeps text typed during
-  it. A loaded version newer than the base (compared as ISO strings), or a
-  409, is the conflict: `takeTheirs` discards the entry and refetches;
-  `keepMine` refetches and rebases the entry, so the next Save is a deliberate
-  overwrite. `formKey` is `updatedAt` plus a reset counter, and the form seeds
-  from the entry. Each edit passes the newest known version as `saved`, so
-  text changed back to it leaves no entry. `save` and `remove` go through
-  `mutateAsync(...).then(...)`, not a per-call `mutate` callback, since
-  TanStack skips that callback once the page has unmounted. Navigation after
-  a delete, and its `mountedRef` guard, stay in the page.
-- A page that finds its place gone (a 404 on the Chapter or Book, or an
+  byline, and no "Add chapter". `BookPage`'s "Edit" button and `SeriesPage`'s
+  "Edit series" read `mayEdit`, so a Moderator opens the edit modals too;
+  "Add chapter" and the co-author picker stay co-author only. After a delete a
+  co-author lands on My works, a Moderator on `/`.
+- A modal that finds its place gone (a 404 on the Chapter or Book, or an
   Account no longer a Co-author) shows the Unsaved text in
   `UnsavedTextNotice`; only Discard removes it.
 - `BookPage` hides the like button from every Co-author and from everyone on a
@@ -98,46 +101,31 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
   come from `BookDetail`.
-- `FavoritesPanel` keeps one page number per tab and clamps it while
-  rendering: removing the last row of the last page steps back a page.
+- `usePageClamp` redirects a page past the end, with `replace`, to the last
+  page of the true `total`. A books page past the end is served as the last
+  non-empty page and a series page comes back empty, both with the true
+  `total`, so the clamp reads `total`. It waits while the list is pending or
+  blocked on a Genre.
 - `ProfilePage`'s outer tabs are paths (`/profile`, `/profile/favorites`,
-  `/profile/my-books`), since the account menu and the book and series
-  editors open a given tab; the inner Books/Series tabs stay antd state
-  (ADR-0010). A non-author on My Books is redirected only after the session
-  resolves, so an author reloading it stays.
-- `ChapterPage` applies the reading Device preferences: background and font
-  through a nested `ConfigProvider` (a class overriding `--ant-*` never
-  reaches antd's components, which redeclare them), size and line height
-  inline on the text column, whose `ch` width is measured at that size. In
-  Scroll its arrows are antd `Button`s with `href`, routed in-app on a plain
-  click, and stay disabled rather than vanish at either end.
-- The Pages Reading layout lives beside the page: rules in `pagination.ts`,
-  every layout read in `measurePages.ts` (mocked in Jest; jsdom lays nothing
-  out, so check pages, spreads and the slide in a browser), state in
-  `usePages.ts`. The strip is CSS multi-column with a fixed height, so its
-  overflow columns are the pages. A relayout re-measures, then shows the page
-  where the paragraph that was on top begins. That paragraph is recorded only
-  on an open or a turn, never after a relayout (it would then be the one
-  carried over from the page before, and every resize would step back a
-  page), and a resize that changes no page size keeps the old geometry. The
-  page stays mounted
-  between chapters, so `usePages` resets its view during render when the
-  chapter id changes. "Open on the last page" is `location.state`, replaced
-  with `null` once read, or a reload would reopen there. In Pages the arrows
-  are plain buttons whose label changes, so focus stays on one as it turns
-  pages; a hand-off to a chapter not yet cached shows the skeleton, which
-  drops focus. `ReadingPreferences` reports closed on unmount, or the page's
-  keys stay off after that skeleton. The window clips with `overflow: clip`: a `hidden` box can be
-  scrolled by find-in-page. Destructure `usePages`'s result: `react-hooks/refs`
-  reads any property of an object holding refs as a ref read during render.
+  `/profile/my-books`, the last labelled "My works"), since the account menu
+  and the book and series editors open a given tab; the outer `Tabs` has
+  `destroyOnHidden`. The inner Books/Series tabs of both panels live in
+  `?tab=series` (Books is never written), superseding ADR-0010's "inner tabs
+  are antd state" for these two panels only. My works hides the Author field
+  and ignores a typed `author`. A non-author on My works is redirected only
+  after the session resolves, so an author reloading it stays.
+- `ChapterPage`'s reading preferences and Pages layout:
+  `.claude/rules/client/chapter-page.md`.
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
   and opens the confirm modal over it. The path and key are a contract with
   `resetUrl()` on the server. Dismissing navigates to `/`, which closes it.
-- `EditBookPage` / `EditSeriesPage` are "Manage" pages whose details live in an
-  `Edit details` modal. My books creates in `BookCreateModal` /
-  `SeriesCreateModal` and edits in the same edit modals. `/books/new` and
-  `/series/new` no longer exist, so an old link reaches `BookPage` /
-  `SeriesPage` with the id `new`. Neither asks the server: `BookPage` shows
-  "This book no longer exists." and `SeriesPage` "This series no longer exists.".
-  `EditBookPage` / `EditSeriesPage` split into a guard and a view the same way,
-  so `/books/new/edit` shows the same message and asks nothing.
+- There are no Manage pages. Edit happens in `BookEditDetailsModal` (tabs
+  Details | Chapters, the Chapter editor over it) and `SeriesEditDetailsModal`
+  (Details | Books), opened from `BookPage`, `SeriesPage` and My works.
+  Every unknown route, including `/books/:id/edit`, `/series/:id/edit` and a
+  bare `/series`, redirects Home with "Page not found."; the Chapter routes
+  (`/books/:id/chapters/new` and `/books/:id/chapters/:chapterId/edit`)
+  redirect with `replace` to the Book page. `BookPage` (a 404 or a bad id,
+  unless the Book has Unsaved text), `SeriesPage` and `ChapterPage` (to the
+  Book page) redirect with their own messages through `GoneRedirect`, which
+  wraps `usePageGuard`'s denied path. `AppShell` renders a footer.

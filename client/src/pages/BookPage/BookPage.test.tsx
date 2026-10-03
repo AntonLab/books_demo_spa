@@ -1,7 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Route, Routes, useLocation, useNavigationType } from 'react-router';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
@@ -10,7 +13,12 @@ import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
+import * as readingListsApi from '@/api/readingLists';
 import * as favoritesApi from '@/api/favorites';
+import * as genresApi from '@/api/genres';
+import * as libraryApi from '@/api/library';
+import * as seriesApi from '@/api/series';
+import * as authorsApi from '@/api/authors';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -21,12 +29,21 @@ jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/favorites');
+jest.mock('@/api/readingLists');
+jest.mock('@/api/genres');
+jest.mock('@/api/library');
+jest.mock('@/api/series');
+jest.mock('@/api/authors');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
+const mockedReadingLists = jest.mocked(readingListsApi);
+const mockedGenres = jest.mocked(genresApi);
+const mockedLibrary = jest.mocked(libraryApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const book: BookDetail = {
   id: 1,
@@ -51,16 +68,18 @@ const book: BookDetail = {
   description: 'Long ago, in a kingdom of scales.',
   tags: ['epic'],
   status: 'in_progress',
-  genre: { id: 4, name: 'Gothic' },
+  genre: publicGenre(4, 'Gothic'),
   coverUrl: null,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
-  series: { id: 2, title: 'The Scale Cycle' },
+  series: { id: 2, title: 'The Scale Cycle', position: 1 },
   likeCount: 4,
   commentCount: 0,
   wordCount: 0,
   favoriteCount: 2,
   viewerFavoriteId: null,
+  viewerReadingStatus: null,
+  libraryCounts: EMPTY_LIBRARY_COUNTS,
   viewerLikeId: null,
 };
 
@@ -73,6 +92,8 @@ const reader: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -93,9 +114,55 @@ const renderPage = (
   });
 };
 
+const Probe = () => {
+  const { pathname } = useLocation();
+  return <p>{`${pathname}|${useNavigationType()}`}</p>;
+};
+
+const renderWithHome = (
+  id: string,
+  {
+    session,
+    preloadedState,
+  }: { session?: PublicUser; preloadedState?: Partial<RootState> } = {}
+) => {
+  const queryClient = createTestQueryClient();
+  if (session) queryClient.setQueryData(queryKeys.session, session);
+
+  return renderWithProviders(
+    <Routes>
+      <Route path="/books/:id" element={<BookPage />} />
+      <Route path="/" element={<Probe />} />
+    </Routes>,
+    { route: `/books/${id}`, queryClient, preloadedState }
+  );
+};
+
+const unsavedFor = (
+  accountId: number,
+  key: string,
+  text: string
+): Partial<RootState> => ({
+  unsavedText: {
+    accountId,
+    entries: { [key]: { text, savedAt: '2026-09-23T10:00:00.000Z' } },
+  },
+});
+
+const noLists = { items: [], total: 0, current: 1, pageSize: 10 };
+
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(authorsApi).searchAuthors.mockResolvedValue([]);
+  mockedReadingLists.listReadingLists.mockResolvedValue(noLists);
   mockedBooks.getBook.mockResolvedValue(book);
+  mockedGenres.listGenres.mockResolvedValue({ items: [] });
+  mockedSeries.listSeries.mockResolvedValue({
+    items: [],
+    total: 0,
+    limit: 100,
+    offset: 0,
+  });
   mockedChapters.listChapters.mockResolvedValue({
     items: [],
     total: 0,
@@ -125,10 +192,14 @@ describe('BookPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
-    // Each name carries a trailing comma except the last — so this also
-    // pins credit order: reversing the fixture would move the comma.
-    expect(screen.getByText('Ann Author,')).toBeInTheDocument();
-    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    // A comma follows every link but the last — so this also pins credit
+    // order: reversing the fixture would move the comma.
+    expect(
+      screen
+        .getAllByRole('link', { name: /Author|Writer/ })
+        .map((a) => a.textContent)
+    ).toEqual(['Ann Author', 'Cora Writer']);
+    expect(screen.getByText(',')).toBeInTheDocument();
     expect(
       screen.getByText('Long ago, in a kingdom of scales.')
     ).toBeInTheDocument();
@@ -172,8 +243,24 @@ describe('BookPage', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('link', { name: 'The Scale Cycle' })
+      await screen.findByRole('link', { name: 'The Scale Cycle · Book 1' })
     ).toHaveAttribute('href', '/series/2');
+  });
+
+  it('links a Subgenre and its parent', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      genre: publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' }),
+    });
+
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'Fantasy' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Urban Fantasy' })
+    ).toBeInTheDocument();
   });
 
   it('omits the series link on a standalone book', async () => {
@@ -203,13 +290,36 @@ describe('BookPage', () => {
     expect(screen.queryByRole('link', { name: 'Gothic' })).toBeNull();
   });
 
-  it('does not ask the server for an id that is not a book id', async () => {
-    renderPage(undefined, undefined, 'new');
+  it('replaces to Home when the id is not a book id, asking nothing', async () => {
+    renderWithHome('new');
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+    expect(
+      await screen.findAllByText('This book no longer exists.')
+    ).toHaveLength(1);
+    expect(mockedBooks.getBook).not.toHaveBeenCalled();
+  });
+
+  it('replaces to Home on a 404', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+
+    renderWithHome('1');
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+    expect(
+      await screen.findAllByText('This book no longer exists.')
+    ).toHaveLength(1);
+  });
+
+  it('keeps the Alert on a 500, with no redirect', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(500, 'boom'));
+
+    renderWithHome('1');
 
     expect(
-      await screen.findByText('This book no longer exists.')
+      await screen.findByText('Could not load this book.')
     ).toBeInTheDocument();
-    expect(mockedBooks.getBook).not.toHaveBeenCalled();
+    expect(screen.queryByText('/|REPLACE')).not.toBeInTheDocument();
   });
 
   it('reports a book that will not load', async () => {
@@ -222,23 +332,41 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('offers the Unsaved text of a book that no longer exists', async () => {
+  it('stays and offers the Unsaved text of a book that is gone', async () => {
     mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'Book not found'));
-    renderPage(reader, {
-      unsavedText: {
-        accountId: 9,
-        entries: {
-          'book:1:comment': {
-            text: 'About that ending',
-            savedAt: '2026-09-23T10:00:00.000Z',
-          },
-        },
-      },
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(
+        reader.id,
+        'book:1:comment',
+        'About that ending'
+      ),
     });
 
     expect(
       await screen.findByRole('textbox', { name: 'Unsaved text' })
     ).toHaveValue('About that ending');
+    expect(screen.queryByText('/|REPLACE')).not.toBeInTheDocument();
+  });
+
+  it('redirects when the only Unsaved text is blank', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(reader.id, 'book:1:comment', '   '),
+    });
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+  });
+
+  it('redirects when another Account owns the Unsaved text', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    renderWithHome('1', {
+      session: reader,
+      preloadedState: unsavedFor(77, 'book:1:comment', 'theirs'),
+    });
+
+    expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
   });
 
   it('hides the like button from an anonymous visitor', async () => {
@@ -336,6 +464,33 @@ describe('BookPage', () => {
     expect(mockedFavorites.createFavorite).toHaveBeenCalledTimes(1);
   });
 
+  describe('Add to reading list', () => {
+    const addButton = { name: 'Add to reading list' };
+
+    it('is offered to a signed-in reader of a Published Book', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+      renderPage(reader);
+
+      expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+    });
+
+    it('is not offered to a Guest', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
+
+    it('is not offered to the Co-author viewing a Draft Book', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+      renderPage({ ...reader, id: 4 });
+
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
+  });
+
   it('renders the chapters tab and the comments section', async () => {
     renderPage();
 
@@ -345,10 +500,279 @@ describe('BookPage', () => {
     // The tab took the old section's place, heading and all.
     expect(screen.queryByRole('heading', { name: 'Chapters' })).toBeNull();
     expect(
-      screen.getByRole('heading', { name: 'Comments' })
+      screen.getByRole('tab', { name: 'Comments (0)' })
     ).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('BookPage recording Recently viewed', () => {
+  it('records a Published Book once its data has loaded', async () => {
+    const { store } = renderPage();
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(store.getState().recentlyViewed.ids).toEqual([1]);
+  });
+
+  it('moves a re-opened Book to the front without a duplicate', async () => {
+    const { store } = renderPage(undefined, {
+      recentlyViewed: { accountId: null, ids: [5, 1, 7] },
+    });
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+
+    expect(store.getState().recentlyViewed.ids).toEqual([1, 5, 7]);
+  });
+
+  it("does not record a Draft, even the Co-author's own", async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+
+    const { store } = renderPage({ ...reader, id: 3 });
+    await screen.findByText('Draft');
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+  });
+
+  it('records nothing when the Book is gone', async () => {
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+
+    const { store } = renderWithHome('1');
+    await screen.findByText('/|REPLACE');
+
+    expect(store.getState().recentlyViewed.ids).toEqual([]);
+  });
+});
+
+describe('BookPage lower tabs', () => {
+  const listsPage = (total: number) => ({
+    items: [
+      {
+        id: 4,
+        title: 'Cold nights',
+        description: '',
+        tags: [],
+        owner: { id: 9, login: 'reader' },
+        itemCount: 2,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      },
+    ],
+    total,
+    current: 1,
+    pageSize: 10,
+  });
+
+  it('counts the Comments from the Book and opens on them, the thread inside the tab', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 3 });
+    renderPage();
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (3)', selected: true })
+    ).toBeInTheDocument();
+    // The tab label names the region: no second "Comments" heading inside it.
+    expect(screen.queryByRole('heading', { name: 'Comments' })).toBeNull();
+  });
+
+  it('counts the lists holding the Book before the tab is opened, then lists them with links', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    const tab = await screen.findByRole('tab', { name: 'Reading lists (1)' });
+    expect(tab).toHaveAttribute('aria-selected', 'false');
+    expect(mockedReadingLists.listReadingLists).toHaveBeenCalledWith({
+      bookId: 1,
+      current: 1,
+      pageSize: 10,
+    });
+
+    await userEvent.click(tab);
+
+    expect(
+      await screen.findByRole('link', { name: 'Cold nights' })
+    ).toHaveAttribute('href', '/lists/4');
+  });
+
+  it('shows the empty message on a Book no list holds', async () => {
+    renderPage();
+
+    await userEvent.click(
+      await screen.findByRole('tab', { name: 'Reading lists (0)' })
+    );
+
+    expect(
+      await screen.findByText('Not in any reading list yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('labels the Reading lists tab without a count when its request fails, Comments unaffected', async () => {
+    mockedReadingLists.listReadingLists.mockRejectedValue(new Error('boom'));
+    renderPage();
+
+    await waitFor(() =>
+      expect(mockedReadingLists.listReadingLists).toHaveBeenCalled()
+    );
+    await expect(
+      mockedReadingLists.listReadingLists.mock.results[0]?.value
+    ).rejects.toThrow('boom');
+    expect(
+      await screen.findByRole('tab', { name: 'Reading lists' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Comments (0)' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows a Guest both lower tabs with their counts and no write controls', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (2)' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Reading lists (1)' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add comment' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Add to reading list' })
+    ).toBeNull();
+  });
+
+  it('names each lower tab by its label, for a regex lookup and for its panel', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    const comments = await screen.findByRole('tab', { name: /Comments/ });
+    expect(comments).toHaveAccessibleName('Comments (2)');
+    expect(
+      screen.getByRole('tabpanel', { name: 'Comments (2)' })
+    ).toBeInTheDocument();
+
+    const lists = await screen.findByRole('tab', { name: /Reading lists/ });
+    expect(lists).toHaveAccessibleName('Reading lists (1)');
+    await userEvent.click(lists);
+    expect(
+      await screen.findByRole('tabpanel', { name: 'Reading lists (1)' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the closed Comments section and an empty Reading lists tab on a Draft', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    expect(
+      await screen.findByText('Comments are closed while this book is a draft.')
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('tab', { name: 'Reading lists (0)' })
+    );
+    expect(
+      await screen.findByText('Not in any reading list yet.')
+    ).toBeInTheDocument();
+  });
+
+  it('raises the Comments count when a Comment is posted and the Book refetches', async () => {
+    mockedBooks.getBook
+      .mockResolvedValueOnce({ ...book, commentCount: 0 })
+      .mockResolvedValue({ ...book, commentCount: 1 });
+    mockedComments.createComment.mockResolvedValue({} as never);
+    renderPage(reader);
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add comment' })
+    );
+    await userEvent.type(screen.getByRole('textbox'), 'Lovely');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    expect(
+      await screen.findByRole('tab', { name: 'Comments (1)' })
+    ).toBeInTheDocument();
+  });
+});
+
+describe('Library', () => {
+  it('shows the counts to a Guest, without the dropdown', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      libraryCounts: { reading: 1, planToRead: 1, read: 1, inLibraries: 3 },
+    });
+    renderPage();
+    expect(await screen.findByText('In 3 libraries')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Reading status' })
+    ).toBeNull();
+  });
+
+  it('shows the reader’s own status in the dropdown', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      viewerReadingStatus: 'reading',
+    });
+    renderPage(reader);
+    const select = await screen.findByRole('combobox', {
+      name: 'Reading status',
+    });
+    expect(
+      within(select.closest('.ant-select') as HTMLElement).getByText('Reading')
+    ).toBeInTheDocument();
+  });
+
+  it('sets a status and refetches the book', async () => {
+    mockedLibrary.setReadingStatus.mockResolvedValue({
+      bookId: 1,
+      status: 'reading',
+      updatedAt: '2026-10-02T10:00:00.000Z',
+    });
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Reading'));
+    expect(mockedLibrary.setReadingStatus).toHaveBeenCalledWith(1, 'reading');
+    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
+  });
+
+  it('removes the book from the Library', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      viewerReadingStatus: 'read',
+    });
+    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Remove from library'));
+    expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(1);
+  });
+
+  it('toasts a failed change and refetches the book', async () => {
+    mockedLibrary.setReadingStatus.mockRejectedValue(
+      new ApiError(404, 'Book 1 not found')
+    );
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Read'));
+    expect(await screen.findByText('Book 1 not found')).toBeInTheDocument();
+    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
+  });
+
+  it('disables the dropdown while a change is in flight', async () => {
+    mockedLibrary.setReadingStatus.mockReturnValue(new Promise(() => {}));
+    renderPage(reader);
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Reading status' })
+    );
+    await userEvent.click(screen.getByTitle('Read'));
+    expect(
+      screen.getByRole('combobox', { name: 'Reading status' })
+    ).toBeDisabled();
   });
 });
 
@@ -376,35 +800,79 @@ describe('BookPage on a draft', () => {
     expect(await screen.findByText('Complete')).toBeInTheDocument();
   });
 
-  it('keeps all three tabs on a draft', async () => {
+  it('keeps all four tabs on a draft', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
 
     renderPage({ ...reader, id: 4, role: 'author' });
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Description',
       'Chapters',
       'Statistics',
+      'Comments (0)',
+      'Reading lists (0)',
     ]);
   });
 });
 
-describe('BookPage edit link', () => {
-  it('offers Edit to every co-author', async () => {
+describe('BookPage Edit button', () => {
+  it('opens the Book edit modal for a co-author, over the page', async () => {
     renderPage({ ...reader, id: 4, role: 'author' });
 
-    expect(await screen.findByRole('link', { name: 'Edit' })).toHaveAttribute(
-      'href',
-      '/books/1/edit'
-    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+
+    // Unnamed: the clicked Edit button keeps focus, and its tooltip then
+    // becomes the dialog's accessible name.
+    expect(
+      within(await screen.findByRole('dialog')).getByText('Edit book')
+    ).toBeInTheDocument();
   });
 
-  it('offers Edit to nobody else', async () => {
-    renderPage(reader);
+  it('offers a Moderator the same Edit button, and a plain reader none', async () => {
+    const { unmount } = renderPage({ ...reader, id: 50, role: 'admin' });
+    expect(
+      await screen.findByRole('button', { name: 'Edit' })
+    ).toBeInTheDocument();
+    unmount();
 
+    renderPage(reader);
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
-    expect(screen.queryByRole('link', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+
+  it.each([
+    [
+      'a co-author goes to My works',
+      { id: 4, role: 'author' as const },
+      'My works',
+    ],
+    ['a moderator goes home', { id: 50, role: 'admin' as const }, 'Home'],
+  ])('after delete from the modal, %s', async (_name, who, landing) => {
+    mockedBooks.deleteBook.mockResolvedValue(undefined);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(queryKeys.session, { ...reader, ...who });
+    renderWithProviders(
+      <Routes>
+        <Route path="/books/:id" element={<BookPage />} />
+        <Route path="/" element={<p>Home</p>} />
+        <Route path="/profile/my-books" element={<p>My works</p>} />
+      </Routes>,
+      { route: '/books/1', queryClient }
+    );
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete book' })
+    );
+    // The server no longer has the book once it is deleted, so any refetch of
+    // it answers 404.
+    mockedBooks.getBook.mockRejectedValue(new ApiError(404, 'gone'));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete' })
+    );
+
+    expect(await screen.findByText(landing)).toBeInTheDocument();
+    expect(screen.queryByText('This book no longer exists.')).toBeNull();
   });
 });
 
@@ -453,6 +921,54 @@ describe('BookPage Unsaved text', () => {
   });
 });
 
+describe('BookPage header and action row', () => {
+  const moderator: PublicUser = { ...reader, id: 50, role: 'admin' };
+
+  it('shows the whole description in the header card, under the title', async () => {
+    const long = 'Long ago, in a kingdom of scales. '.repeat(30).trim();
+    mockedBooks.getBook.mockResolvedValue({ ...book, description: long });
+    renderPage();
+
+    expect(await screen.findByText(long)).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Description' })).toBeNull();
+  });
+
+  it('lays the actions out as Like, Favorite, Library status, Add to reading list, Edit, then the library counts', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+    renderPage(moderator);
+
+    const names = [
+      await screen.findByRole('button', { name: 'Like' }),
+      screen.getByRole('button', { name: 'Add to favorites' }),
+      screen.getByRole('combobox', { name: 'Reading status' }),
+      screen.getByRole('button', { name: 'Add to reading list' }),
+      screen.getByRole('button', { name: 'Edit' }),
+      screen.getByText('In 0 libraries'),
+    ];
+    names.slice(1).forEach((node, index) => {
+      expect(
+        names[index]!.compareDocumentPosition(node) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+  });
+
+  it('shows the Edit icon button with an Edit tooltip', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.hover(await screen.findByRole('button', { name: 'Edit' }));
+
+    expect(await screen.findByRole('tooltip', { name: 'Edit' })).toBeVisible();
+  });
+
+  it('shows a Guest only the library counts under the card', async () => {
+    renderPage();
+
+    expect(await screen.findByText('In 0 libraries')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+  });
+});
+
 describe('BookPage tabs', () => {
   const chapter: ChapterSummary = {
     id: 21,
@@ -476,7 +992,10 @@ describe('BookPage tabs', () => {
 
   // Only the open tab's panel: antd marks the others aria-hidden, which role
   // queries skip.
-  const openPanel = () => within(screen.getByRole('tabpanel'));
+  // The lower set's open panel is also a tabpanel, so pick the upper one by
+  // its label.
+  const openPanel = () =>
+    within(screen.getByRole('tabpanel', { name: /^(Chapters|Statistics)$/ }));
 
   // Each figure is one table cell holding its label and then its value.
   const statistic = (label: string) =>
@@ -489,29 +1008,19 @@ describe('BookPage tabs', () => {
     await userEvent.click(screen.getByRole('tab', { name }));
   };
 
-  it('opens on Description, the first of three tabs', async () => {
+  it('opens on Chapters, the first of two upper tabs, with no Description tab', async () => {
     renderPage();
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Description',
       'Chapters',
       'Statistics',
+      'Comments (0)',
+      'Reading lists (0)',
     ]);
     expect(
-      screen.getByRole('tab', { name: 'Description', selected: true })
+      screen.getByRole('tab', { name: 'Chapters', selected: true })
     ).toBeInTheDocument();
-    expect(
-      openPanel().getByText('Long ago, in a kingdom of scales.')
-    ).toBeInTheDocument();
-  });
-
-  it('shows a placeholder for a description that is only blanks', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, description: ' \n\t ' });
-
-    renderPage();
-
-    expect(await screen.findByText('No description yet.')).toBeInTheDocument();
   });
 
   it('numbers only the published chapters, even for a Co-author', async () => {

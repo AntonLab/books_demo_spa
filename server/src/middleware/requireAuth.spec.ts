@@ -21,6 +21,8 @@ const USER: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -44,7 +46,8 @@ function deps(
         ? null
         : { ...USER, status: overrides.status ?? USER.status };
     },
-  } as UserRepository;
+    async touchLastSeen() {},
+  } as unknown as UserRepository;
 
   return { sessionRepository, userRepository };
 }

@@ -2,7 +2,11 @@ import { Router } from 'express';
 import { createGenreController } from '../controllers/genreController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
-import { genreBodySchema, listGenresQuerySchema } from '../types/genre.ts';
+import {
+  genreBodySchema,
+  genreUpdateSchema,
+  listGenresQuerySchema,
+} from '../types/genre.ts';
 import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
@@ -29,7 +33,7 @@ export function createGenreRoutes(deps: RouteDeps): Router {
   router.patch(
     '/:id',
     requirePermission('genres', 'update'),
-    validate({ params: idParamSchema, body: genreBodySchema }),
+    validate({ params: idParamSchema, body: genreUpdateSchema }),
     controller.update
   );
   router.delete(

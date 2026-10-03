@@ -7,16 +7,14 @@ import { BookForm } from './BookForm';
 import type { BookFieldValues } from './BookForm';
 import { clearSelect } from '@/test/clearSelect';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
 
 const series = [
   { id: 7, title: 'The Scale Cycle' },
   { id: 8, title: 'Letters from Blackmoor' },
 ];
 
-const genres = [
-  { id: 4, name: 'Gothic' },
-  { id: 5, name: 'Hard SF' },
-];
+const genres = [genreItem(4, 'Gothic'), genreItem(5, 'Hard SF')];
 
 describe('BookForm', () => {
   it('fills the form instance it is given, so a caller can read its state', async () => {

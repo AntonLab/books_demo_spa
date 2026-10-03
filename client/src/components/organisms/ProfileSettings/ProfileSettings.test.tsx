@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ProfileSettings } from './ProfileSettings';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
@@ -25,6 +26,8 @@ const session: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
@@ -41,7 +44,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   // A default so that a successful mutation's session invalidation has
   // something real to refetch.
-  mockedAuth.me.mockResolvedValue(session);
+  mockedAuth.me.mockResolvedValue(sessionOf(session));
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
   });
@@ -62,6 +65,42 @@ describe('ProfileSettings', () => {
     expect(
       screen.getByRole('button', { name: 'Upload avatar' })
     ).toBeInTheDocument();
+  });
+
+  it('shows the account details form prefilled with the session', () => {
+    renderWithSession(session);
+
+    expect(screen.getByRole('textbox', { name: 'Login' })).toHaveValue('bob');
+    expect(screen.getByRole('textbox', { name: 'Email' })).toHaveValue(
+      'bob@example.com'
+    );
+  });
+
+  it('shows the Change password and This device sections', () => {
+    renderWithSession(session);
+
+    expect(
+      screen.getByRole('button', { name: 'Change password' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reset theme' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Reset reading settings' })
+    ).toBeInTheDocument();
+  });
+
+  it('gives the two Current password inputs different ids', async () => {
+    renderWithSession(session);
+
+    await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), '.uk');
+
+    const inputs = document.querySelectorAll('input[type="password"]');
+    const ids = Array.from(inputs)
+      .filter((input) => input.id.endsWith('currentPassword'))
+      .map((input) => input.id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
   });
 
   it('has no Remove button while there is no avatar', () => {

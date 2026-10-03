@@ -1,5 +1,7 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
+import type { PublicUser, SessionUser } from 'shared';
+import { permissionsFor } from '../permissions/permissionStore.ts';
 import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
 import { passwordResetMail } from '../delivery/passwordResetMail.ts';
 import { logger } from '../logger.ts';
@@ -57,6 +59,11 @@ function dummyPasswordHash(): Promise<string> {
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+const toSession = (user: PublicUser): SessionUser => ({
+  ...user,
+  permissions: permissionsFor(user.role),
+});
+
 export function createAuthController(deps: AuthControllerDeps) {
   const verify = deps.verify ?? verifyPassword;
 
@@ -87,7 +94,7 @@ export function createAuthController(deps: AuthControllerDeps) {
       );
 
       setSessionCookie(res, await openSession(user.id));
-      res.status(201).json(user);
+      res.status(201).json(toSession(user));
     },
 
     login: async (req, res) => {
@@ -139,8 +146,11 @@ export function createAuthController(deps: AuthControllerDeps) {
         throw new ForbiddenError('Account is blocked');
       }
 
+      // A login is a session's first request and carries no cookie yet, so
+      // the auth middleware cannot stamp it.
+      await deps.userRepository.touchLastSeen(user.id, new Date());
       setSessionCookie(res, token);
-      res.json(user);
+      res.json(toSession(user));
     },
 
     logout: async (req, res) => {
@@ -158,7 +168,7 @@ export function createAuthController(deps: AuthControllerDeps) {
     me: (req, res) => {
       // requireAuth guarantees this; the check narrows the optional type.
       if (!req.user) throw new UnauthorizedError();
-      res.json(req.user);
+      res.json(toSession(req.user));
     },
 
     requestReset: async (req, res) => {

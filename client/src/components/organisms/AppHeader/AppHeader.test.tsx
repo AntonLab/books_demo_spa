@@ -4,6 +4,8 @@ import { useLocation, useNavigate } from 'react-router';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { genreItem } from '@/test/genres';
+import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
@@ -11,7 +13,7 @@ import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import { FakeEventSource } from '@/test/eventSource';
-import type { CreditNotification, PublicUser } from '@/types/api';
+import type { CreditNotification, PublicUser, SessionUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/notifications');
@@ -30,6 +32,8 @@ const user: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
@@ -52,10 +56,7 @@ beforeEach(() => {
     offset: 0,
   });
   mockedGenres.listGenres.mockResolvedValue({
-    items: [
-      { id: 3, name: 'Gothic' },
-      { id: 4, name: 'Hard SF' },
-    ],
+    items: [genreItem(3, 'Gothic'), genreItem(4, 'Hard SF')],
   });
 });
 
@@ -82,7 +83,7 @@ const LocationProbe = () => {
 describe('AppHeader while the session is loading', () => {
   it('shows neither Log in nor an avatar', async () => {
     // Never resolves, so the query stays pending for the assertion.
-    mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
+    mockedAuth.me.mockReturnValue(new Promise<SessionUser>(() => {}));
 
     await renderHeader(<AppHeader />);
 
@@ -99,10 +100,20 @@ describe('AppHeader navigation', () => {
     expect(screen.queryByRole('menuitem', { name: 'Series' })).toBeNull();
   });
 
-  it('never shows My Books in the nav, not even for an author', async () => {
+  it('never shows My works in the nav, not even for an author', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
-    expect(screen.queryByRole('menuitem', { name: 'My Books' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'My works' })).toBeNull();
+  });
+
+  it('shows a decorative header image before the navigation', async () => {
+    const { container } = await renderHeader(<AppHeader />, withSession(null));
+    const image = container.querySelector('header img');
+    expect(image).toHaveAttribute('alt', '');
+    expect(image?.getAttribute('src')).toMatch(/header\.svg$/);
+    expect(image?.nextElementSibling).toBe(
+      container.querySelector('header .ant-menu')
+    );
   });
 });
 
@@ -179,16 +190,16 @@ describe('AppHeader when logged in', () => {
   it('shows the avatar image once the account has one', async () => {
     // Not getByRole('img'): antd's Input.Search and Menu render their own
     // icons as SVGs with role="img", so an actual <img> tag is the
-    // unambiguous query here.
+    // unambiguous query here; the header's own decorative image shares the
+    // page, so the query names the avatar's URL.
     const { container } = await renderHeader(
       <AppHeader />,
       withSession({ ...user, avatarUrl: '/api/users/1/avatar?v=1' })
     );
 
-    expect(container.querySelector('img')).toHaveAttribute(
-      'src',
-      '/api/users/1/avatar?v=1'
-    );
+    expect(
+      container.querySelector('img[src="/api/users/1/avatar?v=1"]')
+    ).toBeInTheDocument();
   });
 
   it('logs out through the dropdown, discarding the Unsaved text', async () => {
@@ -306,6 +317,76 @@ describe('AppHeader genres submenu', () => {
     );
   });
 
+  it('shows a plain link for a Genre without Subgenres', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [
+        genreItem(1, 'Fantasy'),
+        genreItem(2, 'Urban Fantasy', 1),
+        genreItem(3, 'Horror'),
+      ],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    const horror = await screen.findByRole('menuitem', { name: 'Horror' });
+
+    expect(within(horror).getByRole('link')).toHaveAttribute(
+      'href',
+      searchPath({ genre: '3' })
+    );
+  });
+
+  it('opens a submenu for a Genre with Subgenres, its own link first', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [
+        genreItem(1, 'Fantasy'),
+        genreItem(2, 'Urban Fantasy', 1),
+        genreItem(3, 'Horror'),
+      ],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Fantasy' })
+    );
+    // The submenu mounts after the click, so find it by its own entry.
+    const popup = (
+      await screen.findByRole('menuitem', { name: 'Urban Fantasy' })
+    ).closest<HTMLElement>('[role="menu"]')!;
+    const entries = within(popup)
+      .getAllByRole('menuitem')
+      .map((entry) => entry.textContent);
+
+    expect(entries).toEqual(['Fantasy', 'Urban Fantasy']);
+    expect(
+      within(
+        within(popup).getByRole('menuitem', { name: 'Fantasy' })
+      ).getByRole('link')
+    ).toHaveAttribute('href', searchPath({ genre: '1' }));
+  });
+
+  it('lists a Subgenre whose parent is missing as a top-level item', async () => {
+    mockedGenres.listGenres.mockResolvedValue({
+      items: [genreItem(9, 'Lost', 99)],
+    });
+    await renderHeader(<AppHeader />, withSession(null));
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Genres' })
+    );
+    const lost = await screen.findByRole('menuitem', { name: 'Lost' });
+
+    expect(within(lost).getByRole('link')).toHaveAttribute(
+      'href',
+      searchPath({ genre: '9' })
+    );
+  });
+
   it('still highlights Home at /', async () => {
     await renderHeader(<AppHeader />, { ...withSession(null), route: '/' });
 
@@ -336,15 +417,15 @@ describe('AppHeader genres submenu', () => {
 describe('AppHeader account menu', () => {
   const admin: PublicUser = { ...user, role: 'admin' };
 
-  it('offers Favorites after Profile, then Manage genres to an admin', async () => {
+  it('offers Favorites after Profile, then the Admin panel to an admin', async () => {
     await renderHeader(<AppHeader />, withSession(admin));
 
     await userEvent.click(screen.getByText('bob'));
-    await screen.findByText('Manage genres');
+    await screen.findByText('Admin panel');
 
     // Scoped to the account dropdown's own popup — its rendered class, not
     // an index or the nav menu on the left, which is also role="menu" — so
-    // this pins Manage genres landing right after Profile rather than merely
+    // this pins the Admin panel landing right after Profile rather than merely
     // existing somewhere in the menu.
     const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
     if (!dropdown) {
@@ -355,12 +436,14 @@ describe('AppHeader account menu', () => {
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
       'Favorites',
-      'Manage genres',
+      'Library',
+      'Reading lists',
+      'Admin panel',
       'Log out',
     ]);
   });
 
-  it('offers Manage genres to a superadmin', async () => {
+  it('offers the Admin panel to a superadmin', async () => {
     await renderHeader(
       <AppHeader />,
       withSession({ ...user, role: 'superadmin' })
@@ -368,24 +451,24 @@ describe('AppHeader account menu', () => {
 
     await userEvent.click(screen.getByText('bob'));
 
-    expect(await screen.findByText('Manage genres')).toBeInTheDocument();
+    expect(await screen.findByText('Admin panel')).toBeInTheDocument();
   });
 
-  it('hides Manage genres from every other role', async () => {
+  it('hides the Admin panel from every other role', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     await userEvent.click(screen.getByText('bob'));
 
     // Profile is there, so the menu really did open before this claim.
     expect(await screen.findByText('Profile')).toBeInTheDocument();
-    expect(screen.queryByText('Manage genres')).toBeNull();
+    expect(screen.queryByText('Admin panel')).toBeNull();
   });
 
-  it('offers My Books to an author, between Favorites and the divider', async () => {
+  it('offers My works to an author, between Favorites and the divider', async () => {
     await renderHeader(<AppHeader />, withSession({ ...user, role: 'author' }));
 
     await userEvent.click(screen.getByText('bob'));
-    await screen.findByText('My Books');
+    await screen.findByText('My works');
 
     const dropdown = document.querySelector<HTMLElement>('.ant-dropdown-menu');
     if (!dropdown) {
@@ -396,21 +479,23 @@ describe('AppHeader account menu', () => {
     expect(items.map((item) => item.textContent)).toEqual([
       'Profile',
       'Favorites',
-      'My Books',
+      'Library',
+      'Reading lists',
+      'My works',
       'Log out',
     ]);
   });
 
-  it('hides My Books from every other role', async () => {
+  it('hides My works from every other role', async () => {
     await renderHeader(<AppHeader />, withSession(user));
 
     await userEvent.click(screen.getByText('bob'));
     await screen.findByText('Profile');
 
-    expect(screen.queryByText('My Books')).toBeNull();
+    expect(screen.queryByText('My works')).toBeNull();
   });
 
-  it('opens the My Books tab from the menu', async () => {
+  it('opens the My works tab from the menu', async () => {
     await renderHeader(
       <>
         <AppHeader />
@@ -420,14 +505,14 @@ describe('AppHeader account menu', () => {
     );
 
     await userEvent.click(screen.getByText('bob'));
-    await userEvent.click(await screen.findByText('My Books'));
+    await userEvent.click(await screen.findByText('My works'));
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/profile/my-books'
     );
   });
 
-  it('navigates to the management page when Manage genres is clicked', async () => {
+  it('navigates to the Admin panel when it is clicked', async () => {
     await renderHeader(
       <>
         <AppHeader />
@@ -437,9 +522,41 @@ describe('AppHeader account menu', () => {
     );
 
     await userEvent.click(screen.getByText('bob'));
-    await userEvent.click(await screen.findByText('Manage genres'));
+    await userEvent.click(await screen.findByText('Admin panel'));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/admin/genres');
+    expect(screen.getByTestId('location')).toHaveTextContent('/admin');
+  });
+
+  it('opens the Library tab from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(user)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Library'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/profile/library'
+    );
+  });
+
+  it('opens the Reading lists tab from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(user)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Reading lists'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/profile/lists');
   });
 
   it('opens the Favorites tab from the menu', async () => {
@@ -520,6 +637,71 @@ describe('AppHeader returning a Guest after Log in', () => {
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/)
     );
+  });
+});
+
+describe('AppHeader on a phone', () => {
+  const longLogin = 'a'.repeat(20);
+  let original: typeof window.matchMedia;
+  beforeEach(() => {
+    original = window.matchMedia;
+    // antd's `xs` breakpoint is (max-width: 575px); jsdom never matches.
+    window.matchMedia = (query: string) =>
+      ({
+        matches: query === '(max-width: 575px)',
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  it('shows only the Avatar on the user button, named by the login', async () => {
+    await renderHeader(
+      <AppHeader />,
+      withSession({ ...user, login: longLogin })
+    );
+
+    expect(screen.getByRole('button', { name: longLogin })).toBeInTheDocument();
+    expect(screen.queryByText(longLogin)).toBeNull();
+  });
+
+  it('collapses Home and Genres into one menu button', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(null)
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Home' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Home' })
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: /Genres/ }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Gothic' })
+    );
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
+  });
+});
+
+describe('AppHeader on a wide screen', () => {
+  it('keeps the nav links and the login text', async () => {
+    await renderHeader(<AppHeader />, withSession(user));
+
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull();
   });
 });
 

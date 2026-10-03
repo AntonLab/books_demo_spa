@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { NotFoundError } from '../types/errors.ts';
 import type { CreateBookInput } from '../types/book.ts';
 import type { BookRepository } from './bookRepository.ts';
@@ -263,6 +264,8 @@ export function bookRepositoryContract(
     assert.equal(detail?.wordCount, 0);
     assert.equal(detail?.favoriteCount, 0);
     assert.equal(detail?.viewerFavoriteId, null);
+    assert.equal(detail?.viewerReadingStatus, null);
+    assert.deepEqual(detail?.libraryCounts, EMPTY_LIBRARY_COUNTS);
   });
 
   test('contract: a removed book is gone, credits and all', async () => {
@@ -274,6 +277,54 @@ export function bookRepositoryContract(
     assert.equal(await repository.findById(created.id), null);
     assert.equal(await repository.findCoAuthorIds(created.id), null);
     assert.equal(await repository.remove(created.id, asActor(authorId)), false);
+  });
+
+  test('contract: a book carries its Series with its place among the Published books', async () => {
+    const { repository, anAuthor, aSeries } = await setUp();
+    const authorId = await anAuthor();
+    const seriesId = await aSeries([authorId]);
+    const alone = await aBook(repository, authorId);
+    const first = await aBook(repository, authorId, {
+      seriesId,
+      title: 'First',
+    });
+    const second = await aBook(repository, authorId, {
+      seriesId,
+      title: 'Second',
+    });
+    const third = await aBook(repository, authorId, {
+      seriesId,
+      title: 'Third',
+    });
+
+    assert.equal(alone.series, null);
+    assert.equal(first.series?.id, seriesId);
+    assert.equal(first.series?.position, null);
+
+    await repository.update(first.id, { status: 'in_progress' });
+    await repository.update(third.id, { status: 'complete' });
+    const listed = await repository.list(
+      { current: 1, pageSize: 50, seriesId },
+      { id: authorId, role: 'author' }
+    );
+    const byId = new Map(
+      listed.items.map((item) => [item.id, item.series?.position])
+    );
+    assert.equal(byId.get(first.id), 1);
+    assert.equal(byId.get(third.id), 2);
+    const draftDetail = await repository.findDetailById(second.id, {
+      id: authorId,
+      role: 'author',
+    });
+    assert.equal(draftDetail?.series?.position, null);
+
+    await repository.reorderInSeries(seriesId, [third.id, second.id, first.id]);
+    const detail = await repository.findDetailById(first.id, {
+      id: authorId,
+      role: 'author',
+    });
+    assert.equal(detail?.series?.position, 2);
+    assert.ok(detail?.series?.title);
   });
 
   test('contract: the series lists follow the Series order a reorder writes, and a later book is appended', async () => {

@@ -1,0 +1,16 @@
+/* A full-width card beside its action buttons must shrink with the row; a
+   flex item defaults to min-width: auto and would widen the page on a phone. */
+.card {
+  flex: 1;
+  min-width: 0;
+}
+
+.pagination {
+  margin-top: var(--ant-margin-lg);
+}
+
+/* Filters hold the toolbar's right end whether or not toolbarStart is shown,
+   and move to their own line, still right, when it fills the first one. */
+.toolbarEnd {
+  margin-inline-start: auto;
+}

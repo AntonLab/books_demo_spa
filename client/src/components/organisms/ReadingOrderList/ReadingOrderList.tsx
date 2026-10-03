@@ -1,41 +1,20 @@
 import type { FC } from 'react';
-import { Alert, Flex, Space, Tag, Typography } from 'antd';
-import { Link } from 'react-router';
+import { Alert, Button, Flex, Space, Tag } from 'antd';
 import { SortableList } from '@/components/organisms/SortableList/SortableList';
 import { ApiError } from '@/api/client';
 import { useChapters, useReorderChapters } from '@/queries/chapters';
-import { formatDate } from '@/format/date';
-import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
+import { isBlank, unsavedTextKeys } from '@/store/unsavedTextSlice';
+import { useUnsavedText } from '@/store/useUnsavedText';
+import { ChapterRow } from './ChapterRow';
 import spacing from '@/theme/spacing.module.css';
-
-// One row of the book's chapter list: a link to the chapter's editor, a badge
-// for what is not out yet, and the date it came out or will.
-const chapterRow = (bookId: number, chapter: ChapterSummary) => {
-  const state = chapterStateOf(chapter);
-
-  return (
-    <Flex justify="space-between" align="center" gap="small">
-      <Space>
-        <Link to={`/books/${bookId}/chapters/${chapter.id}/edit`}>
-          {chapter.title}
-        </Link>
-        {state === 'draft' && <Tag>Draft</Tag>}
-        {state === 'scheduled' && <Tag color="blue">Scheduled</Tag>}
-      </Space>
-      {chapter.publishedAt !== null && (
-        <Typography.Text type="secondary">
-          {formatDate(chapter.publishedAt)}
-        </Typography.Text>
-      )}
-    </Flex>
-  );
-};
 
 interface ReadingOrderListProps {
   bookId: number;
   // Only a Co-author is offered "Add chapter": a Moderator may edit and delete
   // chapters but has no create on them.
   isCoAuthor: boolean;
+  onAdd: () => void;
+  onEdit: (chapterId: number) => void;
 }
 
 // A book's chapters in Reading order (CONTEXT.md), with the save-on-drop that
@@ -44,23 +23,32 @@ interface ReadingOrderListProps {
 export const ReadingOrderList: FC<ReadingOrderListProps> = ({
   bookId,
   isCoAuthor,
+  onAdd,
+  onEdit,
 }) => {
   const chapters = useChapters(bookId);
   const reorder = useReorderChapters(bookId);
+  const { entry: newChapter } = useUnsavedText(
+    unsavedTextKeys.chapterNew(bookId)
+  );
 
   const reorderConflict =
     reorder.error instanceof ApiError && reorder.error.status === 409;
 
   return (
     <>
-      <Flex justify="space-between" align="center" gap="small">
-        <Typography.Title level={4}>Chapters</Typography.Title>
-        {/* Only a Co-author: a Moderator may edit and delete chapters but has
-            no create on them. */}
-        {isCoAuthor && (
-          <Link to={`/books/${bookId}/chapters/new`}>Add chapter</Link>
-        )}
-      </Flex>
+      {isCoAuthor && (
+        <Flex justify="flex-end" className={spacing.gapBelow}>
+          <Space>
+            {newChapter && !isBlank(newChapter) && (
+              <Tag color="orange">Unsaved changes</Tag>
+            )}
+            <Button size="small" onClick={onAdd}>
+              Add chapter
+            </Button>
+          </Space>
+        </Flex>
+      )}
       {/* A 409 has already brought in the current list; this says why the
           order just moved under the author's hands. */}
       {reorder.error && (
@@ -81,7 +69,13 @@ export const ReadingOrderList: FC<ReadingOrderListProps> = ({
         items={(chapters.data?.items ?? []).map((chapter) => ({
           id: chapter.id,
           label: chapter.title,
-          content: chapterRow(bookId, chapter),
+          content: (
+            <ChapterRow
+              bookId={bookId}
+              chapter={chapter}
+              onEdit={() => onEdit(chapter.id)}
+            />
+          ),
         }))}
         isPending={chapters.isPending}
         isError={chapters.isError}

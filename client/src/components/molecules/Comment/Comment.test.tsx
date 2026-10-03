@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Comment } from './Comment';
+import { renderWithProviders as render } from '@/test/renderWithProviders';
 import { formatDate } from '@/format/date';
 import type { CommentWithAuthor } from '@/types/api';
 
@@ -22,6 +23,8 @@ const comment: CommentWithAuthor = {
   },
   likeCount: 2,
   viewerLikeId: null,
+  hasOpenReport: false,
+  viewerReportedId: null,
 };
 
 const baseProps = {
@@ -33,6 +36,23 @@ const baseProps = {
   onEdit: jest.fn(),
   onDelete: jest.fn(),
   onLike: jest.fn(),
+  canReport: true,
+  onReport: jest.fn(),
+  canModerate: false,
+  onRemove: jest.fn(),
+  onRestore: jest.fn(),
+};
+
+const removedComment: CommentWithAuthor = {
+  ...comment,
+  tombstone: 'removed',
+  text: '',
+  userId: null,
+  author: null,
+};
+const deletedComment: CommentWithAuthor = {
+  ...removedComment,
+  tombstone: 'deleted',
 };
 
 beforeEach(() => {
@@ -40,11 +60,37 @@ beforeEach(() => {
 });
 
 describe('Comment', () => {
+  it('disables Delete, Remove and Restore while busy', () => {
+    const { unmount } = render(
+      <Comment {...baseProps} isOwn canModerate busy />
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    unmount();
+
+    render(
+      <Comment {...baseProps} comment={removedComment} canModerate busy />
+    );
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled();
+  });
+
   it('renders the author and the text', () => {
     render(<Comment {...baseProps} />);
 
     expect(screen.getByText('Read Er')).toBeInTheDocument();
     expect(screen.getByText('A fine chapter')).toBeInTheDocument();
+  });
+
+  it('links the author to their public profile, and a Tombstone links nobody', () => {
+    const { unmount } = render(<Comment {...baseProps} />);
+    expect(screen.getByRole('link', { name: 'Read Er' })).toHaveAttribute(
+      'href',
+      '/accounts/3'
+    );
+    unmount();
+
+    render(<Comment {...baseProps} comment={deletedComment} />);
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('dates the comment with the app date helper', () => {
@@ -158,6 +204,101 @@ describe('Comment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reply' }));
 
     expect(onReply).toHaveBeenCalledWith(5);
+  });
+
+  it('reports a report request with the comment id', async () => {
+    const onReport = jest.fn();
+    render(<Comment {...baseProps} onReport={onReport} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Report' }));
+    expect(onReport).toHaveBeenCalledWith(5);
+  });
+
+  it('offers no Report button when reporting is not allowed', () => {
+    render(<Comment {...baseProps} canReport={false} />);
+    expect(screen.queryByRole('button', { name: /report/i })).toBeNull();
+  });
+
+  it.each([
+    [{ viewerReportedId: 9 }, 'Reported'],
+    [{ hasOpenReport: true }, 'Already under review'],
+    [{ hasOpenReport: true, viewerReportedId: 9 }, 'Reported'],
+  ])('disables Report for %j as "%s"', (flags, name) => {
+    render(<Comment {...baseProps} comment={{ ...comment, ...flags }} />);
+    expect(screen.getByRole('button', { name })).toBeDisabled();
+  });
+
+  it('marks a comment with an open report as Moderating, for a Guest too', () => {
+    render(
+      <Comment
+        {...baseProps}
+        canReport={false}
+        canLike={false}
+        canReply={false}
+        comment={{ ...comment, hasOpenReport: true }}
+      />
+    );
+    expect(screen.getByText('Moderating')).toBeInTheDocument();
+  });
+
+  it('shows no Moderating mark on a Tombstone', () => {
+    render(
+      <Comment
+        {...baseProps}
+        comment={{
+          ...comment,
+          tombstone: 'removed',
+          text: '',
+          userId: null,
+          author: null,
+          hasOpenReport: true,
+        }}
+      />
+    );
+    expect(screen.queryByText('Moderating')).toBeNull();
+  });
+
+  it('asks before it removes, then removes once', async () => {
+    const onRemove = jest.fn();
+    render(
+      <Comment {...baseProps} isOwn={false} canModerate onRemove={onRemove} />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(onRemove).not.toHaveBeenCalled();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onRemove).toHaveBeenCalledWith(5);
+  });
+
+  it('offers Restore on a Removed comment to a Moderator, with no other control', async () => {
+    const onRestore = jest.fn();
+    render(
+      <Comment
+        {...baseProps}
+        comment={removedComment}
+        canModerate
+        onRestore={onRestore}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }));
+
+    expect(onRestore).toHaveBeenCalledWith(5);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  it.each([
+    ['a Removed comment, without canModerate', removedComment, false],
+    ['a Deleted comment, with canModerate', deletedComment, true],
+  ])('offers no Restore on %s', (_name, tombstone, canModerate) => {
+    render(
+      <Comment {...baseProps} comment={tombstone} canModerate={canModerate} />
+    );
+
+    expect(screen.queryByRole('button')).toBeNull();
   });
 
   describe('a deleted comment', () => {

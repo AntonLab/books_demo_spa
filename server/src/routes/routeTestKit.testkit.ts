@@ -62,6 +62,7 @@ export function unlimitedAuthRateLimits(): AuthRateLimits {
 export function defaultDeps(): AppDeps {
   return {
     userRepository: createUnusedRepository('user'),
+    accountRepository: createUnusedRepository('account'),
     seriesRepository: createUnusedRepository('series'),
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),
@@ -70,6 +71,9 @@ export function defaultDeps(): AppDeps {
     likeRepository: createUnusedRepository('like'),
     notificationRepository: createUnusedRepository('notification'),
     favoriteRepository: createUnusedRepository('favorite'),
+    libraryRepository: createUnusedRepository('library'),
+    readingListRepository: createUnusedRepository('readingList'),
+    reportRepository: createUnusedRepository('report'),
     sessionRepository: createUnusedRepository('session'),
     passwordResetRepository: createUnusedRepository('passwordReset'),
     mailDelivery: createUnusedRepository('mailDelivery'),
@@ -132,6 +136,8 @@ export const TEST_USER: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 };
@@ -237,7 +243,8 @@ function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
       async findById(id: number) {
         return USERS_BY_ID.get(id) ?? null;
       },
-    } as UserRepository,
+      async touchLastSeen() {},
+    } as unknown as UserRepository,
   };
 }
 

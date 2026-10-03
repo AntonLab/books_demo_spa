@@ -1,6 +1,6 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DatabaseError,
@@ -13,16 +13,23 @@ import { parseConfig } from '../db/config.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { Favorite } from '../models/Favorite.ts';
-import { Genre } from '../models/Genre.ts';
+import { destroyAllGenres, Genre } from '../models/Genre.ts';
+import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
+import { SeriesCover } from '../models/SeriesCover.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import {
+  createCreditedBook,
+  createCreditedSeries,
+} from '../models/creditedBook.testkit.ts';
 import { AppError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
+import type { PublicSeries, WithFavoriteId } from 'shared';
 
 // A schema of its own rather than the users suite's: node:test runs spec
 // files in parallel processes, and two suites calling sync({ force: true })
@@ -85,7 +92,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     // them. Books are cleared by hand, since a series only unlinks its books.
     await Book.destroy({ where: {}, truncate: false });
     await Series.destroy({ where: {}, truncate: false });
-    await Genre.destroy({ where: {}, truncate: false });
+    await destroyAllGenres();
     await User.destroy({ where: {}, truncate: false });
     ownerId = (await User.create(owner)).id;
   });
@@ -350,6 +357,150 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(page.items[0]?.title, 'Shared Series');
   });
 
+  test('bookCount counts only Published books, on list, detail and findById', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Counted',
+      description: '',
+      tags: [],
+    });
+    const filed = (status: 'in_progress' | 'complete' | 'draft') =>
+      createCreditedBook(
+        {
+          title: status,
+          description: '',
+          tags: [],
+          seriesId: series.id,
+          status,
+        },
+        [ownerId]
+      );
+    await filed('in_progress');
+    await filed('complete');
+    await filed('draft');
+
+    assert.equal(
+      (await repository.findById(series.id, asModerator))?.bookCount,
+      2
+    );
+    assert.equal(
+      (await repository.findDetailById(series.id, asModerator))?.bookCount,
+      2
+    );
+    const listed = await repository.list({ limit: 10, offset: 0 }, asModerator);
+    assert.equal(
+      listed.items.find((item) => item.id === series.id)?.bookCount,
+      2
+    );
+  });
+
+  test('coverUrl is versioned by the Cover row and gone with it; deleting the series cascades', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Covered',
+      description: '',
+      tags: [],
+    });
+    await SeriesCover.create({ seriesId: series.id, data: Buffer.from('x') });
+
+    const found = await repository.findById(series.id, asModerator);
+    assert.match(
+      found?.coverUrl ?? '',
+      new RegExp(`^/api/series/${series.id}/cover\\?v=\\d+$`)
+    );
+
+    assert.equal(await repository.remove(series.id, asOwner()), true);
+    assert.equal(await SeriesCover.findByPk(series.id), null);
+  });
+
+  test('a second upload replaces the Cover and moves its version', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Replaced',
+      description: '',
+      tags: [],
+    });
+    await repository.setCover(series.id, Buffer.from('first'));
+    const first = await repository.getCoverData(series.id, asModerator);
+    const firstUrl = (await repository.findById(series.id, asModerator))
+      ?.coverUrl;
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await repository.setCover(series.id, Buffer.from('second, longer'));
+    const second = await repository.getCoverData(series.id, asModerator);
+
+    assert.deepEqual(second?.data, Buffer.from('second, longer'));
+    assert.ok(
+      (second?.updatedAt.getTime() ?? 0) > (first?.updatedAt.getTime() ?? 0)
+    );
+    assert.notEqual(
+      (await repository.findById(series.id, asModerator))?.coverUrl,
+      firstUrl
+    );
+  });
+
+  test('setCover answers false when the series vanishes between the lookup and the write, and rethrows other errors', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Racy',
+      description: '',
+      tags: [],
+    });
+    const missingId = created.id + 10_000;
+
+    assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
+
+    const broken = mock.method(SeriesCover, 'upsert', async () => {
+      throw new Error('disk full');
+    });
+    try {
+      await assert.rejects(
+        repository.setCover(created.id, Buffer.from('x')),
+        /disk full/
+      );
+    } finally {
+      broken.mock.restore();
+    }
+  });
+
+  test('a Draft-only series Cover is hidden from a guest, readable to a Co-author and a Moderator', async () => {
+    const series = await repository.create({
+      userId: ownerId,
+      title: 'Hidden',
+      description: '',
+      tags: [],
+    });
+    await createCreditedBook(
+      {
+        title: 'D',
+        description: '',
+        tags: [],
+        seriesId: series.id,
+        status: 'draft',
+      },
+      [ownerId]
+    );
+    await repository.setCover(series.id, Buffer.from('c'));
+
+    assert.equal(await repository.getCoverData(series.id, null), null);
+    assert.ok(
+      await repository.getCoverData(series.id, { id: ownerId, role: 'author' })
+    );
+    assert.ok(await repository.getCoverData(series.id, asModerator));
+
+    await createCreditedBook(
+      {
+        title: 'P',
+        description: '',
+        tags: [],
+        seriesId: series.id,
+        status: 'in_progress',
+      },
+      [ownerId]
+    );
+    assert.ok(await repository.getCoverData(series.id, null));
+  });
+
   test('removing a book from a series unlinks it and leaves the book standing', async () => {
     const created = await repository.create({
       userId: ownerId,
@@ -535,6 +686,44 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(inMissing.total, 0);
   });
 
+  test('the genre filter on a top-level Genre also returns its Subgenres’ series; a Subgenre matches only itself', async () => {
+    const fantasy = await Genre.create({ name: 'Family Fantasy' });
+    const urban = await Genre.create({
+      name: 'Family Urban',
+      parentId: fantasy.id,
+    });
+    const horror = await Genre.create({ name: 'Family Horror' });
+    const make = (title: string, genreId: number) =>
+      repository.create({
+        userId: ownerId,
+        title,
+        description: 'x',
+        tags: [],
+        genreId,
+      });
+    const top = await make('Top', fantasy.id);
+    const sub = await make('Sub', urban.id);
+    await make('Elsewhere', horror.id);
+
+    const byTop = await repository.list(
+      { limit: 20, offset: 0, genreId: fantasy.id },
+      asModerator
+    );
+    const bySub = await repository.list(
+      { limit: 20, offset: 0, genreId: urban.id },
+      asModerator
+    );
+
+    assert.deepEqual(
+      byTop.items.map((item) => item.id).sort(),
+      [top.id, sub.id].sort()
+    );
+    assert.deepEqual(
+      bySub.items.map((item) => item.id),
+      [sub.id]
+    );
+  });
+
   test('the co-author filter and paging envelope agree on the total', async () => {
     const otherId = (
       await User.create({
@@ -713,12 +902,16 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       });
     };
 
-    const aPublishedSeries = async (title: string) => {
+    const aPublishedSeries = async (
+      title: string,
+      extra: { tags?: string[]; genreId?: number } = {}
+    ) => {
       const series = await repository.create({
         userId: ownerId,
         title,
         description: title,
         tags: [],
+        ...extra,
       });
       await createCreditedBook(
         {
@@ -764,6 +957,99 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       );
     });
 
+    const favoriteQuery = { limit: 20, offset: 0, favoritedBy: 'me' } as const;
+
+    test('favoritedBy=me lists only the viewer own favorited series, each with its favoriteId', async () => {
+      const mine = await aPublishedSeries('Mine');
+      const theirs = await aPublishedSeries('Theirs');
+      await aPublishedSeries('Nobody');
+      const fan = await aFan();
+      const other = await aFan();
+      const row = await Favorite.create({ userId: fan.id, seriesId: mine.id });
+      await Favorite.create({ userId: other.id, seriesId: theirs.id });
+      await Favorite.create({ userId: other.id, seriesId: mine.id });
+
+      const page = await repository.list(favoriteQuery, {
+        id: fan.id,
+        role: 'user',
+      });
+
+      assert.deepEqual(
+        page.items.map((item) => item.id),
+        [mine.id]
+      );
+      assert.equal(page.total, 1);
+      assert.equal(
+        (page.items[0] as WithFavoriteId<PublicSeries>).favoriteId,
+        row.id
+      );
+    });
+
+    test('favoritedBy=me matches nothing for a viewer with no Favorites, and for no viewer', async () => {
+      await aPublishedSeries('Unloved');
+      const fan = await aFan();
+
+      const none = await repository.list(favoriteQuery, {
+        id: fan.id,
+        role: 'user',
+      });
+      const guest = await repository.list(favoriteQuery, null);
+
+      assert.deepEqual([none.total, guest.total], [0, 0]);
+    });
+
+    test('favoritedBy=me combines by AND with q, tag, genreId and paging', async () => {
+      const genre = await Genre.create({ name: 'Favorite Series Genre' });
+      const saga = await aPublishedSeries('Dragon Saga', {
+        tags: ['epic'],
+        genreId: genre.id,
+      });
+      const tales = await aPublishedSeries('Dragon Tales');
+      const hills = await aPublishedSeries('Quiet Hills', {
+        genreId: genre.id,
+      });
+      await aPublishedSeries('Dragon Lore', {
+        tags: ['epic'],
+        genreId: genre.id,
+      });
+      const fan = await aFan();
+      const viewer = { id: fan.id, role: 'user' } as const;
+      for (const series of [saga, tales, hills]) {
+        await Favorite.create({ userId: fan.id, seriesId: series.id });
+      }
+
+      const byText = await repository.list(
+        { ...favoriteQuery, q: 'Dragon' },
+        viewer
+      );
+      const byTag = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', tag: 'epic' },
+        viewer
+      );
+      const byGenre = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', genreId: genre.id },
+        viewer
+      );
+      const paged = await repository.list(
+        { ...favoriteQuery, q: 'Dragon', limit: 1 },
+        viewer
+      );
+
+      assert.deepEqual(
+        byText.items.map((item) => item.id).sort(),
+        [saga.id, tales.id].sort()
+      );
+      assert.deepEqual(
+        byTag.items.map((item) => item.id),
+        [saga.id]
+      );
+      assert.deepEqual(
+        byGenre.items.map((item) => item.id),
+        [saga.id]
+      );
+      assert.deepEqual([paged.total, paged.items.length], [2, 1]);
+    });
+
     test('a series the viewer may not see has no detail, as findById has no record', async () => {
       const hidden = await repository.create({
         userId: ownerId,
@@ -777,6 +1063,183 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         (await repository.findDetailById(hidden.id, asOwner()))?.id,
         hidden.id
       );
+    });
+  });
+
+  describe('published and sorted lists', () => {
+    const makeSeries = (title: string) =>
+      createCreditedSeries({ title, description: title, tags: [] }, [ownerId]);
+    const fileBook = (
+      seriesId: number,
+      status: 'in_progress' | 'draft' = 'in_progress'
+    ) =>
+      createCreditedBook(
+        { title: 'Filed', description: 'd', tags: [], seriesId, status },
+        [ownerId]
+      );
+    const page = (
+      query: Partial<Parameters<typeof repository.list>[0]>,
+      viewer: Viewer = null
+    ) => repository.list({ limit: 20, offset: 0, ...query }, viewer);
+
+    test('published=true lists only Series holding a Published Book, for every viewer', async () => {
+      const live = await makeSeries('Live');
+      await fileBook(live.id);
+      const draftOnly = await makeSeries('Draft only');
+      await fileBook(draftOnly.id, 'draft');
+      await makeSeries('Empty');
+      const titles = async (viewer: Viewer, published?: 'true') =>
+        (await page({ userId: ownerId, published }, viewer)).items
+          .map((series) => series.title)
+          .sort();
+
+      assert.deepEqual(await titles(asOwner()), [
+        'Draft only',
+        'Empty',
+        'Live',
+      ]);
+      for (const viewer of [asOwner(), asModerator, null]) {
+        assert.deepEqual(await titles(viewer, 'true'), ['Live']);
+      }
+      assert.equal(
+        (await page({ userId: ownerId, published: 'true' }, asOwner())).total,
+        1
+      );
+    });
+
+    test('published=true on an Account with no Series is an empty page, not an error', async () => {
+      assert.deepEqual(await page({ userId: ownerId, published: 'true' }), {
+        items: [],
+        total: 0,
+      });
+    });
+
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
+    let readers = 0;
+
+    const chapters = (bookId: number, at: (Date | null)[]) =>
+      Chapter.bulkCreate(
+        at.map((publishedAt, index) => ({
+          bookId,
+          title: `Chapter ${index + 1}`,
+          text: 'text',
+          publishedAt,
+          position: index + 1,
+        }))
+      );
+    const react = async (bookId: number, isLikes: boolean[]) => {
+      for (const isLike of isLikes) {
+        readers += 1;
+        const reader = await User.create({
+          login: `reader${readers}`,
+          email: `reader${readers}@example.com`,
+          password: 'hunter2hunter2',
+          firstName: 'Rea',
+          lastName: 'Der',
+        });
+        await Like.create({ userId: reader.id, bookId, isLike });
+      }
+    };
+    const titlesOf = async (sort: 'popular' | 'new' | 'updated') => {
+      const { items, total } = await page({ published: 'true', sort });
+      return { titles: items.map((series) => series.title), total };
+    };
+
+    // S1 holds a Book released 5 days ago and one updated 1 day ago (and a
+    // Chapter still scheduled); S2 one Book from 3 days ago; S3 only a scheduled
+    // Chapter; S4 a Published Book with no Chapter; S5 only a Draft whose old
+    // Chapter and Likes must not count.
+    const rankedScenario = async () => {
+      const s1 = await makeSeries('S1');
+      await chapters((await fileBook(s1.id)).id, [daysFromNow(-5)]);
+      await chapters((await fileBook(s1.id)).id, [
+        daysFromNow(-1),
+        daysFromNow(2),
+      ]);
+      const s2 = await makeSeries('S2');
+      await chapters((await fileBook(s2.id)).id, [daysFromNow(-3)]);
+      const s3 = await makeSeries('S3');
+      await chapters((await fileBook(s3.id)).id, [daysFromNow(1)]);
+      const s4 = await makeSeries('S4');
+      await fileBook(s4.id);
+      const s5 = await makeSeries('S5');
+      const draft = await fileBook(s5.id, 'draft');
+      await chapters(draft.id, [daysFromNow(-20)]);
+      await react(draft.id, [true, true, true, true, true]);
+    };
+
+    test('a published, sorted list of an Account with no Series is empty, not an error', async () => {
+      for (const sort of ['popular', 'new', 'updated'] as const) {
+        assert.deepEqual(
+          await page({ userId: ownerId, published: 'true', sort }),
+          { items: [], total: 0 }
+        );
+      }
+    });
+
+    test('popular sums the Likes on its Published Books, dislikes and Drafts aside, ties newest first', async () => {
+      const loved = await makeSeries('Loved');
+      await react((await fileBook(loved.id)).id, [true]);
+      await react((await fileBook(loved.id)).id, [true, true]);
+      const mixed = await makeSeries('Mixed');
+      await react((await fileBook(mixed.id)).id, [true, false, false]);
+      await react((await fileBook(mixed.id, 'draft')).id, [
+        true,
+        true,
+        true,
+        true,
+        true,
+      ]);
+      await fileBook((await makeSeries('Quiet A')).id);
+      await fileBook((await makeSeries('Quiet B')).id);
+      await fileBook((await makeSeries('Draft only')).id, 'draft');
+
+      const popular = await titlesOf('popular');
+      assert.deepEqual(popular.titles, [
+        'Loved',
+        'Mixed',
+        'Quiet B',
+        'Quiet A',
+      ]);
+      assert.equal(popular.total, 4);
+    });
+
+    test('new ranks by the earliest Release time among its Published Books, the unreleased last', async () => {
+      await rankedScenario();
+
+      // S2 (3 days) beats S1 (5 days); S4 then S3 have none, newest id first.
+      assert.deepEqual(await titlesOf('new'), {
+        titles: ['S2', 'S1', 'S4', 'S3'],
+        total: 4,
+      });
+    });
+
+    test('updated ranks by the latest Last update among its Published Books, a scheduled Chapter aside, the unreleased last', async () => {
+      await rankedScenario();
+
+      // S1 (1 day) beats S2 (3 days).
+      assert.deepEqual(await titlesOf('updated'), {
+        titles: ['S1', 'S2', 'S4', 'S3'],
+        total: 4,
+      });
+    });
+
+    test('a sorted list pages by limit and offset over the same order', async () => {
+      await rankedScenario();
+
+      const second = await page({
+        published: 'true',
+        sort: 'new',
+        limit: 2,
+        offset: 2,
+      });
+
+      assert.deepEqual(
+        second.items.map((series) => series.title),
+        ['S4', 'S3']
+      );
+      assert.equal(second.total, 4);
     });
   });
 

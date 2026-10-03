@@ -19,8 +19,12 @@ import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
+import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
+import { Report } from '../../models/Report.ts';
+import { ReadingList } from '../../models/ReadingList.ts';
+import { ReadingListItem } from '../../models/ReadingListItem.ts';
 import { Series } from '../../models/Series.ts';
 import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
 import { User } from '../../models/User.ts';
@@ -28,6 +32,8 @@ import { parseConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
 import { createSequelize } from '../sequelize.ts';
+import { buildPlan } from './plan.ts';
+import { RNG_SEED, createRng } from './rng.ts';
 
 // seed.ts is a script with a top-level `await main()`, so it cannot be imported
 // without seeding. These tests run it the way `npm run seed` does, as a child
@@ -36,12 +42,16 @@ const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
-// The eleven tables the seed deletes from under --force. Listed again here
+// The tables the seed deletes from under --force. Listed again here
 // because a script exports nothing a spec could import.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
+  ReadingListItem,
+  ReadingList,
   Favorite,
+  LibraryEntry,
   Like,
+  Report,
   Comment,
   Chapter,
   BookAuthor,
@@ -245,6 +255,33 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
+  test('stores Last online, About and the hide flag for the demo Accounts', async () => {
+    const rows = await offending(
+      `SELECT login, about, showLastSeen, lastSeenAt, createdAt, updatedAt FROM users`
+    );
+    const byLogin = new Map(
+      rows.map((row) => [
+        (row as { login: string }).login,
+        row as Record<string, unknown>,
+      ])
+    );
+
+    assert.equal(byLogin.get('user3')?.showLastSeen, 0);
+    assert.notEqual(byLogin.get('user3')?.lastSeenAt, null);
+    assert.equal(byLogin.get('user1')?.lastSeenAt, null);
+    assert.match(String(byLogin.get('nquinn')?.about), /\n/);
+    assert.equal(byLogin.get('admin')?.about, '');
+    assert.deepEqual(
+      await offending(`SELECT id FROM users WHERE lastSeenAt < createdAt`),
+      []
+    );
+    // A seeded stamp is not an edit: the backdated updatedAt stays.
+    assert.deepEqual(
+      await offending(`SELECT id FROM users WHERE updatedAt <> createdAt`),
+      []
+    );
+  });
+
   test('dates no comment or like before its account was created', async () => {
     assert.deepEqual(
       await offending(
@@ -306,6 +343,45 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
+  test('writes the planned Library, none of it on a Draft book', async () => {
+    const plan = buildPlan(createRng(RNG_SEED));
+    assert.equal(await LibraryEntry.count(), plan.library.length);
+    assert.deepEqual(
+      await offending(
+        `SELECT e.id FROM library_entries e
+         JOIN books b ON b.id = e.bookId
+         WHERE b.status = 'draft'`
+      ),
+      []
+    );
+  });
+
+  test('writes the planned Reading lists, none holding a Draft Book or a hidden Series', async () => {
+    const plan = buildPlan(createRng(RNG_SEED));
+    assert.equal(await ReadingList.count(), plan.readingLists.length);
+    assert.equal(
+      await ReadingListItem.count(),
+      plan.readingLists.reduce((sum, list) => sum + list.items.length, 0)
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT i.id FROM reading_list_items i
+         LEFT JOIN books b ON b.id = i.bookId
+         WHERE b.status = 'draft'
+            OR (i.seriesId IS NOT NULL AND NOT EXISTS (
+              SELECT 1 FROM books s WHERE s.seriesId = i.seriesId AND s.status <> 'draft'))`
+      ),
+      []
+    );
+    assert.deepEqual(
+      await offending(
+        `SELECT listId, COUNT(*) AS n, MAX(position) AS top FROM reading_list_items
+         GROUP BY listId HAVING top <> n - 1`
+      ),
+      []
+    );
+  });
+
   test('titles no chapter "X and X" or "A" before a vowel sound', async () => {
     assert.deepEqual(
       await offending(
@@ -324,56 +400,72 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
-  test('creates the five genres, and only those', async () => {
-    const names = (await Genre.findAll({ order: [['name', 'ASC']] })).map(
-      (row) => row.name
-    );
-
-    assert.deepEqual(names, [
-      'Gothic',
-      'Hard SF',
+  test('creates the Genre tree: five top-level Genres, their Subgenres, and only those', async () => {
+    const rows = await Genre.findAll({ order: [['name', 'ASC']] });
+    const nameOf = new Map(rows.map((row) => [row.id, row.name]));
+    const tree = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.parentId === null) tree.set(row.name, tree.get(row.name) ?? []);
+    }
+    for (const row of rows) {
+      if (row.parentId !== null) {
+        tree.get(nameOf.get(row.parentId) ?? '')?.push(row.name);
+      }
+    }
+    assert.deepEqual([...tree.keys()].sort(), [
+      'Fantasy',
       'Horror',
+      'Mystery',
       'Romance',
+      'Science Fiction',
+    ]);
+    assert.deepEqual(tree.get('Horror'), ['Gothic']);
+    assert.deepEqual(tree.get('Science Fiction')?.sort(), [
+      'Cyberpunk',
+      'Dystopia',
+      'Hard SF',
+      'Space Opera',
+    ]);
+    assert.deepEqual(tree.get('Fantasy')?.sort(), [
+      'Dark Fantasy',
+      'Epic Fantasy',
+      'Fairy Tale',
+      'Sword and Sorcery',
       'Urban Fantasy',
     ]);
+    assert.deepEqual(tree.get('Mystery'), []);
+    for (const subgenres of tree.values()) assert.ok(subgenres.length <= 10);
   });
 
-  test('files every book and series under its author’s genre, and leaves two genres empty', async () => {
+  test('files every book and series under a Genre at both levels, and leaves some Genres empty', async () => {
     assert.deepEqual(
-      await offending('SELECT id, title FROM books WHERE genreId IS NULL'),
+      await offending('SELECT id FROM books WHERE genreId IS NULL'),
       []
     );
     assert.deepEqual(
-      await offending('SELECT id, title FROM series WHERE genreId IS NULL'),
+      await offending('SELECT id FROM series WHERE genreId IS NULL'),
       []
     );
-
-    // Three content banks, three genres in use: no two authors share one.
-    assert.equal(
-      (await offending('SELECT DISTINCT genreId FROM books')).length,
-      3
-    );
-
-    // Every other genre holds both books and series...
+    for (const table of ['books', 'series']) {
+      const atTop = await offending(
+        `SELECT t.id FROM ${table} t JOIN genres g ON g.id = t.genreId
+         WHERE g.parentId IS NULL AND EXISTS (SELECT 1 FROM genres c WHERE c.parentId = g.id)`
+      );
+      const atSub = await offending(
+        `SELECT t.id FROM ${table} t JOIN genres g ON g.id = t.genreId WHERE g.parentId IS NOT NULL`
+      );
+      assert.ok(
+        atTop.length > 0,
+        `${table} point at a top-level Genre with Subgenres`
+      );
+      assert.ok(atSub.length > 0, `${table} point at a Subgenre`);
+    }
+    // Mystery has no Subgenre and no work: the empty state the demo shows.
     assert.deepEqual(
       await offending(
-        `SELECT g.name FROM genres g
-         LEFT JOIN books b ON b.genreId = g.id
+        `SELECT g.id FROM genres g LEFT JOIN books b ON b.genreId = g.id
          LEFT JOIN series s ON s.genreId = g.id
-         WHERE b.id IS NULL AND s.id IS NULL
-           AND g.name NOT IN ('Horror', 'Romance')`
-      ),
-      []
-    );
-    // ...and these two hold neither, on purpose: a demo with no empty genre
-    // never shows what one looks like.
-    assert.deepEqual(
-      await offending(
-        `SELECT g.name FROM genres g
-         LEFT JOIN books b ON b.genreId = g.id
-         LEFT JOIN series s ON s.genreId = g.id
-         WHERE g.name IN ('Horror', 'Romance')
-           AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
+         WHERE g.name = 'Mystery' AND (b.id IS NOT NULL OR s.id IS NOT NULL)`
       ),
       []
     );
@@ -397,6 +489,28 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
         .map((chapter) => chapter.id),
       []
     );
+  });
+
+  test('writes Reports in every status and an Account at the ban mark', async () => {
+    const statuses = await offending('SELECT DISTINCT status FROM reports');
+    assert.equal(statuses.length, 4);
+    const banned = await offending(
+      `SELECT reportedAccountId FROM reports WHERE status = 'upheld'
+       GROUP BY reportedAccountId HAVING COUNT(DISTINCT commentId) >= 10`
+    );
+    assert.ok(banned.length >= 1);
+  });
+
+  test('writes no Report the API would refuse', async () => {
+    for (const sql of [
+      `SELECT r.id FROM reports r JOIN comments c ON c.id = r.commentId WHERE r.reporterId = c.userId OR r.createdAt < c.createdAt`,
+      `SELECT r.id FROM reports r JOIN comments c ON c.id = r.commentId
+       WHERE r.status IN ('new', 'in_review') AND c.tombstone IS NOT NULL`,
+      `SELECT commentId FROM reports WHERE status IN ('new', 'in_review') GROUP BY commentId HAVING COUNT(*) > 1`,
+      `SELECT r.id FROM reports r JOIN users u ON u.id = r.reporterId WHERE r.createdAt < u.createdAt`,
+    ]) {
+      assert.deepEqual(await offending(sql), [], sql);
+    }
   });
 
   // Otherwise the first announcement pass after a seed would mail every

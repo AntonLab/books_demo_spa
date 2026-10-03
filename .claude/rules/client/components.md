@@ -22,7 +22,9 @@ that read like mistakes and are not.
   `/search?genre=<id>`) so a click navigates to its key like every other item,
   and `selectedKeys` compares `pathname + search`: `searchPath` must keep
   writing exactly what the search page's URL holds. The submenu is left out
-  while Genres load, on error and when there are none.
+  while Genres load, on error and when there are none. A Genre with Subgenres
+  is a nested submenu (key `genre-<id>`) whose first entry is the Genre's own
+  link.
 - There is no Register item: the login modal's "Create an account" is the way
   in.
 
@@ -40,8 +42,12 @@ that read like mistakes and are not.
   only by keeping live replies in their thread, so a tombstoned root survives
   with at least one live direct reply, and a tombstoned reply never does.
 - A surviving tombstone renders as `TOMBSTONE_LABELS` text with no Owner, no
-  avatar and no controls, for anyone. There are no moderation buttons in the
-  client: remove and restore stay API-only until a moderation screen exists.
+  avatar and no controls, for anyone. Comment actions are `IconButton`s. Report
+  shows to a signed-in non-Owner. A Moderator gets Remove (behind a confirm) on
+  another Account's live Comment and Restore on a Removed one, both through
+  `IconButton`; Removed Tombstones show to Moderators only, as a reply and as a
+  root.
+- `ReportActions` and `ReportedAccountCell` are molecules of the Reports table, with `GenreManager`'s confirm (`Popconfirm` plus `IconButton` `tooltipHidden`) and disabled-with-a-reason tooltip.
 - Edit, delete and like render only when the server would allow them; the
   server refuses each with 403 regardless. `closed` (a Draft book) makes the
   section read-only.
@@ -85,12 +91,14 @@ that read like mistakes and are not.
   `notification`: statics skip the ConfigProvider theme. The holder lives in
   `App`, so a toast outlives the modal that fired it.
 - Every modal holding a form uses `DiscardGuardModal`, except
-  `CommentComposerModal` (its text is Unsaved text). Pass `form` only while the
-  `Form` is mounted. A successful submit calls `onClose` itself and so skips
-  the guard.
-- `BookForm` / `SeriesForm`: the Series and Genre selects are `ClearableSelect`
-  (`allowClear`; antd shows the icon only on hover and it takes no focus, so it
-  keeps the icon visible and clears on Delete or Backspace while closed),
+  `CommentComposerModal` and `ChapterEditorModal` (their text is Unsaved
+  text). Pass `form` only while the `Form` is mounted. A successful submit
+  calls `onClose` itself and so skips the guard.
+- `BookForm` / `SeriesForm`: the Series select is a `ClearableSelect` and the
+  Genre select a `GenreTreeSelect` (a tree of Genres and Subgenres, any node
+  choosable). Both are `allowClear`; antd shows the icon only on hover and it
+  takes no focus, so each keeps the icon visible and clears on Delete or
+  Backspace while closed,
   with "No series" / "No genre" as placeholders, not options. An empty or
   cleared select is `undefined` inside the form and leaves as an explicit
   `null` (the server accepts `null` for both). A stored `null` is seeded as
@@ -130,25 +138,6 @@ that read like mistakes and are not.
   a stale cache are filtered at render. The Popover is `destroyOnHidden`:
   antd keeps hidden content mounted otherwise, and the row timers would keep
   running.
-
-## Search suggestions (`SearchBar`, `SearchForm`)
-
-- Both pass the raw typed text to `useSuggestions` (`queries/suggestions.ts`),
-  never a value the URL fills in. The hook owns the matching rules: a term of
-  3 to `SEARCH_TEXT_MAX_LENGTH` characters after trimming; authors found
-  through a books-by-author search; and every answer re-filtered, since the
-  server also matches descriptions and other Co-authors. The header groups
-  books, authors and series, five each; the form offers each field its own.
-  A pick in the header navigates (book, author's search, series page); in the
-  form, a book opens and an author or series fills its field with the id
-  beside it.
-- Enter on an arrowed-to header suggestion fires `Input.Search`'s `onSearch`
-  before the pick, in one keydown, so the text search waits a microtask and
-  a pick cancels it. jsdom never activates an option on ArrowDown, so this is
-  checked in a browser only.
-- `SearchBar`'s `AutoComplete` carries `id="header-search"`: under Jest every
-  rc-component id without one is `test-id`, and the bar, mounted on every
-  page, would otherwise name any modal labelled by that id.
 
 ## Sortable lists (`SortableList`)
 

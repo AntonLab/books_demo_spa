@@ -12,14 +12,28 @@ const Probe = () => {
   );
 };
 
-const Guarded = ({ access }: { access: PageAccess }) =>
-  usePageGuard(access) ? <p>secret</p> : <p>waiting</p>;
+const Guarded = ({
+  access,
+  message,
+  to,
+}: {
+  access: PageAccess;
+  message?: string;
+  to?: string;
+}) => (usePageGuard(access, message, to) ? <p>secret</p> : <p>waiting</p>);
 
-const renderAt = (access: PageAccess) =>
+const renderAt = (
+  access: PageAccess,
+  options: { message?: string; to?: string } = {}
+) =>
   renderWithProviders(
     <Routes>
       <Route path="/" element={<Probe />} />
-      <Route path="/private" element={<Guarded access={access} />} />
+      <Route path="/books/3" element={<Probe />} />
+      <Route
+        path="/private"
+        element={<Guarded access={access} {...options} />}
+      />
     </Routes>,
     { route: '/private?tab=2' }
   );
@@ -42,6 +56,14 @@ describe('usePageGuard', () => {
     expect(
       await screen.findAllByText("You don't have access to this page.")
     ).toHaveLength(1);
+  });
+
+  it('sends a denied page to the given path with its own message', async () => {
+    renderAt('denied', { message: 'Gone.', to: '/books/3' });
+    expect(await screen.findByTestId('location')).toHaveTextContent(
+      '/books/3|null'
+    );
+    expect(await screen.findAllByText('Gone.')).toHaveLength(1);
   });
 
   it('sends a Guest home carrying the URL to return to', async () => {
