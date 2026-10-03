@@ -14,10 +14,8 @@ import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { createLogMailDelivery } from './delivery/mailDelivery.ts';
-import {
-  XSRF_COOKIE_NAME,
-  XSRF_HEADER_NAME,
-} from './middleware/csrfProtection.ts';
+import { XSRF_HEADER_NAME } from './middleware/csrfProtection.ts';
+import { XSRF_COOKIE } from './sessionCookie.ts';
 import { initModels } from './models/index.ts';
 import { User } from './models/User.ts';
 import {
@@ -151,7 +149,7 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
         // The client reaches the API through its dev proxy, so its writes name
         // APP_BASE_URL rather than the API's own host.
         headers.origin = trustedOrigin;
-        const token = jar.get(XSRF_COOKIE_NAME);
+        const token = jar.get(XSRF_COOKIE);
         if (withXsrfToken && token !== undefined) {
           headers[XSRF_HEADER_NAME] = decodeURIComponent(token);
         }
@@ -175,7 +173,7 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
       return [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
     },
     xsrfToken(): string {
-      const token = jar.get(XSRF_COOKIE_NAME);
+      const token = jar.get(XSRF_COOKIE);
       if (token === undefined) {
         throw new Error('No XSRF token issued to this browser yet');
       }

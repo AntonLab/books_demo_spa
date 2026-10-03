@@ -4,8 +4,6 @@ import { SESSION_COOKIE_NAME, setXsrfCookie } from '../sessionCookie.ts';
 import { xsrfTokenFor } from '../tokens.ts';
 import { ForbiddenError } from '../types/errors.ts';
 
-export { xsrfTokenFor };
-
 // Cross-site request forgery is defended twice, because the one ambient
 // credential here — the httpOnly `sid` cookie — is sent by the browser on
 // requests another site can start. The cookie's SameSite=Lax already keeps it
@@ -19,7 +17,6 @@ export { xsrfTokenFor };
 //      session's token, echoed from a script-readable cookie into a header a
 //      foreign page can neither read nor set.
 
-export { XSRF_COOKIE as XSRF_COOKIE_NAME } from '../sessionCookie.ts';
 export const XSRF_HEADER_NAME = 'x-xsrf-token';
 
 // Reads change nothing, so neither layer looks at them.

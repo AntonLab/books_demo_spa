@@ -9,13 +9,12 @@ import {
   createUnusedRepository,
   unlimitedAuthRateLimits,
 } from '../routes/routeTestKit.testkit.ts';
-import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
+import { SESSION_COOKIE_NAME, XSRF_COOKIE } from '../sessionCookie.ts';
+import { xsrfTokenFor } from '../tokens.ts';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
-  XSRF_COOKIE_NAME,
   XSRF_HEADER_NAME,
-  xsrfTokenFor,
 } from './csrfProtection.ts';
 import { errorHandler } from './errorHandler.ts';
 
@@ -150,7 +149,7 @@ describe('the XSRF token', () => {
       const response = await fetch(`${base}/thing`, {
         method: 'POST',
         headers: {
-          cookie: `${sessionCookie}; ${XSRF_COOKIE_NAME}=${token}`,
+          cookie: `${sessionCookie}; ${XSRF_COOKIE}=${token}`,
           [XSRF_HEADER_NAME]: token,
         },
       });
@@ -163,12 +162,12 @@ describe('the XSRF token', () => {
       const planted = xsrfTokenFor('attacker-session');
       for (const headers of [
         { cookie: sessionCookie },
-        { cookie: `${sessionCookie}; ${XSRF_COOKIE_NAME}=${token}` },
+        { cookie: `${sessionCookie}; ${XSRF_COOKIE}=${token}` },
         // A header without the cookie it must match.
         { cookie: sessionCookie, [XSRF_HEADER_NAME]: token },
         // Cookie and header agree, but name a different session.
         {
-          cookie: `${sessionCookie}; ${XSRF_COOKIE_NAME}=${planted}`,
+          cookie: `${sessionCookie}; ${XSRF_COOKIE}=${planted}`,
           [XSRF_HEADER_NAME]: planted,
         },
       ]) {
@@ -198,17 +197,17 @@ describe('the XSRF token', () => {
     await withServer(guarded(requireXsrfToken), async (base) => {
       for (const cookie of [
         sessionCookie,
-        `${sessionCookie}; ${XSRF_COOKIE_NAME}=stale`,
+        `${sessionCookie}; ${XSRF_COOKIE}=stale`,
       ]) {
         const response = await fetch(`${base}/thing`, { headers: { cookie } });
         assert.equal(response.status, 200);
         assert.match(
           response.headers.get('set-cookie') ?? '',
-          new RegExp(`^${XSRF_COOKIE_NAME}=${token};`)
+          new RegExp(`^${XSRF_COOKIE}=${token};`)
         );
       }
       const settled = await fetch(`${base}/thing`, {
-        headers: { cookie: `${sessionCookie}; ${XSRF_COOKIE_NAME}=${token}` },
+        headers: { cookie: `${sessionCookie}; ${XSRF_COOKIE}=${token}` },
       });
       assert.equal(settled.headers.get('set-cookie'), null);
     });

@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { withApp, json } from './routeTestKit.testkit.ts';
 import { createAuthRateLimits } from '../middleware/authRateLimit.ts';
-import { hashToken } from '../tokens.ts';
-import { xsrfTokenFor } from '../middleware/csrfProtection.ts';
+import { hashToken, xsrfTokenFor } from '../tokens.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type {
   SessionRepository,
