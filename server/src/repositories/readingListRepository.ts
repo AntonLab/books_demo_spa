@@ -418,11 +418,14 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
     },
 
     async removeItem(id, itemId, account) {
-      const list = await ownedList(id, account);
-      const removed = await ReadingListItemRow.destroy({
-        where: { id: itemId, listId: id },
+      await sequelizeOf().transaction(async (transaction) => {
+        const list = await ownedList(id, account, transaction);
+        const removed = await ReadingListItemRow.destroy({
+          where: { id: itemId, listId: id },
+          transaction,
+        });
+        if (removed > 0) await touch(list, transaction);
       });
-      if (removed > 0) await touch(list);
     },
 
     async reorderItems(id, account, itemIds) {
