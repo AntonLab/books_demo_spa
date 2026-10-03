@@ -560,6 +560,18 @@ describe('BookPage lower tabs', () => {
     ).toBeInTheDocument();
   });
 
+  it('labels the Reading lists tab without a count when its request fails, Comments unaffected', async () => {
+    mockedReadingLists.listReadingLists.mockRejectedValue(new Error('boom'));
+    renderPage();
+
+    expect(
+      await screen.findByRole('tab', { name: 'Reading lists' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Comments (0)' })
+    ).toBeInTheDocument();
+  });
+
   it('shows a Guest both lower tabs with their counts and no write controls', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
     mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));

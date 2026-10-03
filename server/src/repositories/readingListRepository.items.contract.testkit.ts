@@ -332,4 +332,16 @@ export function readingListItemsContract(
       empty
     );
   });
+
+  test('contract: listByBook is an empty page for a Published Book no list holds', async () => {
+    const { repository, aBook } = await withList();
+    assert.deepEqual(
+      await repository.listByBook({
+        bookId: await aBook(),
+        current: 1,
+        pageSize: 20,
+      }),
+      { items: [], total: 0 }
+    );
+  });
 }
