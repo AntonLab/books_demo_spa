@@ -1,4 +1,4 @@
-import { deleteAvatar, updateUser, uploadAvatar } from './users';
+import { blockUser, deleteAvatar, updateUser, uploadAvatar } from './users';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (body: unknown, status = 200): jest.Mock => {
@@ -52,6 +52,20 @@ describe('updateUser', () => {
     expect(url).toBe('/api/users/7');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ login: 'new' });
+  });
+});
+
+describe('blockUser', () => {
+  it('PATCHes the fixed status body with the XSRF token and resolves the user', async () => {
+    const fetchMock = mockFetch({ id: 7, status: 'blocked' });
+
+    await expect(blockUser(7)).resolves.toEqual({ id: 7, status: 'blocked' });
+
+    const [url, init] = callOf(fetchMock);
+    expect(url).toBe('/api/users/7');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ status: 'blocked' });
+    expect(init.headers).toHaveProperty('X-XSRF-Token', 'tok-123');
   });
 });
 

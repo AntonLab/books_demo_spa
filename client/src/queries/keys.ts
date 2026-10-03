@@ -1,6 +1,7 @@
 import type { ListBooksParams } from '../api/books';
 import type { ListLibraryParams } from '../api/library';
 import type { ListReadingListsParams, WorkTarget } from '../api/readingLists';
+import type { ListReportsParams, ReportRange } from '../api/reports';
 import type { ListSeriesParams } from '../api/series';
 
 // One place where every cache key is spelled, so no two call sites can
@@ -40,6 +41,12 @@ export const queryKeys = {
   library: (params: ListLibraryParams) => ['library', params] as const,
   // The prefix a Reading status change invalidates.
   allLibrary: ['library'] as const,
+  reports: (params: ListReportsParams) => ['reports', params] as const,
+  reportStatistics: (range: ReportRange) =>
+    ['reports', 'statistics', range] as const,
+  // The prefix over the list and the statistics, so one invalidation refreshes
+  // both.
+  allReports: ['reports'] as const,
   // Keyed by a bare id, like `book`, so neither collides with the by-Account
   // list, which is keyed by a params object.
   readingList: (id: number) => ['readingLists', id] as const,

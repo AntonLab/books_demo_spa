@@ -47,6 +47,12 @@ export type NotificationList = Wire<Shared.NotificationList>;
 
 export type NotificationSettings = Shared.NotificationSettings;
 
+// A row of the Moderator's Reports list; Wire<> because `createdAt` is a Date.
+export type ReportRow = Wire<Shared.ReportRow>;
+
+// Counts and seconds only, no Date in it, so it needs no Wire<>.
+export type ReportStatistics = Shared.ReportStatistics;
+
 export type PublicLike = Wire<Shared.PublicLike>;
 
 export type PublicFavorite = Wire<Shared.PublicFavorite>;

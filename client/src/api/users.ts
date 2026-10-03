@@ -22,6 +22,15 @@ export const updateUser = (
   });
 };
 
+// A fixed body rather than a widened AccountChanges: only a Moderator may send
+// `status`, and the Account form must never offer it.
+export const blockUser = (userId: number): Promise<PublicUser> => {
+  return request<PublicUser>(`/users/${userId}`, {
+    method: 'PATCH',
+    body: { status: 'blocked' },
+  });
+};
+
 export const uploadAvatar = (
   userId: number,
   file: File

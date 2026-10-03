@@ -37,6 +37,7 @@ const setUp = () => {
 
   return {
     wrapper: Wrapper,
+    invalidate,
     // The book detail carries commentCount, which BookPage's Statistics tab
     // shows; the thread is what CommentSection shows.
     expectThreadAndBookInvalidated: () => {
@@ -94,6 +95,29 @@ describe('comment writes', () => {
       'Loved it, truly'
     );
     expectThreadAndBookInvalidated();
+  });
+
+  // An Owner's edit or delete settles or reopens Reports.
+  it('editing a comment also refreshes every report query', async () => {
+    const { wrapper, invalidate } = setUp();
+    const { result } = renderHook(() => useUpdateComment(1), { wrapper });
+
+    result.current.mutate({ id: 5, text: 'x' });
+
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['reports'] })
+    );
+  });
+
+  it('deleting a comment also refreshes every report query', async () => {
+    const { wrapper, invalidate } = setUp();
+    const { result } = renderHook(() => useDeleteComment(1), { wrapper });
+
+    result.current.mutate(5);
+
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['reports'] })
+    );
   });
 
   // CommentSection clears its form once the write settles, so a slow book

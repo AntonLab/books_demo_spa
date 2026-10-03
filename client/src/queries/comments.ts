@@ -34,6 +34,9 @@ const useCommentMutation = <TVariables>(
     mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.book(bookId) });
+      // An Owner's edit or delete settles or reopens Reports. Create fires it
+      // too; the extra refetch only runs while a Reports tab is mounted.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allReports });
       return queryClient.invalidateQueries({
         queryKey: queryKeys.comments(bookId),
       });
