@@ -16,8 +16,8 @@ export const registerSchema = z.object({
   login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
-  firstName: z.string().min(1).max(NAME_MAX_LENGTH),
-  lastName: z.string().min(1).max(NAME_MAX_LENGTH),
+  firstName: z.string().trim().min(1).max(NAME_MAX_LENGTH),
+  lastName: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   // The only place a role is accepted from a public body, and it is narrowed to
   // the two that are a statement of intent rather than a privilege. admin and
   // superadmin are unreachable here by construction — see types/user.ts for

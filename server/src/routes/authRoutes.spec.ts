@@ -273,6 +273,29 @@ test('POST /register refuses to make an admin', async () => {
   });
 });
 
+test('register trims names and refuses a name that is only whitespace', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    for (const field of ['firstName', 'lastName'] as const) {
+      const blank = await post(base, 'register', {
+        ...registration,
+        [field]: '   ',
+      });
+      assert.equal(blank.status, 400, field);
+    }
+
+    const padded = await post(base, 'register', {
+      ...registration,
+      firstName: '  Bob ',
+      lastName: ' Bobsson  ',
+    });
+    assert.equal(padded.status, 201);
+    const body = await json<PublicUser>(padded);
+    assert.equal(body.firstName, 'Bob');
+    assert.equal(body.lastName, 'Bobsson');
+  });
+});
+
 test('the session cookie is httpOnly and same-site lax', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {

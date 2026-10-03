@@ -270,6 +270,49 @@ test('PATCH updates one field', async () => {
   );
 });
 
+test('PATCH trims a name and refuses one that is only whitespace', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const as = ROLE_COOKIES.superadmin;
+
+      assert.equal(
+        (await patch(base, created.id, { firstName: '   ' }, as)).status,
+        400
+      );
+      assert.equal(
+        (await patch(base, created.id, { lastName: '' }, as)).status,
+        400
+      );
+
+      const trimmed = await patch(
+        base,
+        created.id,
+        { firstName: ' Robert ' },
+        as
+      );
+      assert.equal(trimmed.status, 200);
+      assert.equal(
+        (await json<{ firstName: string }>(trimmed)).firstName,
+        'Robert'
+      );
+    }
+  );
+});
+
+test('POST (administrative create) refuses a whitespace-only name', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      assert.equal(
+        (await post(base, { ...valid, lastName: '  ' })).status,
+        400
+      );
+    }
+  );
+});
+
 test('PATCH stores About and showLastSeen, and refuses an About over the limit', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository() },

@@ -22,8 +22,9 @@ export const createUserSchema = z.object({
   login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
-  firstName: z.string().min(1).max(NAME_MAX_LENGTH),
-  lastName: z.string().min(1).max(NAME_MAX_LENGTH),
+  // Names are trimmed, so a blank one fails `min(1)`; About is not (below).
+  firstName: z.string().trim().min(1).max(NAME_MAX_LENGTH),
+  lastName: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   status: z.enum(USER_STATUSES).optional(),
   // Not trimmed: line breaks and leading spaces are the writer's.
   about: z.string().max(ABOUT_MAX_LENGTH).optional(),
