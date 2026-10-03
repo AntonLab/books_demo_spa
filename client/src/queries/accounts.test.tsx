@@ -13,7 +13,24 @@ beforeEach(() => {
 
 describe('usePublicProfile', () => {
   it('fetches the profile of the given Account', async () => {
-    const profile = { id: 7, login: 'ann' } as AccountProfile;
+    const profile: AccountProfile = {
+      id: 7,
+      firstName: 'Ann',
+      lastName: 'Lee',
+      avatarUrl: null,
+      about: '',
+      lastSeenAt: null,
+      bookCount: 0,
+      seriesCount: 0,
+      totals: {
+        booksInReadingLists: 0,
+        seriesInReadingLists: 0,
+        bookLikes: 0,
+        seriesLikes: 0,
+        commentsOnBooks: 0,
+        favorites: 0,
+      },
+    };
     mockedAccounts.getAccountProfile.mockResolvedValue(profile);
 
     const { result } = renderHookWithProviders(() => usePublicProfile(7));
