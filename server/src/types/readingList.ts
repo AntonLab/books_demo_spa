@@ -59,11 +59,16 @@ export const reorderReadingListItemsSchema = z.object({
     }),
 });
 
-export const listReadingListsQuerySchema = z.object({
-  userId: idSchema,
+const paging = {
   current: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
-});
+};
+
+// A user's lists or the lists holding a Book, never both.
+export const listReadingListsQuerySchema = z.union([
+  z.strictObject({ userId: idSchema, ...paging }),
+  z.strictObject({ bookId: idSchema, ...paging }),
+]);
 
 // Neither is allowed: no `itemId` is then computed.
 export const myReadingListsQuerySchema = z
@@ -83,4 +88,12 @@ export type ReorderReadingListItemsInput = z.infer<
   typeof reorderReadingListItemsSchema
 >;
 export type ListReadingListsQuery = z.infer<typeof listReadingListsQuerySchema>;
+export type ListReadingListsByOwnerQuery = Extract<
+  ListReadingListsQuery,
+  { userId: number }
+>;
+export type ListReadingListsByBookQuery = Extract<
+  ListReadingListsQuery,
+  { bookId: number }
+>;
 export type MyReadingListsQuery = z.infer<typeof myReadingListsQuerySchema>;

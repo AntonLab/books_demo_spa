@@ -131,6 +131,7 @@ test('bad input is a 400: blank title, empty patch, both targets, odd ids, repea
         ['POST', `/${id}/items`, {}],
         ['PUT', `/${id}/item-order`, { itemIds: [1, 1] }],
         ['GET', ''],
+        ['GET', '?userId=1&bookId=1'],
         ['GET', `/mine?bookId=${BOOK_ID}&seriesId=${SERIES_ID}`],
       ];
       for (const [method, path, body] of bad) {
@@ -316,6 +317,32 @@ test('delete answers 204, then the list is a 404', async () => {
       const { id } = await createList(base);
       assert.equal((await call(base, user, 'DELETE', `/${id}`)).status, 204);
       assert.equal((await call(base, undefined, 'GET', `/${id}`)).status, 404);
+    }
+  );
+});
+
+test('a Guest lists the public lists holding a Book; a Draft or missing Book is an empty page, not an error', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      const { id } = await createList(base);
+      await call(base, user, 'POST', `/${id}/items`, { bookId: BOOK_ID });
+      await createList(base, user, { title: 'Without it' });
+      const page = await json<Wire<PagedResponse<PublicReadingList>>>(
+        await call(base, undefined, 'GET', `?bookId=${BOOK_ID}&pageSize=10`)
+      );
+      assert.deepEqual(
+        [page.total, page.current, page.pageSize, page.items.map((l) => l.id)],
+        [1, 1, 10, [id]]
+      );
+      for (const bookId of [DRAFT_ID, MISSING_ID]) {
+        const empty = await call(base, undefined, 'GET', `?bookId=${bookId}`);
+        assert.equal(empty.status, 200);
+        assert.equal(
+          (await json<Wire<PagedResponse<PublicReadingList>>>(empty)).total,
+          0
+        );
+      }
     }
   );
 });

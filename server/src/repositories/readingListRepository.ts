@@ -30,7 +30,8 @@ import {
 import type {
   AddReadingListItemInput,
   CreateReadingListInput,
-  ListReadingListsQuery,
+  ListReadingListsByBookQuery,
+  ListReadingListsByOwnerQuery,
   MyReadingListsQuery,
   UpdateReadingListInput,
 } from '../types/readingList.ts';
@@ -57,7 +58,11 @@ export interface ReadingListRepository {
   // Newest `updatedAt` first, ties by id descending. An unknown owner is an
   // empty page.
   listByOwner(
-    query: ListReadingListsQuery
+    query: ListReadingListsByOwnerQuery
+  ): Promise<{ items: PublicReadingList[]; total: number }>;
+  // Public, newest `updatedAt` first. A Draft or missing Book is an empty page.
+  listByBook(
+    query: ListReadingListsByBookQuery
   ): Promise<{ items: PublicReadingList[]; total: number }>;
   // 404 for a missing list, then 403 for a non-owner.
   update(
@@ -311,6 +316,35 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       return {
         items: rows.map((list) =>
           toPublicReadingList(list, owner.login, counts.get(list.id) ?? 0)
+        ),
+        total: count,
+      };
+    },
+
+    async listByBook(query) {
+      const target = await Book.findByPk(query.bookId, {
+        attributes: ['status'],
+      });
+      if (!target || target.status === 'draft') return { items: [], total: 0 };
+      const holding = await ReadingListItemRow.findAll({
+        where: { bookId: query.bookId },
+        attributes: ['listId'],
+      });
+      const { rows, count } = await ReadingList.findAndCountAll({
+        where: { id: holding.map((row) => row.listId) },
+        include: [withOwner],
+        order: NEWEST_FIRST,
+        limit: query.pageSize,
+        offset: (query.current - 1) * query.pageSize,
+      });
+      const counts = await shownCounts(rows.map((list) => list.id));
+      return {
+        items: rows.map((list) =>
+          toPublicReadingList(
+            list,
+            joined(list.owner).login,
+            counts.get(list.id) ?? 0
+          )
         ),
         total: count,
       };

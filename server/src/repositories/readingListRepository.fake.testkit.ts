@@ -144,6 +144,26 @@ export function createFakeReadingListRepository(
       };
     },
 
+    async listByBook(query) {
+      const { bookId } = query;
+      const holding =
+        books.has(bookId) && !hiddenBooks.has(bookId)
+          ? [...lists.values()]
+              .filter((list) =>
+                rowsOf(list.id).some((row) => row.bookId === bookId)
+              )
+              .sort(
+                (a, b) =>
+                  b.updatedAt.getTime() - a.updatedAt.getTime() || b.id - a.id
+              )
+          : [];
+      const start = (query.current - 1) * query.pageSize;
+      return {
+        items: holding.slice(start, start + query.pageSize).map(toPublic),
+        total: holding.length,
+      };
+    },
+
     async update(id, account, input) {
       const list = ownedBy(id, account);
       Object.assign(list, input, { updatedAt: now() });

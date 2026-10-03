@@ -275,4 +275,61 @@ export function readingListItemsContract(
     });
     assert.equal(page.items[0]?.id, listId);
   });
+
+  test('contract: listByBook is the lists holding a shown Book, newest change first, paged, one row per list', async () => {
+    const {
+      repository,
+      ownerId,
+      otherId,
+      aBook,
+      aSeries,
+      setBookDraft,
+      pause,
+    } = await withList();
+    const [target, other, s] = [await aBook(), await aBook(), await aSeries()];
+    const first = await repository.create(NEW_LIST, as(ownerId));
+    const second = await repository.create(NEW_LIST, as(otherId));
+    const unrelated = await repository.create(NEW_LIST, as(ownerId));
+    await repository.addItem(unrelated.id, as(ownerId), book(other));
+    await pause();
+    await repository.addItem(first.id, as(ownerId), book(target));
+    await repository.addItem(first.id, as(ownerId), book(other));
+    await repository.addItem(first.id, as(ownerId), series(s));
+    await pause();
+    await repository.addItem(second.id, as(otherId), book(target));
+
+    const page1 = await repository.listByBook({
+      bookId: target,
+      current: 1,
+      pageSize: 1,
+    });
+    assert.deepEqual(
+      [page1.total, page1.items.map((l) => l.id), page1.items[0]?.owner.id],
+      [2, [second.id], otherId]
+    );
+    const page2 = await repository.listByBook({
+      bookId: target,
+      current: 2,
+      pageSize: 1,
+    });
+    assert.deepEqual(
+      [page2.items.map((l) => l.id), page2.items[0]?.itemCount],
+      [[first.id], 3]
+    );
+
+    await setBookDraft(target, true);
+    const empty = { items: [], total: 0 };
+    assert.deepEqual(
+      await repository.listByBook({ bookId: target, current: 1, pageSize: 20 }),
+      empty
+    );
+    assert.deepEqual(
+      await repository.listByBook({
+        bookId: MISSING_ID,
+        current: 1,
+        pageSize: 20,
+      }),
+      empty
+    );
+  });
 }

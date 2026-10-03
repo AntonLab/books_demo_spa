@@ -22,7 +22,10 @@ export function createReadingListController(repository: ReadingListRepository) {
   return {
     list: async (req, res) => {
       const query = validatedQuery<ListReadingListsQuery>(req);
-      const { items, total } = await repository.listByOwner(query);
+      const { items, total } =
+        'userId' in query
+          ? await repository.listByOwner(query)
+          : await repository.listByBook(query);
       res.json({
         items,
         total,

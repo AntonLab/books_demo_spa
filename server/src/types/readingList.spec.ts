@@ -103,18 +103,28 @@ describe('reading list schemas', () => {
     );
   });
 
-  test('list query needs userId and defaults the page', () => {
+  test('list query takes a userId or a bookId, never both or neither, and defaults the page', () => {
     assert.deepEqual(listReadingListsQuerySchema.parse({ userId: '7' }), {
       userId: 7,
       current: 1,
       pageSize: 20,
     });
-    assert.equal(listReadingListsQuerySchema.safeParse({}).success, false);
-    assert.equal(
-      listReadingListsQuerySchema.safeParse({ userId: '7', pageSize: '101' })
-        .success,
-      false
+    assert.deepEqual(
+      listReadingListsQuerySchema.parse({ bookId: '7', pageSize: '10' }),
+      { bookId: 7, current: 1, pageSize: 10 }
     );
+    for (const bad of [
+      {},
+      { userId: '7', bookId: '8' },
+      { bookId: '0' },
+      { userId: '7', pageSize: '101' },
+    ]) {
+      assert.equal(
+        listReadingListsQuerySchema.safeParse(bad).success,
+        false,
+        JSON.stringify(bad)
+      );
+    }
   });
 
   test('my-lists query takes a bookId, a seriesId or neither, never both', () => {
