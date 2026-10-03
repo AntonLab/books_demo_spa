@@ -14,9 +14,13 @@ import {
 } from './personas.ts';
 import { itemAt, type Rng } from './rng.ts';
 import {
+  BAN_MARK_THRESHOLD,
   READING_STATUSES,
+  REPORT_REASONS,
   type BookStatus,
   type ReadingStatus,
+  type ReportReason,
+  type ReportStatus,
   type Tombstone,
 } from 'shared';
 
@@ -109,6 +113,19 @@ export interface PlannedReadingList {
   updatedAt: Date;
 }
 
+export interface PlannedReport {
+  comment: PlannedComment;
+  reporterIndex: number | null; // null: a System report
+  reason: ReportReason;
+  explanation: string | null;
+  status: ReportStatus;
+  moderatorIndex: number | null;
+  settledText: string | null;
+  createdAt: Date;
+  takenAt: Date | null;
+  settledAt: Date | null;
+}
+
 export interface PlannedAuthor {
   spec: AuthorSpec;
   createdAt: Date;
@@ -128,6 +145,7 @@ export interface Plan {
   favorites: PlannedFavorite[];
   library: PlannedLibraryEntry[];
   readingLists: PlannedReadingList[];
+  reports: PlannedReport[];
 }
 
 // Lays an author's whole history out over PUBLICATION_WINDOW_DAYS, ending a few
@@ -667,6 +685,202 @@ function planReadingLists(
   });
 }
 
+const REPORT_EXPLANATIONS = [
+  'Posts the same link under every book.',
+  'Not spam or spoilers, but it reads as aimed at the author.',
+  'Looks like an advert for another site.',
+] as const;
+
+const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+
+// One reader gets exactly BAN_MARK_THRESHOLD Upheld Comments, so the Reports
+// page has an Account at the ban mark; around it sits one Report of each
+// status, a System report on a Comment that was dismissed before an edit, and
+// an Upheld one on another Account. Plans no Comment and no Tombstone of its
+// own: a Tombstone is only ever on a Comment with a reply.
+function planReports(
+  rng: Rng,
+  comments: readonly PlannedComment[],
+  tombstones: ReadonlyMap<PlannedComment, Tombstone>,
+  accounts: Plan['accounts']
+): PlannedReport[] {
+  const now = Date.now();
+  const moderatorIndex = accounts.findIndex(
+    (account) => account.spec.login === 'admin'
+  );
+  if (moderatorIndex === -1) {
+    throw new Error('Seed plan has no admin account to moderate Reports');
+  }
+  const roleOf = (index: number) =>
+    itemAt(accounts, index, 'account').spec.role;
+  const isStaff = (index: number) =>
+    roleOf(index) === 'admin' || roleOf(index) === 'superadmin';
+  const isLive = (comment: PlannedComment) =>
+    tombstones.get(comment) === undefined;
+
+  const reporterFor = (comment: PlannedComment): number =>
+    rng.pick(
+      accounts.flatMap((account, index) =>
+        index !== comment.accountIndex &&
+        index !== moderatorIndex &&
+        account.createdAt <= comment.createdAt
+          ? [index]
+          : []
+      )
+    );
+  // An hour after the Comment at the earliest, and early enough that the
+  // stamps that follow it still lie in the past.
+  const filedAt = (comment: PlannedComment): Date =>
+    new Date(
+      Math.min(
+        comment.createdAt.getTime() + HOUR_MS + rng.float(0, 24 * HOUR_MS),
+        now - 3 * HOUR_MS
+      )
+    );
+  const explanationFor = (reason: ReportReason): string | null =>
+    reason === 'other' ? rng.pick(REPORT_EXPLANATIONS) : null;
+
+  const report = (
+    comment: PlannedComment,
+    fields: Pick<PlannedReport, 'status' | 'reason' | 'createdAt'> &
+      Partial<PlannedReport>
+  ): PlannedReport => ({
+    comment,
+    reporterIndex: reporterFor(comment),
+    explanation: explanationFor(fields.reason),
+    moderatorIndex: null,
+    settledText: null,
+    takenAt: null,
+    settledAt: null,
+    ...fields,
+  });
+  const settledBy = (createdAt: Date) => ({
+    moderatorIndex,
+    takenAt: new Date(createdAt.getTime() + 30 * MINUTE_MS),
+    settledAt: new Date(createdAt.getTime() + 2 * HOUR_MS),
+  });
+
+  let offender = -1;
+  let offenderPool: PlannedComment[] = [];
+  accounts.forEach((_, index) => {
+    if (roleOf(index) !== 'user') return;
+    const owned = comments.filter(
+      (comment) =>
+        comment.accountIndex === index && tombstones.get(comment) !== 'deleted'
+    );
+    if (owned.length > offenderPool.length) {
+      offender = index;
+      offenderPool = owned;
+    }
+  });
+  if (offenderPool.length < BAN_MARK_THRESHOLD) {
+    throw new Error(
+      `Seed plan: the busiest reader holds ${String(offenderPool.length)} Comments, ${String(BAN_MARK_THRESHOLD)} needed for the ban mark`
+    );
+  }
+
+  const reports = rng
+    .sample(offenderPool, BAN_MARK_THRESHOLD)
+    .map((comment, position) => {
+      const createdAt = filedAt(comment);
+      return report(comment, {
+        status: 'upheld',
+        reason: itemAt(
+          REPORT_REASONS,
+          position % REPORT_REASONS.length,
+          'report reason'
+        ),
+        createdAt,
+        ...settledBy(createdAt),
+      });
+    });
+
+  const shown = comments.filter(
+    (comment) =>
+      !isStaff(comment.accountIndex) &&
+      comment.accountIndex !== offender &&
+      tombstones.get(comment) !== 'deleted'
+  );
+  const live = rng.sample(shown.filter(isLive), 4);
+  const fresh = itemAt(live, 0, 'live Comment');
+  const taken = itemAt(live, 1, 'live Comment');
+  const dismissed = itemAt(live, 2, 'live Comment');
+  const edited = itemAt(live, 3, 'live Comment');
+
+  const freshAt = new Date(now - 10 * MINUTE_MS);
+  reports.push(
+    report(fresh, { status: 'new', reason: 'other', createdAt: freshAt })
+  );
+
+  const takenAt = new Date(now - 95 * MINUTE_MS);
+  reports.push(
+    report(taken, {
+      status: 'in_review',
+      reason: 'harassment',
+      createdAt: takenAt,
+      moderatorIndex,
+      takenAt: new Date(takenAt.getTime() + 30 * MINUTE_MS),
+    })
+  );
+
+  const dismissedAt = filedAt(dismissed);
+  reports.push(
+    report(dismissed, {
+      status: 'dismissed',
+      reason: 'spoilers',
+      createdAt: dismissedAt,
+      settledText: dismissed.text,
+      ...settledBy(dismissedAt),
+    })
+  );
+
+  // Dismissed, then edited past the reopen distance: the System files a new
+  // Report on the new text, and the dismissal keeps the text it judged.
+  const editedAt = filedAt(edited);
+  const editedReason = 'spam';
+  reports.push(
+    report(edited, {
+      status: 'dismissed',
+      reason: editedReason,
+      createdAt: editedAt,
+      settledText: itemAt(
+        TOP_LEVEL_COMMENTS.filter((text) => text !== edited.text),
+        0,
+        'earlier text'
+      ),
+      ...settledBy(editedAt),
+    }),
+    report(edited, {
+      status: 'new',
+      reason: editedReason,
+      reporterIndex: null,
+      createdAt: new Date(now - 20 * MINUTE_MS),
+    })
+  );
+
+  // One more Account with an Upheld Comment, below the ban mark. A Comment a
+  // Moderator already removed is preferred: that is what an Uphold leaves.
+  const rest = shown.filter(
+    (comment) => !reports.some((r) => r.comment === comment)
+  );
+  const removed = rest.filter(
+    (comment) => tombstones.get(comment) === 'removed'
+  );
+  const upheld = rng.pick(removed.length > 0 ? removed : rest);
+  const upheldAt = filedAt(upheld);
+  reports.push(
+    report(upheld, {
+      status: 'upheld',
+      reason: 'harassment',
+      createdAt: upheldAt,
+      ...settledBy(upheldAt),
+    })
+  );
+
+  return reports;
+}
+
 export function buildPlan(rng: Rng): Plan {
   const authors = shareSeries(
     shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
@@ -707,5 +921,21 @@ export function buildPlan(rng: Rng): Plan {
   // Drawn after the library, so every earlier draw stays as it was.
   const readingLists = planReadingLists(rng, authors, accounts);
 
-  return { accounts, authors, ...threads, favorites, library, readingLists };
+  // Drawn after the reading lists, so every earlier draw stays as it was.
+  const reports = planReports(
+    rng,
+    threads.comments,
+    threads.tombstones,
+    accounts
+  );
+
+  return {
+    accounts,
+    authors,
+    ...threads,
+    favorites,
+    library,
+    readingLists,
+    reports,
+  };
 }

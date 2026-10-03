@@ -46,6 +46,7 @@ import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
 import { setReadingStatusSchema } from '../../types/library.ts';
 import { createReadingListSchema } from '../../types/readingList.ts';
+import { createReportSchema } from '../../types/report.ts';
 import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
@@ -467,7 +468,11 @@ async function writeThreads(
   accountIds: readonly number[],
   bookIds: Map<PlannedBook, number>,
   transaction: Transaction
-): Promise<{ comments: number; likes: number }> {
+): Promise<{
+  comments: number;
+  likes: number;
+  commentIds: Map<PlannedComment, number>;
+}> {
   const bookIdOf = (book: PlannedBook): number => {
     const id = bookIds.get(book);
     if (id === undefined) {
@@ -537,7 +542,46 @@ async function writeThreads(
     Like.bulkCreate(batch, { transaction })
   );
 
-  return { comments: plan.comments.length, likes: likeRows.length };
+  return { comments: plan.comments.length, likes: likeRows.length, commentIds };
+}
+
+async function writeReports(
+  plan: Plan,
+  accountIds: readonly number[],
+  commentIds: ReadonlyMap<PlannedComment, number>,
+  transaction: Transaction
+): Promise<number> {
+  const accountIdAt = (index: number | null): number | null =>
+    index === null ? null : itemAt(accountIds, index, 'account id');
+
+  const rows = plan.reports.map((report) => {
+    const commentId = commentIds.get(report.comment);
+    if (commentId === undefined) {
+      throw new Error('No row was created for a reported comment');
+    }
+    const settledOrFiled = report.settledAt ?? report.createdAt;
+    return {
+      ...createReportSchema.parse({
+        reason: report.reason,
+        explanation: report.explanation ?? undefined,
+      }),
+      commentId,
+      reporterId: accountIdAt(report.reporterIndex),
+      isSystem: report.reporterIndex === null,
+      reportedAccountId: accountIdAt(report.comment.accountIndex),
+      status: report.status,
+      moderatorId: accountIdAt(report.moderatorIndex),
+      settledText: report.settledText,
+      takenAt: report.takenAt,
+      settledAt: report.settledAt,
+      createdAt: report.createdAt,
+      updatedAt: settledOrFiled,
+    };
+  });
+
+  // A few dozen rows: far below INSERT_BATCH, so one insert.
+  await Report.bulkCreate(rows, { transaction });
+  return rows.length;
 }
 
 async function writeFavorites(
@@ -731,17 +775,26 @@ async function main(): Promise<void> {
         transaction
       );
 
+      const reports = await writeReports(
+        plan,
+        accountIds,
+        threads.commentIds,
+        transaction
+      );
+
       return {
         accounts: accountIds.length,
         genres: genreIds.size,
         series: content.series,
         books: content.bookIds.size,
         chapters: content.chapters,
-        ...threads,
+        comments: threads.comments,
+        likes: threads.likes,
         favorites,
         library,
         ...readingLists,
         notifications,
+        reports,
       };
     });
 

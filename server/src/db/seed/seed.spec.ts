@@ -464,6 +464,28 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     );
   });
 
+  test('writes Reports in every status and an Account at the ban mark', async () => {
+    const statuses = await offending('SELECT DISTINCT status FROM reports');
+    assert.equal(statuses.length, 4);
+    const banned = await offending(
+      `SELECT reportedAccountId FROM reports WHERE status = 'upheld'
+       GROUP BY reportedAccountId HAVING COUNT(DISTINCT commentId) >= 10`
+    );
+    assert.ok(banned.length >= 1);
+  });
+
+  test('writes no Report the API would refuse', async () => {
+    for (const sql of [
+      `SELECT r.id FROM reports r JOIN comments c ON c.id = r.commentId WHERE r.reporterId = c.userId OR r.createdAt < c.createdAt`,
+      `SELECT r.id FROM reports r JOIN comments c ON c.id = r.commentId
+       WHERE r.status IN ('new', 'in_review') AND c.tombstone IS NOT NULL`,
+      `SELECT commentId FROM reports WHERE status IN ('new', 'in_review') GROUP BY commentId HAVING COUNT(*) > 1`,
+      `SELECT r.id FROM reports r JOIN users u ON u.id = r.reporterId WHERE r.createdAt < u.createdAt`,
+    ]) {
+      assert.deepEqual(await offending(sql), [], sql);
+    }
+  });
+
   // Otherwise the first announcement pass after a seed would mail every
   // Favorite holder about the whole catalogue (ADR-0013).
   test('marks every Published chapter and book announced, and leaves Scheduled chapters for the pass', async () => {

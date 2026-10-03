@@ -1,8 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RNG_SEED, createRng } from './rng.ts';
-import { READING_LIST_TITLE_MAX_LENGTH, READING_STATUSES } from 'shared';
-import { buildPlan, type Plan } from './plan.ts';
+import {
+  BAN_MARK_THRESHOLD,
+  READING_LIST_TITLE_MAX_LENGTH,
+  READING_STATUSES,
+  REPORT_EXPLANATION_MAX_LENGTH,
+  REPORT_STATUSES,
+} from 'shared';
+import { buildPlan, type Plan, type PlannedComment } from './plan.ts';
 
 // Everything about the plan except its dates, which are anchored to the moment
 // of the run. Two runs from the same seed must agree on all of this; only the
@@ -27,6 +33,7 @@ const shapeOf = (plan: Plan) => ({
     (favorite) =>
       `${String(favorite.accountIndex)}:${favorite.book?.title ?? favorite.series?.title ?? ''}`
   ),
+  reports: plan.reports.map((r) => `${r.status}:${r.reason}:${r.comment.text}`),
 });
 
 const loginOf = (plan: Plan, accountIndex: number): string => {
@@ -212,6 +219,91 @@ test('gives every reader one or two Reading lists of distinct shown works, mixin
     ).size,
     plan.readingLists.length
   );
+});
+
+test('plans Reports in every status, a System report, and an Account at the ban mark', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  for (const status of REPORT_STATUSES) {
+    assert.ok(
+      plan.reports.some((r) => r.status === status),
+      status
+    );
+  }
+  assert.ok(
+    plan.reports.some((r) => r.reporterIndex === null && r.status === 'new')
+  );
+  assert.ok(
+    plan.reports.some((r) => r.reason === 'other' && r.explanation !== null)
+  );
+  const upheld = new Map<number, Set<PlannedComment>>();
+  for (const r of plan.reports.filter((x) => x.status === 'upheld')) {
+    const owned =
+      upheld.get(r.comment.accountIndex) ?? new Set<PlannedComment>();
+    upheld.set(r.comment.accountIndex, owned.add(r.comment));
+  }
+  const top = Math.max(...[...upheld.values()].map((set) => set.size));
+  assert.ok(
+    top >= BAN_MARK_THRESHOLD,
+    `most upheld Comments of one Account: ${String(top)}`
+  );
+});
+
+test('plans only Reports the API would accept', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const open = new Set<PlannedComment>();
+  const reporters = new Set<string>();
+  const indexOf = (c: PlannedComment) => plan.comments.indexOf(c);
+  for (const r of plan.reports) {
+    const tombstone = plan.tombstones.get(r.comment);
+    const isOpen = r.status === 'new' || r.status === 'in_review';
+    assert.notEqual(
+      r.reporterIndex,
+      r.comment.accountIndex,
+      'nobody reports their own Comment'
+    );
+    assert.notEqual(tombstone, 'deleted');
+    assert.ok(
+      r.createdAt >= r.comment.createdAt,
+      'a Report follows its Comment'
+    );
+    if (r.reporterIndex !== null) {
+      const key = `${String(indexOf(r.comment))}:${String(r.reporterIndex)}`;
+      assert.ok(!reporters.has(key), `duplicate reporter ${key}`);
+      reporters.add(key);
+      const account = plan.accounts[r.reporterIndex];
+      assert.ok(
+        account && account.createdAt <= r.createdAt,
+        'the reporter exists by then'
+      );
+    }
+    if (isOpen) {
+      assert.ok(!open.has(r.comment), 'one Open report per Comment');
+      open.add(r.comment);
+      assert.equal(
+        tombstone,
+        undefined,
+        'an Open report sits on a live Comment'
+      );
+      assert.equal(r.settledAt, null);
+    } else {
+      assert.ok(r.settledAt && r.settledAt >= r.createdAt);
+      assert.notEqual(r.moderatorIndex, null);
+    }
+    if (r.status === 'in_review') {
+      assert.ok(r.moderatorIndex !== null && r.takenAt !== null);
+    }
+    if (r.status === 'dismissed') assert.notEqual(r.settledText, null);
+    if (r.moderatorIndex !== null) {
+      assert.notEqual(r.moderatorIndex, r.comment.accountIndex);
+    }
+    if (r.reason === 'other') {
+      assert.ok(
+        r.explanation && r.explanation.length <= REPORT_EXPLANATION_MAX_LENGTH
+      );
+    } else {
+      assert.equal(r.explanation, null);
+    }
+  }
 });
 
 test('leaves every earlier draw as it was when Reading lists are added', () => {
