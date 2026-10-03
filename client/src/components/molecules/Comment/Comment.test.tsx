@@ -60,6 +60,20 @@ beforeEach(() => {
 });
 
 describe('Comment', () => {
+  it('disables Delete, Remove and Restore while busy', () => {
+    const { unmount } = render(
+      <Comment {...baseProps} isOwn canModerate busy />
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    unmount();
+
+    render(
+      <Comment {...baseProps} comment={removedComment} canModerate busy />
+    );
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled();
+  });
+
   it('renders the author and the text', () => {
     render(<Comment {...baseProps} />);
 

@@ -655,6 +655,103 @@ describe('CommentSection', () => {
   );
 });
 
+describe('a failed Delete, Remove or Restore', () => {
+  const removedRoot: CommentWithAuthor = {
+    ...root,
+    tombstone: 'removed',
+    text: '',
+    userId: null,
+    author: null,
+  };
+
+  it("shows the server's message for a Delete the author cannot make", async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(404, 'Comment not found')
+    );
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Comment not found')).toBeInTheDocument();
+  });
+
+  it('shows a generic message when the network fails on Delete', async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+    renderSignedIn();
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(
+      await screen.findByText('Could not delete the comment.')
+    ).toBeInTheDocument();
+  });
+
+  it("shows the server's message for a refused Remove", async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(403, 'Not allowed to remove this comment')
+    );
+    renderAs('admin');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+
+    expect(
+      await screen.findByText('Not allowed to remove this comment')
+    ).toBeInTheDocument();
+  });
+
+  it('shows a generic message when the network fails on Restore', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [removedRoot],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    mockedComments.restoreComment.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+    renderAs('admin');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Restore' })
+    );
+
+    expect(
+      await screen.findByText('Could not restore the comment.')
+    ).toBeInTheDocument();
+  });
+
+  it('sends one Restore for a double click and disables the button meanwhile', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [removedRoot],
+      total: 1,
+      limit: 100,
+      offset: 0,
+    });
+    let finish: (value: CommentWithAuthor) => void = () => {};
+    mockedComments.restoreComment.mockReturnValue(
+      new Promise<CommentWithAuthor>((resolve) => {
+        finish = resolve;
+      })
+    );
+    renderAs('admin');
+    const restore = await screen.findByRole('button', { name: 'Restore' });
+
+    await userEvent.dblClick(restore);
+
+    expect(mockedComments.restoreComment).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(restore).toBeDisabled());
+    await act(async () => finish(root));
+  });
+});
+
 describe('CommentSection Unsaved text', () => {
   it('restores the root composer after a remount', async () => {
     const { store, queryClient, unmount } = renderSignedIn();

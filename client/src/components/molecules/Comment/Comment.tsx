@@ -41,6 +41,8 @@ interface CommentProps {
   canModerate: boolean;
   onRemove: (id: number) => void;
   onRestore: (id: number) => void;
+  // A Delete, Remove or Restore of this comment is in flight.
+  busy?: boolean;
 }
 
 // The name is free because antd removed its own Comment component in v5, so
@@ -61,6 +63,7 @@ export const Comment: FC<CommentProps> = ({
   canModerate,
   onRemove,
   onRestore,
+  busy = false,
 }) => {
   const { token } = theme.useToken();
   const [confirming, setConfirming] = useState(false);
@@ -83,6 +86,7 @@ export const Comment: FC<CommentProps> = ({
               icon={<UndoOutlined />}
               size="small"
               type="text"
+              disabled={busy}
               onClick={() => onRestore(comment.id)}
             />
           )}
@@ -162,6 +166,7 @@ export const Comment: FC<CommentProps> = ({
               size="small"
               type="text"
               danger
+              disabled={busy}
               onClick={() => onDelete(comment.id)}
             />
           </>
@@ -173,6 +178,7 @@ export const Comment: FC<CommentProps> = ({
             okButtonProps={{ danger: true }}
             onConfirm={() => onRemove(comment.id)}
             onOpenChange={setConfirming}
+            disabled={busy}
           >
             <IconButton
               label="Remove"
@@ -180,6 +186,7 @@ export const Comment: FC<CommentProps> = ({
               size="small"
               type="text"
               danger
+              disabled={busy}
               tooltipHidden={confirming}
             />
           </Popconfirm>

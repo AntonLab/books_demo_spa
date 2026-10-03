@@ -1,5 +1,5 @@
 import { useRef, useState, type FC, type ReactNode } from 'react';
-import { Alert, Button, Empty, Flex, Skeleton, Typography } from 'antd';
+import { Alert, App, Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
 import { CommentComposerModal } from '@/components/molecules/CommentComposerModal/CommentComposerModal';
@@ -27,8 +27,6 @@ import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import { isModeratorRole } from 'shared';
 import type { CommentWithAuthor } from '@/types/api';
 import styles from './CommentSection.module.css';
-
-const noop = () => {};
 
 interface CommentSectionProps {
   bookId: number;
@@ -63,6 +61,8 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const report = useReportComment(bookId);
   const sending = useRef(false);
+  const acting = useRef(new Set<number>());
+  const { message } = App.useApp();
 
   const [composing, setComposing] = useState<Composing | null>(null);
   const [reporting, setReporting] = useState<number | null>(null);
@@ -205,17 +205,33 @@ export const CommentSection: FC<CommentSectionProps> = ({
     setComposing(next);
   };
 
-  const deleteComment = (id: number) => {
-    // mutateAsync over mutate's per-call onSuccess: see submit() above.
-    void remove.mutateAsync(id).then(
-      // The Account chose to delete it; its edit text is not worth offering.
-      () =>
-        dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id))),
-      // Neither error is rendered anywhere in this section yet; this handler
-      // exists only so the rejection is not left unhandled.
-      () => {}
-    );
+  // A ref, not isPending: TanStack notifies it on a later tick, so a double
+  // click would send two requests. mutateAsync over mutate's per-call
+  // onSuccess: see submit() above. Remove is a delete too: the server makes a
+  // Removed comment when another Account calls it.
+  const act = (
+    mutation: typeof remove,
+    id: number,
+    failure: string,
+    onDone?: () => void
+  ) => {
+    if (acting.current.has(id)) return;
+    acting.current.add(id);
+    void mutation
+      .mutateAsync(id)
+      .then(onDone, (error: unknown) => {
+        void message.error(error instanceof ApiError ? error.message : failure);
+      })
+      .finally(() => {
+        acting.current.delete(id);
+      });
   };
+
+  const deleteComment = (id: number) =>
+    act(remove, id, 'Could not delete the comment.', () =>
+      // The Account chose to delete it; its edit text is not worth offering.
+      dispatch(unsavedText.remove(unsavedTextKeys.commentEdit(bookId, id)))
+    );
 
   const like = (comment: CommentWithAuthor) => {
     toggleLike.mutate({
@@ -224,11 +240,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
     });
   };
 
-  // Remove is deleteComment: the server makes a Removed comment when another
-  // Account calls it. Neither it nor Restore renders an error here, like Delete.
-  const restoreComment = (id: number) => {
-    void restore.mutateAsync(id).then(noop, noop);
-  };
+  const removeComment = (id: number) =>
+    act(remove, id, 'Could not remove the comment.');
+
+  const restoreComment = (id: number) =>
+    act(restore, id, 'Could not restore the comment.');
+
+  const busyId = (id: number) =>
+    (remove.isPending && remove.variables === id) ||
+    (restore.isPending && restore.variables === id);
 
   const renderComment = (comment: CommentWithAuthor, canReply: boolean) => (
     <Comment
@@ -252,8 +272,9 @@ export const CommentSection: FC<CommentSectionProps> = ({
       // The server's rule: a Moderator's own Comment gets Delete, not Remove.
       // A Tombstone has no userId, so it passes.
       canModerate={moderating && session?.id !== comment.userId}
-      onRemove={deleteComment}
+      onRemove={removeComment}
       onRestore={restoreComment}
+      busy={busyId(comment.id)}
     />
   );
 
