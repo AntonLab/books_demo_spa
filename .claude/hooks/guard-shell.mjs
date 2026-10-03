@@ -33,6 +33,24 @@ const writeTargets = () => {
     targets.push(m[1]);
   for (const m of bare.matchAll(/\btee\s+(?:-a\s+)?([^\s;|&)]+)/g))
     targets.push(m[1]);
+  // A draft written in /tmp and copied over a plan slipped past the redirect
+  // check on the backlog run; the destination is the last operand. `git mv`
+  // is a tracked rename, not a copy past the hook. The `cp` itself must be
+  // bare (not inside a commit message), but its operands are read with their
+  // quotes kept, since a quoted destination is still a file it writes.
+  const COPY = /(?<!git\s+)\b(?:cp|mv)\s+([^;|&]+)/g;
+  if (bare.search(COPY) !== -1) {
+    const unquoted = command.replace(/"([^"]*)"|'([^']*)'/g, (_, a, b) =>
+      (a ?? b).replace(/\s/g, '_')
+    );
+    for (const m of unquoted.matchAll(COPY)) {
+      const operands = m[1]
+        .trim()
+        .split(/\s+/)
+        .filter((a) => !a.startsWith('-'));
+      if (operands.length >= 2) targets.push(operands.at(-1));
+    }
+  }
   for (const m of bare.matchAll(
     /\b(?:Set-Content|Add-Content|Out-File)\b[^;|]*?(?:-(?:Path|FilePath)\s+)?(["']?[A-Za-z]?:?[\w$~.\\/-]+["']?)/gi
   ))

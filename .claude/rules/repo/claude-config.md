@@ -22,7 +22,8 @@ paths:
   would hide every worktree file. ESLint is left to the pre-commit hook; typed
   linting per edit is too slow.
 - **`guard-shell.mjs`** (PreToolUse on Bash and PowerShell) refuses `sed -i`,
-  shell redirects and `tee` into anything but a temp or scratchpad path,
+  shell redirects, `tee`, `cp` and `mv` (not `git mv`) into anything but a
+  temp or scratchpad path,
   scripts calling `writeFileSync`/`open(…, 'w')`, `find` over a drive root,
   and, outside a subagent (`agent_type` absent), a package-wide
   `npm run typecheck|lint|format:check` or `npm test`; a focused
@@ -31,6 +32,11 @@ paths:
   since the hook cannot resolve the variable; write the path literally.
   Quoted text is skipped (a commit message may name `sed -i`), except a
   quoted redirect target and a `node`/`python` script body.
+- **`after-pr.mjs`** (PostToolUse on Bash and PowerShell) adds one reminder
+  after the main session's `gh pr create`. The reminder says to `/clear`
+  before the next spec, and to close the PR's issues by hand after the merge,
+  because a PR into `dev` ignores closing keywords. It is silent on every
+  other command and inside a subagent.
 - **SessionStart runs `branch-check.mjs --warn`** on `startup` only: it
   fetches `origin/dev` and prints one line when the branch is behind, nothing
   otherwise, so a fresh branch costs no context. A failed fetch exits 0.

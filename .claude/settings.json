@@ -80,6 +80,16 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/after-pr.mjs",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
