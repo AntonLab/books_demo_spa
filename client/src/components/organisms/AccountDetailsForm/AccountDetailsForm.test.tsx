@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LOGIN_MAX_LENGTH } from 'shared';
+import { ABOUT_MAX_LENGTH, LOGIN_MAX_LENGTH } from 'shared';
 import { AccountDetailsForm } from './AccountDetailsForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -56,6 +56,84 @@ beforeEach(() => {
 });
 
 describe('AccountDetailsForm', () => {
+  const aboutField = () => screen.getByRole('textbox', { name: 'About' });
+  const lastSeenBox = () =>
+    screen.getByRole('checkbox', { name: 'Show when I was last online' });
+
+  it('prefills About and the last-online box and keeps Save disabled', () => {
+    renderForm();
+    expect(aboutField()).toHaveValue('');
+    expect(lastSeenBox()).toBeChecked();
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('sends only About when only About changed, line breaks kept', async () => {
+    mockedUsers.updateUser.mockResolvedValue({
+      ...session,
+      about: 'Hi\nthere',
+    });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.type(aboutField(), 'Hi{Enter}there');
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockedUsers.updateUser).toHaveBeenCalledWith(1, {
+        about: 'Hi\nthere',
+      })
+    );
+  });
+
+  it('sends showLastSeen false when the box is unticked, and nothing else', async () => {
+    mockedUsers.updateUser.mockResolvedValue({
+      ...session,
+      showLastSeen: false,
+    });
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(lastSeenBox());
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockedUsers.updateUser).toHaveBeenCalledWith(1, {
+        showLastSeen: false,
+      })
+    );
+    await waitFor(() => expect(saveButton()).toBeDisabled());
+  });
+
+  it('refuses an About over the limit with a message and does not send it', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(aboutField());
+    await user.paste('x'.repeat(ABOUT_MAX_LENGTH + 1));
+    await user.click(saveButton());
+
+    expect(
+      await screen.findByText(
+        `About must be at most ${ABOUT_MAX_LENGTH} characters`
+      )
+    ).toBeInTheDocument();
+    expect(mockedUsers.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('accepts an About of exactly the limit', async () => {
+    mockedUsers.updateUser.mockResolvedValue(session);
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.click(aboutField());
+    await user.paste('x'.repeat(ABOUT_MAX_LENGTH));
+    await user.click(saveButton());
+
+    await waitFor(() =>
+      expect(mockedUsers.updateUser).toHaveBeenCalledTimes(1)
+    );
+  });
+
   it('prefills the four fields and keeps Save disabled with no change', () => {
     renderForm();
 

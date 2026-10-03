@@ -1,7 +1,8 @@
 import type { FC } from 'react';
 import { useState } from 'react';
-import { Alert, App, Button, Form, Input } from 'antd';
+import { Alert, App, Button, Checkbox, Form, Input } from 'antd';
 import {
+  ABOUT_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
   LOGIN_MAX_LENGTH,
   LOGIN_MIN_LENGTH,
@@ -14,7 +15,14 @@ import { accountFieldErrors } from '@/types/accountErrors';
 import type { PublicUser } from '@/types/api';
 import spacing from '@/theme/spacing.module.css';
 
-const FIELDS = ['login', 'email', 'firstName', 'lastName'] as const;
+const FIELDS = [
+  'login',
+  'email',
+  'firstName',
+  'lastName',
+  'about',
+  'showLastSeen',
+] as const;
 
 type AccountValues = Pick<PublicUser, (typeof FIELDS)[number]> & {
   currentPassword?: string;
@@ -25,6 +33,8 @@ const pickFields = (user: PublicUser): AccountValues => ({
   email: user.email,
   firstName: user.firstName,
   lastName: user.lastName,
+  about: user.about,
+  showLastSeen: user.showLastSeen,
 });
 
 export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
@@ -37,13 +47,16 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
   const [saved, setSaved] = useState(() => pickFields(user));
   const values = Form.useWatch([], form);
 
-  const changes: AccountChanges = {};
-  for (const name of FIELDS) {
-    const value = values?.[name];
-    if (value !== undefined && value !== saved[name]) {
-      changes[name] = value;
-    }
-  }
+  // Each entry pairs a field with its own value type, so one cast stands in
+  // for what a loop assigning over the key union cannot express.
+  const changes = Object.fromEntries(
+    FIELDS.flatMap((name) => {
+      const value = values?.[name];
+      return value !== undefined && value !== saved[name]
+        ? [[name, value]]
+        : [];
+    })
+  ) as AccountChanges;
   const hasChanges = Object.keys(changes).length > 0;
   const emailChanged = 'email' in changes;
 
@@ -141,6 +154,23 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
           ]}
         >
           <Input autoComplete="email" />
+        </Form.Item>
+
+        <Form.Item
+          name="about"
+          label="About"
+          rules={[
+            {
+              max: ABOUT_MAX_LENGTH,
+              message: `About must be at most ${ABOUT_MAX_LENGTH} characters`,
+            },
+          ]}
+        >
+          <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} />
+        </Form.Item>
+
+        <Form.Item name="showLastSeen" valuePropName="checked">
+          <Checkbox>Show when I was last online</Checkbox>
         </Form.Item>
 
         {emailChanged && (
