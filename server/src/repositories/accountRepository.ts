@@ -2,6 +2,10 @@ import { Op } from 'sequelize';
 import type { AccountProfile } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
+import { Comment } from '../models/Comment.ts';
+import { Favorite } from '../models/Favorite.ts';
+import { Like } from '../models/Like.ts';
+import { ReadingListItem } from '../models/ReadingListItem.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
 import { loadAvatarUrls } from './userRepository.ts';
@@ -53,6 +57,12 @@ async function publishedWorks(
   };
 }
 
+// An empty id list is 0 without a query: MySQL rejects `IN ()`.
+const countWhere = (
+  ids: number[],
+  run: (ids: number[]) => Promise<number>
+): Promise<number> => (ids.length ? run(ids) : Promise.resolve(0));
+
 export function createSequelizeAccountRepository(): AccountRepository {
   return {
     async findProfile(id) {
@@ -74,6 +84,49 @@ export function createSequelizeAccountRepository(): AccountRepository {
       const avatarUrls = await loadAvatarUrls([id]);
       const { bookIds, seriesIds } = await publishedWorks(id);
 
+      const seriesBookIds = seriesIds.length
+        ? (
+            await Book.findAll({
+              where: {
+                seriesId: seriesIds,
+                status: { [Op.ne]: 'draft' },
+              },
+              attributes: ['id'],
+            })
+          ).map((book) => book.id)
+        : [];
+      const favoriteMatches = [
+        ...(bookIds.length ? [{ bookId: bookIds }] : []),
+        ...(seriesIds.length ? [{ seriesId: seriesIds }] : []),
+      ];
+      const [
+        bookLikes,
+        seriesLikes,
+        commentsOnBooks,
+        favorites,
+        booksInReadingLists,
+        seriesInReadingLists,
+      ] = await Promise.all([
+        countWhere(bookIds, (ids) =>
+          Like.count({ where: { bookId: ids, isLike: true } })
+        ),
+        countWhere(seriesBookIds, (ids) =>
+          Like.count({ where: { bookId: ids, isLike: true } })
+        ),
+        countWhere(bookIds, (ids) =>
+          Comment.count({ where: { bookId: ids, tombstone: null } })
+        ),
+        favoriteMatches.length
+          ? Favorite.count({ where: { [Op.or]: favoriteMatches } })
+          : 0,
+        countWhere(bookIds, (ids) =>
+          ReadingListItem.count({ where: { bookId: ids } })
+        ),
+        countWhere(seriesIds, (ids) =>
+          ReadingListItem.count({ where: { seriesId: ids } })
+        ),
+      ]);
+
       return {
         id: user.id,
         firstName: user.firstName,
@@ -84,12 +137,12 @@ export function createSequelizeAccountRepository(): AccountRepository {
         bookCount: bookIds.length,
         seriesCount: seriesIds.length,
         totals: {
-          booksInReadingLists: 0,
-          seriesInReadingLists: 0,
-          bookLikes: 0,
-          seriesLikes: 0,
-          commentsOnBooks: 0,
-          favorites: 0,
+          booksInReadingLists,
+          seriesInReadingLists,
+          bookLikes,
+          seriesLikes,
+          commentsOnBooks,
+          favorites,
         },
       };
     },
