@@ -19,6 +19,7 @@ jest.mock('@/api/books');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 jest.mock('@/api/favorites');
+jest.mock('@/api/readingLists');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
@@ -335,5 +336,35 @@ describe('SeriesPage star', () => {
     );
 
     expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(8);
+  });
+
+  describe('Add to reading list', () => {
+    const addButton = { name: 'Add to reading list' };
+
+    it('is offered to a signed-in Account on a Series with a Published Book', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+      renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+      expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+    });
+
+    it('is not offered to a Guest', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
+
+    it('is not offered on a Series without a Published Book', async () => {
+      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 0 });
+
+      renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
   });
 });

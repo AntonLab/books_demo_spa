@@ -27,6 +27,7 @@ jest.mock('@/api/chapters');
 jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/favorites');
+jest.mock('@/api/readingLists');
 jest.mock('@/api/genres');
 jest.mock('@/api/library');
 jest.mock('@/api/series');
@@ -448,6 +449,33 @@ describe('BookPage', () => {
 
     await waitFor(() => expect(star).toBeDisabled());
     expect(mockedFavorites.createFavorite).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Add to reading list', () => {
+    const addButton = { name: 'Add to reading list' };
+
+    it('is offered to a signed-in reader of a Published Book', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+      renderPage(reader);
+
+      expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+    });
+
+    it('is not offered to a Guest', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
+      renderPage();
+
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
+
+    it('is not offered to the Co-author viewing a Draft Book', async () => {
+      mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
+      renderPage({ ...reader, id: 4 });
+
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      expect(screen.queryByRole('button', addButton)).toBeNull();
+    });
   });
 
   it('renders the chapters tab and the comments section', async () => {

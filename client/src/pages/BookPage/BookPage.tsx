@@ -25,6 +25,7 @@ import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteBu
 import { GenrePath } from '@/components/molecules/GenrePath/GenrePath';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { TagList } from '@/components/molecules/TagList/TagList';
+import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
 import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { BookStatistics } from '@/components/organisms/BookStatistics/BookStatistics';
 import { BookUnsavedTextNotices } from '@/components/organisms/BookUnsavedTextNotices/BookUnsavedTextNotices';
@@ -39,7 +40,10 @@ import { useSetReadingStatus } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
 import { BOOK_STATUS_COLORS, BOOK_STATUS_LABELS } from '@/types/book';
 import { publishedChapters } from '@/types/chapter';
-import { bookCapabilities } from '@/types/capabilities';
+import {
+  bookCapabilities,
+  mayAddBookToReadingList,
+} from '@/types/capabilities';
 import { entriesOfBook } from '@/store/unsavedTextSlice';
 import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import spacing from '@/theme/spacing.module.css';
@@ -179,6 +183,9 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
                   })
                 }
               />
+            )}
+            {mayAddBookToReadingList(book, session) && (
+              <AddToReadingList target={{ bookId: book.id }} />
             )}
             {mayKeepInLibrary && (
               <ReadingStatusSelect

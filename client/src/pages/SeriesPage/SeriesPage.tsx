@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Alert, Button, Flex, Skeleton } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
+import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
@@ -14,7 +15,10 @@ import {
 import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
 import { useSession } from '@/queries/auth';
-import { seriesCapabilities } from '@/types/capabilities';
+import {
+  mayAddSeriesToReadingList,
+  seriesCapabilities,
+} from '@/types/capabilities';
 import { useBooksInSeries } from '@/queries/books';
 import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
@@ -75,6 +79,9 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
               })
             }
           />
+        )}
+        {mayAddSeriesToReadingList(series.data, session) && (
+          <AddToReadingList target={{ seriesId }} />
         )}
         {mayEdit && (
           <Button onClick={() => setEditing(true)}>Edit series</Button>
