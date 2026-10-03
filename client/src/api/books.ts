@@ -34,6 +34,8 @@ export interface ListBooksParams {
   pageSize?: number;
   // Only the caller's own Favorites; see listFavoritedBooks.
   favoritedBy?: 'me';
+  // Only Published Books, even for the Owner.
+  published?: 'true';
 }
 
 // Every filter combines with the others by AND. Written in the order the

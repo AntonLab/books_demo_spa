@@ -1,5 +1,6 @@
 import { request } from './client';
 import type {
+  BookSort,
   ItemsResponse,
   ListResponse,
   SeriesPayload,
@@ -22,6 +23,9 @@ export interface ListSeriesParams {
   offset?: number;
   // Only the caller's own Favorites; see listFavoritedSeries.
   favoritedBy?: 'me';
+  sort?: BookSort;
+  // Only Published series, so an Owner's Drafts stay off a public list.
+  published?: 'true';
 }
 
 // `?userId=` naming the caller lists the series they co-author: the book form's
@@ -38,6 +42,8 @@ export const listSeries = (
   if (params.tag) search.set('tag', params.tag);
   if (params.offset !== undefined) search.set('offset', String(params.offset));
   if (params.favoritedBy) search.set('favoritedBy', params.favoritedBy);
+  if (params.sort) search.set('sort', params.sort);
+  if (params.published) search.set('published', params.published);
 
   const query = search.toString();
   return request<ListResponse<PublicSeries>>(

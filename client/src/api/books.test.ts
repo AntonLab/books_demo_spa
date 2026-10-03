@@ -55,6 +55,16 @@ describe('listBooks', () => {
     );
   });
 
+  it('encodes published', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ userId: 3, published: 'true' });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?userId=3&published=true'
+    );
+  });
+
   it('encodes the search filters in the order given', async () => {
     const fetchMock = mockFetch(envelope);
 

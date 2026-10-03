@@ -11,6 +11,9 @@ export type PublicUser = Wire<Shared.PublicUser>;
 // /api/users is guarded, so the client can never look an author up itself.
 export type AuthorSummary = Wire<Shared.AuthorSummary>;
 
+// What GET /api/accounts/:id answers; Wire<> because `lastSeenAt` is a Date.
+export type AccountProfile = Wire<Shared.AccountProfile>;
+
 // Like a book, a series has no userId: its Co-authors come embedded, in credit
 // order.
 export type PublicSeries = Wire<Shared.PublicSeries>;

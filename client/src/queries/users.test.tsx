@@ -62,6 +62,7 @@ describe('useUploadAvatar', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['comments'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['authors'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['accounts'] });
   });
 });
 
@@ -82,6 +83,7 @@ describe('useUpdateAccount', () => {
     expect(mockedUsers.updateUser).toHaveBeenCalledWith(7, { login: 'x' });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'me'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['authors'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['accounts'] });
   });
 });
 

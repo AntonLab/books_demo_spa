@@ -32,6 +32,8 @@ export const queryKeys = {
   // Keyed by a bare id, like `book`, so neither collides with `series`.
   seriesDetail: (id: number) => ['series', id] as const,
   seriesBooks: (id: number) => ['series', id, 'books'] as const,
+  // The `['accounts']` prefix is what an Account edit invalidates.
+  accountProfile: (id: number) => ['accounts', id] as const,
   authors: (q: string) => ['authors', { q }] as const,
   notifications: (userId: number) => ['notifications', userId] as const,
   // The prefix over every Account's notifications.

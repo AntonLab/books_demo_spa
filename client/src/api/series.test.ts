@@ -101,6 +101,24 @@ describe('listSeries', () => {
   });
 });
 
+describe('listSeries sort and published', () => {
+  it('encodes sort and published after the other params', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({
+      userId: 3,
+      limit: 20,
+      offset: 40,
+      sort: 'new',
+      published: 'true',
+    });
+
+    expect(callOf(fetchMock)[0]).toBe(
+      '/api/series?userId=3&limit=20&offset=40&sort=new&published=true'
+    );
+  });
+});
+
 describe('getSeries', () => {
   it('gets one series by id, with no body or token', async () => {
     const fetchMock = mockFetch({ id: 2, title: 'Saga' });

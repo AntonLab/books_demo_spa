@@ -23,6 +23,7 @@ const useAccountMutation = <TVariables, TResult>(
         queryClient.invalidateQueries({ queryKey: ['series'] }),
         queryClient.invalidateQueries({ queryKey: ['comments'] }),
         queryClient.invalidateQueries({ queryKey: ['authors'] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
       ]),
   });
 };

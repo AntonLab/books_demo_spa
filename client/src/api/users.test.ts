@@ -53,6 +53,15 @@ describe('updateUser', () => {
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(init.body as string)).toEqual({ login: 'new' });
   });
+
+  it('sends about and showLastSeen', async () => {
+    const fetchMock = mockFetch({ id: 7 });
+    await updateUser(7, { about: 'Hi', showLastSeen: false });
+    expect(JSON.parse(callOf(fetchMock)[1].body as string)).toEqual({
+      about: 'Hi',
+      showLastSeen: false,
+    });
+  });
 });
 
 describe('blockUser', () => {

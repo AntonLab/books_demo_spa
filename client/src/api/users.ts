@@ -10,6 +10,8 @@ export interface AccountChanges {
   lastName?: string;
   password?: string;
   currentPassword?: string;
+  about?: string;
+  showLastSeen?: boolean;
 }
 
 export const updateUser = (
