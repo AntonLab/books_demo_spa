@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 // Nullable *and* defaulted to null, so an omitted key and an explicit null
@@ -50,8 +51,7 @@ export const updateLikeSchema = z.object({
 });
 
 export const listLikesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
+  ...limitOffsetShape,
   userId: idSchema.optional(),
   bookId: idSchema.optional(),
   commentId: idSchema.optional(),

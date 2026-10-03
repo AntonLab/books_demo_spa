@@ -20,6 +20,9 @@ paths:
 - It sets `noUncheckedIndexedAccess` for all three packages: an index read is
   `T | undefined`, application code handles the miss, and only test files
   assert it away with `!`.
+- Fire-and-forget: await a promise, or mark a deliberate one `void` with the
+  reason beside it (`onFinish={(values) => void handleFinish(values)}`). The
+  typed lint rules take no `eslint-disable`.
 - `erasableSyntaxOnly` and `verbatimModuleSyntax` hold everywhere, because
   Node strips types from the server and `shared` (ADR-0006); the client keeps
   the same rules so code moves between packages unchanged.
@@ -58,7 +61,8 @@ paths:
 
 Owns the devDependencies every package needs (eslint, `@eslint/js`,
 typescript-eslint, eslint-config-prettier, globals, prettier, typescript), plus
-`concurrently` and `skills`, and `engines.node`. `shared` defines only
+`concurrently`, `skills` and `fallow` (`npx fallow` is installed for audits;
+`repo-auditor` uses it with the `fallow` skill), and `engines.node`. `shared` defines only
 `typecheck`, `lint` and `lint:fix`; `shared/src/wire.typetest.ts` pins
 `Wire<T>` with type-level assertions that `typecheck` checks.
 
@@ -93,4 +97,5 @@ checks the `.mjs` files, but no package's ESLint config reaches them.
 the newest version, so it needs no update when the plugin does.
 `plan-check.mjs` tells a test block from implementation by a `test`/`it`/
 `describe`/`expect` call; a plan whose tests use another runner's names needs
-the pattern widened, not the 15-line limit.
+the pattern widened, not the 15-line limit. It also caps a task at
+`MAX_TASK_LINES` (180); a longer task becomes two.

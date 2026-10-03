@@ -3,16 +3,12 @@ import type { AddressInfo } from 'node:net';
 import express, { type RequestHandler } from 'express';
 import { createApp, type AppDeps } from '../app.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
-import {
-  XSRF_COOKIE_NAME,
-  XSRF_HEADER_NAME,
-  xsrfTokenFor,
-} from '../middleware/csrfProtection.ts';
+import { XSRF_HEADER_NAME } from '../middleware/csrfProtection.ts';
 import type { RateLimiter } from '../rateLimit.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
-import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
-import { hashToken } from '../tokens.ts';
+import { SESSION_COOKIE_NAME, XSRF_COOKIE } from '../sessionCookie.ts';
+import { hashToken, xsrfTokenFor } from '../tokens.ts';
 import type { UserRole, PublicUser } from 'shared';
 
 // The five route specs each drive one resource; createApp still requires the
@@ -96,7 +92,7 @@ const withXsrfToken: RequestHandler = (req, _res, next) => {
   )?.[1];
   if (session && req.headers[XSRF_HEADER_NAME] === undefined) {
     const token = xsrfTokenFor(session);
-    req.headers.cookie = `${cookie}; ${XSRF_COOKIE_NAME}=${token}`;
+    req.headers.cookie = `${cookie}; ${XSRF_COOKIE}=${token}`;
     req.headers[XSRF_HEADER_NAME] = token;
   }
   next();

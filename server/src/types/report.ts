@@ -4,6 +4,7 @@ import {
   REPORT_REASONS,
   REPORT_STATUSES,
 } from 'shared';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 // Only Other takes an explanation, and it must have one; the transform gives
@@ -49,8 +50,7 @@ export const reportRangeSchema = z
 export const listReportsQuerySchema = reportRangeSchema.and(
   z.object({
     status: z.enum(REPORT_STATUSES).optional(),
-    limit: z.coerce.number().int().min(1).max(100).default(20),
-    offset: z.coerce.number().int().min(0).default(0),
+    ...limitOffsetShape,
   })
 );
 

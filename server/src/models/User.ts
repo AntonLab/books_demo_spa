@@ -8,7 +8,12 @@ import {
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
 import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
-import { USER_STATUSES, USER_ROLES } from 'shared';
+import {
+  EMAIL_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  USER_STATUSES,
+  USER_ROLES,
+} from 'shared';
 
 export class User extends Model<
   InferAttributes<User>,
@@ -50,10 +55,17 @@ export function initUserModel(sequelize: Sequelize): typeof User {
       },
       // No column collation: email inherits the case-insensitive table default,
       // because addresses are treated case-insensitively in practice.
-      email: { type: DataTypes.STRING(255), allowNull: false, unique: true },
+      email: {
+        type: DataTypes.STRING(EMAIL_MAX_LENGTH),
+        allowNull: false,
+        unique: true,
+      },
       password: { type: DataTypes.STRING(255), allowNull: false },
-      firstName: { type: DataTypes.STRING(64), allowNull: false },
-      lastName: { type: DataTypes.STRING(64), allowNull: false },
+      firstName: {
+        type: DataTypes.STRING(NAME_MAX_LENGTH),
+        allowNull: false,
+      },
+      lastName: { type: DataTypes.STRING(NAME_MAX_LENGTH), allowNull: false },
       status: {
         type: DataTypes.ENUM(...USER_STATUSES),
         allowNull: false,

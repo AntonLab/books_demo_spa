@@ -57,41 +57,34 @@ clean MySQL install needs no manual migration step.
 with zod at start-up, so a malformed value fails loudly instead of booting a
 broken server.
 
-| Variable                      | Default                    | Notes                                                                                                                             |
-| ----------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                    | `development`              | `development` \| `test` \| `production`                                                                                           |
-| `PORT`                        | `4000`                     | The API's port                                                                                                                    |
-| `DB_HOST` / `DB_PORT`         | `127.0.0.1` / `3306`       |                                                                                                                                   |
-| `DB_NAME`                     | `books_demo_spa`           |                                                                                                                                   |
-| `DB_USER` / `DB_PASSWORD`     | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.                                           |
-| `APP_BASE_URL`                | `http://localhost:3000`    | Client origin used to build emailed links                                                                                         |
-| `TRUST_PROXY`                 | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none                                           |
-| `MAIL_DELIVERY`               | `log` (none in production) | `log` writes password-reset links and notification emails to the server log; `smtp` sends them. Production must set it explicitly |
-| `SMTP_HOST` / `SMTP_PORT`     | _(none)_ / `587`           | Required with `MAIL_DELIVERY=smtp` (port 465 switches to implicit TLS)                                                            |
-| `SMTP_USER` / `SMTP_PASSWORD` | _(none)_                   | Required with `MAIL_DELIVERY=smtp`                                                                                                |
-| `MAIL_FROM`                   | _(none)_                   | Sender address; required with `MAIL_DELIVERY=smtp`                                                                                |
+| Variable                      | Default                    | Notes                                                                                                                                                 |
+| ----------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                    | `development`              | `development` \| `test` \| `production`; also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag                |
+| `PORT`                        | `4000`                     | The API's port                                                                                                                                        |
+| `DB_HOST` / `DB_PORT`         | `127.0.0.1` / `3306`       |                                                                                                                                                       |
+| `DB_NAME`                     | `books_demo_spa`           |                                                                                                                                                       |
+| `DB_USER` / `DB_PASSWORD`     | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.                                                               |
+| `APP_BASE_URL`                | `http://localhost:3000`    | Client origin: builds emailed links and is the CSRF trusted origin                                                                                    |
+| `TRUST_PROXY`                 | `0`                        | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none; the sign-in limits key on `req.ip`, so set it behind a proxy |
+| `MAIL_DELIVERY`               | `log` (none in production) | `log` writes password-reset links and notification emails to the server log; `smtp` sends them. Production must set it explicitly                     |
+| `SMTP_HOST` / `SMTP_PORT`     | _(none)_ / `587`           | Required with `MAIL_DELIVERY=smtp` (port 465 switches to implicit TLS)                                                                                |
+| `SMTP_USER` / `SMTP_PASSWORD` | _(none)_                   | Required with `MAIL_DELIVERY=smtp`                                                                                                                    |
+| `MAIL_FROM`                   | _(none)_                   | Sender address; required with `MAIL_DELIVERY=smtp`                                                                                                    |
 
 ## API
 
-Everything is mounted under `/api`:
-
-| Prefix          | Resource                                                                                |
-| --------------- | --------------------------------------------------------------------------------------- |
-| `/api/auth`     | `register`, `login`, `logout`, `me`, `password-reset/request`, `password-reset/confirm` |
-| `/api/users`    | CRUD (both reads require a session), plus `PATCH /:id/role` for role changes            |
-| `/api/series`   | CRUD                                                                                    |
-| `/api/books`    | CRUD                                                                                    |
-| `/api/chapters` | CRUD                                                                                    |
-| `/api/comments` | CRUD, plus `POST /:id/restore` for a moderator-removed comment                          |
-| `/api/likes`    | CRUD (a like points at exactly one of a book or a comment)                              |
+Everything is mounted under `/api`; the route prefixes are listed in
+`server/src/routes/index.ts`.
 
 Authentication is session-based: an opaque token in an httpOnly `sid` cookie,
 stored hashed. Every write, plus both reads on `/api/users`, runs through a
 five-role permission matrix (`guest`, `user`, `author`, `admin`, `superadmin`)
 instead of a blanket session check: a request with no session gets 401, and a
 signed-in role with no grant for that action gets 403. Ownership is enforced
-on books, series, chapters, comments and likes — only a row's owner, or an
-`admin`/`superadmin` acting as moderator, may change it. See
+on books, series, chapters, comments, likes, favorites and user accounts —
+only a row's owner, or an `admin`/`superadmin` acting as moderator, may change
+it. Reading lists, library entries and notifications are always the session's
+own rows. See
 `.claude/rules/server/` — `permissions.md` for the full matrix, `auth.md` for
 account blocking, `visibility.md` for the tombstone rules on deleted comments.
 
@@ -104,27 +97,14 @@ accident.
 
 ## Scripts
 
-Run these from the repo root.
+The scripts are in the root `package.json` and each package's own; run the root
+ones from the repo root. Every script except the Prettier pair fans out over
+every workspace that defines it; target one with npm's `-w` flag
+(`npm run dev -w client`, `npm run build -w server`).
 
-| Script                 | Does                                                                |
-| ---------------------- | ------------------------------------------------------------------- |
-| `npm run dev`          | client on :3000 and server on :4000 together, under `concurrently`  |
-| `npm run build`        | both: client bundle into `client/build/`, `tsc` into `server/dist/` |
-| `npm test`             | both: Jest (client) and `node:test` (server)                        |
-| `npm run typecheck`    | every workspace: `tsc --noEmit`                                     |
-| `npm run lint`         | every workspace: ESLint                                             |
-| `npm run format:check` | Prettier over the whole repo                                        |
-
-`npm run lint:fix` and `npm run format` apply fixes.
-
-Every script except the Prettier pair fans out over every workspace that defines it; target one
-with npm's `-w` flag (`npm run dev -w client`, `npm run build -w server`). The
-root deliberately defines no single-package aliases, so `-w` is the one way to
-narrow any script. Prettier is root-only because its config is repo-wide — the
-packages define no `format` script.
-
-The API alone, without the file watcher, is `npm run start -w server`. `client`
-also has `npm run test:watch`.
+`npm run dev` serves the client on :3000 and the API on :4000. `npm run start -w
+server` runs the API without the file watcher, and `npm run test:watch -w client`
+reruns the client tests on change.
 
 The server's test suite talks to a real MySQL database, so `.env.local` must be
 configured before `npm test` there.

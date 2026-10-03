@@ -2,7 +2,7 @@ import type { ErrorRequestHandler } from 'express';
 import { UniqueConstraintError } from 'sequelize';
 import { ZodError } from 'zod';
 import { AppError } from '../types/errors.ts';
-import { logger } from '../logger.ts';
+import { logger, messageOf } from '../logger.ts';
 
 /**
  * body-parser (and other Express-ecosystem middleware) signal a client
@@ -65,7 +65,7 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   // SequelizeDatabaseError (and its .parent/.original) carry `sql` and
   // `parameters`, which can hold sensitive bound values such as a password hash.
   const name = error instanceof Error ? error.name : 'UnknownError';
-  const message = error instanceof Error ? error.message : String(error);
+  const message = messageOf(error);
   const stack = error instanceof Error ? error.stack : undefined;
   logger.error('Unhandled error', { name, message, stack });
   res.status(500).json({ error: 'Internal Server Error' });

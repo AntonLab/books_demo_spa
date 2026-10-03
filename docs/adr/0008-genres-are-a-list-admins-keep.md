@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-09-19
+amended-by: ADR-0014
 ---
 
 # Genres are a list Admins keep, not a fixed list in code

@@ -50,7 +50,7 @@ const useChapterMutation = <TVariables, TResult>(
       void queryClient.invalidateQueries({
         queryKey: queryKeys.chapters(bookId),
       });
-      void queryClient.invalidateQueries({ queryKey: ['chapters'] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.allChapters });
       void queryClient.invalidateQueries({ queryKey: queryKeys.book(bookId) });
     },
   });
@@ -73,6 +73,6 @@ export const useDeleteChapter = (bookId: number, id: number) =>
 export const useReorderChapters = (bookId: number) =>
   useOptimisticReorder<ListResponse<ChapterSummary>>(
     queryKeys.chapters(bookId),
-    ['chapters'],
+    queryKeys.allChapters,
     (chapterIds) => reorderChapters(bookId, chapterIds)
   );

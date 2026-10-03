@@ -18,8 +18,7 @@
     // Not for this package's own imports, which stay extensionless: the
     // `shared` workspace is type-checked as part of this program, and its
     // relative imports end in `.ts` because Node loads it too (ADR-0006).
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true
+    "allowImportingTsExtensions": true
   },
   "include": ["src"]
 }

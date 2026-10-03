@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 
 // Nullable and defaulted to null, as in types/like.ts: an omitted key and an
@@ -27,10 +28,7 @@ export const createFavoriteSchema = z
     path: ['bookId'],
   });
 
-export const listFavoritesQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-  offset: z.coerce.number().int().min(0).default(0),
-});
+export const listFavoritesQuerySchema = z.object(limitOffsetShape);
 
 export type CreateFavoriteInput = z.infer<typeof createFavoriteSchema>;
 export type ListFavoritesQuery = z.infer<typeof listFavoritesQuerySchema>;

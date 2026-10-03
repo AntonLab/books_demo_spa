@@ -101,9 +101,5 @@ in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
   strings. Request payloads and field limits come from `shared` as they are;
   `src/types/` adds only client-side labels and helpers. Format a date through `src/format/date.ts` only (fixed `en` locale,
   the browser's time zone).
-- **`noUncheckedIndexedAccess`**: component code handles a miss with `?.`/`??`
-  or an early return; only tests (`*.test.ts(x)`, `src/test/`) may write `!`
-  (`no-non-null-assertion`).
-- **A fire-and-forget promise is marked `void`** with the reason beside it, as
-  in `onFinish={(values) => void handleFinish(values)}`. The typed lint rules
-  take no `eslint-disable`.
+- **Index misses and fire-and-forget promises** (`noUncheckedIndexedAccess`,
+  `void`): see `.claude/rules/repo/tooling.md`.

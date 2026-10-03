@@ -1,6 +1,12 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { logger } from './logger.ts';
+import { logger, messageOf } from './logger.ts';
+
+test('messageOf reads an Error message and stringifies anything else', () => {
+  assert.equal(messageOf(new Error('boom')), 'boom');
+  assert.equal(messageOf('plain'), 'plain');
+  assert.equal(messageOf(42), '42');
+});
 
 function spyOnConsole(t: TestContext) {
   const levels = ['info', 'warn', 'error'] as const;

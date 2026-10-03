@@ -7,6 +7,7 @@ import {
   updateGenre,
 } from '../api/genres';
 import type { GenrePayload, GenreUpdatePayload } from 'shared';
+import { invalidateWorks } from './invalidateWorks';
 import { queryKeys } from './keys';
 
 // The whole flat list, unpaged: both forms' select reads this entry.
@@ -49,8 +50,7 @@ const useGenreMutation = <TVariables, TResult>(
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.genres }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
+        invalidateWorks(queryClient),
       ]),
   });
 };

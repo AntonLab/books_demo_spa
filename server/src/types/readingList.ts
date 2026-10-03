@@ -1,10 +1,10 @@
 import {
-  PAGE_SIZE_MAX,
   READING_LIST_MAX_ITEMS,
   READING_LIST_TITLE_MAX_LENGTH,
   WORK_DESCRIPTION_MAX_LENGTH,
 } from 'shared';
 import { z } from 'zod';
+import { pageShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 import { workTagListSchema } from './work.ts';
 
@@ -60,8 +60,7 @@ export const reorderReadingListItemsSchema = z.object({
 });
 
 const paging = {
-  current: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(PAGE_SIZE_MAX).default(20),
+  ...pageShape,
 };
 
 // A user's lists or the lists holding a Book, never both.

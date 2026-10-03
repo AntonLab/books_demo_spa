@@ -11,7 +11,12 @@ import {
 import type { Book } from './Book.ts';
 import type { Genre } from './Genre.ts';
 import { toTagArray } from './tagArray.ts';
-import type { PublicGenre, PublicSeries, AuthorSummary } from 'shared';
+import {
+  WORK_TITLE_MAX_LENGTH,
+  type PublicGenre,
+  type PublicSeries,
+  type AuthorSummary,
+} from 'shared';
 
 export class Series extends Model<
   InferAttributes<Series>,
@@ -47,7 +52,7 @@ export function initSeriesModel(sequelize: Sequelize): typeof Series {
       // VARCHAR rather than the TEXT below it: a title is short, and only a
       // bounded column can carry an index if one is ever wanted for it.
       title: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(WORK_TITLE_MAX_LENGTH),
         allowNull: false,
       },
       description: {

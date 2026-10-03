@@ -18,7 +18,7 @@ import type {
   PublicGenre,
   AuthorSummary,
 } from 'shared';
-import { BOOK_STATUSES } from 'shared';
+import { BOOK_STATUSES, WORK_TITLE_MAX_LENGTH } from 'shared';
 
 export class Book extends Model<
   InferAttributes<Book>,
@@ -88,7 +88,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       // VARCHAR rather than the TEXT below it: a title is short, and only a
       // bounded column can carry an index if one is ever wanted for it.
       title: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(WORK_TITLE_MAX_LENGTH),
         allowNull: false,
       },
       description: {

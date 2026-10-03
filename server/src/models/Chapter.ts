@@ -9,7 +9,11 @@ import {
   type Sequelize,
 } from 'sequelize';
 import type { Book } from './Book.ts';
-import type { ChapterSummary, PublicChapter } from 'shared';
+import {
+  CHAPTER_TITLE_MAX_LENGTH,
+  type ChapterSummary,
+  type PublicChapter,
+} from 'shared';
 
 // The one place a chapter's words are counted: the text setter below calls it,
 // so the repository and the seed cannot disagree. A word is a run of
@@ -70,7 +74,7 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
         allowNull: false,
       },
       title: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(CHAPTER_TITLE_MAX_LENGTH),
         allowNull: false,
       },
       // MEDIUMTEXT, not the TEXT used for the descriptions on series and

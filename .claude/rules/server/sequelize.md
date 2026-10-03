@@ -90,8 +90,12 @@ paths:
 `sequelize.sync()` runs without `alter`: it creates a missing table and never
 touches an existing one. A new column, index or `ENUM` value reaches a
 developer's database only by dropping it (`DROP DATABASE books_demo_spa`); the
-next boot rebuilds it. A new table needs no drop. Say which one a change needs
-in its PR.
+next boot rebuilds it (`/db-reset` drops it and reseeds). A new table needs no
+drop. Say which one a change needs in its PR.
+
+`permissions.module` is an `ENUM` built from `MODULES`, so adding a module
+needs the rebuild too. CI and the test schemas are built fresh, so only a
+developer's long-lived database goes stale.
 
 `sequelize-cli` is not installed. When it is, remember the package is ESM:
 name migrations `.cjs` or write them as ESM.

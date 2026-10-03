@@ -18,7 +18,13 @@ import type {
   PublicNotification,
   WorkType,
 } from 'shared';
-import { ACTOR_KINDS, NOTIFICATION_KINDS, WORK_TYPES } from 'shared';
+import {
+  ACTOR_KINDS,
+  CHAPTER_TITLE_MAX_LENGTH,
+  NOTIFICATION_KINDS,
+  WORK_TITLE_MAX_LENGTH,
+  WORK_TYPES,
+} from 'shared';
 
 // A snapshot, not a view: everything a notification says is copied onto the
 // row when it is raised, so it reads the same after the work is renamed or
@@ -89,7 +95,7 @@ export function initNotificationModel(
       },
       // The width of books.title and series.title, which it copies.
       workTitle: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(WORK_TITLE_MAX_LENGTH),
         allowNull: false,
       },
       actorKind: {
@@ -107,7 +113,7 @@ export function initNotificationModel(
       },
       // The width of chapters.title and series.title, which they copy.
       chapterTitle: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(CHAPTER_TITLE_MAX_LENGTH),
         allowNull: true,
       },
       chapterCount: {
@@ -115,7 +121,7 @@ export function initNotificationModel(
         allowNull: true,
       },
       seriesTitle: {
-        type: DataTypes.STRING(255),
+        type: DataTypes.STRING(WORK_TITLE_MAX_LENGTH),
         allowNull: true,
       },
       readAt: {

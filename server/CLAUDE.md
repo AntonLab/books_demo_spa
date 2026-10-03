@@ -56,53 +56,41 @@ Install from the repo root. Scripts run here or from the root with `-w server`.
   `*.spec.ts`, `*.testkit.ts` and `src/db/seed/`. `dist/` still imports `shared`
   as `.ts`, so running it needs the workspace link and a type-stripping Node
   (ADR-0006).
-- `npm run seed -- --force` — **deletes every row in the eleven content
-  tables**, Covers and Avatars with them; without `--force` it only reports
-  row counts.
+- `npm run seed -- --force` — **deletes every row in the content tables**
+  (`CONTENT_MODELS` in `src/db/seed/seed.ts`), Covers and Avatars with them;
+  without `--force` it only reports row counts.
 - `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`.
-  Keep `--env-file-if-exists`: without it the MySQL suites skip silently.
-  `posttest` drops the test schemas, and npm runs it only after a green run —
-  never run it by hand. See `testing.md`.
+  Keep `--env-file-if-exists`: without it `DB_USER` is unset and the MySQL
+  suites fail. `posttest` drops the test schemas, and npm runs it only after a
+  green run — never run it by hand. See `testing.md`.
 - `npm run typecheck`, `npm run lint`, `npm run lint:fix`. Prettier is root-only.
-
-`sequelize-cli` is not installed; reference it only once it is.
 
 ## Environment
 
-`.env.local` (git-ignored) supplies these; `src/db/config.ts` validates them
-with zod and refuses to start on a malformed value.
+`.env.local` (git-ignored) supplies the variables; the full list is the
+README's Environment table, and `src/db/config.ts` validates them with zod and
+refuses to start on a malformed value. The traps:
 
-| Variable                  | Default                   | Notes                                                                                                      |
-| ------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `NODE_ENV`                | `development`             | Also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag.             |
-| `PORT`                    | `4000`                    |                                                                                                            |
-| `DB_HOST` / `DB_PORT`     | `127.0.0.1` / `3306`      |                                                                                                            |
-| `DB_NAME`                 | `books_demo_spa`          |                                                                                                            |
-| `DB_USER` / `DB_PASSWORD` | _(none)_                  | No default, so the server never starts against an unintended database. An empty password is accepted.      |
-| `APP_BASE_URL`            | `http://localhost:3000`   | The client origin: emailed links and the CSRF trusted origin.                                              |
-| `TRUST_PROXY`             | `0`                       | Proxy hops trusted for `X-Forwarded-For`. The sign-in limits key on `req.ip`: set it behind a proxy.       |
-| `MAIL_DELIVERY`           | `log`; none in production | `log` or `smtp`. Production refuses to start without it, so link-logging never ships by accident.          |
-| `SMTP_HOST` … `MAIL_FROM` | none; `SMTP_PORT` 587     | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`; all but the port required under smtp. |
-
-The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
-`SKIP_MYSQL` (see `testing.md`).
+- `NODE_ENV` also picks the argon2 cost (`test` is deliberately weak).
+- `TRUST_PROXY`: the sign-in limits key on `req.ip`, so set it behind a proxy.
+- `DB_USER` / `DB_PASSWORD` have no default, so the server never starts against
+  an unintended database.
+- The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
+  `SKIP_MYSQL` (see `testing.md`).
 
 ## Runtime
 
 - ESM, and every relative import carries `.ts`: Node resolves imports exactly
   as written, and `rewriteRelativeImportExtensions` turns them into `.js` for
   `dist/`.
-- `erasableSyntaxOnly` and `verbatimModuleSyntax`: no enum, namespace or
-  parameter property, and type-only imports say `type`. An ambient `const enum`
-  from a dependency is refused too, which is why `password.ts` names no argon2
-  `algorithm` and relies on the argon2id default (`password.spec.ts` pins the
-  PHC prefix).
+- `erasableSyntaxOnly` and `verbatimModuleSyntax`: see
+  `.claude/rules/repo/tooling.md`. An ambient `const enum` from a dependency is
+  refused too, which is why `password.ts` names no argon2 `algorithm` and
+  relies on the argon2id default (`password.spec.ts` pins the PHC prefix).
 - `target`/`lib` are `ES2024`; the client and `shared` stay on ES2020.
-- `noUncheckedIndexedAccess`: application code handles a miss with an early
-  return, a throw naming what was missing (`itemAt` in `seed/rng.ts`) or
-  `?.`/`??`. Only `*.spec.ts` and `*.testkit.ts` may write `!`.
-- Await a promise, or mark a deliberate fire-and-forget `void` with the reason
-  beside it. The typed lint rules take no `eslint-disable`.
+- `noUncheckedIndexedAccess` and fire-and-forget `void`: see
+  `.claude/rules/repo/tooling.md`. A miss may also throw a typed error naming
+  what was missing (`itemAt` in `seed/rng.ts`).
 
 ## Express 5
 

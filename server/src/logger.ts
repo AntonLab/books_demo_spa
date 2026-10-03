@@ -13,6 +13,9 @@ const emit = (level: Level, message: string, meta?: unknown): void => {
   }
 };
 
+export const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 export const logger = {
   info: (message: string, meta?: unknown) => emit('info', message, meta),
   warn: (message: string, meta?: unknown) => emit('warn', message, meta),

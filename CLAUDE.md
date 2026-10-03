@@ -38,10 +38,8 @@ types only from a file whose real path lies outside `node_modules`.
 
 ## Status
 
-- **A dev database older than the current schema must be dropped and rebuilt.**
-  `sync()` creates a missing table but never alters an existing one, and
-  `permissions.module` is an `ENUM` built from `MODULES`. CI and the test
-  schemas are built fresh. `/db-reset` drops it and reseeds.
+- **A dev database older than the current schema must be dropped and rebuilt**
+  (`/db-reset`); see `.claude/rules/server/sequelize.md`.
 - `npm run seed -w server -- --force` loads the demo data. **The flag is
   mandatory and destructive** — see `server/CLAUDE.md`.
 
