@@ -18,6 +18,7 @@ import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
 import * as libraryApi from '@/api/library';
 import * as seriesApi from '@/api/series';
+import * as authorsApi from '@/api/authors';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -150,6 +151,7 @@ const noLists = { items: [], total: 0, current: 1, pageSize: 10 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  jest.mocked(authorsApi).searchAuthors.mockResolvedValue([]);
   mockedReadingLists.listReadingLists.mockResolvedValue(noLists);
   mockedBooks.getBook.mockResolvedValue(book);
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
@@ -564,6 +566,12 @@ describe('BookPage lower tabs', () => {
     mockedReadingLists.listReadingLists.mockRejectedValue(new Error('boom'));
     renderPage();
 
+    await waitFor(() =>
+      expect(mockedReadingLists.listReadingLists).toHaveBeenCalled()
+    );
+    await expect(
+      mockedReadingLists.listReadingLists.mock.results[0]?.value
+    ).rejects.toThrow('boom');
     expect(
       await screen.findByRole('tab', { name: 'Reading lists' })
     ).toBeInTheDocument();
