@@ -337,6 +337,19 @@ describe('useSearchPage writing the URL', () => {
     expect(location()).toBe('/search');
   });
 
+  it('keeps the chosen page size on Search and drops it on Reset', async () => {
+    const { page, location } = renderSearchPage(
+      '/search?q=dragon&pageSize=50&page=2'
+    );
+    await whenLoaded(page);
+
+    act(() => page().form.onSearch({ q: 'ghost', sort: 'popular' }));
+    expect(location()).toBe('/search?q=ghost&pageSize=50');
+
+    act(() => page().form.onReset());
+    expect(location()).toBe('/search');
+  });
+
   it('turns the page through the URL', async () => {
     const { page, location } = renderSearchPage('/search?q=dragon');
     await whenLoaded(page);

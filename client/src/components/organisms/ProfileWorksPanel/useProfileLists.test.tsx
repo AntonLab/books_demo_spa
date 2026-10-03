@@ -128,6 +128,16 @@ describe('useProfileBooks', () => {
     act(() => result.current.state.form.onReset());
     expect(result.current.location.search).toBe('');
   });
+
+  it('Search keeps a page size of 50 and Reset drops it, back to the default', () => {
+    const { result } = setup('favorites', '/p?q=x&pageSize=50');
+
+    act(() => result.current.state.form.onSearch({ q: 'y', sort: 'popular' }));
+    expect(result.current.location.search).toBe('?q=y&pageSize=50');
+    act(() => result.current.state.form.onReset());
+    expect(result.current.location.search).toBe('');
+    expect(result.current.state.list.pageSize).toBe(20);
+  });
 });
 
 // Every render's page and pending flag, to prove a past-the-end page is never
@@ -325,6 +335,20 @@ describe('useProfileSeries', () => {
     expect(result.current.navType).toBe('PUSH');
     act(() => result.current.state.form.onReset());
     expect(result.current.location.search).toBe('?tab=series');
+  });
+
+  it('Search keeps a page size of 50 and Reset drops it, keeping the tab', () => {
+    const { result } = setupSeries('favorites', '/p?tab=series&pageSize=50');
+
+    act(() =>
+      result.current.state.form.onSearch({ q: 'saga', sort: 'popular' })
+    );
+    expect(result.current.location.search).toBe(
+      '?tab=series&q=saga&pageSize=50'
+    );
+    act(() => result.current.state.form.onReset());
+    expect(result.current.location.search).toBe('?tab=series');
+    expect(result.current.state.list.pageSize).toBe(20);
   });
 
   it('replaces an empty page past the end with the last one, never shown as ready', async () => {
