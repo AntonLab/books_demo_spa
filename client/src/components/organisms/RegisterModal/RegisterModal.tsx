@@ -120,11 +120,16 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           <Input autoComplete="email" />
         </Form.Item>
 
+        {/* `required` alone lets "   " through; the server trims, then requires one character. */}
         <Form.Item
           name="firstName"
           label="First name"
           rules={[
-            { required: true, message: 'Enter your first name' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your first name',
+            },
             {
               max: NAME_MAX_LENGTH,
               message: `First name must be at most ${NAME_MAX_LENGTH} characters`,
@@ -138,7 +143,11 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           name="lastName"
           label="Last name"
           rules={[
-            { required: true, message: 'Enter your last name' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your last name',
+            },
             {
               max: NAME_MAX_LENGTH,
               message: `Last name must be at most ${NAME_MAX_LENGTH} characters`,

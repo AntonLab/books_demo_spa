@@ -113,11 +113,16 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
           <Input autoComplete="username" />
         </Form.Item>
 
+        {/* `required` alone lets "   " through; the server trims, then requires one character. */}
         <Form.Item
           name="firstName"
           label="First name"
           rules={[
-            { required: true, message: 'Enter your first name' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your first name',
+            },
             {
               max: NAME_MAX_LENGTH,
               message: `First name must be at most ${NAME_MAX_LENGTH} characters`,
@@ -131,7 +136,11 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
           name="lastName"
           label="Last name"
           rules={[
-            { required: true, message: 'Enter your last name' },
+            {
+              required: true,
+              whitespace: true,
+              message: 'Enter your last name',
+            },
             {
               max: NAME_MAX_LENGTH,
               message: `Last name must be at most ${NAME_MAX_LENGTH} characters`,

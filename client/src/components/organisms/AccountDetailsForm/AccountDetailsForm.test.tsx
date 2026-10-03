@@ -68,6 +68,23 @@ describe('AccountDetailsForm', () => {
     expect(saveButton()).toBeDisabled();
   });
 
+  it.each([
+    ['First name', 'Enter your first name'],
+    ['Last name', 'Enter your last name'],
+  ])(
+    'refuses spaces only in %s and does not send it',
+    async (name, message) => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await replaceText(user, name, '   ');
+      await user.click(saveButton());
+
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(mockedUsers.updateUser).not.toHaveBeenCalled();
+    }
+  );
+
   it('sends only About when only About changed, line breaks kept', async () => {
     mockedUsers.updateUser.mockResolvedValue({
       ...session,

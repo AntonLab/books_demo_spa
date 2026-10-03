@@ -80,6 +80,21 @@ describe('RegisterModal validation', () => {
       await screen.findByText('The two passwords do not match')
     ).toBeInTheDocument();
   });
+
+  it.each([
+    ['First name', 'Enter your first name'],
+    ['Last name', 'Enter your last name'],
+  ])('refuses spaces only in %s', async (label, message) => {
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
+    await fillInTheForm();
+
+    await userEvent.clear(screen.getByLabelText(label));
+    await userEvent.type(screen.getByLabelText(label), '   ');
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(mockedAuth.register).not.toHaveBeenCalled();
+  });
 });
 
 describe('RegisterModal submission', () => {
