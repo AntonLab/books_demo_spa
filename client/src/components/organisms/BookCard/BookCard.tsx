@@ -14,18 +14,24 @@ interface BookCardProps {
   book: PublicBook;
   // A grid cell: the Cover over the title, and only the status beneath.
   tile?: boolean;
+  // The Book page's own header, so the card does not link to the page it is on.
+  heading?: boolean;
 }
 
 // Linked to the book page, with its Cover beside the text and its status
 // under it. The list response embeds the Co-authors, so no second request is
 // needed to name them.
-export const BookCard: FC<BookCardProps> = ({ book, tile = false }) => {
+export const BookCard: FC<BookCardProps> = ({
+  book,
+  tile = false,
+  heading = false,
+}) => {
   const { token } = theme.useToken();
 
   return (
     <Card
       title={book.title}
-      href={`/books/${book.id}`}
+      href={heading ? undefined : `/books/${book.id}`}
       tile={tile}
       authors={book.authors}
       description={tile ? undefined : book.description}
@@ -36,6 +42,7 @@ export const BookCard: FC<BookCardProps> = ({ book, tile = false }) => {
           coverUrl={book.coverUrl}
           title={book.title}
           fullWidth={tile}
+          large={heading}
         />
       }
       subtitle={
@@ -52,7 +59,7 @@ export const BookCard: FC<BookCardProps> = ({ book, tile = false }) => {
           <Tag color={BOOK_STATUS_COLORS[book.status]}>
             {BOOK_STATUS_LABELS[book.status]}
           </Tag>
-          {!tile && (
+          {!tile && !heading && (
             <Typography.Text type="secondary">
               {formatDate(book.createdAt)}
             </Typography.Text>

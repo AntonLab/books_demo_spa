@@ -166,6 +166,39 @@ describe('BookCard', () => {
   });
 });
 
+describe('BookCard as a page heading', () => {
+  const headed = {
+    ...book,
+    series: { id: 2, title: 'The Scale Cycle', position: 1 },
+    description: 'Long ago, in a kingdom of scales. '.repeat(20).trim(),
+  };
+
+  it('shows the title as the level-2 heading with no link, and the whole description', () => {
+    renderWithProviders(<BookCard book={headed} heading />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'A Tale of Dragons' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'A Tale of Dragons' })
+    ).toBeNull();
+    expect(screen.getByText(headed.description)).toBeInTheDocument();
+  });
+
+  it('keeps the series line, genre, tags, co-authors and status, and drops the date', () => {
+    renderWithProviders(<BookCard book={headed} heading />);
+
+    expect(
+      screen.getByRole('link', { name: 'The Scale Cycle · Book 1' })
+    ).toHaveAttribute('href', '/series/2');
+    expect(screen.getByRole('link', { name: 'Gothic' })).toBeInTheDocument();
+    expect(screen.getByText('epic')).toBeInTheDocument();
+    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+    expect(screen.queryByText(formatDate(book.createdAt))).toBeNull();
+  });
+});
+
 describe('Series line', () => {
   const inSeries = (position: number | null) => ({
     ...book,

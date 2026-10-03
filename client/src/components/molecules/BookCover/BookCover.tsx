@@ -8,15 +8,19 @@ interface BookCoverProps {
   title: string;
   // Takes its container's width instead of the fixed cover width: a grid tile.
   fullWidth?: boolean;
+  // Twice the list width, the list width on a phone: the page header.
+  large?: boolean;
 }
 
 // A 2:3 frame. The title sits right beside this in every place it
 // renders (BookCard, BookPage), so the image is decorative and the
-// placeholder's text is hidden from assistive technology.
+// placeholder's text is hidden from assistive technology. The page header
+// renders it large.
 export const BookCover: FC<BookCoverProps> = ({
   coverUrl,
   title,
   fullWidth = false,
+  large = false,
 }) => {
   // Stores the URL that failed, not just a boolean: a fresh upload hands
   // this component a new `coverUrl` (`?v=<ms>`), and comparing it against
@@ -26,7 +30,9 @@ export const BookCover: FC<BookCoverProps> = ({
   const showImage = coverUrl !== null && coverUrl !== failedUrl;
 
   return (
-    <div className={`${styles.frame} ${fullWidth ? styles.fullWidth : ''}`}>
+    <div
+      className={`${styles.frame} ${large ? styles.large : ''} ${fullWidth ? styles.fullWidth : ''}`}
+    >
       {showImage ? (
         <img
           src={coverUrl}
