@@ -1,4 +1,11 @@
-import { col, fn, literal, Op, where as sequelizeWhere } from 'sequelize';
+import {
+  col,
+  ForeignKeyConstraintError,
+  fn,
+  literal,
+  Op,
+  where as sequelizeWhere,
+} from 'sequelize';
 import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
@@ -850,10 +857,15 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async setCover(bookId, data) {
-      const book = await Book.findByPk(bookId, { attributes: ['id'] });
-      if (!book) return false;
-      await BookCover.upsert({ bookId, data });
-      return true;
+      // The cover row's foreign key is the existence check, so a book deleted
+      // mid-upload reads as not found (as commentRepository maps it).
+      try {
+        await BookCover.upsert({ bookId, data });
+        return true;
+      } catch (error) {
+        if (error instanceof ForeignKeyConstraintError) return false;
+        throw error;
+      }
     },
 
     async removeCover(bookId) {

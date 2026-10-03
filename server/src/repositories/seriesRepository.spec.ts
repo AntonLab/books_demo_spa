@@ -1,6 +1,6 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DatabaseError,
@@ -437,6 +437,43 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       (await repository.findById(series.id, asModerator))?.coverUrl,
       firstUrl
     );
+  });
+
+  test('setCover answers false when the series vanishes between the lookup and the write, and rethrows other errors', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Racy',
+      description: '',
+      tags: [],
+    });
+    const missingId = created.id + 10_000;
+
+    // The lookup still sees the series; only the write finds it gone.
+    const lookup = mock.method(
+      Series,
+      'findByPk',
+      async () => ({ id: missingId }) as never
+    );
+    try {
+      assert.equal(
+        await repository.setCover(missingId, Buffer.from('x')),
+        false
+      );
+    } finally {
+      lookup.mock.restore();
+    }
+
+    const broken = mock.method(SeriesCover, 'upsert', async () => {
+      throw new Error('disk full');
+    });
+    try {
+      await assert.rejects(
+        repository.setCover(created.id, Buffer.from('x')),
+        /disk full/
+      );
+    } finally {
+      broken.mock.restore();
+    }
   });
 
   test('a Draft-only series Cover is hidden from a guest, readable to a Co-author and a Moderator', async () => {

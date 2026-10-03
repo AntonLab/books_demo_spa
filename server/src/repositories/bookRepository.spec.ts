@@ -1,6 +1,6 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import { after, before, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ForeignKeyConstraintError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -1798,6 +1798,44 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(await repository.removeCover(missingId), false);
     assert.equal(await repository.removeCover(created.id), true);
     assert.equal(await repository.getCoverData(created.id, null), null);
+  });
+
+  test('setCover answers false when the book vanishes between the lookup and the write, and rethrows other errors', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Racy',
+      description: '',
+      tags: [],
+    });
+    const missingId = created.id + 10_000;
+
+    // The lookup still sees the book; only the write finds it gone.
+    const lookup = mock.method(
+      Book,
+      'findByPk',
+      async () => ({ id: missingId }) as never
+    );
+    try {
+      assert.equal(
+        await repository.setCover(missingId, Buffer.from('x')),
+        false
+      );
+    } finally {
+      lookup.mock.restore();
+    }
+
+    const broken = mock.method(BookCover, 'upsert', async () => {
+      throw new Error('disk full');
+    });
+    try {
+      await assert.rejects(
+        repository.setCover(created.id, Buffer.from('x')),
+        /disk full/
+      );
+    } finally {
+      broken.mock.restore();
+    }
   });
 
   test('a draft book cover is unreadable to a guest and a non-co-author, readable to a co-author and a moderator', async () => {

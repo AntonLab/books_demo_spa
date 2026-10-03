@@ -1,4 +1,11 @@
-import { col, fn, literal, Op, where as sequelizeWhere } from 'sequelize';
+import {
+  col,
+  ForeignKeyConstraintError,
+  fn,
+  literal,
+  Op,
+  where as sequelizeWhere,
+} from 'sequelize';
 import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
@@ -486,10 +493,15 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async setCover(seriesId, data) {
-      const series = await Series.findByPk(seriesId, { attributes: ['id'] });
-      if (!series) return false;
-      await SeriesCover.upsert({ seriesId, data });
-      return true;
+      // The cover row's foreign key is the existence check, so a series deleted
+      // mid-upload reads as not found (as commentRepository maps it).
+      try {
+        await SeriesCover.upsert({ seriesId, data });
+        return true;
+      } catch (error) {
+        if (error instanceof ForeignKeyConstraintError) return false;
+        throw error;
+      }
     },
 
     async removeCover(seriesId) {
