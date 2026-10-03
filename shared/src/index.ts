@@ -3,6 +3,7 @@
 // sides check, and the string unions both packages use, each derived from an
 // `as const` array. No zod: its schemas stay in the server, so none of it
 // reaches the client bundle. See ADR-0006.
+export * from './account.ts';
 export * from './api.ts';
 export * from './book.ts';
 export * from './chapter.ts';

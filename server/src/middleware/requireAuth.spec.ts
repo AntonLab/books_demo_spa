@@ -21,6 +21,8 @@ const USER: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

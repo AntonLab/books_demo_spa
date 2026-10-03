@@ -15,6 +15,9 @@ export interface PublicUser {
   role: UserRole;
   // The same versioned-URL shape as a Book's Cover.
   avatarUrl: string | null;
+  // The Account form reads both from the session. An empty About means none.
+  about: string;
+  showLastSeen: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +42,11 @@ export const NAME_MAX_LENGTH = 64;
 export const EMAIL_MAX_LENGTH = 255;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
+// The client checks the same number for the About text.
+export const ABOUT_MAX_LENGTH = 1000;
+// How long a last-seen stamp stays fresh: the server stamps at most once per
+// window, and the client calls a stamp within it "Online now".
+export const LAST_ONLINE_WINDOW_MS = 300000;
 
 // PublicUser minus the email address. That single omission is what makes an
 // author safe to embed in a public response: the email is the whole reason

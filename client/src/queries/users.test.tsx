@@ -20,6 +20,8 @@ const session: PublicUser = {
   status: 'active',
   role: 'user',
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };

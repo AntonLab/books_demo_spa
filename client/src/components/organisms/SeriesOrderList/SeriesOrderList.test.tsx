@@ -31,6 +31,8 @@ const sessionOf = (role: PublicUser['role']): PublicUser => ({
   email: 'ann@example.com',
   role,
   status: 'active',
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 });

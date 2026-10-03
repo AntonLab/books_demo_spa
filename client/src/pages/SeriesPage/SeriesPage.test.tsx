@@ -69,6 +69,8 @@ const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   email: 'ann@example.com',
   status: 'active',
   role: 'author',
+  about: '',
+  showLastSeen: true,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
   ...overrides,

@@ -108,6 +108,8 @@ function accountDeps() {
     status: account.status,
     role: 'user',
     avatarUrl: null,
+    about: '',
+    showLastSeen: true,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
   });

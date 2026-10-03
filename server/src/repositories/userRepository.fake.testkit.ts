@@ -82,6 +82,8 @@ export function createFakeUserRepository(
         status: input.status ?? 'pending',
         role,
         avatarUrl: null,
+        about: '',
+        showLastSeen: true,
         password: await hashPassword(input.password, 'test'),
         createdAt: now,
         updatedAt: now,

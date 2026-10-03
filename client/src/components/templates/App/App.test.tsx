@@ -369,6 +369,8 @@ describe('AppShell Profile routing', () => {
       status: 'active',
       role: 'user',
       avatarUrl: null,
+      about: '',
+      showLastSeen: true,
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
@@ -445,6 +447,8 @@ describe('AppShell and Unsaved text', () => {
       status: 'active',
       role: 'user',
       avatarUrl: null,
+      about: '',
+      showLastSeen: true,
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };

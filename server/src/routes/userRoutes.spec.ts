@@ -43,6 +43,8 @@ function seedPersonaRows(): FakeUserRow[] {
     status: 'active',
     role,
     avatarUrl: null,
+    about: '',
+    showLastSeen: true,
     password: PASSWORD_HASH,
     createdAt: now,
     updatedAt: now,

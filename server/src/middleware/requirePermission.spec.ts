@@ -23,6 +23,8 @@ const userWithRole = (role: UserRole): PublicUser => ({
   status: 'active',
   role,
   avatarUrl: null,
+  about: '',
+  showLastSeen: true,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 });
