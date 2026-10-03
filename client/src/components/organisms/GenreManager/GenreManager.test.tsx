@@ -275,6 +275,69 @@ describe('GenreManager', () => {
         rowOf('Mystery').querySelector('.ant-tree-indent-unit')
       ).toBeNull();
     });
+
+    it('ignores a second drag while a move is pending, then drags again once it succeeds', async () => {
+      let finish: (genre: ReturnType<typeof publicGenre>) => void = () => {};
+      mockedGenres.updateGenre.mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+      );
+      await renderLoaded();
+
+      drag('Mystery', 'Fantasy');
+      await waitFor(() =>
+        expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1)
+      );
+      drag('Romance', 'Fantasy');
+
+      expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1);
+
+      mockedGenres.updateGenre.mockResolvedValue(
+        publicGenre(6, 'Romance', { id: 1, name: 'Fantasy' })
+      );
+      await act(async () =>
+        finish(publicGenre(5, 'Mystery', { id: 1, name: 'Fantasy' }))
+      );
+      await waitFor(() =>
+        expect(rowOf('Mystery')).toHaveAttribute('draggable', 'true')
+      );
+      drag('Romance', 'Fantasy');
+
+      await waitFor(() =>
+        expect(mockedGenres.updateGenre).toHaveBeenLastCalledWith(6, {
+          parentId: 1,
+        })
+      );
+      expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(2);
+    });
+
+    it('drags again after a move fails', async () => {
+      let fail: (error: Error) => void = () => {};
+      mockedGenres.updateGenre.mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          fail = reject;
+        })
+      );
+      await renderLoaded();
+
+      drag('Mystery', 'Fantasy');
+      await waitFor(() =>
+        expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1)
+      );
+      await act(async () =>
+        fail(new ApiError(409, 'A genre with this name already exists here'))
+      );
+      await screen.findByRole('alert');
+      mockedGenres.updateGenre.mockResolvedValue(
+        publicGenre(6, 'Romance', { id: 1, name: 'Fantasy' })
+      );
+      drag('Romance', 'Fantasy');
+
+      await waitFor(() =>
+        expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(2)
+      );
+    });
   });
 
   it('reports a failure to load the list', async () => {

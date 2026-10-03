@@ -217,7 +217,9 @@ export const GenreManager: FC = () => {
           expandedKeys={expandedKeys}
           onExpand={setExpanded}
           titleRender={renderTitle}
-          draggable={{ icon: false }}
+          // A second move sent before the first settles reads a stale tree and
+          // can drop onto a parent that is about to change.
+          draggable={move.isPending ? false : { icon: false }}
           allowDrop={({ dragNode, dropNode, dropPosition }) =>
             dropParentOf(
               tree,
