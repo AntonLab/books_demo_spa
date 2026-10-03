@@ -8,6 +8,7 @@ import {
   type NonAttribute,
   type Sequelize,
 } from 'sequelize';
+import { READING_LIST_TITLE_MAX_LENGTH } from 'shared';
 import type { ReadingListItem } from './ReadingListItem.ts';
 import type { User } from './User.ts';
 
@@ -40,7 +41,10 @@ export function initReadingListModel(sequelize: Sequelize): typeof ReadingList {
       // INTEGER UNSIGNED like the id it references, or MySQL rejects the
       // foreign key with errno 3780.
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-      title: { type: DataTypes.STRING(200), allowNull: false },
+      title: {
+        type: DataTypes.STRING(READING_LIST_TITLE_MAX_LENGTH),
+        allowNull: false,
+      },
       description: { type: DataTypes.TEXT, allowNull: false },
       // JSON, as on Series: MySQL has no array type, and a JSON column cannot
       // carry a literal DEFAULT.

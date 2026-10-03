@@ -9,7 +9,7 @@ import {
   type Sequelize,
   type Transaction,
 } from 'sequelize';
-import type { PublicGenre } from 'shared';
+import { GENRE_NAME_MAX_LENGTH, type PublicGenre } from 'shared';
 
 // A category of the catalogue, from the list Admins and Superadmins keep
 // (CONTEXT.md, ADR-0008). A Book or a Series points at one or at none; nothing
@@ -37,7 +37,7 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
       // column can carry the unique index below. Under utf8mb4 a 50-character
       // index entry is 200 bytes, well inside InnoDB's 3072-byte key limit.
       name: {
-        type: DataTypes.STRING(50),
+        type: DataTypes.STRING(GENRE_NAME_MAX_LENGTH),
         allowNull: false,
       },
       // The Genre this one is a Subgenre of; null at the top level. RESTRICT:

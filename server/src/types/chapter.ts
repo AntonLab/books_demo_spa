@@ -1,4 +1,4 @@
-import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
+import { CHAPTER_TITLE_MAX_LENGTH, SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { z } from 'zod';
 import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
@@ -65,11 +65,13 @@ export const updateChapterSchema = z
 // than a single move, so the repository can tell when it was drawn from a
 // chapter set that has since changed. The cap keeps one request's FIELD()
 // argument list bounded without refusing any real book.
+const REORDER_CHAPTERS_MAX = 5_000;
+
 export const reorderChaptersSchema = z.object({
   chapterIds: z
     .array(idSchema)
     .min(1)
-    .max(5_000)
+    .max(REORDER_CHAPTERS_MAX)
     .refine((ids) => new Set(ids).size === ids.length, {
       message: 'Each chapter may appear only once',
     }),
@@ -78,7 +80,7 @@ export const reorderChaptersSchema = z.object({
 export const listChaptersQuerySchema = z.object({
   ...limitOffsetShape,
   bookId: idSchema.optional(),
-  q: z.string().min(1).max(200).optional(),
+  q: z.string().min(1).max(SEARCH_TEXT_MAX_LENGTH).optional(),
 });
 
 export type CreateChapterInput = z.infer<typeof createChapterSchema>;
