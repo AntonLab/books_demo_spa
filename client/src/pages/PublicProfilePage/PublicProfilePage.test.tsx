@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Link } from 'react-router';
 import { PublicProfilePage } from './PublicProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as accountsApi from '@/api/accounts';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
@@ -111,7 +112,7 @@ describe('PublicProfilePage', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
-    mockedAuth.me.mockResolvedValue(me);
+    mockedAuth.me.mockResolvedValue(sessionOf(me));
     renderPage();
 
     expect(

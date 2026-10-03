@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LoginModal } from './LoginModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { queryKeys } from '@/queries/keys';
@@ -44,7 +45,7 @@ describe('LoginModal', () => {
   });
 
   it('submits the credentials, caches the user and closes the modal', async () => {
-    mockedAuth.login.mockResolvedValue(user);
+    mockedAuth.login.mockResolvedValue(sessionOf(user));
     const { queryClient } = renderWithProviders(
       <LoginModal onOpen={onOpen} onClose={onClose} />
     );
@@ -54,7 +55,9 @@ describe('LoginModal', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     await waitFor(() => {
-      expect(queryClient.getQueryData(queryKeys.session)).toEqual(user);
+      expect(queryClient.getQueryData(queryKeys.session)).toEqual(
+        sessionOf(user)
+      );
     });
     expect(mockedAuth.login).toHaveBeenCalledWith({
       login: 'bob',

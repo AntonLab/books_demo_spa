@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ProfileSettings } from './ProfileSettings';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
@@ -43,7 +44,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   // A default so that a successful mutation's session invalidation has
   // something real to refetch.
-  mockedAuth.me.mockResolvedValue(session);
+  mockedAuth.me.mockResolvedValue(sessionOf(session));
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
   });

@@ -1,6 +1,6 @@
 import { request } from './client';
 import type { RegistrableRole } from 'shared';
-import type { PublicUser } from '../types/api';
+import type { SessionUser } from '../types/api';
 
 export interface RegisterInput {
   login: string;
@@ -18,23 +18,23 @@ export interface LoginInput {
   password: string;
 }
 
-export const register = (input: RegisterInput): Promise<PublicUser> => {
-  return request<PublicUser>('/auth/register', {
+export const register = (input: RegisterInput): Promise<SessionUser> => {
+  return request<SessionUser>('/auth/register', {
     method: 'POST',
     body: input,
   });
 };
 
-export const login = (input: LoginInput): Promise<PublicUser> => {
-  return request<PublicUser>('/auth/login', { method: 'POST', body: input });
+export const login = (input: LoginInput): Promise<SessionUser> => {
+  return request<SessionUser>('/auth/login', { method: 'POST', body: input });
 };
 
 export const logout = (): Promise<void> => {
   return request<void>('/auth/logout', { method: 'POST' });
 };
 
-export const me = (): Promise<PublicUser> => {
-  return request<PublicUser>('/auth/me');
+export const me = (): Promise<SessionUser> => {
+  return request<SessionUser>('/auth/me');
 };
 
 export const requestReset = (email: string): Promise<void> => {

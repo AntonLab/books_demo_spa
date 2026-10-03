@@ -1,4 +1,5 @@
-import type { ReportedAccount } from 'shared';
+import type { PermissionScope, ReportedAccount, UserRole } from 'shared';
+import { permissionsOf } from '@/test/session';
 import { banBlockedReason } from './banReach';
 
 const target = (over: Partial<ReportedAccount> = {}): ReportedAccount => ({
@@ -10,18 +11,24 @@ const target = (over: Partial<ReportedAccount> = {}): ReportedAccount => ({
   ...over,
 });
 
+const viewer = (id: number, role: UserRole, usersUpdate?: PermissionScope) => ({
+  id,
+  role,
+  permissions: permissionsOf(role, usersUpdate),
+});
+
 describe('banBlockedReason', () => {
   it('allows an admin to ban a user or an author', () => {
-    expect(banBlockedReason({ id: 1, role: 'admin' }, target())).toBeNull();
+    expect(banBlockedReason(viewer(1, 'admin'), target())).toBeNull();
     expect(
-      banBlockedReason({ id: 1, role: 'admin' }, target({ role: 'author' }))
+      banBlockedReason(viewer(1, 'admin'), target({ role: 'author' }))
     ).toBeNull();
   });
 
   it.each(['admin', 'superadmin'] as const)(
     'keeps an admin from banning a %s',
     (role) => {
-      expect(banBlockedReason({ id: 1, role: 'admin' }, target({ role }))).toBe(
+      expect(banBlockedReason(viewer(1, 'admin'), target({ role }))).toBe(
         'Only a superadmin can ban an admin or superadmin'
       );
     }
@@ -29,23 +36,30 @@ describe('banBlockedReason', () => {
 
   it('lets a superadmin ban an admin', () => {
     expect(
-      banBlockedReason({ id: 1, role: 'superadmin' }, target({ role: 'admin' }))
+      banBlockedReason(viewer(1, 'superadmin'), target({ role: 'admin' }))
     ).toBeNull();
   });
 
+  it.each(['none', 'own'] as const)(
+    'refuses an admin whose users:update scope is %s',
+    (scope) => {
+      expect(banBlockedReason(viewer(1, 'admin', scope), target())).toBe(
+        'You have no permission to ban accounts'
+      );
+    }
+  );
+
+  it('refuses a user, whose users:update scope is own', () => {
+    expect(banBlockedReason(viewer(1, 'user'), target())).toBe(
+      'You have no permission to ban accounts'
+    );
+  });
+
   it.each([
-    [
-      { id: 1, role: 'admin' as const },
-      target({ status: 'blocked' }),
-      'Already banned',
-    ],
-    [
-      { id: 4, role: 'superadmin' as const },
-      target(),
-      "You can't ban yourself",
-    ],
+    [viewer(1, 'admin'), target({ status: 'blocked' }), 'Already banned'],
+    [viewer(4, 'superadmin'), target(), "You can't ban yourself"],
     [null, target(), 'Sign in to ban accounts'],
-  ])('refuses with a reason: %p', (viewer, account, reason) => {
-    expect(banBlockedReason(viewer, account)).toBe(reason);
+  ])('refuses with a reason: %p', (who, account, reason) => {
+    expect(banBlockedReason(who, account)).toBe(reason);
   });
 });

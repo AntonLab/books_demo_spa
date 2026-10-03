@@ -10,12 +10,12 @@ import type { LoginInput, RegisterInput } from '../api/auth';
 import { ApiError } from '../api/client';
 import { updateUser } from '../api/users';
 import { queryKeys } from './keys';
-import type { PublicUser } from '../types/api';
+import type { SessionUser } from '../types/api';
 
 // `null` means "asked, and nobody is signed in"; `undefined` means "not asked
 // yet". TanStack enforces the distinction for us — it rejects an `undefined`
 // return from a queryFn outright — so the cache can hold the whole answer.
-type Session = PublicUser | null;
+type Session = SessionUser | null;
 
 interface ConfirmResetInput {
   token: string;

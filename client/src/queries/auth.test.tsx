@@ -13,6 +13,7 @@ import {
 } from './auth';
 import { queryKeys } from './keys';
 import { createTestQueryClient } from '../test/queryClient';
+import { sessionOf } from '../test/session';
 import * as authApi from '../api/auth';
 import { ApiError } from '../api/client';
 import type { PublicUser } from '../types/api';
@@ -50,7 +51,7 @@ beforeEach(() => {
 
 describe('useSession', () => {
   it('resolves the signed-in user', async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useSession(), {
@@ -60,7 +61,7 @@ describe('useSession', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(result.current.data).toEqual(user);
+    expect(result.current.data).toEqual(sessionOf(user));
   });
 
   it('treats a 401 as "nobody is signed in", not as an error', async () => {
@@ -98,7 +99,7 @@ describe('useSession', () => {
 
 describe('useLogin', () => {
   it('writes the returned user into the session cache', async () => {
-    mockedAuth.login.mockResolvedValue(user);
+    mockedAuth.login.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useLogin(), {
@@ -106,7 +107,7 @@ describe('useLogin', () => {
     });
     await result.current.mutateAsync({ login: 'bob', password: 'secret123' });
 
-    expect(client.getQueryData(queryKeys.session)).toEqual(user);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
     expect(mockedAuth.login).toHaveBeenCalledWith({
       login: 'bob',
       password: 'secret123',
@@ -134,7 +135,7 @@ describe('useLogin', () => {
 
 describe('useRegister', () => {
   it('writes the new user into the session cache', async () => {
-    mockedAuth.register.mockResolvedValue(user);
+    mockedAuth.register.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
 
     const { result } = renderHook(() => useRegister(), {
@@ -148,7 +149,7 @@ describe('useRegister', () => {
       lastName: 'Bobson',
     });
 
-    expect(client.getQueryData(queryKeys.session)).toEqual(user);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
   });
 
   it('preserves the 409 conflict field on the rejection', async () => {
@@ -205,7 +206,7 @@ describe('watchSession', () => {
   };
 
   it('announces a session its own mutation wrote, not one it fetched', async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     mockedAuth.logout.mockResolvedValue(undefined);
     const client = createTestQueryClient();
     const channel = fakeChannel();
@@ -218,7 +219,7 @@ describe('watchSession', () => {
       }
     );
     await waitFor(() => {
-      expect(result.current.session.data).toEqual(user);
+      expect(result.current.session.data).toEqual(sessionOf(user));
     });
     expect(channel.postMessage).not.toHaveBeenCalled();
 
@@ -228,7 +229,7 @@ describe('watchSession', () => {
   });
 
   it("asks /auth/me again on another tab's announcement", async () => {
-    mockedAuth.me.mockResolvedValue(user);
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
     const client = createTestQueryClient();
     const channel = fakeChannel();
     watchSession(client, channel);
@@ -236,7 +237,7 @@ describe('watchSession', () => {
       wrapper: wrapper(client),
     });
     await waitFor(() => {
-      expect(result.current.data).toEqual(user);
+      expect(result.current.data).toEqual(sessionOf(user));
     });
 
     mockedAuth.me.mockRejectedValue(

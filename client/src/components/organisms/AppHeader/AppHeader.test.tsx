@@ -13,7 +13,7 @@ import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
 import { ApiError } from '@/api/client';
 import { FakeEventSource } from '@/test/eventSource';
-import type { CreditNotification, PublicUser } from '@/types/api';
+import type { CreditNotification, PublicUser, SessionUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/notifications');
@@ -83,7 +83,7 @@ const LocationProbe = () => {
 describe('AppHeader while the session is loading', () => {
   it('shows neither Log in nor an avatar', async () => {
     // Never resolves, so the query stays pending for the assertion.
-    mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
+    mockedAuth.me.mockReturnValue(new Promise<SessionUser>(() => {}));
 
     await renderHeader(<AppHeader />);
 

@@ -4,6 +4,7 @@ import { useLocation } from 'react-router';
 import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -14,7 +15,7 @@ import * as notificationsApi from '@/api/notifications';
 import * as readingListsApi from '@/api/readingLists';
 import * as seriesApi from '@/api/series';
 import * as usersApi from '@/api/users';
-import type { PublicUser } from '@/types/api';
+import type { PublicUser, SessionUser } from '@/types/api';
 
 jest.mock('@/api/users');
 jest.mock('@/api/auth');
@@ -74,7 +75,7 @@ const renderWithSession = (data: PublicUser | null, route = '/profile') => {
 
 beforeEach(() => {
   jest.resetAllMocks();
-  mockedAuth.me.mockResolvedValue(session);
+  mockedAuth.me.mockResolvedValue(sessionOf(session));
   mockedNotifications.getNotificationSettings.mockResolvedValue({
     emailNotifications: true,
   });
@@ -90,7 +91,7 @@ beforeEach(() => {
 describe('ProfilePage while the session is loading', () => {
   it('shows only a spinner and redirects nowhere', () => {
     // Never resolves, so the session query stays pending for the assertion.
-    mockedAuth.me.mockReturnValue(new Promise<PublicUser>(() => {}));
+    mockedAuth.me.mockReturnValue(new Promise<SessionUser>(() => {}));
 
     renderWithProviders(
       <>

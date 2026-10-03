@@ -4,6 +4,7 @@ import { ABOUT_MAX_LENGTH, LOGIN_MAX_LENGTH } from 'shared';
 import { AccountDetailsForm } from './AccountDetailsForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as authApi from '@/api/auth';
@@ -52,7 +53,7 @@ const replaceText = async (
 
 beforeEach(() => {
   jest.resetAllMocks();
-  mockedAuth.me.mockResolvedValue(session);
+  mockedAuth.me.mockResolvedValue(sessionOf(session));
 });
 
 describe('AccountDetailsForm', () => {

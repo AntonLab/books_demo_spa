@@ -5,6 +5,7 @@ import { useChangePassword } from './auth';
 import { queryKeys } from './keys';
 import { useDeleteAvatar, useUpdateAccount, useUploadAvatar } from './users';
 import { createTestQueryClient } from '../test/queryClient';
+import { sessionOf } from '../test/session';
 import * as usersApi from '../api/users';
 import type { PublicUser } from '../types/api';
 
@@ -84,6 +85,22 @@ describe('useUpdateAccount', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['auth', 'me'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['authors'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['accounts'] });
+  });
+});
+
+describe('the session after an Account change', () => {
+  it('keeps the permissions the session already holds', async () => {
+    const withPermissions = sessionOf(session, 'any');
+    mockedUsers.updateUser.mockResolvedValue({ ...session, about: 'Hi' });
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, withPermissions);
+
+    const { result } = renderHook(() => useUpdateAccount(7), {
+      wrapper: wrapper(client),
+    });
+    await result.current.mutateAsync({ about: 'Hi' });
+
+    expect(client.getQueryData(queryKeys.session)).toEqual(withPermissions);
   });
 });
 

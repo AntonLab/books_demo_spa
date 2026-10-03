@@ -1,12 +1,17 @@
-import type { ReportedAccount, UserRole } from 'shared';
+import type { ReportedAccount } from 'shared';
+import type { SessionUser } from './api';
 
-// Mirrors the server's `assertMayTouch` (userController); the server stays the
-// authority, this only keeps a doomed button from being offered.
+// The scope mirrors the server's `users:update` gate and the role rule mirrors
+// `assertMayTouch` (userController); the server stays the authority, this only
+// keeps a doomed button from being offered.
 export const banBlockedReason = (
-  viewer: { id: number; role: UserRole } | null | undefined,
+  viewer: Pick<SessionUser, 'id' | 'role' | 'permissions'> | null | undefined,
   target: ReportedAccount
 ): string | null => {
   if (!viewer) return 'Sign in to ban accounts';
+  if (viewer.permissions.users.update !== 'any') {
+    return 'You have no permission to ban accounts';
+  }
   if (viewer.id === target.id) return "You can't ban yourself";
   if (target.status === 'blocked') return 'Already banned';
   if (

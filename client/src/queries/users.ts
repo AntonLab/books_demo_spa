@@ -6,6 +6,9 @@ import { queryKeys } from './keys';
 // An Account change touches every place an AuthorSummary or a PublicUser is
 // embedded: the session itself, and every books/series/comments list
 // or detail that names its owner, plus the author-picker's search cache.
+// These endpoints answer a bare PublicUser, so the hook never writes it into
+// the session (that would drop `permissions`): it invalidates, and /auth/me
+// answers the whole SessionUser again.
 const useAccountMutation = <TVariables, TResult>(
   mutationFn: (variables: TVariables) => Promise<TResult>
 ) => {

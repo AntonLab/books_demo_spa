@@ -4,6 +4,7 @@ import { useLocation, useNavigationType } from 'react-router';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import * as accountsApi from '@/api/accounts';
 import * as booksApi from '@/api/books';
@@ -421,7 +422,7 @@ describe('AppShell Profile routing', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
-    mockedAuth.me.mockResolvedValue(signedIn);
+    mockedAuth.me.mockResolvedValue(sessionOf(signedIn));
     mockedNotifications.listNotifications.mockResolvedValue({
       items: [],
       total: 0,
@@ -499,7 +500,7 @@ describe('AppShell and Unsaved text', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     };
-    mockedAuth.me.mockResolvedValue(signedIn);
+    mockedAuth.me.mockResolvedValue(sessionOf(signedIn));
     // The bell a signed-in header shows asks for these.
     mockedNotifications.listNotifications.mockResolvedValue({
       items: [],
@@ -534,20 +535,22 @@ describe('AppShell and Unsaved text', () => {
 
 describe('AppShell and Recently viewed', () => {
   it('binds the Recently viewed to the Account signed in', async () => {
-    mockedAuth.me.mockResolvedValue({
-      id: 5,
-      login: 'eve',
-      email: 'eve@example.com',
-      firstName: 'Eve',
-      lastName: 'Evans',
-      status: 'active',
-      role: 'user',
-      avatarUrl: null,
-      about: '',
-      showLastSeen: true,
-      createdAt: '2026-09-01T00:00:00.000Z',
-      updatedAt: '2026-09-01T00:00:00.000Z',
-    });
+    mockedAuth.me.mockResolvedValue(
+      sessionOf({
+        id: 5,
+        login: 'eve',
+        email: 'eve@example.com',
+        firstName: 'Eve',
+        lastName: 'Evans',
+        status: 'active',
+        role: 'user',
+        avatarUrl: null,
+        about: '',
+        showLastSeen: true,
+        createdAt: '2026-09-01T00:00:00.000Z',
+        updatedAt: '2026-09-01T00:00:00.000Z',
+      })
+    );
     mockedNotifications.listNotifications.mockResolvedValue({
       items: [],
       total: 0,

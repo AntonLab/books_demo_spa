@@ -9,7 +9,8 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { emptyStatistics, reportRow } from '@/test/reports';
 import type { QueryClient } from '@tanstack/react-query';
 import * as usersApi from '@/api/users';
-import type { PublicUser, ReportRow } from '@/types/api';
+import { sessionOf } from '@/test/session';
+import type { PublicUser, ReportRow, SessionUser } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/reports');
@@ -17,7 +18,7 @@ jest.mock('@/api/users');
 const mockedReports = jest.mocked(reportsApi);
 const mockedUsers = jest.mocked(usersApi);
 
-const admin: PublicUser = {
+const adminAccount: PublicUser = {
   id: 1,
   login: 'root',
   email: 'root@example.com',
@@ -31,6 +32,7 @@ const admin: PublicUser = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
+const admin: SessionUser = sessionOf(adminAccount);
 
 const listOf = (items: ReportRow[], total = items.length) => ({
   items,
@@ -39,8 +41,11 @@ const listOf = (items: ReportRow[], total = items.length) => ({
   offset: 0,
 });
 
-const renderPanel = (queryClient: QueryClient = createTestQueryClient()) => {
-  queryClient.setQueryData(queryKeys.session, admin);
+const renderPanel = (
+  queryClient: QueryClient = createTestQueryClient(),
+  session: SessionUser = admin
+) => {
+  queryClient.setQueryData(queryKeys.session, session);
   return renderWithProviders(<ReportsPanel />, { queryClient });
 };
 
@@ -426,6 +431,26 @@ describe('ReportsPanel', () => {
       ])
     );
     renderPanel();
+    expect(
+      await screen.findByRole('button', { name: 'Ban user' })
+    ).toBeDisabled();
+  });
+
+  it('keeps Ban user disabled for an admin without users:update', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({
+          reportedAccount: {
+            id: 4,
+            login: 'Writer',
+            status: 'active',
+            role: 'user',
+            atBanThreshold: true,
+          },
+        }),
+      ])
+    );
+    renderPanel(undefined, sessionOf(adminAccount, 'none'));
     expect(
       await screen.findByRole('button', { name: 'Ban user' })
     ).toBeDisabled();
