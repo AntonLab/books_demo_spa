@@ -11,6 +11,7 @@ import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as libraryApi from '@/api/library';
 import * as notificationsApi from '@/api/notifications';
+import * as readingListsApi from '@/api/readingLists';
 import * as seriesApi from '@/api/series';
 import * as usersApi from '@/api/users';
 import type { PublicUser } from '@/types/api';
@@ -22,6 +23,8 @@ jest.mock('@/api/genres');
 jest.mock('@/api/notifications');
 jest.mock('@/api/series');
 jest.mock('@/api/library');
+jest.mock('@/api/readingLists');
+const mockedReadingLists = jest.mocked(readingListsApi);
 const mockedLibrary = jest.mocked(libraryApi);
 const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
@@ -207,7 +210,31 @@ describe('ProfilePage tabs', () => {
 
     await screen.findByRole('switch', { name: 'Email notifications' });
     const names = screen.getAllByRole('tab').map((tab) => tab.textContent);
-    expect(names).toEqual(['Account', 'Favorites', 'Library']);
+    expect(names).toEqual(['Account', 'Favorites', 'Library', 'Reading lists']);
+  });
+
+  it('opens the Reading lists tab at /profile/lists', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithSession(session, '/profile/lists');
+
+    expect(
+      await screen.findByText('You have no reading lists yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: 'Reading lists', selected: true })
+    ).toBeInTheDocument();
+  });
+
+  it('does not fetch Reading lists while another tab is open', async () => {
+    renderWithSession(session, '/profile');
+
+    await screen.findByRole('switch', { name: 'Email notifications' });
+    expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
   });
 
   it('does not fetch the Library while another tab is open', async () => {
@@ -313,6 +340,7 @@ describe('ProfilePage tabs', () => {
       'Account',
       'Favorites',
       'Library',
+      'Reading lists',
       'My works',
     ]);
   });
@@ -324,6 +352,7 @@ describe('ProfilePage tabs', () => {
       'Account',
       'Favorites',
       'Library',
+      'Reading lists',
     ]);
   });
 

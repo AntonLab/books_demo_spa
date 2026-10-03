@@ -95,6 +95,7 @@ export const AppHeader: FC = () => {
     { key: '/profile', label: 'Profile' },
     { key: '/profile/favorites', label: 'Favorites' },
     { key: '/profile/library', label: 'Library' },
+    { key: '/profile/lists', label: 'Reading lists' },
     // Only for an account holding the author Role: that is who can be credited
     // on a book, so nobody else has anything to find there.
     ...(user?.role === 'author'

@@ -435,6 +435,7 @@ describe('AppHeader account menu', () => {
       'Profile',
       'Favorites',
       'Library',
+      'Reading lists',
       'Manage genres',
       'Log out',
     ]);
@@ -477,6 +478,7 @@ describe('AppHeader account menu', () => {
       'Profile',
       'Favorites',
       'Library',
+      'Reading lists',
       'My works',
       'Log out',
     ]);
@@ -538,6 +540,21 @@ describe('AppHeader account menu', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/profile/library'
     );
+  });
+
+  it('opens the Reading lists tab from the menu', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(user)
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Reading lists'));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/profile/lists');
   });
 
   it('opens the Favorites tab from the menu', async () => {

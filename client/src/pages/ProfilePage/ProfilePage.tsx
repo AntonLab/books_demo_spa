@@ -5,6 +5,7 @@ import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
 import { usePageGuard } from '@/hooks/usePageGuard';
 import { ProfileWorksPanel } from '@/components/organisms/ProfileWorksPanel/ProfileWorksPanel';
 import { LibraryPanel } from '@/components/organisms/LibraryPanel/LibraryPanel';
+import { ProfileReadingListsPanel } from '@/components/organisms/ProfileReadingListsPanel/ProfileReadingListsPanel';
 import { ProfileSettings } from '@/components/organisms/ProfileSettings/ProfileSettings';
 import { useSession } from '@/queries/auth';
 
@@ -55,8 +56,8 @@ export const ProfilePage: FC = () => {
   return (
     <>
       {title}
-      {/* antd keeps a visited tab mounted; a hidden works or Library panel would
-          keep its list query and URL-driven state alive on a path where ?tab,
+      {/* antd keeps a visited tab mounted; a hidden works, Library or Reading lists
+          panel would keep its list query and URL-driven state alive on a path where ?tab,
           ?status and the filters mean nothing. Account stays mounted so its form state
           survives a tab switch. */}
       <Tabs
@@ -77,6 +78,12 @@ export const ProfilePage: FC = () => {
             label: 'Library',
             destroyOnHidden: true,
             children: <LibraryPanel />,
+          },
+          {
+            key: '/profile/lists',
+            label: 'Reading lists',
+            destroyOnHidden: true,
+            children: <ProfileReadingListsPanel viewerId={session.id} />,
           },
           ...(isAuthor
             ? [
