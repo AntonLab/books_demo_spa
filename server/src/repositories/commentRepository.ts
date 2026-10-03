@@ -1,5 +1,5 @@
 import { ForeignKeyConstraintError, Op } from 'sequelize';
-import type { WhereOptions } from 'sequelize';
+import type { Sequelize, WhereOptions } from 'sequelize';
 import {
   Comment,
   toCommentWithAuthor,
@@ -11,6 +11,7 @@ import { Report } from '../models/Report.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { loadAvatarUrls } from './userRepository.ts';
+import { shouldReopen } from '../reportText.ts';
 import { OPEN_REPORT_STATUSES } from 'shared';
 import type {
   CommentWithAuthor,
@@ -38,10 +39,14 @@ export interface CommentRepository {
   // the viewer is also who viewerLikeId is reported for.
   list(query: ListCommentsQuery, viewer: Viewer): Promise<CommentListResult>;
   findById(id: number, viewer: Viewer): Promise<PublicComment | null>;
+  // A large edit after a Dismissed report may open a System report; see
+  // reportText.shouldReopen. A tombstone reports null.
   update(id: number, input: UpdateCommentInput): Promise<PublicComment | null>;
   // `kind` is decided by the caller, who knows whether the actor owns the
-  // comment. Scoped to live rows, so a tombstone reports false.
-  remove(id: number, kind: Tombstone): Promise<boolean>;
+  // comment. Scoped to live rows, so a tombstone reports false. Open reports
+  // settle with it: 'deleted' dismisses them, 'removed' upholds them and
+  // records `actorId`, the Moderator, on each.
+  remove(id: number, kind: Tombstone, actorId: number): Promise<boolean>;
   // Only a `removed` comment comes back; null for anything else.
   restore(id: number): Promise<PublicComment | null>;
 }
@@ -85,6 +90,12 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
   if (query.parentId !== undefined) clauses.push({ parentId: query.parentId });
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
+}
+
+function sequelizeOf(): Sequelize {
+  const sequelize = Comment.sequelize;
+  if (!sequelize) throw new Error('Comment model is not initialised');
+  return sequelize;
 }
 
 export function createSequelizeCommentRepository(): CommentRepository {
@@ -236,32 +247,86 @@ export function createSequelizeCommentRepository(): CommentRepository {
     // lose the race to a moderator's removal — and text written onto the
     // hidden row would be published by a later restore no moderator saw.
     async update(id, input) {
-      // No FK mapping here: updateCommentSchema carries only `text`, so an
-      // update cannot violate a constraint.
-      const [changed] = await Comment.update(input, {
-        where: { id, tombstone: null },
-      });
+      return sequelizeOf().transaction(async (transaction) => {
+        // Locked first, the order reportRepository uses, so the two cannot
+        // deadlock. A missing row or a tombstone is refused.
+        const locked = await Comment.findByPk(id, {
+          attributes: ['id', 'userId', 'tombstone'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!locked || locked.tombstone !== null) return null;
 
-      const comment = await Comment.findByPk(id);
-      if (!comment) return null;
-      // Sequelize connects with FOUND_ROWS off, so MySQL counts changed rows,
-      // not matched ones — and a live comment resubmitted unchanged within
-      // the column's one-second precision changes nothing. Only a tombstone
-      // turns that 0 into a refusal.
-      if (changed === 0 && comment.tombstone !== null) return null;
-      return toPublicComment(comment);
+        // No FK mapping here: updateCommentSchema carries only `text`, so an
+        // update cannot violate a constraint.
+        await Comment.update(input, { where: { id }, transaction });
+
+        const open = await Report.count({
+          where: { commentId: id, status: [...OPEN_REPORT_STATUSES] },
+          transaction,
+        });
+        if (open === 0) {
+          const latest = await Report.findOne({
+            where: { commentId: id, status: ['upheld', 'dismissed'] },
+            order: [
+              ['settledAt', 'DESC'],
+              ['id', 'DESC'],
+            ],
+            transaction,
+          });
+          if (
+            latest?.status === 'dismissed' &&
+            latest.settledText !== null &&
+            shouldReopen(latest.settledText, input.text)
+          ) {
+            await Report.create(
+              {
+                reporterId: null,
+                isSystem: true,
+                commentId: id,
+                reportedAccountId: locked.userId,
+                reason: latest.reason,
+                explanation: latest.explanation,
+              },
+              { transaction }
+            );
+          }
+        }
+
+        const comment = await Comment.findByPk(id, { transaction });
+        return comment ? toPublicComment(comment) : null;
+      });
     },
 
     // A soft delete: the row survives so its replies keep a parent, and the
     // thread stays readable around the gap. Only this comment is marked — a
     // reply is somebody else's writing and is not theirs to remove. Scoped to
     // live rows, so a second call reports false and the route answers 404.
-    async remove(id, kind) {
-      const [affected] = await Comment.update(
-        { tombstone: kind },
-        { where: { id, tombstone: null } }
-      );
-      return affected > 0;
+    async remove(id, kind, actorId) {
+      return sequelizeOf().transaction(async (transaction) => {
+        const live = await Comment.findOne({
+          where: { id, tombstone: null },
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!live) return false;
+
+        await Comment.update(
+          { tombstone: kind },
+          { where: { id }, transaction }
+        );
+        await Report.update(
+          kind === 'deleted'
+            ? { status: 'dismissed', moderatorId: null, settledAt: new Date() }
+            : { status: 'upheld', moderatorId: actorId, settledAt: new Date() },
+          {
+            where: { commentId: id, status: [...OPEN_REPORT_STATUSES] },
+            transaction,
+          }
+        );
+        return true;
+      });
     },
 
     // The inverse of a moderator's delete. Scoped to `removed`: an owner's

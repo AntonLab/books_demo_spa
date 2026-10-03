@@ -110,7 +110,7 @@ export function createCommentController(repository: CommentRepository) {
       // moderating.
       const kind: Tombstone =
         existing.userId === actorId(req) ? 'deleted' : 'removed';
-      const removed = await repository.remove(id, kind);
+      const removed = await repository.remove(id, kind, actorId(req));
       if (!removed) throw new NotFoundError('Comment', id);
       res.status(204).end();
     },
