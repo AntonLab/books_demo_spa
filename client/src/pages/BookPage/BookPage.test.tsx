@@ -641,6 +641,25 @@ describe('BookPage lower tabs', () => {
     ).toBeNull();
   });
 
+  it('names each lower tab by its label, for a regex lookup and for its panel', async () => {
+    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+    mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
+    renderPage();
+
+    const comments = await screen.findByRole('tab', { name: /Comments/ });
+    expect(comments).toHaveAccessibleName('Comments (2)');
+    expect(
+      screen.getByRole('tabpanel', { name: 'Comments (2)' })
+    ).toBeInTheDocument();
+
+    const lists = await screen.findByRole('tab', { name: /Reading lists/ });
+    expect(lists).toHaveAccessibleName('Reading lists (1)');
+    await userEvent.click(lists);
+    expect(
+      await screen.findByRole('tabpanel', { name: 'Reading lists (1)' })
+    ).toBeInTheDocument();
+  });
+
   it('keeps the closed Comments section and an empty Reading lists tab on a Draft', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
     renderPage({ ...reader, id: 4, role: 'author' });

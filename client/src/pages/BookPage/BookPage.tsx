@@ -211,7 +211,9 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
 
       {/* Uncontrolled like the set above: the open tab is page state
           (ADR-0010), so a reload opens Comments. No fixed body height: the
-          thread grows with the page. */}
+          thread grows with the page. A tab is named by its content, so the
+          icon stays aria-hidden and the text stays inside the tab; rc-tabs
+          has no hook for an aria-label on the tab. */}
       <Tabs
         items={[
           {
