@@ -263,6 +263,18 @@ A New or In review Report. While a Comment has one, everyone sees it marked as
 under review and nobody can report it again. When a Dismissed Comment's text is
 later changed beyond small corrections, a New Report is opened on it again.
 
+**System report**:
+The New Report the platform itself opens when a Dismissed Comment's text is
+changed beyond small corrections. It has no reporter and repeats the reason of
+the Dismissed Report it follows.
+_Avoid_: Auto report, bot report
+
+**Ban mark**:
+The flag Moderators see on an Account that owns 10 or more Comments with at
+least one Upheld Report each; a restored Comment still counts. It only suggests
+blocking the Account: a Moderator decides.
+_Avoid_: Strike, automatic ban
+
 ### Notifications
 
 **Notification**:
