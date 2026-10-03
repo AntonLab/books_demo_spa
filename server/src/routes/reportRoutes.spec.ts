@@ -194,6 +194,7 @@ const listed = async (base: string, query = DAY) =>
       id: number;
       status: string;
       moderatorLogin: string | null;
+      moderatorId: number | null;
       isOwnComment: boolean;
       comment: { tombstone: string | null };
     }[];
@@ -283,8 +284,13 @@ test('Take then Uphold removes the Comment; any Moderator may finish what anothe
       );
       const [item] = (await listed(base)).items;
       assert.deepEqual(
-        [item?.status, item?.moderatorLogin, item?.comment.tombstone],
-        ['upheld', 'superadmin', 'removed']
+        [
+          item?.status,
+          item?.moderatorLogin,
+          item?.moderatorId,
+          item?.comment.tombstone,
+        ],
+        ['upheld', 'superadmin', USER_IDS.superadmin, 'removed']
       );
     }
   );

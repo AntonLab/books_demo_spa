@@ -16,6 +16,7 @@ export const reportRow = (overrides: Partial<ReportRow> = {}): ReportRow => ({
   },
   comment: { id: 5, bookId: 1, text: 'Buy now', tombstone: null },
   status: 'new',
+  moderatorId: null,
   moderatorLogin: null,
   isOwnComment: false,
   ...overrides,

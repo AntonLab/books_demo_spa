@@ -197,6 +197,10 @@ export function createFakeReportRepository(options: {
               tombstone: comment?.tombstone ?? null,
             },
             status: row.status,
+            moderatorId:
+              row.moderatorId !== null && accounts.has(row.moderatorId)
+                ? row.moderatorId
+                : null,
             moderatorLogin:
               (row.moderatorId !== null &&
                 accounts.get(row.moderatorId)?.login) ||

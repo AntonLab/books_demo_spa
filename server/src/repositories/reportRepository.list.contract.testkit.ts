@@ -90,9 +90,10 @@ export function reportListContract(
         items[0]?.reason,
         items[0]?.explanation,
         items[0]?.moderatorLogin,
+        items[0]?.moderatorId,
         items[0]?.isOwnComment,
       ],
-      ['new', 'other', 'rude', null, false]
+      ['new', 'other', 'rude', null, null, false]
     );
   });
 

@@ -265,6 +265,7 @@ export function createSequelizeReportRepository(): ReportRepository {
               tombstone: comment.tombstone ?? null,
             },
             status: row.status,
+            moderatorId: moderator?.id ?? null,
             moderatorLogin: moderator?.login ?? null,
             isOwnComment: comment.userId === viewer.id,
           };

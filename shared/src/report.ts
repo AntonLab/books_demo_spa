@@ -66,6 +66,7 @@ export interface ReportRow {
     tombstone: Tombstone | null;
   };
   status: ReportStatus;
+  moderatorId: number | null;
   moderatorLogin: string | null;
   isOwnComment: boolean;
 }
