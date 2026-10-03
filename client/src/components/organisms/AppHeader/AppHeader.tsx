@@ -152,6 +152,7 @@ export const AppHeader: FC = () => {
             items: navItems,
             onClick: handleNavClick,
             selectedKeys: [navSelectedKey],
+            triggerSubMenuAction: 'click',
           }}
           trigger={['click']}
         >

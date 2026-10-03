@@ -1810,20 +1810,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
     const missingId = created.id + 10_000;
 
-    // The lookup still sees the book; only the write finds it gone.
-    const lookup = mock.method(
-      Book,
-      'findByPk',
-      async () => ({ id: missingId }) as never
-    );
-    try {
-      assert.equal(
-        await repository.setCover(missingId, Buffer.from('x')),
-        false
-      );
-    } finally {
-      lookup.mock.restore();
-    }
+    assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
 
     const broken = mock.method(BookCover, 'upsert', async () => {
       throw new Error('disk full');

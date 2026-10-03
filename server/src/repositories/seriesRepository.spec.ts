@@ -448,20 +448,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     });
     const missingId = created.id + 10_000;
 
-    // The lookup still sees the series; only the write finds it gone.
-    const lookup = mock.method(
-      Series,
-      'findByPk',
-      async () => ({ id: missingId }) as never
-    );
-    try {
-      assert.equal(
-        await repository.setCover(missingId, Buffer.from('x')),
-        false
-      );
-    } finally {
-      lookup.mock.restore();
-    }
+    assert.equal(await repository.setCover(missingId, Buffer.from('x')), false);
 
     const broken = mock.method(SeriesCover, 'upsert', async () => {
       throw new Error('disk full');

@@ -102,7 +102,8 @@ export const useSearchPage = (): SearchPageState => {
       key: `${searchParams.toString()}|${genre?.id ?? ''}`,
       initialValues: formValuesOf(search, genre?.id),
       fieldErrors,
-      // Page size is a filter of the search state: Search keeps the chosen size, Reset drops it with the other filters (back to the default 20).
+      // Page size is a filter of the search state: Search keeps the chosen
+      // size, Reset drops it with the other filters (back to the default 20).
       onSearch: (values) =>
         setSearchParams(
           toSearchParams({
