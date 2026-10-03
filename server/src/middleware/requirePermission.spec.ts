@@ -44,7 +44,8 @@ function deps(role: UserRole, status: PublicUser['status'] = 'active') {
       async findById(id: number) {
         return id === user.id ? user : null;
       },
-    } as UserRepository,
+      async touchLastSeen() {},
+    } as unknown as UserRepository,
   };
 }
 

@@ -46,7 +46,8 @@ function deps(
         ? null
         : { ...USER, status: overrides.status ?? USER.status };
     },
-  } as UserRepository;
+    async touchLastSeen() {},
+  } as unknown as UserRepository;
 
   return { sessionRepository, userRepository };
 }

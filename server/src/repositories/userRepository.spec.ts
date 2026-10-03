@@ -4,6 +4,7 @@ import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { DatabaseError, type Sequelize } from 'sequelize';
+import { LAST_ONLINE_WINDOW_MS } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { parseConfig } from '../db/config.ts';
@@ -92,6 +93,34 @@ describe('userRepository against real MySQL', { skip }, () => {
     const created = await repository.create({ ...base });
 
     assert.equal('password' in created, false);
+  });
+
+  test('touchLastSeen stamps a never-seen Account, then at most once per window, without moving updatedAt', async () => {
+    const created = await repository.create({ ...base });
+    const longAgo = new Date('2026-01-01T00:00:00Z');
+    // Raw SQL: Model.update re-stamps updatedAt even with silent when the
+    // value is passed in.
+    await sequelize.query('UPDATE users SET updatedAt = ? WHERE id = ?', {
+      replacements: ['2026-01-01 00:00:00', created.id],
+    });
+    const stored = async () => {
+      const row = await User.findByPk(created.id);
+      assert.ok(row);
+      return row;
+    };
+    const t0 = new Date('2026-06-01T12:00:00Z');
+
+    await repository.touchLastSeen(created.id, t0);
+    assert.equal((await stored()).lastSeenAt?.getTime(), t0.getTime());
+
+    await repository.touchLastSeen(created.id, new Date(t0.getTime() + 60_000));
+    assert.equal((await stored()).lastSeenAt?.getTime(), t0.getTime());
+
+    const later = new Date(t0.getTime() + LAST_ONLINE_WINDOW_MS + 1);
+    await repository.touchLastSeen(created.id, later);
+    const after = await stored();
+    assert.equal(after.lastSeenAt?.getTime(), later.getTime());
+    assert.equal(after.updatedAt.getTime(), longAgo.getTime());
   });
 
   test('Bob and bob are different logins', async () => {

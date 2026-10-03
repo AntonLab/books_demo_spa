@@ -242,7 +242,8 @@ function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
       async findById(id: number) {
         return USERS_BY_ID.get(id) ?? null;
       },
-    } as UserRepository,
+      async touchLastSeen() {},
+    } as unknown as UserRepository,
   };
 }
 

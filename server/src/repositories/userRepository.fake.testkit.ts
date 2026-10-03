@@ -1,12 +1,15 @@
 import { hashPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
-import type { PublicUser } from 'shared';
+import { LAST_ONLINE_WINDOW_MS, type PublicUser } from 'shared';
 import type { ListAuthorsQuery } from '../types/user.ts';
 import type { UserListResult, UserRepository } from './userRepository.ts';
 
 // A row as the fake stores it: the public user plus the one thing PublicUser
-// deliberately omits, the password hash.
-export type FakeUserRow = PublicUser & { password: string };
+// deliberately omits, the password hash and lastSeenAt (absent: never seen).
+export type FakeUserRow = PublicUser & {
+  password: string;
+  lastSeenAt?: Date | null;
+};
 
 export interface FakeUserRepositoryOptions {
   // Accounts already there, with their hashes.
@@ -48,7 +51,7 @@ export function createFakeUserRepository(
   // answer — avatarUrl is computed from the avatars map rather than the
   // row's own field, which a create leaves null forever.
   const publicView = (row: FakeUserRow): PublicUser => {
-    const { password: _password, ...user } = row;
+    const { password: _password, lastSeenAt: _lastSeenAt, ...user } = row;
     return { ...user, avatarUrl: avatarUrlOf(row.id) };
   };
 
@@ -193,6 +196,15 @@ export function createFakeUserRepository(
     async getAvatarData(id) {
       if (!rows.has(id)) return null;
       return avatars.get(id) ?? null;
+    },
+
+    async touchLastSeen(id, now) {
+      const row = rows.get(id);
+      if (!row) return;
+      const seen = row.lastSeenAt;
+      if (!seen || seen.getTime() < now.getTime() - LAST_ONLINE_WINDOW_MS) {
+        row.lastSeenAt = now;
+      }
     },
   };
 }

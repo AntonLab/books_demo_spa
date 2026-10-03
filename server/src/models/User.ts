@@ -78,7 +78,9 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         allowNull: false,
         defaultValue: true,
       },
-      lastSeenAt: { type: DataTypes.DATE, allowNull: true },
+      // Millisecond precision: the stamp's one-window throttle compares at
+      // that resolution, and a whole-second column would round it away.
+      lastSeenAt: { type: DataTypes.DATE(3), allowNull: true },
       // allowNull: false is required explicitly here — Sequelize only applies
       // its own NOT NULL default to createdAt/updatedAt when it auto-injects
       // them; declaring them ourselves (to attach the CreationOptional<Date>

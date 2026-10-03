@@ -15,7 +15,8 @@ export interface RequireAuthDeps {
 // session, deleted user, blocked account — because each of its two callers
 // (requireAuth, requirePermission) draws its own conclusion
 // from that answer and none of them needs to know which of the five
-// happened.
+// happened. Its one side effect: it stamps the resolved user's lastSeenAt
+// (throttled by the repository).
 export async function resolveSessionUser(
   deps: RequireAuthDeps,
   req: Request
@@ -38,5 +39,11 @@ export async function resolveSessionUser(
   // straight into the table, which purges nothing. A session can also
   // outlive its user in the window before the CASCADE commits; that is the
   // null case.
-  return user?.status === 'blocked' ? null : user;
+  if (!user || user.status === 'blocked') return null;
+
+  // Awaited and not caught: a database that cannot take this write cannot
+  // serve the request either, and an unawaited write would outlive a test's
+  // connection.
+  await deps.userRepository.touchLastSeen(session.userId, new Date());
+  return user;
 }

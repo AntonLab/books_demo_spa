@@ -139,6 +139,9 @@ export function createAuthController(deps: AuthControllerDeps) {
         throw new ForbiddenError('Account is blocked');
       }
 
+      // A login is a session's first request and carries no cookie yet, so
+      // the auth middleware cannot stamp it.
+      await deps.userRepository.touchLastSeen(user.id, new Date());
       setSessionCookie(res, token);
       res.json(user);
     },

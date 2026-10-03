@@ -98,6 +98,7 @@ function accountDeps() {
     status: 'active',
   };
   const opened: string[] = [];
+  const touched: number[] = [];
 
   const publicUser = (): PublicUser => ({
     id: account.id,
@@ -120,6 +121,9 @@ function accountDeps() {
     },
     async findById(id: number) {
       return id === account.id ? publicUser() : null;
+    },
+    async touchLastSeen(id: number) {
+      touched.push(id);
     },
   } as unknown as UserRepository;
 
@@ -147,7 +151,7 @@ function accountDeps() {
     },
   } as unknown as SessionRepository;
 
-  return { account, opened, userRepository, sessionRepository };
+  return { account, opened, touched, userRepository, sessionRepository };
 }
 
 function recordingResponse() {
@@ -188,6 +192,7 @@ test('a login whose account is unchanged since the verify opens its session', as
   );
 
   assert.equal(deps.opened.length, 1);
+  assert.deepEqual(deps.touched, [7]);
   // The session and the XSRF token derived from it are handed out together.
   assert.deepEqual(cookies, ['sid', 'xsrfToken']);
 });
@@ -211,6 +216,7 @@ test('a password change that lands during the verify leaves the login without a 
       error.message === 'Invalid credentials'
   );
   assert.deepEqual(deps.opened, []);
+  assert.deepEqual(deps.touched, []);
   assert.deepEqual(cookies, []);
 });
 
@@ -232,5 +238,6 @@ test('a block that lands during the verify leaves the login without a session', 
       error.message === 'Account is blocked'
   );
   assert.deepEqual(deps.opened, []);
+  assert.deepEqual(deps.touched, []);
   assert.deepEqual(cookies, []);
 });

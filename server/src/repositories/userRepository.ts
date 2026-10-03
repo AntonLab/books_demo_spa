@@ -5,7 +5,7 @@ import {
   where as sequelizeWhere,
 } from 'sequelize';
 import type { Transaction, WhereOptions } from 'sequelize';
-import { OPEN_REPORT_STATUSES } from 'shared';
+import { LAST_ONLINE_WINDOW_MS, OPEN_REPORT_STATUSES } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Comment } from '../models/Comment.ts';
@@ -64,6 +64,10 @@ export interface UserRepository {
   setAvatar(id: number, data: Buffer): Promise<boolean>;
   removeAvatar(id: number): Promise<void>;
   getAvatarData(id: number): Promise<{ data: Buffer; updatedAt: Date } | null>;
+  // A throttled stamp, never an edit: it writes lastSeenAt only when the
+  // stored value is null or older than LAST_ONLINE_WINDOW_MS, and leaves
+  // updatedAt alone. A missing id is a silent no-op.
+  touchLastSeen(id: number, now: Date): Promise<void>;
 }
 
 // MySQL reports the violated index, not the column, and the shape varies by
@@ -498,6 +502,26 @@ export function createSequelizeUserRepository(): UserRepository {
         attributes: ['data', 'updatedAt'],
       });
       return avatar ? { data: avatar.data, updatedAt: avatar.updatedAt } : null;
+    },
+
+    // One statement, so two concurrent requests cannot both pass a
+    // read-then-write check. silent keeps updatedAt still: an Account's "last
+    // edited" must not move on every page view.
+    async touchLastSeen(id, now) {
+      const staleBefore = new Date(now.getTime() - LAST_ONLINE_WINDOW_MS);
+      await User.update(
+        { lastSeenAt: now },
+        {
+          where: {
+            id,
+            [Op.or]: [
+              { lastSeenAt: null },
+              { lastSeenAt: { [Op.lt]: staleBefore } },
+            ],
+          },
+          silent: true,
+        }
+      );
     },
   };
 }

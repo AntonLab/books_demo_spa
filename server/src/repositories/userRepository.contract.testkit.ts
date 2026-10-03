@@ -75,6 +75,11 @@ export function userRepositoryContract(
     );
   });
 
+  test('contract: touchLastSeen on a missing account is a quiet no-op', async () => {
+    const { repository } = await setUp();
+    await repository.touchLastSeen(MISSING_ID, new Date());
+  });
+
   test('contract: every lookup and write on a missing account answers null or false', async () => {
     const { repository } = await setUp();
 
