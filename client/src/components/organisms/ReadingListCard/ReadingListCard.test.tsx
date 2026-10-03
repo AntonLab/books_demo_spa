@@ -29,7 +29,11 @@ describe('ReadingListCard', () => {
     expect(
       screen.getByRole('heading', { name: 'Cold nights' })
     ).toBeInTheDocument();
-    expect(screen.getByText('by reader')).toBeInTheDocument();
+    expect(screen.getByText('by')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'reader' })).toHaveAttribute(
+      'href',
+      '/accounts/9'
+    );
     expect(screen.getByText('For rainy days')).toBeInTheDocument();
     expect(screen.getByText('cosy')).toBeInTheDocument();
     expect(screen.getByText('3 items')).toBeInTheDocument();

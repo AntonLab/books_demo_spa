@@ -62,10 +62,14 @@ describe('BookCard', () => {
   it('names every co-author, in credit order', () => {
     renderWithProviders(<BookCard book={book} />);
 
-    // Each name carries a trailing comma except the last — so this also
-    // pins credit order: reversing the fixture would move the comma.
-    expect(screen.getByText('Ann Author,')).toBeInTheDocument();
-    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    // A comma follows every link but the last — so this also pins credit
+    // order: reversing the fixture would move the comma.
+    expect(
+      screen
+        .getAllByRole('link', { name: /Author|Writer/ })
+        .map((a) => a.textContent)
+    ).toEqual(['Ann Author', 'Cora Writer']);
+    expect(screen.getByText(',')).toBeInTheDocument();
   });
 
   it('shows the cover image when the book has one', () => {
@@ -193,7 +197,9 @@ describe('BookCard as a page heading', () => {
     ).toHaveAttribute('href', '/series/2');
     expect(screen.getByRole('link', { name: 'Gothic' })).toBeInTheDocument();
     expect(screen.getByText('epic')).toBeInTheDocument();
-    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'Cora Writer' })
+    ).toBeInTheDocument();
     expect(screen.getByText('In progress')).toBeInTheDocument();
     expect(screen.queryByText(formatDate(book.createdAt))).toBeNull();
   });

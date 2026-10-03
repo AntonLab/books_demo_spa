@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReportedAccount } from 'shared';
 import { ReportedAccountCell } from './ReportedAccountCell';
+import { renderWithProviders as render } from '@/test/renderWithProviders';
 
 const account = (over: Partial<ReportedAccount> = {}): ReportedAccount => ({
   id: 4,
@@ -31,6 +32,15 @@ describe('ReportedAccountCell', () => {
     setup({ account: null });
     expect(screen.getByText('Deleted account')).toBeInTheDocument();
     expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('links the login to the public profile', () => {
+    setup();
+    expect(screen.getByRole('link', { name: 'Writer' })).toHaveAttribute(
+      'href',
+      '/accounts/4'
+    );
   });
 
   it('shows the login, and the Ban mark only at the threshold', () => {

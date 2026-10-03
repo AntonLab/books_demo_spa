@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Comment } from './Comment';
+import { renderWithProviders as render } from '@/test/renderWithProviders';
 import { formatDate } from '@/format/date';
 import type { CommentWithAuthor } from '@/types/api';
 
@@ -64,6 +65,18 @@ describe('Comment', () => {
 
     expect(screen.getByText('Read Er')).toBeInTheDocument();
     expect(screen.getByText('A fine chapter')).toBeInTheDocument();
+  });
+
+  it('links the author to their public profile, and a Tombstone links nobody', () => {
+    const { unmount } = render(<Comment {...baseProps} />);
+    expect(screen.getByRole('link', { name: 'Read Er' })).toHaveAttribute(
+      'href',
+      '/accounts/3'
+    );
+    unmount();
+
+    render(<Comment {...baseProps} comment={deletedComment} />);
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('dates the comment with the app date helper', () => {

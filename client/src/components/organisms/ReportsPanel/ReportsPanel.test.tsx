@@ -173,6 +173,30 @@ describe('ReportsPanel', () => {
     renderPanel();
     expect(await screen.findByText('System')).toBeInTheDocument();
     expect(screen.getAllByText('Deleted account')).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: 'System' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Deleted account' })).toBeNull();
+  });
+
+  it('links the reporter, the reported Account and the Moderator, when there is one', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({ id: 1 }),
+        reportRow({ id: 2, moderatorId: 6, moderatorLogin: 'mod' }),
+      ])
+    );
+    renderPanel();
+    const rows = await screen.findAllByRole('row', { name: /Reader/ });
+    expect(
+      within(rows[0]!).getByRole('link', { name: 'Reader' })
+    ).toHaveAttribute('href', '/accounts/2');
+    expect(
+      within(rows[0]!).getByRole('link', { name: 'Writer' })
+    ).toHaveAttribute('href', '/accounts/3');
+    expect(within(rows[0]!).getByText('—')).toBeInTheDocument();
+    expect(within(rows[1]!).getByRole('link', { name: 'mod' })).toHaveAttribute(
+      'href',
+      '/accounts/6'
+    );
   });
 
   it('shows the Tombstone label instead of the text of a Removed comment', async () => {

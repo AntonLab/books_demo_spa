@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { Button, Flex, Popconfirm, Tag, Tooltip } from 'antd';
 import type { ReportedAccount } from 'shared';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 
 interface Props {
   account: ReportedAccount | null;
@@ -20,7 +21,7 @@ export const ReportedAccountCell: FC<Props> = ({
 
   return (
     <Flex gap="small" align="center" wrap>
-      {account.login}
+      <NameLink id={account.id} name={account.login} />
       {account.atBanThreshold && <Tag color="error">Ban mark</Tag>}
       <Tooltip title={blockedReason}>
         {/* A disabled button swallows mouse events, so the span takes them. */}

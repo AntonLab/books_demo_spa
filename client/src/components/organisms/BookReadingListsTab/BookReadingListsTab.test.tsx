@@ -53,7 +53,10 @@ describe('BookReadingListsTab', () => {
     expect(
       await screen.findByRole('link', { name: 'Cold nights' })
     ).toHaveAttribute('href', '/lists/4');
-    expect(screen.getByText('by reader')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'reader' })).toHaveAttribute(
+      'href',
+      '/accounts/9'
+    );
     expect(screen.getByText('3 items')).toBeInTheDocument();
     expect(screen.getByText('count 1')).toBeInTheDocument();
     expect(mocked.listReadingLists).toHaveBeenCalledWith({

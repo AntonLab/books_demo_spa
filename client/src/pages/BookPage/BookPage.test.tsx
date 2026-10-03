@@ -192,10 +192,14 @@ describe('BookPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'A Tale of Dragons' })
     ).toBeInTheDocument();
-    // Each name carries a trailing comma except the last — so this also
-    // pins credit order: reversing the fixture would move the comma.
-    expect(screen.getByText('Ann Author,')).toBeInTheDocument();
-    expect(screen.getByText('Cora Writer')).toBeInTheDocument();
+    // A comma follows every link but the last — so this also pins credit
+    // order: reversing the fixture would move the comma.
+    expect(
+      screen
+        .getAllByRole('link', { name: /Author|Writer/ })
+        .map((a) => a.textContent)
+    ).toEqual(['Ann Author', 'Cora Writer']);
+    expect(screen.getByText(',')).toBeInTheDocument();
     expect(
       screen.getByText('Long ago, in a kingdom of scales.')
     ).toBeInTheDocument();

@@ -11,6 +11,7 @@ import {
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 import { formatDate } from '@/format/date';
 import styles from './Comment.module.css';
 import type { Tombstone } from 'shared';
@@ -101,9 +102,14 @@ export const Comment: FC<CommentProps> = ({
           />
         )}
         <Typography.Text strong>
-          {comment.author
-            ? `${comment.author.firstName} ${comment.author.lastName}`
-            : ''}
+          {comment.author ? (
+            <NameLink
+              id={comment.author.id}
+              name={`${comment.author.firstName} ${comment.author.lastName}`}
+            />
+          ) : (
+            ''
+          )}
         </Typography.Text>
         <Typography.Text type="secondary">
           {formatDate(comment.createdAt)}

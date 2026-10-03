@@ -1,6 +1,7 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CommentComposerModal } from './CommentComposerModal';
+import { renderWithProviders as render } from '@/test/renderWithProviders';
 import type { CommentWithAuthor } from '@/types/api';
 
 const target: CommentWithAuthor = {

@@ -1,5 +1,6 @@
 import type { FC } from 'react';
 import { Space, Typography } from 'antd';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 import { Card } from '@/components/organisms/Card/Card';
 import type { PublicReadingList } from '@/types/readingList';
 
@@ -21,7 +22,9 @@ export const ReadingListCard: FC<ReadingListCardProps> = ({ list, href }) => (
     tags={list.tags}
     footer={
       <Space size="small">
-        <Typography.Text type="secondary">{`by ${list.owner.login}`}</Typography.Text>
+        <Typography.Text type="secondary">
+          by <NameLink id={list.owner.id} name={list.owner.login} />
+        </Typography.Text>
         <Typography.Text type="secondary">
           {list.itemCount === 1 ? '1 item' : `${list.itemCount} items`}
         </Typography.Text>

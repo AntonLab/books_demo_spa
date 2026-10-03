@@ -44,9 +44,13 @@ describe('SeriesCard', () => {
   it('names every co-author, in credit order', () => {
     renderWithProviders(<SeriesCard series={series} />);
 
-    // The trailing comma on all but the last name pins the order too.
-    expect(screen.getByText('Margaret Hale,')).toBeInTheDocument();
-    expect(screen.getByText('Ivan Petrov')).toBeInTheDocument();
+    // The comma after all but the last link pins the order too.
+    expect(
+      screen
+        .getAllByRole('link', { name: /Hale|Petrov/ })
+        .map((a) => a.textContent)
+    ).toEqual(['Margaret Hale', 'Ivan Petrov']);
+    expect(screen.getByText(',')).toBeInTheDocument();
   });
 
   it('shows a co-author avatar once they have one', () => {

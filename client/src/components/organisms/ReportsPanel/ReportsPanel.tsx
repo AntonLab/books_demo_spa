@@ -18,6 +18,7 @@ import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 import { formatDateTime } from '@/format/date';
 import { ApiError } from '@/api/client';
 import { ReportStatisticsView } from '@/components/molecules/ReportStatisticsView/ReportStatisticsView';
+import { NameLink } from '@/components/molecules/NameLink/NameLink';
 import { ReportActions } from '@/components/molecules/ReportActions/ReportActions';
 import { ReportedAccountCell } from '@/components/molecules/ReportedAccountCell/ReportedAccountCell';
 import { useSession } from '@/queries/auth';
@@ -164,7 +165,12 @@ export const ReportsPanel: FC = () => {
               },
               {
                 title: 'Reporter',
-                render: (_, row) => reporterName(row),
+                render: (_, row) =>
+                  row.isSystem || row.reporter === null ? (
+                    reporterName(row)
+                  ) : (
+                    <NameLink id={row.reporter.id} name={row.reporter.login} />
+                  ),
               },
               {
                 title: 'Reason',
@@ -225,7 +231,12 @@ export const ReportsPanel: FC = () => {
               },
               {
                 title: 'Moderator',
-                render: (_, row) => row.moderatorLogin ?? '—',
+                render: (_, row) =>
+                  row.moderatorId !== null && row.moderatorLogin !== null ? (
+                    <NameLink id={row.moderatorId} name={row.moderatorLogin} />
+                  ) : (
+                    '—'
+                  ),
               },
               {
                 title: 'Actions',
