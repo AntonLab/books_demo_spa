@@ -1,10 +1,11 @@
 import type { FC } from 'react';
 import { Alert, Flex, Tabs, Typography } from 'antd';
-import { useParams } from 'react-router';
+import { useParams, useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
+import { PublicWorksList } from '@/components/organisms/PublicWorksList/PublicWorksList';
 import { PublicProfileTab } from '@/components/organisms/PublicProfileTab/PublicProfileTab';
 import { lastOnlineLabel } from '@/format/lastOnline';
 import { usePublicProfile } from '@/queries/accounts';
@@ -25,6 +26,7 @@ export const PublicProfilePage: FC = () => {
 
 const PublicProfileView: FC<{ id: number }> = ({ id }) => {
   const query = usePublicProfile(id);
+  const [, setSearchParams] = useSearchParams();
 
   if (query.isError) {
     // A blocked, pending or deleted Account answers 404, as a missing one.
@@ -53,16 +55,36 @@ const PublicProfileView: FC<{ id: number }> = ({ id }) => {
           )}
         </div>
       </Flex>
-      {/* Uncontrolled: ADR-0010. */}
+      {/* Uncontrolled: ADR-0010. The tab is not in the URL, so a switch clears
+          the list's paging and sort with its own replace. */}
       <Tabs
         defaultActiveKey="profile"
         destroyOnHidden
+        onChange={() => setSearchParams({}, { replace: true })}
         items={[
           {
             key: 'profile',
             label: 'Profile',
             children: <PublicProfileTab profile={profile} />,
           },
+          ...(profile.seriesCount > 0
+            ? [
+                {
+                  key: 'series',
+                  label: `Series (${profile.seriesCount})`,
+                  children: <PublicWorksList kind="series" userId={id} />,
+                },
+              ]
+            : []),
+          ...(profile.bookCount > 0
+            ? [
+                {
+                  key: 'books',
+                  label: `Books (${profile.bookCount})`,
+                  children: <PublicWorksList kind="books" userId={id} />,
+                },
+              ]
+            : []),
         ]}
       />
     </>

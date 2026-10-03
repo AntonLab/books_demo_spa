@@ -1,18 +1,24 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from 'react-router';
 import { PublicProfilePage } from './PublicProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as accountsApi from '@/api/accounts';
 import * as authApi from '@/api/auth';
+import * as booksApi from '@/api/books';
 import { ApiError } from '@/api/client';
+import * as seriesApi from '@/api/series';
 import type { AccountProfile, PublicUser } from '@/types/api';
 
 jest.mock('@/api/accounts');
 jest.mock('@/api/auth');
+jest.mock('@/api/books');
+jest.mock('@/api/series');
 
 const mockedAccounts = jest.mocked(accountsApi);
 const mockedAuth = jest.mocked(authApi);
+const mockedBooks = jest.mocked(booksApi);
+const mockedSeries = jest.mocked(seriesApi);
 
 const profile: AccountProfile = {
   id: 7,
@@ -127,6 +133,100 @@ describe('PublicProfilePage', () => {
     expect(
       await screen.findByText('Could not load this profile.')
     ).toBeInTheDocument();
+  });
+
+  describe('list tabs', () => {
+    const counted = { ...profile, bookCount: 45, seriesCount: 3 };
+    const tabNames = () =>
+      screen.getAllByRole('tab').map((tab) => tab.textContent);
+
+    beforeEach(() => {
+      mockedAccounts.getAccountProfile.mockResolvedValue(counted);
+      mockedBooks.listBooks.mockResolvedValue({
+        items: [],
+        total: 0,
+        current: 1,
+        pageSize: 20,
+      });
+      mockedSeries.listSeries.mockResolvedValue({
+        items: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
+      });
+    });
+
+    it('reads Profile, Series, Books with their counts', async () => {
+      renderPage();
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+
+      expect(tabNames()).toEqual(['Profile', 'Series (3)', 'Books (45)']);
+    });
+
+    it('hides a tab whose count is 0', async () => {
+      mockedAccounts.getAccountProfile.mockResolvedValue({
+        ...counted,
+        seriesCount: 0,
+      });
+      const noSeries = renderPage();
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+      expect(tabNames()).toEqual(['Profile', 'Books (45)']);
+      noSeries.unmount();
+
+      mockedAccounts.getAccountProfile.mockResolvedValue({
+        ...counted,
+        bookCount: 0,
+      });
+      const noBooks = renderPage();
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+      expect(tabNames()).toEqual(['Profile', 'Series (3)']);
+      noBooks.unmount();
+
+      mockedAccounts.getAccountProfile.mockResolvedValue(profile);
+      renderPage();
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+      expect(tabNames()).toEqual(['Profile']);
+    });
+
+    it('asks no list while Profile shows', async () => {
+      renderPage();
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+
+      expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+      expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+    });
+
+    it('starts a list from its defaults after a tab switch', async () => {
+      const user = userEvent.setup();
+      renderPage('/accounts/7?page=3&sort=new');
+      await screen.findByRole('heading', { name: 'Margaret Hale' });
+
+      await user.click(screen.getByRole('tab', { name: 'Books (45)' }));
+      await waitFor(() =>
+        expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+          userId: 7,
+          published: 'true',
+          sort: 'popular',
+          current: 1,
+          pageSize: 20,
+        })
+      );
+
+      await user.click(await screen.findByText('New releases'));
+      await waitFor(() =>
+        expect(mockedBooks.listBooks).toHaveBeenLastCalledWith(
+          expect.objectContaining({ sort: 'new' })
+        )
+      );
+      await user.click(screen.getByRole('tab', { name: 'Profile' }));
+      await user.click(screen.getByRole('tab', { name: 'Books (45)' }));
+
+      // The popular page 1 is cached, so the reset shows as the checked sort,
+      // not as a new request.
+      expect(
+        await screen.findByRole('radio', { name: 'Popular' })
+      ).toBeChecked();
+    });
   });
 
   it('loads the next Account when the id changes', async () => {
