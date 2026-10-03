@@ -14,12 +14,13 @@ import type {
   ReadingListItem,
 } from '../types/readingList';
 
-export interface ListReadingListsParams {
-  userId: number;
+export type ListReadingListsParams = (
+  { userId: number } | { bookId: number }
+) & {
   // antd Pagination's names: the 1-based page and its size.
   current?: number;
   pageSize?: number;
-}
+};
 
 export type WorkTarget = { bookId: number } | { seriesId: number };
 

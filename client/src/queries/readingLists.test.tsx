@@ -1,4 +1,4 @@
-import { act } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import {
   useAddReadingListItem,
   useCopyReadingList,
@@ -6,6 +6,7 @@ import {
   useDeleteReadingList,
   useMyReadingLists,
   useReadingListItems,
+  useReadingListsByBook,
   useRemoveReadingListItem,
   useReorderReadingListItems,
   useToggleListItem,
@@ -111,7 +112,7 @@ it('useDeleteReadingList spares its own detail on success and refreshes it after
   const matches = (key: readonly unknown[]) =>
     lists?.predicate?.({ queryKey: key } as never);
   expect(matches(queryKeys.readingList(4))).toBe(false);
-  expect(matches(queryKeys.readingListsByAccount({ userId: 1 }))).toBe(true);
+  expect(matches(queryKeys.readingListsPage({ userId: 1 }))).toBe(true);
   expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.allMyReadingLists });
 
   mocked.deleteReadingList.mockRejectedValue(new ApiError(404, 'Not Found'));
@@ -152,4 +153,27 @@ it.each([
 ])('%s stays idle while disabled', (_name, useHook, api) => {
   renderHookWithProviders(() => useHook() as never);
   expect(api()).not.toHaveBeenCalled();
+});
+
+it('useReadingListsByBook asks for the Book at the given page and refetches when an item is added to any list', async () => {
+  mocked.listReadingLists.mockResolvedValue({
+    items: [],
+    total: 0,
+    current: 2,
+    pageSize: 10,
+  });
+  const { result } = renderHookWithProviders(() => ({
+    lists: useReadingListsByBook(7, 2, 10),
+    add: useAddReadingListItem(4),
+  }));
+  await waitFor(() => expect(result.current.lists.isSuccess).toBe(true));
+  expect(mocked.listReadingLists).toHaveBeenCalledWith({
+    bookId: 7,
+    current: 2,
+    pageSize: 10,
+  });
+
+  await act(() => result.current.add.mutateAsync({ bookId: 7 }));
+
+  await waitFor(() => expect(mocked.listReadingLists).toHaveBeenCalledTimes(2));
 });

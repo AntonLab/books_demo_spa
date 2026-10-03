@@ -36,9 +36,22 @@ export const useReadingListsByAccount = (
   enabled: boolean
 ) => {
   return useQuery({
-    queryKey: queryKeys.readingListsByAccount(params),
+    queryKey: queryKeys.readingListsPage(params),
     queryFn: () => listReadingLists(params),
     enabled,
+  });
+};
+
+// Needs no invalidation of its own: useReadingListMutation already refreshes
+// the allReadingLists prefix on add and remove.
+export const useReadingListsByBook = (
+  bookId: number,
+  current: number,
+  pageSize: number
+) => {
+  return useQuery({
+    queryKey: queryKeys.readingListsPage({ bookId, current, pageSize }),
+    queryFn: () => listReadingLists({ bookId, current, pageSize }),
   });
 };
 

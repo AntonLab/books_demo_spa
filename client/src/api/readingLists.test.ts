@@ -51,6 +51,11 @@ describe('reads', () => {
       () => listReadingLists({ userId: 9, current: 2 }),
       '/api/reading-lists?userId=9&current=2',
     ],
+    [
+      'listReadingLists by Book',
+      () => listReadingLists({ bookId: 7, current: 2, pageSize: 10 }),
+      '/api/reading-lists?bookId=7&current=2&pageSize=10',
+    ],
   ])('%s asks %s without the XSRF token', async (_name, call, url) => {
     const fetchMock = mockFetch(jsonResponse({ items: [] }));
     await call();

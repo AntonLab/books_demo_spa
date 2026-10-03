@@ -47,11 +47,11 @@ export const queryKeys = {
   // The prefix over the list and the statistics, so one invalidation refreshes
   // both.
   allReports: ['reports'] as const,
-  // Keyed by a bare id, like `book`, so neither collides with the by-Account
-  // list, which is keyed by a params object.
+  // Keyed by a bare id, like `book`, so neither collides with a page of lists
+  // (by Account or by Book), which is keyed by its params object.
   readingList: (id: number) => ['readingLists', id] as const,
   readingListItems: (id: number) => ['readingLists', id, 'items'] as const,
-  readingListsByAccount: (params: ListReadingListsParams) =>
+  readingListsPage: (params: ListReadingListsParams) =>
     ['readingLists', params] as const,
   // The Lists of the session's Account that hold (or could take) a work.
   myListsForWork: (target: WorkTarget) => ['myReadingLists', target] as const,
