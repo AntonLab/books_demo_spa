@@ -1,0 +1,5 @@
+/* Must beat antd's row-hover background, which module CSS does through the
+   `antd` layer. */
+.table tr[data-highlighted='true'] > td {
+  background: var(--ant-color-primary-bg);
+}

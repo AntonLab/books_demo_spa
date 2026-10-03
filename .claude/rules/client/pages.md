@@ -57,6 +57,9 @@ See `.claude/rules/client/routing.md` for the App shell: lazy loading,
   the section has loaded more than six.
 - `AdminPage` has Reports and Genres path tabs (`/admin/reports`,
   `/admin/genres`); `/admin` redirects to Reports.
+- The Reports tab lists Reports newest first for a local-day range, paged
+  server-side; rows of one Comment highlight together. `ReportsPanel` is an
+  organism holding the filters.
 - `GenreManager` (an organism under `AdminPage`'s Genres tab) is a two-level `Tree` of the counts list, with a search box,
   a usage filter and per-row Add subgenre / Edit / Delete (`GenreFormModal`;
   there is no rename in place). A top-level row shows its own works plus its
