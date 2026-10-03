@@ -89,7 +89,7 @@ const useSeriesMutation = <TVariables, TResult>(
   const refresh = (skipDetail?: boolean) =>
     Promise.all([
       queryClient.invalidateQueries({
-        queryKey: ['series'],
+        queryKey: queryKeys.allSeries,
         // A delete skips the deleted series' own detail: its page is still
         // mounted, would refetch into a 404 and redirect with "no longer
         // exists" before the delete's own landing page takes over.
@@ -100,7 +100,7 @@ const useSeriesMutation = <TVariables, TResult>(
               hashKey(queryKeys.seriesDetail(deletedId)),
           }),
       }),
-      queryClient.invalidateQueries({ queryKey: ['books'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
     ]);
 
   return useMutation({

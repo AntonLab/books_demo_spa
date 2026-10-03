@@ -36,7 +36,7 @@ export const useSetReadingStatus = () => {
     },
     onSettled: () =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
       ]),
   });

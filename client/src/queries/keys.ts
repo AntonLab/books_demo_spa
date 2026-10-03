@@ -38,6 +38,14 @@ export const queryKeys = {
   notifications: (userId: number) => ['notifications', userId] as const,
   // The prefix over every Account's notifications.
   allNotifications: ['notifications'] as const,
+  // The prefixes a write that touches a work, a comment or an Account
+  // invalidates.
+  allBooks: ['books'] as const,
+  allSeries: ['series'] as const,
+  allChapters: ['chapters'] as const,
+  allComments: ['comments'] as const,
+  allAuthors: ['authors'] as const,
+  allAccounts: ['accounts'] as const,
   // The prefix a Favorite toggle or removal invalidates.
   allFavorites: ['favorites'] as const,
   library: (params: ListLibraryParams) => ['library', params] as const,

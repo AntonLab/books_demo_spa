@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { deleteAvatar, updateUser, uploadAvatar } from '../api/users';
 import type { AccountChanges } from '../api/users';
+import { invalidateWorks } from './invalidateWorks';
 import { queryKeys } from './keys';
 
 // An Account change touches every place an AuthorSummary or a PublicUser is
@@ -22,11 +23,10 @@ const useAccountMutation = <TVariables, TResult>(
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.session }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
-        queryClient.invalidateQueries({ queryKey: ['comments'] }),
-        queryClient.invalidateQueries({ queryKey: ['authors'] }),
-        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        invalidateWorks(queryClient),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allComments }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allAuthors }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allAccounts }),
       ]),
   });
 };

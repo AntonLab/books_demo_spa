@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryKey } from '@tanstack/react-query';
 import { createFavorite, deleteFavorite } from '../api/favorites';
 import type { CreateFavoritePayload } from 'shared';
+import { invalidateWorks } from './invalidateWorks';
 import { queryKeys } from './keys';
 
 // One hook for both directions, as useToggleLike: `existingId` is the
@@ -43,8 +44,7 @@ export const useRemoveFavorite = () => {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.allFavorites }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['series'] }),
+        invalidateWorks(queryClient),
       ]),
   });
 };
