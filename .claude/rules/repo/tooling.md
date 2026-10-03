@@ -58,7 +58,8 @@ paths:
 
 Owns the devDependencies every package needs (eslint, `@eslint/js`,
 typescript-eslint, eslint-config-prettier, globals, prettier, typescript), plus
-`concurrently` and `skills`, and `engines.node`. `shared` defines only
+`concurrently`, `skills` and `fallow` (`npx fallow` is installed for audits;
+`repo-auditor` uses it with the `fallow` skill), and `engines.node`. `shared` defines only
 `typecheck`, `lint` and `lint:fix`; `shared/src/wire.typetest.ts` pins
 `Wire<T>` with type-level assertions that `typecheck` checks.
 
