@@ -15,6 +15,9 @@ import type {
   DevicePreferencesState,
   ReadingPreferences,
 } from './devicePreferencesSlice';
+import { BOOK_IDS_MAX } from 'shared';
+import { recentlyViewed } from './recentlyViewedSlice';
+import type { RecentlyViewedState } from './recentlyViewedSlice';
 import { isBlank, unsavedText } from './unsavedTextSlice';
 import type { UnsavedTextEntry, UnsavedTextState } from './unsavedTextSlice';
 import type { RootState } from './index';
@@ -25,6 +28,7 @@ import type { RootState } from './index';
 export const STORAGE_KEYS = {
   devicePreferences: 'books.devicePreferences.v1',
   unsavedText: 'books.unsavedText.v1',
+  recentlyViewed: 'books.recentlyViewed.v1',
 } as const;
 
 // A long Chapter would otherwise be serialised on every keystroke.
@@ -151,6 +155,24 @@ const validEntries = (
   return result;
 };
 
+// A repeated id would make the server answer 400 and hide the section for
+// good, so ids are cleaned here rather than trusted.
+const toRecentlyViewed = (value: unknown): RecentlyViewedState | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { accountId, ids } = value as Record<string, unknown>;
+  if (
+    !(accountId === null || typeof accountId === 'number') ||
+    !Array.isArray(ids)
+  ) {
+    return undefined;
+  }
+  const clean = ids.filter(
+    (id, index): id is number =>
+      Number.isInteger(id) && id > 0 && ids.indexOf(id) === index
+  );
+  return { accountId, ids: clean.slice(0, BOOK_IDS_MAX) };
+};
+
 // Parses a raw storage value through the guards above: this tab's own at load,
 // and another tab's for the `storage` event listener in index.ts. `null` (the
 // key was cleared) and a value of the wrong shape are told apart: `null`
@@ -170,6 +192,10 @@ export const parsePersisted = (
   if (key === STORAGE_KEYS.devicePreferences) {
     const devicePreferences = toDevicePreferences(value);
     return devicePreferences && { devicePreferences };
+  }
+  if (key === STORAGE_KEYS.recentlyViewed) {
+    const history = toRecentlyViewed(value);
+    return history && { recentlyViewed: history };
   }
   if (key === STORAGE_KEYS.unsavedText && isUnsavedTextShape(value)) {
     return {
@@ -217,6 +243,17 @@ export const createPersistenceMiddleware = () => {
       current.devicePreferences !== previous.devicePreferences,
     effect: (_action, api) => {
       write(STORAGE_KEYS.devicePreferences, api.getState().devicePreferences);
+    },
+  });
+
+  // Written at once: it changes once per Book opened, so no throttle, and
+  // `replaced` is skipped for the reason given below.
+  listener.startListening({
+    predicate: (action, current, previous) =>
+      !recentlyViewed.replaced.match(action) &&
+      current.recentlyViewed !== previous.recentlyViewed,
+    effect: (_action, api) => {
+      write(STORAGE_KEYS.recentlyViewed, api.getState().recentlyViewed);
     },
   });
 

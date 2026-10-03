@@ -3,6 +3,7 @@ import {
   devicePreferences,
   devicePreferencesReducer,
 } from './devicePreferencesSlice';
+import { recentlyViewedReducer } from './recentlyViewedSlice';
 import { unsavedText, unsavedTextReducer } from './unsavedTextSlice';
 import {
   createPersistenceMiddleware,
@@ -17,6 +18,7 @@ import {
 const rootReducer = combineReducers({
   devicePreferences: devicePreferencesReducer,
   unsavedText: unsavedTextReducer,
+  recentlyViewed: recentlyViewedReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;
