@@ -1,6 +1,10 @@
 import { describe } from 'node:test';
 import { reportCreateContract } from './reportRepository.contract.testkit.ts';
 import {
+  reportListContract,
+  type ReportListWorld,
+} from './reportRepository.list.contract.testkit.ts';
+import {
   createFakeReportRepository,
   type FakeAccount,
   type FakeComment,
@@ -8,11 +12,52 @@ import {
 } from './reportRepository.fake.testkit.ts';
 
 describe('the fake reportRepository', () => {
-  const setUp = async () => {
+  const setUp = async (): Promise<ReportListWorld> => {
     const accounts = new Map<number, FakeAccount>();
     const comments = new Map<number, FakeComment>();
     const rows: FakeReport[] = [];
     return {
+      async aReport(commentId, fields = {}) {
+        const comment = comments.get(commentId);
+        const id = Math.max(0, ...rows.map((row) => row.id)) + 1;
+        rows.push({
+          id,
+          commentId,
+          reporterId: null,
+          isSystem: false,
+          reportedAccountId: comment?.userId ?? null,
+          reason: 'spam',
+          explanation: null,
+          status: 'new',
+          moderatorId: null,
+          settledText: null,
+          takenAt: null,
+          settledAt: null,
+          createdAt: new Date(),
+          ...fields,
+        });
+        return id;
+      },
+      async deleteAccount(id) {
+        accounts.delete(id);
+        for (const row of rows) {
+          if (row.reporterId === id) row.reporterId = null;
+          if (row.reportedAccountId === id) row.reportedAccountId = null;
+          if (row.moderatorId === id) row.moderatorId = null;
+        }
+        for (const comment of comments.values()) {
+          if (comment.userId === id) comment.userId = null;
+        }
+      },
+      async loginOf(id) {
+        return accounts.get(id)?.login ?? '';
+      },
+      async bookIdOf(commentId) {
+        return comments.get(commentId)?.bookId ?? 0;
+      },
+      async textOf(commentId) {
+        return comments.get(commentId)?.text ?? '';
+      },
       repository: createFakeReportRepository({ accounts, comments, rows }),
       async anAccount() {
         const id = accounts.size + 1;
@@ -64,4 +109,5 @@ describe('the fake reportRepository', () => {
     };
   };
   reportCreateContract(setUp);
+  reportListContract(setUp);
 });

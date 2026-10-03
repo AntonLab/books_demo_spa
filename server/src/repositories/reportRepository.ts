@@ -1,5 +1,6 @@
 import type { Viewer } from './visibility.ts';
-import type { CreateReportInput } from '../types/report.ts';
+import type { ReportRow } from 'shared';
+import type { CreateReportInput, ListReportsQuery } from '../types/report.ts';
 
 // The signed-in account behind a Report. Never a Guest: every route that
 // reaches this repository is guarded.
@@ -16,4 +17,15 @@ export interface ReportRepository {
     input: CreateReportInput,
     reporter: Account
   ): Promise<{ id: number }>;
+
+  // Reports created in [from, to), newest first (ties by id descending),
+  // optionally of one status. `total` counts every match, not the page.
+  // `reporter` is null for a System report and a deleted reporter;
+  // `reportedAccount` is null once that Account is deleted. `atBanThreshold`:
+  // the Account owns at least BAN_MARK_THRESHOLD distinct Comments with an
+  // Upheld report (a restored Comment still counts).
+  list(
+    query: ListReportsQuery,
+    viewer: Account
+  ): Promise<{ items: ReportRow[]; total: number }>;
 }

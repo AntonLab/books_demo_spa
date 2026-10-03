@@ -1,6 +1,8 @@
 import {
+  BAN_MARK_THRESHOLD,
   OPEN_REPORT_STATUSES,
   type ReportReason,
+  type ReportRow,
   type ReportStatus,
   type Tombstone,
   type UserRole,
@@ -12,7 +14,7 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
-import type { CreateReportInput } from '../types/report.ts';
+import type { CreateReportInput, ListReportsQuery } from '../types/report.ts';
 import type { Account, ReportRepository } from './reportRepository.ts';
 
 export interface FakeAccount {
@@ -52,7 +54,7 @@ export function createFakeReportRepository(options: {
   comments: Map<number, FakeComment>;
   rows: FakeReport[];
 }): ReportRepository {
-  const { comments, rows } = options;
+  const { accounts, comments, rows } = options;
   return {
     async create(
       commentId: number,
@@ -88,6 +90,73 @@ export function createFakeReportRepository(options: {
         createdAt: new Date(),
       });
       return { id };
+    },
+    async list(query: ListReportsQuery, viewer: Account) {
+      const matches = rows
+        .filter(
+          (row) =>
+            row.createdAt >= query.from &&
+            row.createdAt < query.to &&
+            (!query.status || row.status === query.status)
+        )
+        .sort(
+          (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id
+        );
+      const bannedMarks = (accountId: number) =>
+        new Set(
+          rows
+            .filter(
+              (row) =>
+                row.status === 'upheld' && row.reportedAccountId === accountId
+            )
+            .map((row) => row.commentId)
+        ).size;
+      const items = matches
+        .slice(query.offset, query.offset + query.limit)
+        .map((row): ReportRow => {
+          const reporter =
+            row.reporterId === null ? undefined : accounts.get(row.reporterId);
+          const reported =
+            row.reportedAccountId === null
+              ? undefined
+              : accounts.get(row.reportedAccountId);
+          const comment = comments.get(row.commentId);
+          return {
+            id: row.id,
+            createdAt: row.createdAt,
+            reporter:
+              reporter && row.reporterId !== null
+                ? { id: row.reporterId, login: reporter.login }
+                : null,
+            isSystem: row.isSystem,
+            reason: row.reason,
+            explanation: row.explanation,
+            reportedAccount:
+              reported && row.reportedAccountId !== null
+                ? {
+                    id: row.reportedAccountId,
+                    login: reported.login,
+                    status: reported.status,
+                    role: reported.role,
+                    atBanThreshold:
+                      bannedMarks(row.reportedAccountId) >= BAN_MARK_THRESHOLD,
+                  }
+                : null,
+            comment: {
+              id: row.commentId,
+              bookId: comment?.bookId ?? 0,
+              text: comment?.tombstone ? '' : (comment?.text ?? ''),
+              tombstone: comment?.tombstone ?? null,
+            },
+            status: row.status,
+            moderatorLogin:
+              (row.moderatorId !== null &&
+                accounts.get(row.moderatorId)?.login) ||
+              null,
+            isOwnComment: comment?.userId === viewer.id,
+          };
+        });
+      return { items, total: matches.length };
     },
   };
 }
