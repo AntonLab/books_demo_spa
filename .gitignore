@@ -1,13 +1,16 @@
 # Tool output and secrets only; OS/editor files go in ~/.config/git/ignore.
+
+# Dependencies and build output
 node_modules/
 coverage/
-build/
-dist/
-.env
-.env.*
-!.env.example
+/client/build/
+/server/dist/
 
-# Per clone: restored skills (db-reset is checked in), agents, worktrees
+# Secrets (.env.local holds the DB credentials)
+.env*
+
+# Claude Code, per clone: restored skills (db-reset is checked in), agents,
+# worktrees, personal settings
 /.agents/
 /.claude/agents/
 /.claude/skills/*
@@ -15,10 +18,10 @@ dist/
 /.claude/worktrees/
 /.claude/settings.local.json
 
-# Agent scratch; docs/agents/ and docs/adr/ are real docs
+# Agent scratch (docs/agents/ and docs/adr/ are real docs)
 /docs/*
 !/docs/agents/
 !/docs/adr/
-/.superpowers
-/.playwright-mcp
-/.fallow
+/.superpowers/
+/.playwright-mcp/
+/.fallow/
