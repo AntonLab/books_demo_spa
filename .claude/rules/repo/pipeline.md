@@ -60,8 +60,8 @@ git-ignored.
   the subset if it ran one). Never write that line yourself: a past run
   claimed typecheck and lint that never ran. The `guard-shell` hook refuses a
   package-wide gate in the main session.
-- **A diff that touches `client/src` gets a `ui-checker` run** after the final
-  review's fixes and before `finishing-a-development-branch`, because it finds
+- **A diff that touches `client/src` gets a `ui-checker` run** after the
+  changed-files audit's fixes and before `finishing-a-development-branch`, because it finds
   defects every review passed: a numbered checklist from the spec's
   user-visible behavior, the worktree as working directory. It serves the
   worktree on ports 3100/4100 and never touches the user's server on 3000. Its
@@ -88,6 +88,14 @@ git-ignored.
 - **Final-review fixes: one fresh `sdd-implementer` per group of up to five
   related findings**, then one scoped re-review. This overrides the skill's
   single fix dispatch, which runs too many turns in one context.
+- **After the final scoped re-review, audit the changed files** with one
+  `repo-auditor` (sonnet): yardstick "comments and duplication", scope the
+  output of `git diff --name-only origin/dev...HEAD`. Reviews judge
+  correctness, so wordy comments and copied logic pass them. Fix every
+  finding the same way as final-review findings (`sdd-implementer` groups,
+  one scoped re-review), then rerun `gate-runner` if code changed. A `dup`
+  whose owner copy lies outside the diff is fixed only inside the diff; any
+  other out-of-diff finding goes to the follow-ups file.
 - **Pass `model` on every dispatch:** `sdd-implementer` haiku when the brief
   holds the exact code for a mechanical change (a move, a rename), sonnet
   otherwise; `sdd-task-reviewer` the implementer's model (haiku or sonnet,
