@@ -2,53 +2,37 @@
 
 React 19 + TypeScript SPA bundled with webpack 5. Server state lives in
 TanStack Query (`src/queries/`). Client state that outlives the component
-showing it and never reaches the server, Unsaved text and Device preferences,
-lives in Redux Toolkit (`src/store/`, kept in `localStorage`). All other UI
-state lives in the component that uses it (ADR-0010).
+showing it and never reaches the server (Unsaved text, Device preferences and
+Recently viewed) lives in Redux Toolkit (`src/store/`, kept in
+`localStorage`). All other UI state lives in the component that uses it
+(ADR-0010).
 
 ## Topic rules
 
-The detail lives in `.claude/rules/client/`, one topic per file. Each loads on
-its own when you Read a file its `paths:` names — writing or editing one does
-not. Before creating a file, or changing a topic whose files you have not
-read, read the rule first:
+Read the rule before creating a file or changing a topic you have not read.
+Rules live in `.claude/rules/client/`:
 
-| Rule                   | Covers                                                                 |
-| ---------------------- | ---------------------------------------------------------------------- |
-| `api.md`               | `request()`, its body and CSRF traps, the per-module request contract  |
-| `queries.md`           | retries, the session shape, mutation wrapping, invalidation            |
-| `store.md`             | the two slices, `localStorage` persistence, binding to the Account     |
-| `components.md`        | component traps: menus, comments, cards, images, icons, sortable lists |
-| `chapter-editor.md`    | the Chapter editor modal: saving, conflicts, Unsaved text              |
-| `components-search.md` | search suggestions: `SearchBar`, `SearchForm`                          |
-| `pages.md`             | page-level rules                                                       |
-| `chapter-page.md`      | `ChapterPage`: reading preferences, the Pages layout                   |
-| `routing.md`           | App shell: lazy loading, `Suspense`/`ErrorBoundary`, provider order    |
-| `styling.md`           | tokens and quarks, CSS Modules, the antd cascade layer                 |
-| `testing.md`           | the Jest setup, jsdom polyfills, mocking, what a test must cover       |
-| `webpack.md`           | the typed webpack config parts, how Node loads them, build traps       |
-
-## Commands
-
-Install from the repo root. Scripts run here or from the root with `-w client`:
-`npm run dev` (port 3000, `/api` proxied to 4000), `npm run build` (`build/`),
-`npm run analyze` (the build plus `build/report.html`),
-`npm test` / `npm run test:watch`, `npm run typecheck`, `npm run lint`,
-`npm run lint:fix`. Prettier is root-only.
+| Rule                   | Covers                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| `api.md`               | `request()`, CSRF traps, the per-module request contract |
+| `queries.md`           | retries, session shape, mutation wrapping, invalidation  |
+| `store.md`             | the three slices, persistence, binding to the Account    |
+| `components.md`        | menus, comments, cards, images, icons, sortable lists    |
+| `chapter-editor.md`    | the Chapter editor modal: saving, conflicts              |
+| `components-search.md` | search suggestions: `SearchBar`, `SearchForm`            |
+| `pages.md`             | page-level rules                                         |
+| `chapter-page.md`      | `ChapterPage`: reading preferences, Pages layout         |
+| `routing.md`           | lazy loading, `Suspense`/`ErrorBoundary`, providers      |
+| `styling.md`           | tokens and quarks, CSS Modules, the antd cascade layer   |
+| `testing.md`           | Jest setup, jsdom polyfills, mocking, coverage           |
+| `webpack.md`           | the typed webpack config parts, build traps              |
 
 ## Atomic Design
 
-`src/components/` is grouped by level, not by feature. A level with nothing in
-it has no directory.
-
-| Level     | Lives in                    | What it is                                                      |
-| --------- | --------------------------- | --------------------------------------------------------------- |
-| Quarks    | `src/theme/tokens.ts`       | Design tokens: antd 6's defaults plus our `app*` tokens         |
-| Atoms     | antd 6                      | Used directly; write one only where antd has no equivalent      |
-| Molecules | `src/components/molecules/` | A few atoms doing one job; props in, render out                 |
-| Organisms | `src/components/organisms/` | A standalone section; may hold state and call queries           |
-| Templates | `src/components/templates/` | `App`: the composition root and the `Layout` around every route |
-| Pages     | `src/pages/`                | A routed template filled with real data                         |
+`src/components/` is grouped by level, not by feature; a level with nothing in
+it has no directory. Levels: quarks (`src/theme/tokens.ts`), atoms (antd 6,
+used directly; write one only where antd has no equivalent), molecules, organisms,
+templates (`App`) and pages (`src/pages/`).
 
 1. **Imports flow downward only.** ESLint enforces it (`no-restricted-imports`
    per level, tests exempt).
@@ -89,9 +73,8 @@ in TypeScript 6, hence the leading `./src/*`), `resolve.alias` in
 - **Named exports everywhere** (lint enforces it), except where a tool's
   contract needs a default: `src/test/styleMock.ts` (Jest's CSS mapping) and
   the `*.module.css` declaration in `src/types/css.d.ts`.
-- **`ErrorBoundary` is the one class component**: React has no hook for
-  `getDerivedStateFromError`. It defines nothing else, because React already
-  logs an uncaught render error and the client has no logger.
+- **`ErrorBoundary` is the one class component** (root rule); it logs nothing
+  because React already logs render errors.
 - **Every call goes `component → src/queries → src/api → request()`.** A call
   that skips `request()` loses `credentials: 'include'` (every authenticated
   call becomes 401) and the CSRF header. Lint allows the global `fetch` only in

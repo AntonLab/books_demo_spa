@@ -6,13 +6,13 @@ paths:
 # `src/store/` (ADR-0010)
 
 Redux Toolkit holds only client state that outlives the component showing it
-and that the server never sees: Unsaved text and Device preferences
-(`CONTEXT.md`). Nothing the server returns goes here.
+and that the server never sees: Unsaved text, Device preferences and
+Recently viewed (`CONTEXT.md`). Nothing the server returns goes here.
 
-- **Persistence is ours, not `redux-persist`.** `createAppStore()` reads both
-  slices from `localStorage` once, as `preloadedState`; a listener middleware
-  writes each back on change, under `books.unsavedText.v1` and
-  `books.devicePreferences.v1`. A change that would misread old data (a
+- **Persistence is ours, not `redux-persist`.** `createAppStore()` reads all
+  three slices from `localStorage` once, as `preloadedState`; a listener
+  middleware writes each back on change, under `books.unsavedText.v1`,
+  `books.devicePreferences.v1` and `books.recentlyViewed.v1`. A change that would misread old data (a
   renamed or retyped field) bumps its `v` suffix, so that data is dropped
   instead. An added field with a default does not: the reader fills it in
   (`resultsLayout` reads as `grid`), so nobody loses a stored theme. A stored
@@ -23,13 +23,14 @@ and that the server never sees: Unsaved text and Device preferences
 - **Unsaved text is written at most once per 500 ms**: the listener
   unsubscribes, waits, writes the state as it is then, and resubscribes. A
   `pagehide` listener writes both slices at once, so a reload inside that
-  window loses nothing.
+  window loses nothing. Recently viewed changes once per Book opened, so it
+  is written at once, with no throttle.
 - **Two open tabs sync through the `storage` event**, not just at startup: a
   `window` listener in `index.ts` reparses the other tab's value with
   `persistence.ts`'s own shape guards and replaces the slice here, or resets
-  it when the other tab cleared the key. Unsaved text of a different
-  signed-in Account is ignored, or the two tabs' `accountChanged` would
-  overwrite each other forever. A `replaced` never starts a write of its
+  it when the other tab cleared the key. Unsaved text or Recently viewed of a
+  different signed-in Account is ignored, or the two tabs' `accountChanged`
+  would overwrite each other forever. A `replaced` never starts a write of its
   own, or an idle tab could write back a value older than the one its
   sender wrote since. The 500 ms throttle still leaves a
   small race — a keystroke in this tab lands after that reparse and before
@@ -50,7 +51,10 @@ and that the server never sees: Unsaved text and Device preferences
 - **Entries follow the Account, not the session.**
   `useUnsavedTextAccountBinding`, called once in `AppShell`, dispatches
   `accountChanged(id)` when a signed-in id differs from `accountId`: the first
-  id is adopted with the entries, a different one discards them. Sign out goes
+  id is adopted with the entries, a different one discards them.
+  `useRecentlyViewedAccountBinding` does the same for Recently viewed, and the
+  hooks in `useRecentlyViewed.ts` are the only readers of
+  `state.recentlyViewed`. Sign out goes
   through `useSignOut`, which dispatches `discardAll` once the server has
   ended the session (`queries/` never imports the store). A lost session
   (expiry, Block, password reset) dispatches nothing, so the same Account gets

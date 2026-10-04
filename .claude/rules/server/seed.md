@@ -5,24 +5,11 @@ paths:
 
 # Demo seed
 
-`npm run seed -w server -- --force` from the repo root. Without `--force` it
-reports row counts and exits.
-
 ## Accounts
 
-All `active`, password `Password123!`, email `<login>@example.com`:
-
-| Login           | Name                               | Role         |
-| --------------- | ---------------------------------- | ------------ |
-| `superadmin`    | Olga Ivanova                       | `superadmin` |
-| `admin`         | Daniel Reeves                      | `admin`      |
-| `mhale`         | Margaret Hale — Gothic             | `author`     |
-| `ipetrov`       | Ivan Petrov — Hard SF              | `author`     |
-| `nquinn`        | Nora Quinn — Urban Fantasy         | `author`     |
-| `user1`…`user5` | Sofia, Emeka, Hannah, Léa, Grigory | `user`       |
-
-Names are real ones because the UI shows the name: "User Two" answering "User
-Four" reads as a test run, not a demo.
+All accounts are `active` with the password in `DEMO_PASSWORD` (`seed.ts`);
+names are real on purpose because the UI shows them ("User Two" answering "User
+Four" reads as a test run, not a demo). Personas are in `db/seed/personas.ts`.
 
 ## Rules that keep the data honest
 
@@ -51,16 +38,6 @@ Four" reads as a test run, not a demo.
   name a Genre the seed never creates; even-numbered works (counted per author,
   no RNG draw) sit under that Subgenre, odd-numbered ones under its parent.
   Mystery and most Subgenres stay empty on purpose, to demo an empty Genre.
-- Demo shape: two standalone books and one series are co-authored
-  (`shareBooks`, `shareSeries`), and the tags `mystery` and `slow-burn` span
-  two banks each, so `?tag=` returns more than one author. Each author's newest
-  book is a Draft (last two chapters Draft), the one before it and its series
-  In progress (next chapter Scheduled), older ones Complete (`statusOf`,
-  `publicationOf`). Each author starts with two unread Notifications
-  (`writeNotifications`). Each reader (`user1`…`user5`) holds 2-4 Favorite
-  books and one Favorite series (`planFavorites`), drawn after every other
-  draw so adding them changed nothing else. Each reader also owns 1-2 Reading
-  lists of 3-6 shown works (`planReadingLists`), drawn after the Library.
 
 ## Deleting
 
@@ -76,8 +53,5 @@ Four" reads as a test run, not a demo.
 
 ## Tests
 
-`plan.spec.ts` unit-tests the plan with no database; nothing under `seed/`
-except `seed.ts` runs on import. `seed.spec.ts` runs the script as a child
-process three times: a production run (refused before connecting), a dry run
-(no row count changes, `genres` among the reported tables) and a `--force` run
-checked for rows the API would refuse.
+`plan.spec.ts` needs no database; nothing under `seed/` except `seed.ts` runs
+on import. `seed.spec.ts` runs the script as a child process.

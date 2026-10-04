@@ -26,8 +26,6 @@ paths:
 - `erasableSyntaxOnly` and `verbatimModuleSyntax` hold everywhere, because
   Node strips types from the server and `shared` (ADR-0006); the client keeps
   the same rules so code moves between packages unchanged.
-- `noImplicitReturns` and `noImplicitOverride`: a class member that overrides
-  (only `ErrorBoundary`'s) says `override`.
 - Left off on purpose: `noPropertyAccessFromIndexSignature` and
   `exactOptionalPropertyTypes`, each a hundred-odd edits for little caught.
 - Keep `include`, `exclude` and `paths` out of it: TypeScript resolves them
@@ -49,22 +47,18 @@ paths:
   from the same module, the repo's style.
 - `no-console` and `no-non-null-assertion` are errors; test files
   (`*.spec.ts`, `*.test.ts(x)`, `*.testkit.ts`, `src/test/`) may write `!`.
-- The client config adds the rules `client/CLAUDE.md` lists: imports flow
-  down the Atomic Design levels, components and pages import `@/api` only as
-  types (plus `ApiError`), no default exports, no `React` default or namespace
-  import, no global `fetch` outside `api/client`. `no-restricted-imports` takes
-  one option set per file, so each level's block repeats the rules above it.
+- The client config adds the rules `client/CLAUDE.md` lists;
+  `no-restricted-imports` takes one option set per file, so each level block
+  repeats the rules above it.
 - Plugins resolve by bare specifier because the root `package.json` declares
   them and npm hoists them.
 
 ## Root `package.json`
 
-Owns the devDependencies every package needs (eslint, `@eslint/js`,
-typescript-eslint, eslint-config-prettier, globals, prettier, typescript), plus
-`concurrently`, `skills` and `fallow` (`npx fallow` is installed for audits;
-`repo-auditor` uses it with the `fallow` skill), and `engines.node`. `shared` defines only
-`typecheck`, `lint` and `lint:fix`; `shared/src/wire.typetest.ts` pins
-`Wire<T>` with type-level assertions that `typecheck` checks.
+Owns the devDependencies every package needs. `fallow` is installed for
+audits (`repo-auditor` uses it with the `fallow` skill).
+`shared/src/wire.typetest.ts` pins `Wire<T>` with type-level assertions that
+`typecheck` checks.
 
 ## Pre-commit hook (`.githooks/pre-commit`)
 

@@ -21,9 +21,10 @@ paths:
   read is a row in the matrix, not a missing guard.
 - `PERMISSION_DEFINITION` lists grants only; `buildMatrixRows()` expands the
   rest to `none`, so a missing row is never an accidental grant.
-- `reports` is reserved for a moderation feature that does not exist. The
-  matrix already grants admin and superadmin `any` on it, but no route checks
-  it, so it opens nothing today.
+- `reports` has matrix rows (admin and superadmin hold `any`), but the report
+  routes do not check them: creating a report needs only `requireAuth` (any
+  signed-in Account may report), and the Moderator list routes use
+  `requireModerator`.
 - On `create`, `own` and `any` mean the same thing, since a new row is the
   caller's by construction. The create path still checks rows after the matrix:
   `assertMayAddToSeries` for a book filed into a series, and `assertMayChange`
@@ -37,8 +38,7 @@ paths:
 - `favorites` is `create`/`delete: own` for every signed-in role, superadmin
   included, and nothing for `guest`. No role gets `read` or `update`: a
   Favorite is private and has nothing to edit, so the two lists sit behind
-  `requireAuth` and read the session's own rows. The new `MODULES` value is
-  why an older dev database needs `/db-reset`.
+  `requireAuth` and read the session's own rows.
 
 ## Enforcement
 
@@ -78,5 +78,4 @@ paths:
 - On your own row, a `status` key is 403 even when it changes nothing. A new
   `password` or `email` needs `currentPassword` in the same body (missing 400,
   wrong 403); it is never stored.
-- `pending` restricts nothing: it is the default status, reserved for a future
-  email verification, and signs in like `active`.
+- `pending` is the default status and restricts nothing (`CONTEXT.md`).

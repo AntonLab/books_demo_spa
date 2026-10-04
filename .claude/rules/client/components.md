@@ -47,7 +47,9 @@ that read like mistakes and are not.
   another Account's live Comment and Restore on a Removed one, both through
   `IconButton`; Removed Tombstones show to Moderators only, as a reply and as a
   root.
-- `ReportActions` and `ReportedAccountCell` are molecules of the Reports table, with `GenreManager`'s confirm (`Popconfirm` plus `IconButton` `tooltipHidden`) and disabled-with-a-reason tooltip.
+- `ReportActions` and `ReportedAccountCell` are molecules of the Reports table;
+  like `GenreManager` they confirm destructive actions (`Popconfirm`) and show
+  a disabled-with-a-reason tooltip.
 - Edit, delete and like render only when the server would allow them; the
   server refuses each with 403 regardless. `closed` (a Draft book) makes the
   section read-only.
@@ -116,7 +118,7 @@ that read like mistakes and are not.
   the URL alone, never by state. `RegisterModal`'s "I'm author" maps to
   `role: 'author' | 'user'`, the two `REGISTRABLE_ROLES`.
 - `LikeButton` takes the viewer's like id, not a boolean, so a second click
-  deletes the right row. It predates the icons and still uses a text glyph.
+  deletes the right row.
 - `FavoriteButton` has the same id-in, id-out shape but draws a star icon.
   It shows to Co-authors too (a Favorite asks for news, it is not praise) and
   never on a Draft, whose Favorites the server neither counts nor lists.

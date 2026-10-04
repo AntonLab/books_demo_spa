@@ -22,10 +22,9 @@ paths:
   TanStack skips that callback once the modal has unmounted. The `mountedRef`
   guards stay.
 - `onSaved` runs after the `saved` dispatch and never on a 409.
-- The modal closes silently and keeps the Unsaved text. It has no
-  `usePageGuard` and no `DiscardGuardModal`.
 - A mask click, Escape or the close icon closes only the Chapter modal,
-  silently, and keeps its Unsaved text.
+  silently, and keeps its Unsaved text. It has no `usePageGuard` and no
+  `DiscardGuardModal`.
 - Escape and the close icon reach only the top modal, because it is a sibling
   of the Book modal's `DiscardGuardModal`, not a child of it.
 - A place that is gone (404) or no longer editable shows `UnsavedTextNotice`
