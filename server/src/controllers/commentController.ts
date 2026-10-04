@@ -41,13 +41,10 @@ export function createCommentController(repository: CommentRepository) {
     return existing;
   };
 
-  // The same ownership rule books, series, chapters and likes enforce: `own`
-  // may change only the caller's own comments. `any` skips the comparison —
-  // that is what lets a moderator act on a reported comment. Every other
-  // value, a missing scope included, is compared: a handler mounted without
-  // requirePermission fails closed rather than acting as `any`. The check
-  // lives here rather than in a middleware because it needs the repository to
-  // load the row before an owner can be compared.
+  // `own` may change only the caller's own comments; `any` skips the
+  // comparison, which is what lets a moderator act on a reported comment. Any
+  // other scope is compared (see requirePermission.ts). Not a middleware:
+  // the row must be loaded before an owner can be compared.
   const assertOwner = (req: Request, comment: PublicComment): void => {
     if (req.permissionScope !== 'any' && comment.userId !== req.user?.id) {
       throw new ForbiddenError('You may only change your own comments');
@@ -65,8 +62,7 @@ export function createCommentController(repository: CommentRepository) {
 
     list: async (req, res) => {
       const query = validatedQuery<ListCommentsQuery>(req);
-      // requirePermission sets req.user when a session resolves; null is what
-      // makes viewerLikeId come back empty for an anonymous visitor.
+      // A null viewer makes viewerLikeId come back empty for a visitor.
       const { items, total } = await repository.list(query, viewerOf(req.user));
       res.json({ items, total, limit: query.limit, offset: query.offset });
     },

@@ -30,7 +30,7 @@ export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
   });
 };
 
-export const RECENTLY_VIEWED_SIZE = 6;
+const RECENTLY_VIEWED_SIZE = 6;
 
 // The Books of a viewing history, newest first. The request and key use the ids
 // as a set, so a re-opened Book (order change only) reuses the cached answer.

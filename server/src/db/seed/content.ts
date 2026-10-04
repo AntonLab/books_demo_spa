@@ -27,7 +27,7 @@ export const GENRE_TREE = [
   { name: 'Mystery', subgenres: [] },
 ] as const;
 
-export type SubgenreName = (typeof GENRE_TREE)[number]['subgenres'][number];
+type SubgenreName = (typeof GENRE_TREE)[number]['subgenres'][number];
 
 export function parentGenreOf(
   subgenre: SubgenreName

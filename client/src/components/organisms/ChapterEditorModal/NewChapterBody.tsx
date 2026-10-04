@@ -54,9 +54,8 @@ export const NewChapterBody: FC<NewChapterBodyProps> = ({
   }
 
   const handleSubmit = ({ title, text, publishedAt }: ChapterFormValues) => {
-    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
-    // callback if the component unmounts before the mutation settles, but
-    // mutateAsync's own promise still settles, so the entry is still cleared.
+    // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
+    // the component unmounts first: the promise still settles.
     void create
       .mutateAsync({ bookId, title, text, publishedAt: publishedAt ?? null })
       .then(
@@ -64,8 +63,7 @@ export const NewChapterBody: FC<NewChapterBodyProps> = ({
           unsaved.discard();
           if (mountedRef.current) onClose();
         },
-        // A rejection is already surfaced through create.error; this handler
-        // exists only so the rejection is not left unhandled.
+        // The rejection already shows through create.error.
         () => {}
       );
   };

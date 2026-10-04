@@ -7,7 +7,7 @@ import spacing from '@/theme/spacing.module.css';
 
 // A structural slice of a TanStack mutation, so any resource's upload/delete
 // hook fits and the manager imports no API module.
-export interface CoverMutation<TVariables> {
+interface CoverMutation<TVariables> {
   mutate: (
     variables: TVariables,
     options: { onError: (error: Error) => void }

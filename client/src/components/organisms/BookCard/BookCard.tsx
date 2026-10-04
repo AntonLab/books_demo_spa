@@ -18,9 +18,6 @@ interface BookCardProps {
   heading?: boolean;
 }
 
-// Linked to the book page, with its Cover beside the text and its status
-// under it. The list response embeds the Co-authors, so no second request is
-// needed to name them.
 export const BookCard: FC<BookCardProps> = ({
   book,
   tile = false,

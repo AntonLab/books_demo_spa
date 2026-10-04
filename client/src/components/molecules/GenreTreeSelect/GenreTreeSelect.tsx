@@ -7,7 +7,7 @@ import { buildGenreTree, genrePathOf } from '@/types/genreTree';
 import styles from '@/components/molecules/ClearableSelect/ClearableSelect.module.css';
 
 // `value` and `onChange` are the pair a Form.Item injects.
-export type GenreTreeSelectProps = Omit<
+type GenreTreeSelectProps = Omit<
   TreeSelectProps<number | undefined>,
   'treeData' | 'value' | 'onChange' | 'allowClear' | 'showSearch'
 > & {

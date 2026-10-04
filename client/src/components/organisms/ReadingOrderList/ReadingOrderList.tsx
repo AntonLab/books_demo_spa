@@ -17,9 +17,6 @@ interface ReadingOrderListProps {
   onEdit: (chapterId: number) => void;
 }
 
-// A book's chapters in Reading order (CONTEXT.md), with the save-on-drop that
-// rewrites it. An organism: it owns the chapter list query and the reorder
-// mutation.
 export const ReadingOrderList: FC<ReadingOrderListProps> = ({
   bookId,
   isCoAuthor,

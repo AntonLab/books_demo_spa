@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router';
 // signed in; 'denied' when the Account may not open the page.
 export type PageAccess = 'pending' | 'allowed' | 'guest' | 'denied';
 
-export const ACCESS_DENIED_MESSAGE = "You don't have access to this page.";
+const ACCESS_DENIED_MESSAGE = "You don't have access to this page.";
 
 // What the guard leaves in the router state for AppHeader to open Log in with.
 export interface LoginReturnState {

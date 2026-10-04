@@ -41,8 +41,3 @@ export const genreSegments = (
   ...(genre.parent === null ? [] : [genre.parent]),
   { id: genre.id, name: genre.name },
 ];
-
-export const publicGenrePath = (genre: PublicGenre): string =>
-  genreSegments(genre)
-    .map((segment) => segment.name)
-    .join(GENRE_PATH_SEPARATOR);

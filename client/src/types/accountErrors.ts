@@ -1,7 +1,7 @@
 import type { FormInstance } from 'antd';
 import { ApiError } from '@/api/client';
 
-export interface AccountFieldError {
+interface AccountFieldError {
   name: string;
   errors: string[];
 }

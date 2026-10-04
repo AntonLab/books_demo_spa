@@ -115,7 +115,7 @@ export const ReportsPanel: FC = () => {
         <Select
           id="reports-status-filter"
           aria-label="Status filter"
-          style={{ minWidth: 140 }}
+          className={styles.statusFilter}
           options={STATUS_OPTIONS}
           value={status}
           onChange={(value: ReportStatus | undefined) => {
@@ -218,7 +218,7 @@ export const ReportsPanel: FC = () => {
                     {row.comment.tombstone === null ? (
                       <Typography.Paragraph
                         ellipsis={{ rows: 3 }}
-                        style={{ marginBottom: 0 }}
+                        className={styles.commentText}
                       >
                         {row.comment.text}
                       </Typography.Paragraph>

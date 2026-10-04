@@ -4,7 +4,7 @@ import { pagingOf, type BookSearchFormValues } from './bookSearch';
 
 // The Series tab's state as its URL holds it. `genre` is kept raw, like
 // BookSearch.genre.
-export interface SeriesSearch {
+interface SeriesSearch {
   q?: string;
   genre?: string;
   tag?: string;

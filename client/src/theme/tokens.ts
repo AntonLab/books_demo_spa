@@ -26,6 +26,8 @@ declare module 'antd/es/theme/interface' {
     appBookTabsHeight: number;
     /** Tallest the replied-to Comment grows in the composer before it scrolls. */
     appCommentQuoteMaxHeight: number;
+    /** Narrowest a report statistics card shrinks to before the grid wraps. */
+    appStatisticCardMinWidth: number;
     /** Width of the page's content column (header and route): a CSS length. */
     appPageWidth: string;
     /** Widest a Chapter's text column grows at each reading width: CSS lengths. */
@@ -56,6 +58,7 @@ export const appTheme: ThemeConfig = {
     appBookCoverWidth: 96,
     appBookTabsHeight: 257,
     appCommentQuoteMaxHeight: 160,
+    appStatisticCardMinWidth: 240,
     // A share of the window, kept between a floor and a ceiling. The `%`
     // resolves where the variable is used, against the Layout's full width.
     appPageWidth: 'clamp(1024px, 75%, 1440px)',

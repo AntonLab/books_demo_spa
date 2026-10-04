@@ -79,9 +79,8 @@ const remove = (name) => {
   // worktree the check ran against.
   rmSync(join(root, '.playwright-mcp'), { recursive: true, force: true });
   // The task's spec, code map, follow-ups and plan are git-ignored working
-  // notes that
-  // nothing reads once its branch has merged. Only files whose topic equals
-  // `name` go, so a task still running keeps its own.
+  // notes that nothing reads once its branch has merged. Only files whose
+  // topic equals `name` go, so a task still running keeps its own.
   for (const dir of ['specs', 'plans']) {
     const notes = join(root, 'docs', 'superpowers', dir);
     if (!existsSync(notes)) continue;

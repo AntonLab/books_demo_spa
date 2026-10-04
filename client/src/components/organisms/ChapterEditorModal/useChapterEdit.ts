@@ -67,10 +67,8 @@ export const useChapterEdit = (
 
   const common: ChapterEditCommon = {
     unsaved,
-    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
-    // callback if the page unmounts before the mutation settles, but
-    // mutateAsync's own promise still settles, so the entry is still
-    // discarded.
+    // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
+    // the page unmounts first: the promise still settles.
     remove: () => deletion.mutateAsync(undefined).then(() => unsaved.discard()),
     removeState: { isPending: deletion.isPending, error: deletion.error },
   };
@@ -129,10 +127,8 @@ export const useChapterEdit = (
       });
     },
     save: (values: ChapterFormValues) => {
-      // mutateAsync over mutate's per-call onSuccess: TanStack skips that
-      // callback if the page unmounts before the mutation settles (a click
-      // on "Back to …" right after Save), but mutateAsync's own promise
-      // still settles, so the entry is still cleared or rebased.
+      // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
+      // the page unmounts first (a click on "Back to …" right after Save).
       void update
         .mutateAsync({ ...values, expectedUpdatedAt: baseUpdatedAt })
         .then(
@@ -149,9 +145,7 @@ export const useChapterEdit = (
             );
             onSaved?.();
           },
-          // A rejection is already surfaced through `saveError` or
-          // `conflict`; this handler exists only so the rejection is not
-          // left unhandled.
+          // The rejection already shows through `saveError` or `conflict`.
           () => {}
         );
     },

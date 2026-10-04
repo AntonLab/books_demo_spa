@@ -1,23 +1,20 @@
 /**
  * Shared ESLint config for every workspace.
  *
- * ESLint does not search ancestor directories for a flat config — running it
- * from `client/` with no local config reports "File ignored because no
- * matching configuration was supplied". So each package keeps its own
- * `eslint.config.mjs`, and that file calls `createConfig` from here.
+ * ESLint does not search ancestor directories for a flat config: run from
+ * `client/` with no local config it reports "File ignored because no matching
+ * configuration was supplied". So each package keeps its own
+ * `eslint.config.mjs`, which calls `createConfig` from here. Only
+ * `languageOptions` differ between the packages (browser globals and ES2020 vs
+ * Node globals), so those stay in the package configs.
  *
- * The plugins are imported directly: the root package.json declares them and
- * npm hoists them into the root `node_modules`, so bare specifiers resolve
- * from this file. Only `languageOptions` genuinely differ between the packages
- * (browser globals and ES2020 vs Node globals), so those stay in
- * the package configs.
+ * The plugins are imported directly: npm hoists them from the root
+ * package.json into the root `node_modules`, so bare specifiers resolve here.
  *
- * TypeScript files are linted with type information: the block for .ts and
- * .tsx files turns on the project service, which reads the tsconfig.json
- * nearest each file (the client's webpack config has its own) — hence
- * `tsconfigRootDir`, which each package passes as its own directory.
- * JavaScript files (jest.config.mjs, the eslint configs themselves) stay
- * outside that block and are never parsed with types.
+ * .ts and .tsx files are linted with type information: the project service
+ * reads the tsconfig.json nearest each file (the client's webpack config has
+ * its own), hence the `tsconfigRootDir` each package passes. JavaScript files
+ * (jest.config.mjs, the eslint configs themselves) are never parsed with types.
  */
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';

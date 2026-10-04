@@ -30,8 +30,6 @@ interface CardProps {
   footer?: ReactNode;
 }
 
-// What a reader is told about a Book or a Series, with every Co-author named
-// under the title. BookCard and SeriesCard map their record onto it.
 export const Card: FC<CardProps> = ({
   title,
   href,

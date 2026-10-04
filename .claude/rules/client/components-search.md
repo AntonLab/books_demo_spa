@@ -1,6 +1,7 @@
 ---
 paths:
-  - 'client/src/components/**'
+  - 'client/src/components/organisms/SearchBar/**'
+  - 'client/src/components/organisms/SearchForm/**'
 ---
 
 # Search suggestions (`SearchBar`, `SearchForm`)

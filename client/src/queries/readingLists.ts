@@ -132,14 +132,6 @@ export const useDeleteReadingList = (id: number) =>
     deletedId: id,
   });
 
-export const useAddReadingListItem = (id: number) =>
-  useReadingListMutation(
-    (target: WorkTarget) => addReadingListItem(id, target),
-    {
-      settle: true,
-    }
-  );
-
 export const useRemoveReadingListItem = (id: number) =>
   useReadingListMutation(
     (itemId: number) => removeReadingListItem(id, itemId),

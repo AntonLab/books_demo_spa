@@ -57,7 +57,7 @@ export interface ProfileFilters {
 
 // The request never waits for the genre list: `genreId` comes from the URL
 // alone, so a genre the list lacks (a Draft-only one) still filters.
-export const useGenreFilter = (raw: string | undefined) => {
+const useGenreFilter = (raw: string | undefined) => {
   const genres = useGenres().data?.items ?? [];
   const genreId = genreIdOf(raw);
   return {

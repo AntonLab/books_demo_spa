@@ -31,7 +31,7 @@ export interface GenreRepository {
   remove(id: number): Promise<boolean>;
 }
 
-export const SIBLING_NAME_TAKEN = 'A genre with this name already exists here.';
+const SIBLING_NAME_TAKEN = 'A genre with this name already exists here.';
 
 // The unique index on (parent, name) is the only unique constraint here, so a
 // violation is always the name among its siblings.
@@ -44,7 +44,7 @@ function asConflict(error: unknown): never {
   throw error;
 }
 
-export type ParentFault = 'missing' | 'notTopLevel' | 'self' | 'hasSubgenres';
+type ParentFault = 'missing' | 'notTopLevel' | 'self' | 'hasSubgenres';
 
 const PARENT_FAULTS: Record<ParentFault, string> = {
   missing: 'Parent genre does not exist.',

@@ -38,8 +38,7 @@ export function initSeriesAuthorModel(
         autoIncrement: true,
         primaryKey: true,
       },
-      // Both must match their targets' INTEGER UNSIGNED exactly, or MySQL
-      // rejects the foreign keys with errno 3780.
+      // INTEGER UNSIGNED to match the target ids (errno 3780 otherwise).
       seriesId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       createdAt: { type: DataTypes.DATE, allowNull: false },

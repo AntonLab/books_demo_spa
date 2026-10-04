@@ -1,7 +1,7 @@
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import type { PublicNotification } from '../types/api';
 
-export interface NotificationStreamHandlers {
+interface NotificationStreamHandlers {
   onNotification: (notification: PublicNotification) => void;
   // The browser has stopped reconnecting: the server answered something
   // other than 200, most often the 401 of a session that has ended.

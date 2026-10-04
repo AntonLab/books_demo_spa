@@ -47,12 +47,11 @@ export function initFavoriteModel(sequelize: Sequelize): typeof Favorite {
         autoIncrement: true,
         primaryKey: true,
       },
-      // INTEGER UNSIGNED like the ids they reference, or MySQL rejects the
-      // foreign key with errno 3780.
+      // INTEGER UNSIGNED to match the referenced ids (errno 3780 otherwise).
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       bookId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       seriesId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
-      // Declaring the timestamp opts out of Sequelize's implicit NOT NULL.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
     },
     {
@@ -64,9 +63,8 @@ export function initFavoriteModel(sequelize: Sequelize): typeof Favorite {
       collate: 'utf8mb4_0900_ai_ci',
       validate: { exactlyOneTarget },
       indexes: [
-        // A work's favoriteCount, and the holders an announcement goes to
-        // (part 2), look a target up by itself. Each is also the index its
-        // foreign key needs, so InnoDB adds no second one.
+        // A work's favoriteCount and the announcement's holder lookup each
+        // read by target. Each doubles as its FK index.
         { name: 'favorites_book_id', fields: ['bookId'] },
         { name: 'favorites_series_id', fields: ['seriesId'] },
         // One favorite per account per work, enforced here instead of a

@@ -27,13 +27,11 @@ export const createQueryClient = (): QueryClient => {
     defaultOptions: {
       queries: {
         retry: shouldRetryQuery,
-        // The thunks never refetched on focus. Turning it on would be a
-        // behaviour change, and this migration is not making any.
+        // Off: a refetch on every window focus is not wanted.
         refetchOnWindowFocus: false,
-        // The default of 0 marks data stale the instant it arrives, so every
-        // remount refetches — exactly the behaviour this change exists to
-        // stop. Thirty seconds makes navigating home and back free without
-        // anything looking frozen.
+        // The default of 0 marks data stale on arrival, so every remount
+        // refetches. Thirty seconds makes navigating home and back free
+        // without anything looking frozen.
         staleTime: 30_000,
       },
     },

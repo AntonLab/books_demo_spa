@@ -31,9 +31,9 @@ export interface SeriesFieldValues extends Omit<SeriesFormValues, 'genreId'> {
   genreId?: number | null;
 }
 
-// Presentational, like BookForm: the page that renders it owns the mutation
-// and the error, so creating and editing share one set of fields. A series has
-// no status and belongs to no series, so it is WorkFields alone.
+// Presentational, like BookForm: the page owns the mutation and the error, so
+// creating and editing share the fields. A series has no status and belongs to
+// no series, so it is WorkFields alone.
 export const SeriesForm: FC<SeriesFormProps> = ({
   genreOptions,
   submitLabel,

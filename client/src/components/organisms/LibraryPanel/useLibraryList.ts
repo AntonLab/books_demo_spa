@@ -7,9 +7,7 @@ import { useLibrary } from '@/queries/library';
 import { pagingOf } from '@/types/bookSearch';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 
-export const libraryStatusOf = (
-  params: URLSearchParams
-): ReadingStatus | undefined =>
+const libraryStatusOf = (params: URLSearchParams): ReadingStatus | undefined =>
   READING_STATUSES.find((status) => status === params.get('status'));
 
 export const useLibraryList = () => {

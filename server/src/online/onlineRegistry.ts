@@ -30,7 +30,7 @@ export interface OnlineRegistry {
   stop(): void;
 }
 
-export interface OnlineRegistryDeps {
+interface OnlineRegistryDeps {
   sessionRepository: Pick<SessionRepository, 'findLiveSessions'>;
 }
 

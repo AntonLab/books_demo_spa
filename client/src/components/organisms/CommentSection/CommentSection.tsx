@@ -100,14 +100,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const canAct = Boolean(session) && !closed;
   const moderating = canAct && isModeratorRole(session?.role);
 
-  // The server returns a flat list; the two-level tree is assembled here, in
-  // one pass over it. Only roots and their direct replies render, so a
-  // tombstone earns its place only as a root keeping at least one live reply
-  // in its thread. Every other tombstone — a reply, or a root whose replies
-  // are all tombstones too — is noise, and is dropped here rather than on the
-  // server: this is the only place that already knows what hangs off what.
-  // The exception is a Moderator, who keeps every Removed tombstone, as a
-  // reply and as a root, so Restore stays reachable.
+  // The server returns a flat list; the two-level tree is built here. A
+  // tombstone stays only as a root keeping at least one live reply; every
+  // other one is dropped here rather than on the server, since only this
+  // code knows what hangs off what. A Moderator keeps every Removed
+  // tombstone, so Restore stays reachable.
   const shows = (item: CommentWithAuthor) =>
     item.tombstone === null || (moderating && item.tombstone === 'removed');
   const liveReplies = new Map<number, CommentWithAuthor[]>();
@@ -166,18 +163,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
     if (text.length === 0) return;
 
     const key = composerKey;
-    // mutateAsync over mutate's per-call onSuccess: TanStack skips that
-    // callback if the section unmounts before the mutation settles (the
-    // reader navigating away right after Post), but mutateAsync's own
-    // promise still settles, so the entry is still cleared instead of
-    // resurfacing in the next composer that reads this key.
+    // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
+    // the section unmounts first (navigating away right after Post): the
+    // entry is cleared instead of resurfacing in the next composer.
     const onFulfilled = () => {
       // Only once the server has the text: a failed send keeps it.
       dispatch(unsavedText.remove(key));
       setComposing(null);
     };
-    // The modal shows the failure from the mutation's own state; this handler
-    // exists only so the rejection is not left unhandled.
+    // The modal already shows the failure from the mutation's state.
     const onRejected = () => {};
 
     if (editTarget !== undefined) {
@@ -206,9 +200,9 @@ export const CommentSection: FC<CommentSectionProps> = ({
   };
 
   // A ref, not isPending: TanStack notifies it on a later tick, so a double
-  // click would send two requests. mutateAsync over mutate's per-call
-  // onSuccess: see submit() above. Remove is a delete too: the server makes a
-  // Removed comment when another Account calls it.
+  // click would send two requests. mutateAsync as in submit() above. Remove is
+  // a delete too: the server makes a Removed comment when another Account
+  // calls it.
   const act = (
     mutation: typeof remove,
     id: number,

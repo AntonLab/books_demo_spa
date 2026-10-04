@@ -67,8 +67,7 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
         autoIncrement: true,
         primaryKey: true,
       },
-      // Must match books.id exactly (INTEGER UNSIGNED) or MySQL rejects the
-      // foreign key with errno 3780 on incompatible column types.
+      // INTEGER UNSIGNED to match books.id (errno 3780 otherwise).
       bookId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
@@ -93,8 +92,6 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
           this.setDataValue('wordCount', countWords(value));
         },
       },
-      // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
       // Millisecond precision, like updatedAt below: a chapter scheduled for
       // 18:00:00.500 is not out at 18:00:00.
       publishedAt: { type: DataTypes.DATE(3), allowNull: true },
@@ -105,6 +102,7 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       // No default: the text setter always supplies it, and a row inserted any
       // other way should fail loudly rather than claim zero words.
       wordCount: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
+      // allowNull: false restated on both timestamps (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
       // Millisecond precision rather than the whole seconds every other table
       // keeps: a save carries the updatedAt it last saw (chapterRepository
@@ -119,13 +117,10 @@ export function initChapterModel(sequelize: Sequelize): typeof Chapter {
       charset: 'utf8mb4',
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
-        // Serves the `?bookId=` filter together with the list endpoint's
-        // `ORDER BY position, id` — InnoDB appends the primary key to every
-        // secondary index, so the id tie-break is covered too — and neither
-        // needs a filesort. It is also a leftmost prefix of the foreign key's
-        // column, so InnoDB reuses it instead of creating a second index for
-        // the constraint. Not unique: a reorder rewrites every position in one
-        // UPDATE, and a unique index would refuse the rows it passes through.
+        // Serves `?bookId=` with `ORDER BY position, id` (InnoDB appends the
+        // primary key, so no filesort) and doubles as the FK index. Not
+        // unique: a reorder rewrites every position in one UPDATE, and a
+        // unique index would refuse the rows it passes through.
         { name: 'chapters_book_id_position', fields: ['bookId', 'position'] },
         // Serves the announcement pass's `announcedAt IS NULL AND
         // publishedAt <= now` scan (announcementRepository.ts); without it

@@ -3,10 +3,9 @@ paths:
   - 'client/src/pages/**'
 ---
 
-# Routing and pages
+# Pages
 
-See `.claude/rules/client/routing.md` for the App shell: lazy loading,
-`Suspense`/`ErrorBoundary` and provider order.
+Routing and the App shell: `routing.md`.
 
 ## Page rules
 

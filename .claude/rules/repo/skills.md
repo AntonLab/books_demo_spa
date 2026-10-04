@@ -17,5 +17,4 @@ one. Both directories are git-ignored and per-clone.
 
 Add a skill with `npx skills add <source>` (project-level, no `-g`), which
 writes the lock. A skill a Claude Code plugin already ships stays out of the
-lock; that covers every mattpocock/skills skill, which the `mattpocock-skills`
-plugin provides.
+lock.

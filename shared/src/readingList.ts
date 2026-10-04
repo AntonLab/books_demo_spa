@@ -7,7 +7,7 @@ export const READING_LIST_TITLE_MAX_LENGTH = 200;
 export const READING_LIST_MAX_ITEMS = 100;
 
 // Reading list (CONTEXT.md): the Account that owns a list.
-export interface ReadingListOwner {
+interface ReadingListOwner {
   id: number;
   login: string;
 }

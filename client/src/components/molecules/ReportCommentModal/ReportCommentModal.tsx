@@ -4,6 +4,7 @@ import { REPORT_EXPLANATION_MAX_LENGTH, REPORT_REASONS } from 'shared';
 import type { ReportPayload, ReportReason } from 'shared';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { REASON_LABELS } from '@/types/report';
+import spacing from '@/theme/spacing.module.css';
 
 interface ReportCommentModalProps {
   onSubmit: (payload: ReportPayload) => void;
@@ -69,7 +70,7 @@ export const ReportCommentModal: FC<ReportCommentModalProps> = ({
           </Form.Item>
         )}
         {error !== null && (
-          <Alert type="error" title={error} style={{ marginBottom: 16 }} />
+          <Alert type="error" title={error} className={spacing.gapBelow} />
         )}
       </Form>
     </DiscardGuardModal>

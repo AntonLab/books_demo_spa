@@ -16,8 +16,6 @@ interface ChapterContentsProps {
   onClose: () => void;
 }
 
-// The reader's table of contents: the Book's card over its chapters, the one
-// being read marked, and a pick closing the drawer on the way to it.
 export const ChapterContents: FC<ChapterContentsProps> = ({
   book,
   chapters,

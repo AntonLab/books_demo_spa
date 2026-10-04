@@ -47,8 +47,7 @@ export function initReadingListItemModel(
         autoIncrement: true,
         primaryKey: true,
       },
-      // INTEGER UNSIGNED like the ids they reference, or MySQL rejects the
-      // foreign key with errno 3780.
+      // INTEGER UNSIGNED to match the referenced ids (errno 3780 otherwise).
       listId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       bookId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       seriesId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },

@@ -57,20 +57,16 @@ export function createSequelizeSessionRepository(): SessionRepository {
       return toRecord(await Session.create({ userId, tokenHash, expiresAt }));
     },
 
-    // A login verifies its password against a hash it read without a lock,
-    // and argon2 is slow on purpose: a password change or a block can commit
-    // in between and purge the account's sessions before this one exists. So
-    // the account is re-read here, in the insert's own transaction, under a
-    // shared lock. Either the read queues behind a change that holds the row
-    // and then sees its new hash or its block, or the change queues behind
-    // this transaction and its purge deletes the session committed here.
-    // A plain read would not do: it waits for no lock, returns the row as it
-    // was before an uncommitted change, and the insert's foreign-key check
-    // then waits out that change and lands just after its purge.
+    // argon2 is slow, so a password change or block can commit between the
+    // login's unlocked read and this insert, and purge sessions before this
+    // one exists. The account is therefore re-read under a shared lock in the
+    // insert's transaction: a concurrent change is either seen, or queues
+    // behind this transaction and its purge deletes this session. A plain read
+    // would miss an uncommitted change, and the insert's foreign-key check
+    // would then land just after the purge.
     //
     // Any password change yields a new hash, even to the same password, since
-    // argon2 salts afresh. An account that is gone counts as a changed
-    // credential: the hash that was verified is no longer on file.
+    // argon2 salts afresh. A gone account counts as a changed credential.
     async createIfCredentialCurrent(
       userId,
       tokenHash,

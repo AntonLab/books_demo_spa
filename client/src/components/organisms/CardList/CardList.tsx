@@ -23,14 +23,10 @@ const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
 // window, so at `xl` tiles would shrink as the window widens past 1200.
 export const TILE_COLUMNS: ColProps = { xs: 12, sm: 8, md: 6, lg: 4 };
 
-// Presentational on purpose: each page runs its own query (`useSortedBooks`,
-// `useBookSearch`, `useBooksInSeries`…) and hands the states down. A
-// component that ran the query itself could not serve them all.
-//
-// It takes TanStack's own flags rather than a `LoadStatus` string so there is
-// one vocabulary for a load rather than two, and no page has to translate
-// between them. Callers pass `data?.items ?? []`, so `items` is always an
-// array and the empty branch never sees `undefined`.
+// Presentational: each page runs its own query (`useSortedBooks`,
+// `useBookSearch`, `useBooksInSeries`…) and hands the states down. It takes
+// TanStack's own flags, not a `LoadStatus` string. Callers pass
+// `data?.items ?? []`, so the empty branch never sees `undefined`.
 //
 // A function, not `FC`: `FC` cannot carry the type parameter.
 export const CardList = <T extends { id: number }>({
@@ -49,10 +45,8 @@ export const CardList = <T extends { id: number }>({
     );
   }
 
-  // `isPending`, not `isLoading`: the two differ for a query disabled by
-  // `enabled: false`, which sits at `isPending: true` with `isLoading: false`.
-  // "There is no data to render" is what the skeleton means, and that is
-  // `isPending`.
+  // `isPending`, not `isLoading`: a query disabled by `enabled: false` is
+  // `isPending: true` with `isLoading: false`, and it has no data to render.
   if (isPending) {
     return (
       <div role="status" aria-label={`Loading ${noun}`} aria-busy="true">

@@ -1,11 +1,11 @@
 // Usage: node scripts/plan-check.mjs <plan.md>
-// Fails when a plan carries implementation bodies. plan-writer ignored the
-// "Contracts, Not Code" prose rule on its first real run, so the rule became
-// an exit code. A block counts as a test when it calls test/it/describe/expect;
-// tests stay complete, anything else must fit in MAX_LINES.
-// It also caps a task at MAX_TASK_LINES: the work-modals plan passed with a
-// 237-line task that the prose limit of "about 150" did not stop. The cap
-// leaves that "about" some room: the same branch's 160-line task was fine.
+// Fails when a plan carries implementation bodies: plan-writer ignored the
+// "Contracts, Not Code" prose rule, so the rule became an exit code. A block
+// counts as a test when it calls test/it/describe/expect; tests stay complete,
+// anything else must fit in MAX_LINES.
+// It also caps a task at MAX_TASK_LINES, since a 237-line task slipped past the
+// prose limit of "about 150". The cap leaves that "about" some room: a
+// 160-line task was fine.
 import { readFileSync } from 'node:fs';
 
 const MAX_LINES = 15;

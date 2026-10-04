@@ -45,9 +45,7 @@ function refuseUncredited(
 }
 
 // Editing a work, its chapters or its order: a Co-author, or a Moderator
-// under `any`. Only `any` skips the comparison. Every other value, a missing
-// scope included, falls through to it, so a handler mounted without
-// requirePermission fails closed rather than acting as `any`.
+// under `any`. Only `any` skips the comparison (see requirePermission.ts).
 export async function assertMayChange(
   req: Request,
   target: CoAuthorTarget,

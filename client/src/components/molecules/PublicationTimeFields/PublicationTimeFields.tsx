@@ -33,7 +33,6 @@ const disabledDate = (day: Dayjs): boolean => day.isBefore(dayjs(), 'day');
 const range = (count: number): number[] =>
   Array.from({ length: count }, (_, index) => index);
 
-// Presentational: no query hook, no api call — the parent owns submission.
 export const PublicationTimeFields = <Values extends PublicationTimeValues>({
   form,
   defaultImmediately,

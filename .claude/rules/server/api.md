@@ -96,8 +96,7 @@ code alone does not explain.
   paging meaningful. Deletion is soft (see `visibility.md`).
 - `/api/notifications` sits behind `requireAuth`, not the matrix; whose
   notifications they are comes from the session only. A read Notification is
-  hidden a minute after it is read (`NOTIFICATION_READ_TTL_MS`) and deleted by
-  the hourly expiry purge. `GET`/`PATCH /api/notifications/settings` carry the
+  hidden after `NOTIFICATION_READ_TTL_MS` (`operations.md`). `GET`/`PATCH /api/notifications/settings` carry the
   Account's email switch (`users.emailNotifications`, default on); it is kept
   out of `PublicUser` because Admins read other Accounts' `PublicUser`.
 

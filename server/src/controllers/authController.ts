@@ -35,10 +35,9 @@ export interface AuthControllerDeps {
   passwordResetRepository: PasswordResetRepository;
   mailDelivery: MailDelivery;
   appBaseUrl: string;
-  // Injectable purely so a test can prove the unknown-login path still spends
-  // an argon2 verify. A wall-clock assertion would be flaky under load, and an
-  // ESM import binding cannot be spied on from outside; this makes the timing
-  // defence observable instead of merely asserted in a comment.
+  // Injectable so a test can prove the unknown-login path still spends an
+  // argon2 verify: a wall-clock assertion would flake and an ESM import binding
+  // cannot be spied on.
   verify?: (hashed: string, plaintext: string) => Promise<boolean>;
 }
 
@@ -191,11 +190,10 @@ export function createAuthController(deps: AuthControllerDeps) {
       // would turn this endpoint into an account-enumeration oracle.
       res.status(202).end();
 
-      // Sent after the response, and not awaited: awaiting it here would let
-      // an attacker read the address's existence off the response time, and a
-      // rejection would turn a slow mail server into a 500 that does the
-      // same. Logged without the address or token, which the error alone
-      // never carries; no retry, the account can just ask again.
+      // Sent after the response and not awaited: awaiting would let response
+      // time reveal whether the address exists, and a rejection would turn a
+      // slow mail server into a 500 that does the same. Logged without the
+      // address or token; no retry, the account can ask again.
       if (user && mail) {
         void deps.mailDelivery.send(mail).catch((error: unknown) => {
           logger.error('Password reset mail failed', {
@@ -209,20 +207,15 @@ export function createAuthController(deps: AuthControllerDeps) {
     confirmReset: async (req, res) => {
       const { token, password } = validatedBody<ResetConfirmInput>(req);
 
-      // One call, one transaction: the repository updates the password, stamps
-      // the token used, and revokes every session together.
       const redeemed = await deps.passwordResetRepository.redeem(
         hashToken(token),
         password
       );
       if (!redeemed) {
-        // Unknown, expired and already-used all land here with one message, so
-        // the response never says which.
-        //
-        // AppError rather than ValidationError: ValidationError's constructor
-        // takes `details`, not a message, so passing a string there would
-        // produce {error: 'Request validation failed', details: '...'} — the
-        // wrong shape for a failure that is not a schema violation.
+        // Unknown, expired and already-used share one message, so the response
+        // never says which. AppError, not ValidationError: its constructor
+        // takes `details`, not a message, and the shape is wrong for a failure
+        // that is not a schema violation.
         throw new AppError('Reset token is invalid or has expired', 400);
       }
 

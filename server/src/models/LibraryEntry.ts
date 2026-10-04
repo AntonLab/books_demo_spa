@@ -39,13 +39,12 @@ export function initLibraryEntryModel(
         autoIncrement: true,
         primaryKey: true,
       },
-      // INTEGER UNSIGNED like the ids they reference, or MySQL rejects the
-      // foreign key with errno 3780.
+      // INTEGER UNSIGNED to match the referenced ids (errno 3780 otherwise).
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       bookId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       status: { type: DataTypes.ENUM(...READING_STATUSES), allowNull: false },
-      // Declaring a timestamp opts out of Sequelize's implicit NOT NULL.
-      // Millisecond precision, so "newest change first" does not tie.
+      // allowNull: false restated (see User.ts). Millisecond precision, so
+      // "newest change first" does not tie.
       createdAt: { type: DataTypes.DATE(3), allowNull: false },
       updatedAt: { type: DataTypes.DATE(3), allowNull: false },
     },

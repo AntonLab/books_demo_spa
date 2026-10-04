@@ -13,15 +13,14 @@ The client keeps three kinds of state apart:
   the signed-in Account reads the session query, so a changed Avatar or a
   Blocked Account cannot leave a stale second copy behind.
 - **Shared client state.** State that outlives the component showing it and
-  that the server never sees: Unsaved text and Device preferences. It will
-  live in Redux Toolkit.
+  that the server never sees: Unsaved text, Device preferences and Recently
+  viewed. It lives in Redux Toolkit.
 - **Everything else stays in components.** Which auth modal is open belongs to
   `AppHeader`. The password-reset token is read from the URL, because the URL
   is where the emailed link carries it.
 
 Using two libraries is deliberate. The project demonstrates each tool doing
-the job it is built for. Redux is not installed until the first slice needs
-it: a store with nothing in it is only setup.
+the job it is built for.
 
 ## Considered Options
 

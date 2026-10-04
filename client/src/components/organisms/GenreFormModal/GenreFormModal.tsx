@@ -11,6 +11,7 @@ import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/Disc
 import { useCreateGenre, useUpdateGenre } from '@/queries/genres';
 import { parentChoices } from '@/types/genreAdmin';
 import { buildGenreTree } from '@/types/genreTree';
+import spacing from '@/theme/spacing.module.css';
 
 export type GenreFormMode =
   | { kind: 'create'; parentId: number | null }
@@ -147,7 +148,7 @@ export const GenreFormModal: FC<GenreFormModalProps> = ({
           <Alert
             type="error"
             title={failure.message}
-            style={{ marginBottom: 16 }}
+            className={spacing.gapBelow}
           />
         )}
       </Form>

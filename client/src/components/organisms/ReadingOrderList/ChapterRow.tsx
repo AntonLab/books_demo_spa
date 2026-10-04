@@ -15,8 +15,6 @@ interface ChapterRowProps {
   onEdit: () => void;
 }
 
-// One row of the book's chapter list: its title, a badge for what is not out
-// yet or holds Unsaved text, the date it came out or will, and Edit / Delete.
 export const ChapterRow: FC<ChapterRowProps> = ({
   bookId,
   chapter,

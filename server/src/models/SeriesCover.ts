@@ -24,8 +24,7 @@ export class SeriesCover extends Model<
 export function initSeriesCoverModel(sequelize: Sequelize): typeof SeriesCover {
   SeriesCover.init(
     {
-      // Must match series.id exactly (INTEGER UNSIGNED) or MySQL rejects the
-      // foreign key with errno 3780.
+      // INTEGER UNSIGNED to match series.id (errno 3780 otherwise).
       seriesId: {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,

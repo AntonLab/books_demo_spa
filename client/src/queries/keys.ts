@@ -7,12 +7,9 @@ import type { ListSeriesParams } from '../api/series';
 // One place where every cache key is spelled, so no two call sites can
 // disagree about what identifies a query.
 //
-// `books` taking the same params object `listBooks` does is what keeps
-// MainPage's key (`{ sort, pageSize }`) and SearchPage's (`{ q, pageSize }`)
-// distinct. searchSlice existed as a separate slice precisely so a search
-// could not overwrite the MainPage list and leave stale results behind; two
-// cache keys give that structurally, since neither can write the other's
-// entry.
+// `books` takes the same params object `listBooks` does, so MainPage's key
+// (`{ sort, pageSize }`) and SearchPage's (`{ q, pageSize }`) stay distinct and
+// neither can overwrite the other's entry.
 export const queryKeys = {
   session: ['auth', 'me'] as const,
   // A constant key, like `session`: the list takes no parameters at all.

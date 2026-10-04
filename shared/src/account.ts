@@ -1,4 +1,4 @@
-export interface AccountProfileTotals {
+interface AccountProfileTotals {
   booksInReadingLists: number;
   seriesInReadingLists: number;
   bookLikes: number;

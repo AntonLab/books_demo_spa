@@ -26,11 +26,9 @@ async function decode(buffer: Buffer): Promise<Sharp> {
   return image;
 }
 
-// EXIF orientation applied then dropped (autoOrient), centre-cropped to
-// fill the frame (fit: 'cover', the default position), encoded as WebP with
-// no metadata — .webp() carries none unless .withMetadata() is called,
-// which this never does. The uploaded bytes themselves are discarded: only
-// this re-encoded buffer is ever stored.
+// The upload's bytes are discarded; only this re-encoded buffer is stored.
+// .webp() carries no metadata unless .withMetadata() is called, which this
+// never does.
 async function reencode(
   buffer: Buffer,
   width: number,
@@ -48,12 +46,12 @@ async function reencode(
   }
 }
 
-// A Cover: 600x900 (CONTEXT.md).
+// A Cover: 600x900.
 export function processCoverImage(buffer: Buffer): Promise<Buffer> {
   return reencode(buffer, 600, 900);
 }
 
-// An Avatar: 256x256 (CONTEXT.md), square wherever it appears.
+// An Avatar: 256x256, square wherever it appears.
 export function processAvatarImage(buffer: Buffer): Promise<Buffer> {
   return reencode(buffer, 256, 256);
 }

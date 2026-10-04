@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Tag } from 'antd';
 import styles from './TagList.module.css';
 
-export interface TagListProps {
+interface TagListProps {
   tags: readonly string[];
 }
 

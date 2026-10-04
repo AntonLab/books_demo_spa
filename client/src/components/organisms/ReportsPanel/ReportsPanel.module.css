@@ -1,3 +1,11 @@
+.statusFilter {
+  min-width: 140px;
+}
+
+.commentText {
+  margin-bottom: 0;
+}
+
 /* Must beat antd's row-hover background, which module CSS does through the
    `antd` layer. */
 .table tr[data-highlighted='true'] > td {

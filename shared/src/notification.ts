@@ -4,7 +4,7 @@ import type { ListResponse } from './api.ts';
 // Text, status and chapter changes raise none of these by design: a
 // Notification is the safeguard ADR-0005 relies on for who is credited, not an
 // activity feed.
-export const CREDIT_NOTIFICATION_KINDS = [
+const CREDIT_NOTIFICATION_KINDS = [
   'co_author_added',
   'co_author_removed',
   'co_author_left',
@@ -14,7 +14,7 @@ export const CREDIT_NOTIFICATION_KINDS = [
 
 // Something an Account holds as a Favorite has news (CONTEXT.md, New chapter,
 // New book). Raised by the announcement pass, never by `notify`.
-export const FAVORITE_NOTIFICATION_KINDS = ['new_chapter', 'new_book'] as const;
+const FAVORITE_NOTIFICATION_KINDS = ['new_chapter', 'new_book'] as const;
 
 export const NOTIFICATION_KINDS = [
   ...CREDIT_NOTIFICATION_KINDS,
@@ -33,8 +33,6 @@ export const ACTOR_KINDS = [
 ] as const;
 
 export type CreditNotificationKind = (typeof CREDIT_NOTIFICATION_KINDS)[number];
-export type FavoriteNotificationKind =
-  (typeof FAVORITE_NOTIFICATION_KINDS)[number];
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 export type WorkType = (typeof WORK_TYPES)[number];
 export type ActorKind = (typeof ACTOR_KINDS)[number];

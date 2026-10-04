@@ -32,10 +32,8 @@ export const SearchBar: FC = () => {
 
   // The URL is the source of truth; the input follows it, so a paste, a
   // reload and a back-button press all leave the bar showing the live query.
-  // Adjusted during render rather than in a useEffect — react-hooks flags
-  // setState-in-effect as a cascading-render risk, and React's own guidance
-  // for "reset state when a prop changes" is this prev-value comparison done
-  // while rendering, not after.
+  // Adjusted during render, not in an effect: react-hooks flags setState in
+  // an effect as a cascading-render risk.
   const [prevQueryFromUrl, setPrevQueryFromUrl] = useState(queryFromUrl);
   if (queryFromUrl !== prevQueryFromUrl) {
     setPrevQueryFromUrl(queryFromUrl);
@@ -92,23 +90,14 @@ export const SearchBar: FC = () => {
     info?: { source?: 'input' | 'clear' }
   ) => {
     // antd fires onSearch for the clear icon as well as for Enter and the
-    // button. Navigating on a clear would run a search for the term the user
-    // just erased.
+    // button; navigating on a clear would search for the term just erased.
     //
-    // On antd 6.6.5, clearing actually forces `text` to `''` before this
-    // handler ever sees it (@rc-component/input's resolveOnChange clones the
-    // event with the target value hard-coded to '' for a click-type change),
-    // so the empty-text guard below currently blocks this path too — the two
-    // guards are redundant today, and no test isolates this one alone: the
-    // isolated case (source === 'clear' with a non-empty text) can't be
-    // reached through the real component, only synthesized, and a test built
-    // on that synthetic input would be pinning our handler against a case
-    // antd itself never produces. Kept anyway, deliberately, because that
-    // redundancy rides on resolveOnChange's internals, not on onSearch's
-    // documented contract — the contract only promises the callback fires on
-    // clear, not that the value comes through empty. If a future antd ever
-    // passes the erased text through instead, this guard is what stops it
-    // from being navigated to.
+    // On antd 6.6.5 the empty-text guard below also blocks a clear, because
+    // @rc-component/input's resolveOnChange hard-codes the value to '' for a
+    // click-type change. No test isolates this guard: source === 'clear' with
+    // a non-empty text cannot come from the real component. It stays because
+    // onSearch's documented contract only promises the callback fires on
+    // clear, not that the text is empty.
     if (info?.source === 'clear') {
       setTyped('');
       return;

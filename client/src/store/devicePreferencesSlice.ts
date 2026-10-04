@@ -32,7 +32,7 @@ export type ReadingWidth = (typeof READING_WIDTHS)[number];
 // Scroll is one continuous column; Pages lays the text out in screen-sized
 // pages turned sideways (CONTEXT.md, Reading layout).
 export const READING_LAYOUTS = ['scroll', 'pages'] as const;
-export type ReadingLayout = (typeof READING_LAYOUTS)[number];
+type ReadingLayout = (typeof READING_LAYOUTS)[number];
 
 export const READING_FONT_SIZE = { min: 14, max: 28, step: 2 } as const;
 

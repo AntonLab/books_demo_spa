@@ -4,23 +4,21 @@ Express 5 + Sequelize 6 / MySQL API, run as native TypeScript on Node >= 24.
 
 ## Topic rules
 
-The detail lives in `.claude/rules/server/`, one topic per file. Each loads on
-its own when you Read a file its `paths:` names — writing or editing one does
-not. Before creating a file, or changing a topic whose files you have not
-read, read the rule first:
+Read the rule before creating a file or changing a topic you have not read.
+Rules live in `.claude/rules/server/`:
 
-| Rule             | Covers                                                                                             |
-| ---------------- | -------------------------------------------------------------------------------------------------- |
-| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps                |
-| `access.md`      | ownership, Co-authors                                                                              |
-| `visibility.md`  | Notifications, Draft books, comment tombstones                                                     |
-| `permissions.md` | Roles, the permission matrix, account rank rules                                                   |
-| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                                       |
-| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                               |
-| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                                 |
-| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas                        |
-| `seed.md`        | the demo seed                                                                                      |
-| `operations.md`  | security headers, graceful shutdown, bind errors, expiry purge, announcement pass, Online registry |
+| Rule             | Covers                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `api.md`         | Book status, Publication time, Reading and Series order, credits, Genres, zod traps       |
+| `access.md`      | ownership, Co-authors                                                                     |
+| `visibility.md`  | Notifications, Draft books, comment tombstones                                            |
+| `permissions.md` | Roles, the permission matrix, account rank rules                                          |
+| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                              |
+| `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                      |
+| `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                        |
+| `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas               |
+| `seed.md`        | the demo seed                                                                             |
+| `operations.md`  | security headers, shutdown, bind errors, expiry purge, announcement pass, Online registry |
 
 ## Invariants
 
@@ -47,23 +45,19 @@ Every change holds these; the rules above say why.
 
 ## Commands
 
-Install from the repo root. Scripts run here or from the root with `-w server`.
+Scripts are in `package.json`; the traps:
 
-- `npm start` / `npm run dev` — `node ./src/index.ts`, `dev` adding `--watch`,
-  which also restarts on `../shared/src` changes. Do not add `--watch-path`: it
+- `dev` restarts on `../shared/src` changes. Do not add `--watch-path`: it
   throws `ERR_FEATURE_UNAVAILABLE_ON_PLATFORM` on Linux.
-- `npm run build` — `tsc -p tsconfig.build.json` to `dist/`, leaving out
-  `*.spec.ts`, `*.testkit.ts` and `src/db/seed/`. `dist/` still imports `shared`
-  as `.ts`, so running it needs the workspace link and a type-stripping Node
-  (ADR-0006).
-- `npm run seed -- --force` — **deletes every row in the content tables**
+- `build` omits `*.spec.ts`, `*.testkit.ts` and `src/db/seed/`. `dist/` still
+  imports `shared` as `.ts`, so running it needs the workspace link and a
+  type-stripping Node (ADR-0006).
+- `npm run seed -- --force` **deletes every row in the content tables**
   (`CONTENT_MODELS` in `src/db/seed/seed.ts`), Covers and Avatars with them;
   without `--force` it only reports row counts.
-- `npm test` — `node --env-file-if-exists=.env.local --test "src/**/*.spec.ts"`.
-  Keep `--env-file-if-exists`: without it `DB_USER` is unset and the MySQL
-  suites fail. `posttest` drops the test schemas, and npm runs it only after a
-  green run — never run it by hand. See `testing.md`.
-- `npm run typecheck`, `npm run lint`, `npm run lint:fix`. Prettier is root-only.
+- Keep `--env-file-if-exists` in the `test` script: without it `DB_USER` is
+  unset and the MySQL suites fail. `posttest` drops the test schemas, and npm
+  runs it only after a green run; never run it by hand. See `testing.md`.
 
 ## Environment
 

@@ -23,11 +23,8 @@ merges into. Both run the same automation.
   `CodeQL` check it also reports is not required.
 - `dependabot.yml` — weekly npm and Actions updates, minor and patch grouped per
   ecosystem, majors one PR each, no labels (the labels are the triage roles).
-  It ignores TypeScript 7 (a native compiler without the JavaScript API
-  typescript-eslint loads) and ESLint /
-  `@eslint/js` 10 (past what eslint-plugin-react and eslint-plugin-jsx-a11y
-  support). Drop an entry once those catch up, then take the major by hand. It
-  also holds `@types/node` to the `.nvmrc` major.
+  It documents each ignored major; drop an entry once its blocker catches up.
+  It also holds `@types/node` to the `.nvmrc` major.
 - **Every action is pinned to a full commit SHA** with its version in a trailing
   comment; Dependabot moves both. A tag can be re-pointed, a SHA cannot.
 

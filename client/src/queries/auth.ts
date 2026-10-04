@@ -52,10 +52,9 @@ const isAccountList = (
   return favoritedBy === 'me' || (accountId !== null && userId === accountId);
 };
 
-// A session is a cookie every tab of the browser shares, so a sign-in or Sign
-// out in one tab changes who every other tab is acting as — a tab still showing
-// the old Account would send its writes as the new one. Two duties, for the
-// app's one client:
+// A session is a cookie every tab shares, so a sign-in or Sign out in one tab
+// changes who every other tab acts as; a tab still showing the old Account
+// would send its writes as the new one. Three duties, for the app's one client:
 //
 // - A session this tab's own mutation wrote (`setQueryData`, so `manual`) is
 //   announced on the channel; a tab that hears it asks /auth/me again rather
@@ -63,7 +62,7 @@ const isAccountList = (
 //   browser has no BroadcastChannel: `useSession`'s refetch on focus catches up.
 // - A different Account (Guest counts as one) invalidates every other query,
 //   from whichever path the change arrived: likes, Draft books and
-//   notifications are all answered for whoever asks.
+//   notifications are answered for whoever asks.
 // - A 401 on any request while this tab shows an Account is a Lost session
 //   noticed mid-page: /auth/me is asked again rather than the session guessed
 //   to be `null`, since a sign-in in another tab may have overtaken the
@@ -162,12 +161,9 @@ export const useSession = () => {
 // `invalidateQueries`: the response body *is* the new session, so refetching
 // /auth/me would re-ask a question the response already answered.
 //
-// `login`, `register` and `requestReset` are wrapped in a one-line arrow
-// rather than passed by reference: the installed TanStack Query build calls
-// `mutationFn(variables, mutationFnContext)`, and a point-free reference
-// would forward that second, internal context object straight to the api
-// layer. The wrapper is the same shape `useConfirmReset` already needs for
-// its two-positional-argument call — it just also applies here.
+// `mutationFn`s are wrapped in an arrow, not passed by reference: TanStack
+// calls `mutationFn(variables, mutationFnContext)`, and a point-free reference
+// would forward that internal context object to the api layer.
 export const useLogin = () => {
   const client = useQueryClient();
   return useMutation({

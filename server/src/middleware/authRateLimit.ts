@@ -65,13 +65,9 @@ function normalisedLogin(body: unknown): string {
   return '';
 }
 
-// The name half of the IP+login key, hashed (SHA-256, hex) rather than kept
-// verbatim. loginSchema puts no cap on login, and this runs ahead of
-// validate, so an unbounded body (express.json() allows up to 100 KB) would
-// otherwise leave an unbounded key sitting in the limiter's map until the
-// sweep drops it — a cheap way to grow retained memory without ever failing
-// a single login. A fixed-size digest keeps the key's size constant whatever
-// the client sends.
+// The name half of the key is a SHA-256 hex digest: loginSchema caps nothing
+// and this runs before validate, so a 100 KB login (the express.json() limit)
+// would otherwise sit in the limiter's map until the sweep.
 function loginNameKey(address: string, body: unknown): string {
   const digest = createHash('sha256')
     .update(normalisedLogin(body))
@@ -99,19 +95,13 @@ export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
   };
 }
 
-// Login: only a failure counts — a 401, or an abort (the connection closing
-// before any answer goes out) — but both budgets are counted the moment the
-// request arrives, before validate, the lookup or argon2 run — never on a
-// later check-then-record path. A request is counted, provisionally, against
-// both the instant it is seen; the reservation is given back only when an
-// answer other than a 401 goes out. Counting up front is what closes the
-// race a peek-then-record design leaves open: with the count written only
-// when the response finishes, every request still waiting on argon2 reads
-// the same unspent budget, so C requests fired at once cost only about one
-// slot between them instead of C. Hitting first means each arrival claims
-// its own slot as it is seen — Node runs one request's synchronous
-// middleware to completion before starting the next's, so there is no window
-// for two arrivals to read the same count.
+// Login: only a failure counts (a 401, or an abort: the connection closing
+// before any answer goes out). Both budgets are charged the moment the request
+// arrives, before validate or argon2, and the hit is given back only when an
+// answer other than a 401 goes out. Counting later would let C parallel
+// requests spend about one slot, since all wait on argon2 and read the same
+// count. Node runs one request's synchronous middleware to completion, so each
+// arrival claims its own slot.
 export function limitFailedLogins(
   limits: Pick<AuthRateLimits, 'loginByIpAndLogin' | 'loginByIp'>
 ): RequestHandler {
@@ -124,13 +114,9 @@ export function limitFailedLogins(
     const refused = [nameHit, addressHit].filter((state) => !state.allowed);
 
     if (refused.length > 0) {
-      // A request refused here never reaches the handler, so it was never
-      // really an attempt: both budgets give back the hit this hit added,
-      // including the one that did not refuse it — hit() always increments,
-      // even on the budget that refuses, so leaving that one un-released
-      // would let a burst of refused attempts keep inflating the count that
-      // refused them, locking the budget for longer than its own limit ever
-      // earned.
+      // Refused requests never reach the handler, so both budgets give back
+      // their hit, including the one that did not refuse, because hit() always
+      // increments.
       limits.loginByIpAndLogin.release(nameKey);
       limits.loginByIp.release(address);
       next(
@@ -150,8 +136,7 @@ export function limitFailedLogins(
         // A genuine failure: both claims stay spent.
         return;
       }
-      // Any other answer gives both claims back: of the answers, only a 401
-      // is an attempt worth counting.
+      // Of the answers, only a 401 is an attempt worth counting.
       limits.loginByIpAndLogin.release(nameKey);
       limits.loginByIp.release(address);
       if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -162,11 +147,9 @@ export function limitFailedLogins(
       }
     });
     res.on('close', () => {
-      // An abort keeps both claims spent, as a 401 does, and never earns
-      // the success reset, even should a late 'finish' follow. The handler
-      // goes on to run the lookup and argon2 after the client has gone, so
-      // giving the claims back would let a client abort and repeat for
-      // unlimited argon2 work per address without ever being refused.
+      // An abort stays counted and never earns the success reset, even should
+      // a late 'finish' follow: the handler still runs argon2 after the client
+      // left, so a refund would allow unlimited argon2 work per address.
       settled = true;
     });
     next();

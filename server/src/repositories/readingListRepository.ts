@@ -64,26 +64,20 @@ export interface ReadingListRepository {
   listByBook(
     query: ListReadingListsByBookQuery
   ): Promise<{ items: PublicReadingList[]; total: number }>;
-  // 404 for a missing list, then 403 for a non-owner.
   update(
     id: number,
     account: Account,
     input: UpdateReadingListInput
   ): Promise<PublicReadingList>;
-  // 404 for a missing list, then 403 for a non-owner.
   remove(id: number, account: Account): Promise<void>;
-  // 404 for a missing list, then 403 for a non-owner. Hidden items come back
-  // as `unavailable`.
+  // Hidden items come back as `unavailable`.
   listEditItems(id: number, account: Account): Promise<ReadingListEditItem[]>;
-  // 404 for a missing list, then 403 for a non-owner.
   addItem(
     id: number,
     account: Account,
     target: AddReadingListItemInput
   ): Promise<ReadingListItem>;
-  // 404 for a missing list, then 403 for a non-owner.
   removeItem(id: number, itemId: number, account: Account): Promise<void>;
-  // 404 for a missing list, then 403 for a non-owner.
   reorderItems(id: number, account: Account, itemIds: number[]): Promise<void>;
   // 404 for a missing list. Anyone may copy a list; the copy is the account's.
   copy(id: number, account: Account): Promise<ReadingListDetail>;

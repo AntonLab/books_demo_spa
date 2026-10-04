@@ -38,8 +38,7 @@ export function initReadingListModel(sequelize: Sequelize): typeof ReadingList {
         autoIncrement: true,
         primaryKey: true,
       },
-      // INTEGER UNSIGNED like the id it references, or MySQL rejects the
-      // foreign key with errno 3780.
+      // INTEGER UNSIGNED to match users.id (errno 3780 otherwise).
       userId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       title: {
         type: DataTypes.STRING(READING_LIST_TITLE_MAX_LENGTH),
@@ -50,8 +49,8 @@ export function initReadingListModel(sequelize: Sequelize): typeof ReadingList {
       // carry a literal DEFAULT.
       tags: { type: DataTypes.JSON, allowNull: false },
       // Millisecond precision: lists are ordered by updatedAt, and two edits
-      // inside one second must rarely tie. Declaring the timestamps opts out
-      // of Sequelize's implicit NOT NULL.
+      // inside one second must rarely tie. allowNull: false restated (see
+      // User.ts).
       createdAt: { type: DataTypes.DATE(3), allowNull: false },
       updatedAt: { type: DataTypes.DATE(3), allowNull: false },
     },

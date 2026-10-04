@@ -23,9 +23,6 @@ interface SeriesOrderListProps {
   session: PublicUser;
 }
 
-// A series' books in Series order (CONTEXT.md), with the save-on-drop that
-// rewrites it and the way out of the series. An organism: it owns the book
-// list query and two mutations.
 export const SeriesOrderList: FC<SeriesOrderListProps> = ({
   seriesId,
   mayEdit,
