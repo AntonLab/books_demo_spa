@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { usePageClamp } from '@/components/organisms/ProfileWorksPanel/useProfileLists';
 import { useReadingListsByBook } from '@/queries/readingLists';
 
-export const BOOK_READING_LISTS_PAGE_SIZE = 10;
+const BOOK_READING_LISTS_PAGE_SIZE = 10;
 
 export const useBookReadingLists = (bookId: number) => {
   const [page, setPage] = useState(1);

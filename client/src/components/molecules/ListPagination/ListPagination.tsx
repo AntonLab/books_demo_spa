@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { Pagination } from 'antd';
 import { PAGE_SIZE_OPTIONS } from '@/constants/pagination';
 
-export interface ListPaginationProps {
+interface ListPaginationProps {
   current: number;
   pageSize: number;
   total: number;

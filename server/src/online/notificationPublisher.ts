@@ -2,7 +2,7 @@ import type { Transaction } from 'sequelize';
 import type { PublicNotification } from 'shared';
 import { logger, messageOf } from '../logger.ts';
 
-export type PublishNotification = (
+type PublishNotification = (
   userId: number,
   notification: PublicNotification
 ) => void;

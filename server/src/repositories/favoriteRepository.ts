@@ -30,11 +30,11 @@ import {
 // that reaches this repository is guarded.
 export type Account = NonNullable<Viewer>;
 
-export type FavoriteBookListResult = Pick<
+type FavoriteBookListResult = Pick<
   ListResponse<FavoriteBook>,
   'items' | 'total'
 >;
-export type FavoriteSeriesListResult = Pick<
+type FavoriteSeriesListResult = Pick<
   ListResponse<FavoriteSeries>,
   'items' | 'total'
 >;

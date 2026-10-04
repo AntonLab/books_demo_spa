@@ -12,7 +12,7 @@ export interface Geometry {
   gap: number;
 }
 
-export interface PageSizes {
+interface PageSizes {
   gap: number;
   // What stays below the pages: the bottom toolbar and the paddings under it.
   reserve: number;

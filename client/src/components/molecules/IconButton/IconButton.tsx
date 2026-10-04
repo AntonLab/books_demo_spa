@@ -3,10 +3,7 @@ import type { FC, Ref } from 'react';
 import { Button, Tooltip } from 'antd';
 import type { ButtonProps } from 'antd';
 
-export interface IconButtonProps extends Omit<
-  ButtonProps,
-  'aria-label' | 'title'
-> {
+interface IconButtonProps extends Omit<ButtonProps, 'aria-label' | 'title'> {
   label: string;
   // Tooltip text when it should differ from the accessible name, e.g. a denial.
   tooltip?: string;

@@ -93,14 +93,14 @@ interface PlannedFavorite {
   createdAt: Date;
 }
 
-export interface PlannedLibraryEntry {
+interface PlannedLibraryEntry {
   book: PlannedBook;
   accountIndex: number;
   status: ReadingStatus;
   updatedAt: Date;
 }
 
-export interface PlannedReadingList {
+interface PlannedReadingList {
   accountIndex: number;
   title: string;
   description: string;
@@ -113,7 +113,7 @@ export interface PlannedReadingList {
   updatedAt: Date;
 }
 
-export interface PlannedReport {
+interface PlannedReport {
   comment: PlannedComment;
   reporterIndex: number | null; // null: a System report
   reason: ReportReason;

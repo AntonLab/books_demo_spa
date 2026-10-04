@@ -17,7 +17,7 @@ type CreditChange = (
   actor: Actor
 ) => Promise<object | null>;
 
-export interface CreditHandlerOptions {
+interface CreditHandlerOptions {
   target: (id: number) => CoAuthorTarget;
   module: 'books' | 'series';
   // The 403 for an account that is not credited on the work.
