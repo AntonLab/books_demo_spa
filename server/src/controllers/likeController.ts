@@ -21,13 +21,10 @@ import type {
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
 export function createLikeController(repository: LikeRepository) {
-  // The matrix grants `user` only `own` on update/delete — flipping or
-  // removing someone else's like is not a plain user's call to make. Mirrors
-  // commentController's assertOwned: 404 before 403, so a refusal cannot be
-  // used to probe which ids exist, and `any` (admin) skips the owner
-  // comparison entirely. Every other value, a missing scope included, is
-  // compared: a handler mounted without requirePermission fails closed rather
-  // than acting as `any`.
+  // The matrix grants `user` only `own` on update/delete. Mirrors
+  // commentController's assertOwner: 404 before 403, so a refusal cannot probe
+  // which ids exist, and `any` skips the owner comparison (see
+  // requirePermission.ts).
   const assertOwned = async (req: Request, id: number): Promise<PublicLike> => {
     const existing = await repository.findById(id, viewerOf(req.user));
     if (!existing) throw new NotFoundError('Like', id);
@@ -41,10 +38,8 @@ export function createLikeController(repository: LikeRepository) {
 
   return {
     create: async (req, res) => {
-      // requirePermission guarantees req.user here — `guest` has no create
-      // grant on likes, so an anonymous request is a 401 before it arrives —
-      // but the type is optional because most requests legitimately have
-      // none, so narrow rather than assert.
+      // `guest` has no create grant, so req.user is set here; the check only
+      // narrows the optional type.
       if (!req.user) throw new UnauthorizedError();
 
       const like = await repository.create(

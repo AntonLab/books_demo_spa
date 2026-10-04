@@ -48,8 +48,7 @@ export function initGenreModel(sequelize: Sequelize): typeof Genre {
         references: { model: 'genres', key: 'id' },
         onDelete: 'RESTRICT',
       },
-      // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     },

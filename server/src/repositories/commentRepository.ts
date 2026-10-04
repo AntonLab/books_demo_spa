@@ -101,9 +101,8 @@ function sequelizeOf(): Sequelize {
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
     async create(input, actorId) {
-      // Nobody comments on a Draft book — not even its Co-authors: a draft
-      // is not out yet, and there is nothing for a reader to answer. A missing
-      // book falls through to the foreign key, which reports it as before.
+      // Nobody comments on a Draft book, its Co-authors included: it is not
+      // out yet. A missing book falls through to the foreign key.
       const book = await Book.findByPk(input.bookId, {
         attributes: ['status'],
       });

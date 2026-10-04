@@ -128,8 +128,7 @@ export function initNotificationModel(
         type: DataTypes.DATE,
         allowNull: true,
       },
-      // See User.ts: declaring the timestamp ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
     },
     {
@@ -141,10 +140,8 @@ export function initNotificationModel(
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
         // Serves both reads the bell makes: one account's unread count, and
-        // its list of live rows, which takes a filesort over that one
-        // account's rows. It is also a leftmost prefix of userId's foreign
-        // key, so InnoDB reuses it rather than adding a second index for the
-        // constraint.
+        // its list of live rows, which filesorts that one account's rows.
+        // Doubles as the userId FK index.
         {
           name: 'notifications_user_id_read_at',
           fields: ['userId', 'readAt'],

@@ -921,17 +921,12 @@ export function buildPlan(rng: Rng): Plan {
     authors.flatMap((author) => author.books),
     accounts
   );
-  // Drawn last, so every draw above is unchanged and adding Favorites left
-  // the chapters, comments and likes of the demo as they were.
+  // The draws below run in this order and only ever append: a new plan step
+  // draws last, so every earlier draw (and the demo's chapters, comments and
+  // likes) stays as it was.
   const favorites = planFavorites(rng, authors, accounts);
-
-  // Drawn after favorites for the same reason: every earlier draw stays as it was.
   const library = planLibrary(rng, authors, accounts);
-
-  // Drawn after the library, so every earlier draw stays as it was.
   const readingLists = planReadingLists(rng, authors, accounts);
-
-  // Drawn after the reading lists, so every earlier draw stays as it was.
   const reports = planReports(
     rng,
     threads.comments,

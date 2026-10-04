@@ -10,6 +10,11 @@ import type { Action, Module } from '../types/permission.ts';
 //
 // Mount it before `validate`, so a refused request is never parsed or echoed
 // back in a 400.
+//
+// Handlers compare `req.permissionScope !== 'any'`, so a missing scope (a
+// handler mounted without this middleware) is compared like `own` and fails
+// closed. `req.user` is set only when a session resolves, so it stays optional
+// to a handler on a public route.
 export function createRequirePermission(
   deps: RequireAuthDeps
 ): (module: Module, action: Action) => RequestHandler {
@@ -21,9 +26,8 @@ export function createRequirePermission(
     const scope = scopeFor(role, module, action);
 
     if (scope === 'none') {
-      // 401 and 403 are different answers and must stay so: for an anonymous
-      // caller the useful reply is "identify yourself", and every route spec
-      // asserts that today.
+      // 401 and 403 stay distinct: an anonymous caller needs "identify
+      // yourself".
       next(user ? new ForbiddenError() : new UnauthorizedError());
       return;
     }

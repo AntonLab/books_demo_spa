@@ -5,7 +5,6 @@
 // content blocks is logged once per block. It prints totals per subagent role
 // and model, and the main session's compactions. It reads transcripts only and
 // prints counters, never record bodies: one transcript line can be a megabyte.
-// Three session diagnoses rebuilt this tally by hand before it became a script.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';

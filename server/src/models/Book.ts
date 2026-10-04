@@ -64,10 +64,8 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         autoIncrement: true,
         primaryKey: true,
       },
-      // Must match series.id exactly (INTEGER UNSIGNED) or MySQL rejects the
-      // foreign key with errno 3780 on incompatible column types. allowNull is
-      // what makes the association's ON DELETE SET NULL legal: MySQL rejects
-      // SET NULL on a NOT NULL column.
+      // INTEGER UNSIGNED to match series.id (errno 3780 otherwise). allowNull
+      // is what makes the association's ON DELETE SET NULL legal.
       seriesId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
@@ -78,9 +76,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
       },
-      // Must match genres.id exactly (INTEGER UNSIGNED), as seriesId matches
-      // series.id, or MySQL rejects the foreign key with errno 3780 on
-      // incompatible column types.
+      // INTEGER UNSIGNED to match genres.id (errno 3780 otherwise).
       genreId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: true,
@@ -111,8 +107,7 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
         defaultValue: 'draft',
       },
       announcedAt: { type: DataTypes.DATE(3), allowNull: true },
-      // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     },
@@ -123,21 +118,17 @@ export function initBookModel(sequelize: Sequelize): typeof Book {
       charset: 'utf8mb4',
       collate: 'utf8mb4_0900_ai_ci',
       indexes: [
-        // Serves the `?seriesId=` filter together with its
-        // `ORDER BY seriesPosition, id` — InnoDB appends the primary key to
-        // every secondary index — so it needs no filesort. It is also a
-        // leftmost prefix of the foreign key's column, so InnoDB reuses it
-        // instead of creating a second index for the constraint. Not unique,
-        // for the reason chapters_book_id_position gives. `?userId=` goes
-        // through book_authors_user_id instead.
+        // Serves `?seriesId=` with `ORDER BY seriesPosition, id` (InnoDB
+        // appends the primary key to every secondary index, so no filesort)
+        // and doubles as the FK index. Not unique, for the reason
+        // chapters_book_id_position gives. `?userId=` goes through
+        // book_authors_user_id instead.
         {
           name: 'books_series_id_series_position',
           fields: ['seriesId', 'seriesPosition'],
         },
-        // Serves the `?genreId=` filter, and is the leftmost prefix of the
-        // foreign key's column, so InnoDB reuses it instead of creating a
-        // second index for the constraint. Not unique: any number of books
-        // share a Genre.
+        // Serves `?genreId=` and doubles as the FK index. Not unique: any
+        // number of books share a Genre.
         {
           name: 'books_genre_id',
           fields: ['genreId'],

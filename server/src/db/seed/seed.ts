@@ -1,25 +1,20 @@
-// Demo data for books_demo_spa: ten accounts, three authors' worth of
-// published work, and the comment threads and likes that make the
-// reader-facing pages look lived-in rather than empty.
+// Demo data: ten accounts, three authors' worth of published work, and the
+// comment threads and likes that make the reader-facing pages look lived-in.
 //
-// It writes through the models rather than the HTTP API. POST /api/auth/register
-// can only mint a `user`, so the admin and the superadmin would need a back
-// door anyway; every content write would need a live session cookie per
-// persona; and several hundred chapter POSTs against a running server is slow
-// and needs one started first. The generated payloads are still parsed by the
-// same zod schemas the routes use, so nothing lands here that the API would
-// have refused — only the identity fields those schemas deliberately withhold
-// (the owner, and the role) are attached afterwards.
+// It writes through the models, not the HTTP API: register can only mint a
+// `user`, content writes would need a session cookie per persona, and several
+// hundred chapter POSTs against a running server is slow. The payloads are
+// still parsed by the routes' zod schemas, so nothing lands that the API would
+// refuse; only the identity fields those schemas withhold (owner, role) are
+// attached afterwards.
 //
-// Every count is drawn from a PRNG with a fixed seed, so two runs produce the
-// same shape: book 7 has the same number of chapters today and tomorrow. Only
-// the dates move, and only because they are anchored to the moment of the run
-// (see PUBLICATION_WINDOW_DAYS) — a demo whose newest chapter is a year old
-// looks like an abandoned project.
+// Every count is drawn from a PRNG with a fixed seed, so two runs give the
+// same shape. Only the dates move, anchored to the moment of the run (see
+// PUBLICATION_WINDOW_DAYS): a demo whose newest chapter is a year old looks
+// abandoned.
 //
-// Destructive by design: with --force it deletes every row in the
-// content tables before inserting. Without --force it reports what it found
-// and exits without writing.
+// Destructive: with --force it deletes every row in the content tables first.
+// Without it, the script reports what it found and exits without writing.
 
 import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger, messageOf } from '../../logger.ts';
@@ -65,28 +60,20 @@ import { RNG_SEED, createRng, itemAt } from './rng.ts';
 import { assertSafeTarget } from './seedGuards.ts';
 import { createSequelize } from '../sequelize.ts';
 
-// One password for all ten accounts. This is demo data on a developer's
-// machine, not a credential: it is printed at the end of a run so nobody has
-// to come back and read it out of this file.
+// One password for all ten accounts: demo data, not a credential. It is
+// printed at the end of a run.
 const DEMO_PASSWORD = 'Password123!';
 
-// MySQL's max_allowed_packet is the reason for a batch at all; 200 chapter
-// rows of ~2 KB is ~400 KB, comfortably inside the 64 MB default and well
-// inside a conservative 4 MB one.
+// Batched for MySQL's max_allowed_packet: 200 chapter rows of ~2 KB is ~400 KB,
+// inside even a conservative 4 MB limit.
 const INSERT_BATCH = 200;
 
-/* -------------------------------------------------------------------------- */
-/* Write                                                                      */
-/* -------------------------------------------------------------------------- */
-
-// Ordered from the dependent end upwards, and deleted that way rather than left
-// to the cascades. Deleting `users` alone would currently take everything with
-// it, but that is a property of the schema's ON DELETE clauses, not of this
-// script: the day one of them changes, a seed relying on it would start leaving
-// rows behind silently. `genres` sits after `books` and `series` for the same
-// reason — both point at it, and its ON DELETE SET NULL is not this script's to
-// lean on. `permissions` is deliberately absent — it is reference data
-// syncPermissions() derives from code, not demo content.
+// Deleted from the dependent end upwards rather than left to the cascades:
+// deleting `users` alone would take everything today, but that is a property
+// of the schema's ON DELETE clauses, and if one changes a seed relying on it
+// would leave rows behind silently. `genres` follows `books` and `series` for
+// the same reason. `permissions` is absent on purpose: syncPermissions()
+// derives it from code, so it is not demo content.
 const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Notification,
   ReadingListItem,
@@ -695,10 +682,6 @@ async function writeReadingLists(
   await ReadingListItem.bulkCreate(items, { transaction });
   return { readingLists: lists.length, readingListItems: items.length };
 }
-
-/* -------------------------------------------------------------------------- */
-/* Entry point                                                              */
-/* -------------------------------------------------------------------------- */
 
 async function countExisting(): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};

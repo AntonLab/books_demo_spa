@@ -92,8 +92,8 @@ function declareAssociations(): void {
 
   Series.hasMany(Book, {
     as: 'books',
-    // allowNull is restated here so Sequelize does not infer NOT NULL from the
-    // association and quietly make SET NULL illegal.
+    // allowNull is restated on every nullable foreign key below: Sequelize
+    // would infer NOT NULL from the association and make SET NULL illegal.
     foreignKey: { name: 'seriesId', allowNull: true },
     // Not CASCADE, unlike the credits above: seriesId is optional, so a book can
     // stand alone. Dropping the series unlinks its books rather than
@@ -150,8 +150,6 @@ function declareAssociations(): void {
   // creates the foreign key.
   Genre.hasMany(Book, {
     as: 'books',
-    // allowNull is restated here so Sequelize does not infer NOT NULL from the
-    // association and quietly make SET NULL illegal.
     foreignKey: { name: 'genreId', allowNull: true },
     onDelete: 'SET NULL',
     onUpdate: 'CASCADE',
@@ -181,8 +179,6 @@ function declareAssociations(): void {
 
   User.hasMany(Comment, {
     as: 'comments',
-    // allowNull is restated so Sequelize does not infer NOT NULL from the
-    // association and quietly make SET NULL illegal.
     foreignKey: { name: 'userId', allowNull: true },
     // SET NULL, unlike every other owner reference here: a comment is part of
     // a conversation other people replied to, so it outlives its owner's
@@ -220,8 +216,6 @@ function declareAssociations(): void {
   ] as const) {
     User.hasMany(Report, {
       as,
-      // allowNull is restated so Sequelize does not infer NOT NULL from the
-      // association and quietly make SET NULL illegal.
       foreignKey: { name, allowNull: true },
       onDelete: 'SET NULL',
       onUpdate: 'CASCADE',
@@ -254,8 +248,6 @@ function declareAssociations(): void {
   // working at any thread depth.
   Comment.hasMany(Comment, {
     as: 'replies',
-    // allowNull is restated here so Sequelize does not infer NOT NULL from the
-    // association and quietly make SET NULL illegal.
     foreignKey: { name: 'parentId', allowNull: true },
     onDelete: 'SET NULL',
     // Not CASCADE, unlike every other association above: MySQL will not
@@ -268,15 +260,14 @@ function declareAssociations(): void {
   Comment.belongsTo(Comment, { as: 'parent', foreignKey: 'parentId' });
 
   // A like points at exactly one of a book or a comment, so both foreign keys
-  // are nullable — and both cascade, unlike the SET NULL that books.seriesId
-  // and comments.parentId use. SET NULL would leave a like with neither target
-  // set, which is the one state models/Like.ts exists to forbid; deleting the
-  // thing that was liked should take the likes with it.
+  // are nullable and both cascade, unlike the SET NULL on books.seriesId and
+  // comments.parentId: SET NULL would leave a like with neither target, the
+  // state models/Like.ts forbids.
   //
-  // There is no recursion to worry about here, unlike the comment replies: the
-  // deepest chain is books -> comments -> likes, well inside InnoDB's cascade
-  // limit of 15. Users reach likes by two paths (directly, and through their
-  // books and comments), which MySQL allows.
+  // No recursion concern, unlike the comment replies: the deepest chain is
+  // books -> comments -> likes, inside InnoDB's cascade limit of 15. Users
+  // reach likes by two paths (directly, and through their books and comments),
+  // which MySQL allows.
   User.hasMany(Like, {
     as: 'likes',
     foreignKey: 'userId',
@@ -287,8 +278,7 @@ function declareAssociations(): void {
 
   Book.hasMany(Like, {
     as: 'likes',
-    // allowNull is restated here so Sequelize does not infer NOT NULL from the
-    // association: a like on a comment leaves this column empty.
+    // A like on a comment leaves this column empty.
     foreignKey: { name: 'bookId', allowNull: true },
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',
@@ -317,8 +307,7 @@ function declareAssociations(): void {
 
   Book.hasMany(Favorite, {
     as: 'favorites',
-    // allowNull restated so Sequelize does not infer NOT NULL from the
-    // association: a favorite on a series leaves this column empty.
+    // A favorite on a series leaves this column empty.
     foreignKey: { name: 'bookId', allowNull: true },
     onDelete: 'CASCADE',
     onUpdate: 'CASCADE',

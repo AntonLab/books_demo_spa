@@ -57,9 +57,9 @@ export function initReportModel(sequelize: Sequelize): typeof Report {
         autoIncrement: true,
         primaryKey: true,
       },
-      // INTEGER UNSIGNED like the ids they reference, or MySQL rejects the
-      // foreign key with errno 3780. The Account references are nullable: an
-      // Account's delete nulls them and the Report stays.
+      // INTEGER UNSIGNED to match the referenced ids (errno 3780 otherwise).
+      // The Account references are nullable: an Account's delete nulls them
+      // and the Report stays.
       commentId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
       reporterId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       isSystem: {
@@ -83,8 +83,7 @@ export function initReportModel(sequelize: Sequelize): typeof Report {
       settledText: { type: DataTypes.TEXT, allowNull: true },
       takenAt: { type: DataTypes.DATE, allowNull: true },
       settledAt: { type: DataTypes.DATE, allowNull: true },
-      // See User.ts: declaring the timestamps ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
       updatedAt: { type: DataTypes.DATE, allowNull: false },
     },

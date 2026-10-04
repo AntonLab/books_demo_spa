@@ -27,9 +27,8 @@ export class BookCover extends Model<
 export function initBookCoverModel(sequelize: Sequelize): typeof BookCover {
   BookCover.init(
     {
-      // Must match books.id exactly (INTEGER UNSIGNED) or MySQL rejects the
-      // foreign key with errno 3780. No autoIncrement: this column *is* the
-      // link to the Book it belongs to.
+      // INTEGER UNSIGNED to match books.id (errno 3780 otherwise). No
+      // autoIncrement: this column *is* the link to its Book.
       bookId: {
         type: DataTypes.INTEGER.UNSIGNED,
         primaryKey: true,

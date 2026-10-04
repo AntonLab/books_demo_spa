@@ -13,16 +13,15 @@ type ModuleGrants = Partial<Record<Action, PermissionScope>>;
 type RoleGrants = Partial<Record<Module, ModuleGrants>>;
 
 // Only what is granted is spelled out; everything omitted expands to `none`.
-// Writing 160 rows by hand would bury the five decisions that actually matter
-// under a wall of denials.
+// Writing all 180 rows (5 roles x 9 modules x 4 actions) by hand would bury the
+// grants under a wall of denials.
 //
-// On `create`: a created row is the caller's by construction — its userId
-// comes from the session — so `own` and `any` mean the same thing there, and
-// `own` is the spelling a role that may create uses. The create path is not
-// scope-only, though: creating a book into a series checks that the caller
-// may touch that series (assertMayAddToSeries in controllers/bookController.ts),
-// and creating a chapter checks the owner of its book (assertMayAddTo in
-// controllers/chapterController.ts).
+// On `create`: a created row is the caller's by construction (its userId comes
+// from the session), so `own` and `any` mean the same and `own` is the
+// spelling used. The create path is not scope-only, though: filing a book into
+// a series checks the caller may touch that series (assertMayAddToSeries in
+// controllers/bookController.ts), and creating a chapter checks the owner of
+// its book (assertMayAddTo in controllers/chapterController.ts).
 const PUBLIC_READS: RoleGrants = {
   series: { read: 'any' },
   books: { read: 'any' },
@@ -36,8 +35,7 @@ const PUBLIC_READS: RoleGrants = {
 
 const USER_GRANTS: RoleGrants = {
   ...PUBLIC_READS,
-  // Guarded but unrestricted, as it is today: any signed-in caller may read the
-  // directory, and may edit only their own row.
+  // Any signed-in caller may read the directory and edit only their own row.
   users: { read: 'any', update: 'own', delete: 'own' },
   comments: { read: 'any', create: 'own', update: 'own', delete: 'own' },
   // update is what turns a like into a dislike; without it likeRoutes' PATCH

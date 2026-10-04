@@ -38,17 +38,14 @@ export class Like extends Model<
   declare comment?: NonAttribute<Comment>;
 }
 
-// The XOR, restated where Sequelize can enforce it. createLikeSchema refuses
-// the same two shapes at the API edge, but a caller reaching the model
-// directly never passes through zod, and MySQL cannot be given the CHECK
-// constraint that would catch it either: Sequelize 6 has no way to declare one
-// in Model.init, and there is no migration tool here to add it out of band
-// (see .claude/rules/server/sequelize.md). So this validator is the last
-// line, and a write that bypasses the model can still break the invariant.
+// The XOR, restated where Sequelize can enforce it: createLikeSchema covers the
+// API edge, but a caller reaching the model skips zod, and MySQL gets no CHECK
+// (Sequelize 6 cannot declare one in Model.init and there is no migration tool;
+// see .claude/rules/server/sequelize.md). So this validator is the last line,
+// and a write that bypasses the model can still break the invariant.
 //
-// Declared as a named function with an explicit `this` rather than a method in
-// the options object, which would leave `this` implicitly any under strict
-// mode.
+// A named function with an explicit `this`: a method in the options object
+// would leave `this` implicitly any under strict mode.
 function exactlyOneTarget(this: Like): void {
   if ((this.bookId == null) === (this.commentId == null)) {
     throw new Error('Exactly one of bookId or commentId must be set');
@@ -63,9 +60,8 @@ export function initLikeModel(sequelize: Sequelize): typeof Like {
         autoIncrement: true,
         primaryKey: true,
       },
-      // Must match users.id / books.id / comments.id exactly (INTEGER
-      // UNSIGNED) or MySQL rejects the foreign key with errno 3780 on
-      // incompatible column types.
+      // INTEGER UNSIGNED to match users.id / books.id / comments.id (errno
+      // 3780 otherwise).
       userId: {
         type: DataTypes.INTEGER.UNSIGNED,
         allowNull: false,
@@ -84,8 +80,7 @@ export function initLikeModel(sequelize: Sequelize): typeof Like {
         type: DataTypes.BOOLEAN,
         allowNull: false,
       },
-      // See User.ts: declaring the timestamp ourselves opts out of Sequelize's
-      // implicit NOT NULL, so it is restated here.
+      // allowNull: false restated (see User.ts).
       createdAt: { type: DataTypes.DATE, allowNull: false },
     },
     {
@@ -102,19 +97,16 @@ export function initLikeModel(sequelize: Sequelize): typeof Like {
         // Four indexes, each doing two jobs — likes are the most write-heavy
         // table here, and every extra index is paid on each insert.
         //
-        // The first pair serves `?bookId=` / `?commentId=` together with the
-        // list endpoint's ORDER BY id, so neither needs a filesort, and each
-        // is a leftmost prefix of its foreign key's column, so InnoDB reuses
-        // it instead of creating a second index for the constraint.
+        // The first pair serves `?bookId=` / `?commentId=` with ORDER BY id (no
+        // filesort) and doubles as the FK indexes.
         { name: 'likes_book_id_id', fields: ['bookId', 'id'] },
         { name: 'likes_comment_id_id', fields: ['commentId', 'id'] },
         // The second pair is the uniqueness the repository relies on instead
-        // of a check-then-write findOne: one like per user per target. MySQL
-        // treats NULLs in a unique index as distinct, so every like on a
-        // comment (bookId IS NULL) sits outside the first constraint and every
-        // like on a book sits outside the second — which is exactly right.
-        // Both also index userId, which is why there is no separate
-        // (userId, id): `?userId=` takes a filesort over one user's own rows.
+        // of a findOne first: one like per user per target. NULLs are distinct
+        // in a unique index, so a comment like (bookId IS NULL) sits outside
+        // the first constraint and a book like outside the second. Both also
+        // index userId, hence no separate (userId, id): `?userId=` filesorts
+        // one user's own rows.
         {
           name: 'likes_user_id_book_id',
           fields: ['userId', 'bookId'],
