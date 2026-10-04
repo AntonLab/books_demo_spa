@@ -45,9 +45,7 @@ interface CommentProps {
   busy?: boolean;
 }
 
-// The name is free because antd removed its own Comment component in v5, so
-// there is no import collision. Built from Typography and Button rather than
-// pulled from a dependency for the same reason.
+// The name is free because antd removed its own Comment component in v5.
 export const Comment: FC<CommentProps> = ({
   comment,
   canReply,

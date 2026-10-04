@@ -12,20 +12,16 @@ interface BookCoverProps {
   large?: boolean;
 }
 
-// A 2:3 frame. The title sits right beside this in every place it
-// renders (BookCard, BookPage), so the image is decorative and the
-// placeholder's text is hidden from assistive technology. The page header
-// renders it large.
+// A 2:3 frame. The title sits beside it everywhere (BookCard, BookPage), so
+// the image and the placeholder's text are hidden from assistive technology.
 export const BookCover: FC<BookCoverProps> = ({
   coverUrl,
   title,
   fullWidth = false,
   large = false,
 }) => {
-  // Stores the URL that failed, not just a boolean: a fresh upload hands
-  // this component a new `coverUrl` (`?v=<ms>`), and comparing it against
-  // the URL that failed lets that new URL try loading again instead of
-  // staying stuck on the placeholder from an unrelated, earlier failure.
+  // The failed URL, not a boolean: a fresh upload brings a new `coverUrl`
+  // (`?v=<ms>`), which then gets its own try.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showImage = coverUrl !== null && coverUrl !== failedUrl;
 

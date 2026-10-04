@@ -1,7 +1,6 @@
-// `Response` does not exist in the jsdom test environment: jsdom does not
-// implement the fetch API and Jest does not copy Node's globals in. These
-// fixtures supply the four members `api/client.ts` actually reads, so the
-// tests stop depending on a global that is not there.
+// `Response` does not exist under jsdom (no fetch API, and Jest does not copy
+// Node's globals in). These fixtures supply the four members `api/client.ts`
+// reads.
 interface ResponseLike {
   ok: boolean;
   status: number;

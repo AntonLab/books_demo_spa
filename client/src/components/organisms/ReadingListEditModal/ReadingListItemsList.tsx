@@ -26,9 +26,6 @@ const itemLabel = (item: ReadingListEditItem) => {
   return UNAVAILABLE;
 };
 
-// A Reading list's items in order (CONTEXT.md), with the save-on-drop that
-// rewrites it and the way to take an item out. An organism: it owns the items
-// query and two mutations.
 export const ReadingListItemsList: FC<ReadingListItemsListProps> = ({
   listId,
   mayEdit,

@@ -52,10 +52,9 @@ interface CoAuthorManagerProps {
 const nameOf = (author: AuthorSummary): string =>
   `${author.firstName} ${author.lastName}`;
 
-// Every action here is its own request, unlike the work's fields: a credit is
-// one request each, and the server's answer — a refusal included — belongs
-// next to the list it changes rather than behind a Save button. Only leaving
-// asks first, because it cannot be undone from this page.
+// Every action here is its own request, unlike the work's fields, so the
+// server's answer, a refusal included, shows next to the list rather than
+// behind a Save button. Only leaving asks first: it cannot be undone from here.
 export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
   work,
   authors,
@@ -168,11 +167,9 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
             avatarUrl: author.avatarUrl,
             name: nameOf(author),
           }))}
-          // Keeping `label` a plain string preserves antd's own derived
-          // `title` (used for the option's tooltip, and by this component's
-          // tests) and rc-select's search-filter matching; drawing the
-          // avatar through optionRender instead avoids the breakage a
-          // ReactNode label would cause there (Ruling P9).
+          // `label` stays a plain string so antd's derived `title` (the
+          // tooltip) and rc-select's filter still work; a ReactNode label
+          // would break both (Ruling P9).
           optionRender={(option) => (
             <Space size={token.marginXS}>
               <AccountAvatar

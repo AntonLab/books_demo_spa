@@ -85,8 +85,7 @@ export const EditChapterBody: FC<EditChapterBodyProps> = ({
   const handleDelete = () => {
     void edit.remove().then(
       closeIfMounted,
-      // A rejection is already surfaced through removeState.error; this
-      // handler exists only so the rejection is not left unhandled.
+      // The rejection already shows through removeState.error.
       () => {}
     );
   };
