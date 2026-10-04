@@ -10,7 +10,7 @@
 }
 
 .logo {
-  height: 32px;
+  height: var(--ant-control-height);
   width: auto;
   flex: none;
 }
@@ -28,7 +28,7 @@
   }
 
   .logo {
-    height: 24px;
+    height: var(--ant-control-height-sm);
   }
 }
 

@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Button, Flex, Popconfirm, Tag, Tooltip } from 'antd';
 import type { ReportedAccount } from 'shared';
 import { NameLink } from '@/components/molecules/NameLink/NameLink';
+import styles from './ReportedAccountCell.module.css';
 
 interface Props {
   account: ReportedAccount | null;
@@ -25,7 +26,7 @@ export const ReportedAccountCell: FC<Props> = ({
       {account.atBanThreshold && <Tag color="error">Ban mark</Tag>}
       <Tooltip title={blockedReason}>
         {/* A disabled button swallows mouse events, so the span takes them. */}
-        <span style={{ display: 'inline-block' }}>
+        <span className={styles.tooltipTarget}>
           <Popconfirm
             title={`Ban ${account.login}?`}
             okText="Yes, ban"

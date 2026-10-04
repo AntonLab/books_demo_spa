@@ -33,6 +33,7 @@ import {
 } from '@/types/genreAdmin';
 import { buildGenreTree } from '@/types/genreTree';
 import spacing from '@/theme/spacing.module.css';
+import styles from './GenreManager.module.css';
 
 interface GenreTreeData extends TreeDataNode {
   genre: AdminGenreListItem;
@@ -105,7 +106,7 @@ export const GenreManager: FC = () => {
       <Typography.Text type="secondary">{countsLabel(counts)}</Typography.Text>
       <Flex
         gap="small"
-        style={{ marginInlineStart: 'auto' }}
+        className={styles.actions}
         // rc-tree handles Enter on its list and swallows the button's click.
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {

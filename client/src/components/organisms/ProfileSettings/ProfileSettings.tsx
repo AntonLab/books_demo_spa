@@ -9,6 +9,7 @@ import { ChangePasswordForm } from '@/components/organisms/ChangePasswordForm/Ch
 import { DevicePreferencesReset } from '@/components/organisms/DevicePreferencesReset/DevicePreferencesReset';
 import { useSession } from '@/queries/auth';
 import { useDeleteAvatar, useUploadAvatar } from '@/queries/users';
+import styles from './ProfileSettings.module.css';
 
 // The signed-in Account's avatar, details, password, email setting and device
 // resets. ProfilePage renders it only once the session holds a PublicUser.
@@ -68,11 +69,11 @@ export const ProfileSettings: FC = () => {
         )}
       </Space>
       <EmailNotificationsSetting />
-      <div style={{ maxWidth: token.controlHeightLG * 10 }}>
+      <div className={styles.forms}>
         <Space
           orientation="vertical"
           size={token.marginLG}
-          style={{ width: '100%' }}
+          className={styles.formStack}
         >
           <AccountDetailsForm user={session} />
           <ChangePasswordForm userId={session.id} />

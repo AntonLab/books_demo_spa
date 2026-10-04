@@ -1,0 +1,7 @@
+.forms {
+  max-width: calc(var(--ant-control-height-lg) * 10);
+}
+
+.formStack {
+  width: 100%;
+}
