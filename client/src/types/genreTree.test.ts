@@ -1,9 +1,4 @@
-import {
-  buildGenreTree,
-  genrePathOf,
-  genreSegments,
-  publicGenrePath,
-} from './genreTree';
+import { buildGenreTree, genrePathOf, genreSegments } from './genreTree';
 import { genreItem, publicGenre } from '@/test/genres';
 
 const items = [
@@ -48,10 +43,9 @@ describe('paths', () => {
     expect(genrePathOf(404, items)).toBe('');
   });
 
-  it('builds the same path and the segments from a PublicGenre', () => {
+  it('builds the segments from a PublicGenre', () => {
     const g = publicGenre(2, 'Urban Fantasy', { id: 1, name: 'Fantasy' });
 
-    expect(publicGenrePath(g)).toBe('Fantasy / Urban Fantasy');
     expect(genreSegments(g)).toEqual([
       { id: 1, name: 'Fantasy' },
       { id: 2, name: 'Urban Fantasy' },

@@ -1,6 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
 import {
-  useAddReadingListItem,
   useCopyReadingList,
   useCreateReadingList,
   useDeleteReadingList,
@@ -84,7 +83,6 @@ it.each([
     { title: 'T', description: '', tags: [] },
   ],
   ['update', () => useUpdateReadingList(4), { title: 'U' }],
-  ['add', () => useAddReadingListItem(4), { bookId: 7 }],
   ['remove', () => useRemoveReadingListItem(4), 9],
   ['copy', () => useCopyReadingList(), 4],
 ])('%s refreshes both prefixes', async (_name, useHook, variables) => {
@@ -164,7 +162,7 @@ it('useReadingListsByBook asks for the Book at the given page and refetches when
   });
   const { result } = renderHookWithProviders(() => ({
     lists: useReadingListsByBook(7, 2, 10),
-    add: useAddReadingListItem(4),
+    add: useToggleListItem({ bookId: 7 }),
   }));
   await waitFor(() => expect(result.current.lists.isSuccess).toBe(true));
   expect(mocked.listReadingLists).toHaveBeenCalledWith({
@@ -173,7 +171,7 @@ it('useReadingListsByBook asks for the Book at the given page and refetches when
     pageSize: 10,
   });
 
-  await act(() => result.current.add.mutateAsync({ bookId: 7 }));
+  await act(() => result.current.add.mutateAsync({ listId: 4, itemId: null }));
 
   await waitFor(() => expect(mocked.listReadingLists).toHaveBeenCalledTimes(2));
 });
