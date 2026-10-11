@@ -27,14 +27,14 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
-    "concurrently": "10.0.5",
+    "concurrently": "10.0.6",
     "eslint": "9.39.5",
     "eslint-config-prettier": "10.1.8",
-    "fallow": "3.31.0",
+    "fallow": "3.32.0",
     "globals": "17.13.0",
     "prettier": "3.9.9",
-    "skills": "1.7.0",
+    "skills": "1.7.1",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.71.0"
+    "typescript-eslint": "8.71.1"
   }
 }
