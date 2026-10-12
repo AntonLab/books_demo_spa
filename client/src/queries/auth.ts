@@ -157,6 +157,10 @@ export const useSession = () => {
   });
 };
 
+export function useSignedIn(): boolean {
+  return useSession().data != null;
+}
+
 // Every mutation below writes the session with `setQueryData` rather than
 // `invalidateQueries`: the response body *is* the new session, so refetching
 // /auth/me would re-ask a question the response already answered.

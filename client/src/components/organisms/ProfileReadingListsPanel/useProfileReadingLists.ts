@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 import { usePageClamp } from '@/components/organisms/ProfileWorksPanel/useProfileLists';
-import { useSession } from '@/queries/auth';
+import { useSignedIn } from '@/queries/auth';
 import { useReadingListsByAccount } from '@/queries/readingLists';
 import { pagingOf } from '@/types/bookSearch';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
@@ -9,7 +9,7 @@ import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
 export const useProfileReadingLists = (viewerId: number) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { page, pageSize } = pagingOf(searchParams);
-  const signedIn = useSession().data != null;
+  const signedIn = useSignedIn();
   const query = useReadingListsByAccount(
     { userId: viewerId, current: page, pageSize },
     signedIn

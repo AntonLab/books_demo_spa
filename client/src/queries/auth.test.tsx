@@ -9,6 +9,7 @@ import {
   useRegister,
   useRequestReset,
   useSession,
+  useSignedIn,
   watchSession,
 } from './auth';
 import { queryKeys } from './keys';
@@ -94,6 +95,32 @@ describe('useSession', () => {
       expect(result.current.isError).toBe(true);
     });
     expect(result.current.error?.message).toBe('Internal Server Error');
+  });
+});
+
+describe('useSignedIn', () => {
+  it('is true with a session user', () => {
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, sessionOf(user));
+
+    const { result } = renderHook(() => useSignedIn(), {
+      wrapper: wrapper(client),
+    });
+
+    expect(result.current).toBe(true);
+  });
+
+  it('is false with nobody signed in', () => {
+    mockedAuth.me.mockRejectedValue(new ApiError(401, 'Unauthorized'));
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, null);
+
+    const { result } = renderHook(() => useSignedIn(), {
+      wrapper: wrapper(client),
+    });
+
+    expect(result.current).toBe(false);
   });
 });
 

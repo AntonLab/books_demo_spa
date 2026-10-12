@@ -66,6 +66,8 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const [composing, setComposing] = useState<Composing | null>(null);
   const [reporting, setReporting] = useState<number | null>(null);
+  // Per-id state: `mutation.variables` keeps only the latest call, so a second
+  // request would re-enable the first Comment early.
   const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set());
 
   // The Book page's tab label names the region, so no heading here. Every
@@ -203,8 +205,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
   // A ref, not isPending: TanStack notifies it on a later tick, so a double
   // click would send two requests. mutateAsync as in submit() above. Remove is
   // a delete too: the server makes a Removed comment when another Account
-  // calls it. busyIds, not mutation.variables: that holds only the latest
-  // call, so two Comments in flight would re-enable the first early.
+  // calls it.
   const act = (
     mutation: typeof remove,
     id: number,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import type { BookSort, GenreListItem } from 'shared';
-import { useSession } from '@/queries/auth';
+import { useSignedIn } from '@/queries/auth';
 import { useBookSearch, useFavoritedBooks } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useFavoritedSeries, useSeriesList } from '@/queries/series';
@@ -56,11 +56,6 @@ export interface ProfileFilters {
   };
 }
 
-// The profile list hooks (here, useProfileReadingLists, useLibraryList) also
-// ask only with a session user: their cache keys carry no Account, and
-// `watchSession` removes these queries on logout while the panel is still
-// mounted, so only `enabled` stops the refetch as a Guest (a 401).
-//
 // The request never waits for the genre list: `genreId` comes from the URL
 // alone, so a genre the list lacks (a Draft-only one) still filters.
 const useGenreFilter = (raw: string | undefined) => {
@@ -96,6 +91,9 @@ export const usePageClamp = (
   return overshooting;
 };
 
+// Profile list queries run only with a session user. Their cache keys carry no
+// Account, and `watchSession` removes them on logout while the panel is
+// mounted. Without `enabled` they would refetch as a Guest (401).
 export const useProfileBooks = (
   scope: ProfileScope,
   viewerId: number
@@ -111,7 +109,7 @@ export const useProfileBooks = (
 
   // The forced userId goes last: My works is the viewer's own works, Drafts
   // included, whatever the Author field says.
-  const signedIn = useSession().data != null;
+  const signedIn = useSignedIn();
   const mine = useBookSearch(
     { ...params, userId: viewerId },
     scope === 'mine' && !blocked && signedIn
@@ -183,7 +181,7 @@ export const useProfileSeries = (
   const { genres, genre, genreId, blocked } = useGenreFilter(search.genre);
   const params = seriesListParamsOf(search, genreId);
 
-  const signedIn = useSession().data != null;
+  const signedIn = useSignedIn();
   const mine = useSeriesList(
     { ...params, userId: viewerId },
     scope === 'mine' && !blocked && signedIn
