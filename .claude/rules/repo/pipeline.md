@@ -55,6 +55,11 @@ git-ignored.
   unreviewable. A PR into `dev` does not run its closing keywords, so after
   the merge, close each issue it fixes with
   `gh issue close <n> --comment "Fixed in #<pr>"`.
+- **`dev` and `main` change only through a PR**, a main→dev sync included;
+  never push to either directly, even though the ruleset lets an admin
+  through. `guard-shell.mjs` refuses such a push. When a protection rule,
+  permission or hook blocks a push or `gh pr create`, stop and ask the user;
+  never work around it.
 - **Run the gates through `gate-runner` before the final review**, in every
   mode, and quote its last line in the dispatch (`gates green at <sha>`, with
   the subset if it ran one). Never write that line yourself: a past run
@@ -73,8 +78,11 @@ git-ignored.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`, since
-  a compaction summary can drop it. Before the PR, each line is fixed or filed
-  as an issue (`gh issue create`) and marked so.
+  a compaction summary can drop it. Before the PR, list the open lines to the
+  user and ask what to do with each: fix now, file as an issue, or drop. Then
+  mark each line with the answer. **Never run `gh issue create` for a
+  follow-up the user did not pick for an issue**, in any mode, subagents
+  included.
 - **In `superpowers:subagent-driven-development`, dispatch the named agents**:
   implementer → `sdd-implementer`, task reviewer → `sdd-task-reviewer`, scoped
   re-review → `sdd-re-reviewer`, final review → `sdd-final-reviewer`. Send only

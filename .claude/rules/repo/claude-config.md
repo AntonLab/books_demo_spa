@@ -33,7 +33,9 @@ paths:
   Quoted text is skipped (a commit message may name `sed -i`), except a
   quoted redirect target and a `node`/`python` script body. A heredoc body
   is skipped the same way (a PR body may name `npm run typecheck`), unless
-  a shell or interpreter on the opening line runs it.
+  a shell or interpreter on the opening line runs it. It also refuses a
+  `git push` whose destination is `dev` or `main`: a named refspec,
+  `HEAD`, `--all`/`--mirror`, or no refspec while on either branch.
 - **`after-pr.mjs`** (PostToolUse on Bash and PowerShell) adds one reminder
   after the main session's `gh pr create`. The reminder says to `/clear`
   before the next spec, and to close the PR's issues by hand after the merge,
