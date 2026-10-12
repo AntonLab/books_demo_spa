@@ -125,9 +125,6 @@ per-call values.
   fix stay in the main session: a subagent cannot ask the user anything.
 - **`/db-reset` is the user's command** (`disable-model-invocation`): when the
   database needs a rebuild, ask the user to type it; the Skill call is refused.
-- **Each agent body carries a `<!-- Revised: YYYY-MM-DD … -->` line.** Bump it
-  with every change: the bodies are not in git, and a session diagnosis can
-  tell which version ran only from that line and the file's mtime.
 - **The controller creates the worktree before Task 1 with
   `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
   `.env.local` files an agent may not copy, and an install. Name the worktree
