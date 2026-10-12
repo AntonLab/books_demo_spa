@@ -130,8 +130,8 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   While a plan pipeline runs, `code-mapper` does the mapping and
   `sdd-implementer` makes the changes. Neither a search agent nor
   `cavecrew-builder` stands in for them.
-- `.claude/agents/` is git-ignored, so a fresh clone has none and a dispatch to
-  a missing agent fails; every agent preloads `caveman`
+- The agents come from the `swarm` plugin: dispatch them as `swarm:<name>`
+  (`swarm:code-mapper`). Every agent preloads `caveman`
   (`.claude/rules/repo/claude-config.md` has the detail).
 - To find out why a pipeline session went wrong, use
   `superpowers:diagnosing-superpowers` rather than reading transcripts by hand.
