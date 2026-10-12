@@ -172,8 +172,7 @@ async function loadBookCounts(
 
 // A page of rows as PublicSeries, in the order given, with credits and Genres
 // in one query each. Exported for favoriteRepository, whose rows embed the
-// series they point at. The optional transaction is for single-row reads
-// inside one.
+// series they point at. `transaction` joins an open one.
 export async function publicSeriesOf(
   rows: Series[],
   transaction?: Transaction
@@ -199,7 +198,7 @@ export async function publicSeriesOf(
   );
 }
 
-// One row through the batch path.
+// Single-row form of publicSeriesOf, so the single-row and batch reads cannot drift.
 async function publicSeriesRow(
   series: Series,
   transaction?: Transaction

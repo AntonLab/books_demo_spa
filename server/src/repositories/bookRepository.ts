@@ -245,8 +245,8 @@ async function loadSeriesRefs(
 
 // A page of rows as PublicBooks, in the order given: credits, Covers and
 // Genres in one query each, so a LIMIT keeps paging over books. Exported for
-// favoriteRepository, whose rows embed the books they point at. The optional
-// transaction is for single-row reads inside one.
+// favoriteRepository, whose rows embed the books they point at.
+// `transaction` joins an open one.
 export async function publicBooksOf(
   rows: Book[],
   transaction?: Transaction
@@ -272,7 +272,7 @@ export async function publicBooksOf(
   );
 }
 
-// One row through the batch path.
+// Single-row form of publicBooksOf, so the single-row and batch reads cannot drift.
 async function publicBook(
   book: Book,
   transaction?: Transaction
