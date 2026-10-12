@@ -33,7 +33,8 @@ is load-bearing:
   `matchMedia` and `ResizeObserver` (antd responsive helpers),
   `TextEncoder`/`TextDecoder` (react-router builds one at import),
   `MessageChannel` (every antd `Form.Item` mount) and `scrollIntoView`
-  (`ChapterContents` once its drawer opens), and `EventSource`
+  (`ChapterContents` once its drawer opens), `getComputedStyle` (pseudo-element
+  argument dropped, so a modal open logs no error), and `EventSource`
   (`src/test/eventSource.ts`, reset before each test): `NotificationBell`
   opens a stream whenever an Account is signed in. A test drives it through
   `FakeEventSource.latest()` — `emit(NOTIFICATION_STREAM_EVENT, n)` inside

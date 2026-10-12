@@ -57,6 +57,14 @@ if (!(Element.prototype.scrollIntoView as unknown)) {
   Element.prototype.scrollIntoView = () => {};
 }
 
+// jsdom lays out nothing and logs a not-implemented error for any
+// pseudo-element argument; rc-component's scrollbar measure passes one on every
+// modal or drawer open. Dropping it keeps the element's own style, which is
+// what jsdom answered anyway.
+const realGetComputedStyle = window.getComputedStyle.bind(window);
+window.getComputedStyle = (elt: Element, _pseudoElt?: string | null) =>
+  realGetComputedStyle(elt);
+
 // jsdom implements no MessageChannel. antd's Form (via @rc-component/form's
 // watch mechanism) constructs one unconditionally on every field mount to
 // schedule a macrotask, so without this polyfill mounting any Form-based
