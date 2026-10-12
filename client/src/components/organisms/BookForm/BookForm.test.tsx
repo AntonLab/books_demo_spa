@@ -230,53 +230,34 @@ describe('BookForm', () => {
     );
   });
 
-  it('leaves a Genre alone when Delete is pressed while its dropdown is open', async () => {
-    const onSubmit = jest.fn();
-    renderForm({
-      submitLabel: 'Save',
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: [],
-        seriesId: null,
-        genreId: 4,
-      },
-      onSubmit,
-    });
+  it.each([
+    ['Genre', { seriesId: null, genreId: 4 }, { genreId: 4 }],
+    ['Series', { seriesId: 7, genreId: null }, { seriesId: 7 }],
+  ])(
+    'leaves a %s alone when Delete is pressed while its dropdown is open',
+    async (label, ids, expected) => {
+      const onSubmit = jest.fn();
+      renderForm({
+        submitLabel: 'Save',
+        initialValues: {
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: [],
+          ...ids,
+        },
+        onSubmit,
+      });
 
-    await userEvent.click(screen.getByLabelText('Genre'));
-    await userEvent.keyboard('{Delete}');
-    await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await userEvent.click(screen.getByLabelText(label));
+      await userEvent.keyboard('{Delete}');
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(onSubmit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ genreId: 4 })
-    );
-  });
-
-  it('leaves a Series alone when Delete is pressed while its dropdown is open', async () => {
-    const onSubmit = jest.fn();
-    renderForm({
-      submitLabel: 'Save',
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: [],
-        seriesId: 7,
-        genreId: null,
-      },
-      onSubmit,
-    });
-
-    await userEvent.click(screen.getByLabelText('Series'));
-    await userEvent.keyboard('{Delete}');
-    await userEvent.keyboard('{Escape}');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(onSubmit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ seriesId: 7 })
-    );
-  });
+      expect(onSubmit).toHaveBeenLastCalledWith(
+        expect.objectContaining(expected)
+      );
+    }
+  );
 
   it('submits the picked id after a select was cleared', async () => {
     const onSubmit = jest.fn();
