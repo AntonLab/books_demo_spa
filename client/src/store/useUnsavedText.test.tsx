@@ -7,6 +7,7 @@ import {
 } from './useUnsavedText';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as authApi from '@/api/auth';
@@ -42,7 +43,7 @@ const ownedBy = (accountId: number | null): Partial<RootState> => ({
 const withSession = (session: PublicUser | null | undefined) => {
   const queryClient = createTestQueryClient();
   if (session !== undefined) {
-    queryClient.setQueryData(queryKeys.session, session);
+    queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
   }
   return queryClient;
 };

@@ -6,6 +6,7 @@ import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import { formatDate } from '@/format/date';
@@ -104,7 +105,7 @@ const renderPage = (
   id = '1'
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) queryClient.setQueryData(queryKeys.session, session);
+  if (session) queryClient.setQueryData(queryKeys.session, sessionOf(session));
 
   return renderWithProviders(<BookPage />, {
     route: `/books/${id}`,
@@ -127,7 +128,7 @@ const renderWithHome = (
   }: { session?: PublicUser; preloadedState?: Partial<RootState> } = {}
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) queryClient.setQueryData(queryKeys.session, session);
+  if (session) queryClient.setQueryData(queryKeys.session, sessionOf(session));
 
   return renderWithProviders(
     <Routes>
@@ -850,7 +851,10 @@ describe('BookPage Edit button', () => {
   ])('after delete from the modal, %s', async (_name, who, landing) => {
     mockedBooks.deleteBook.mockResolvedValue(undefined);
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData(queryKeys.session, { ...reader, ...who });
+    queryClient.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...reader, ...who })
+    );
     renderWithProviders(
       <Routes>
         <Route path="/books/:id" element={<BookPage />} />

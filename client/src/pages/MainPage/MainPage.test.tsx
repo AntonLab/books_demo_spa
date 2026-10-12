@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { MainPage } from './MainPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as booksApi from '@/api/books';
 import type { BookSort } from 'shared';
@@ -286,7 +287,7 @@ describe('MainPage', () => {
     it("hides another Account's history", async () => {
       answerWithViewed([titled(1)]);
       const queryClient = createTestQueryClient();
-      queryClient.setQueryData(queryKeys.session, account(5));
+      queryClient.setQueryData(queryKeys.session, sessionOf(account(5)));
 
       renderWithProviders(<MainPage />, {
         queryClient,

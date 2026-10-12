@@ -181,7 +181,7 @@ describe('useLogout', () => {
   it('clears the session cache', async () => {
     mockedAuth.logout.mockResolvedValue(undefined);
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
 
     const { result } = renderHook(() => useLogout(), {
       wrapper: wrapper(client),
@@ -273,12 +273,15 @@ describe('watchSession', () => {
   it('invalidates every other query when the Account changes, and only then', () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     client.setQueryData(queryKeys.book(7), { id: 7 });
     const bookIsInvalidated = () =>
       client.getQueryState(queryKeys.book(7))?.isInvalidated;
 
-    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    client.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...user, login: 'bobby' })
+    );
     expect(bookIsInvalidated()).toBe(false);
 
     client.setQueryData(queryKeys.session, null);
@@ -289,7 +292,7 @@ describe('watchSession', () => {
   it("drops the last Account's notifications rather than refetching them", () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     client.setQueryData(queryKeys.notifications(user.id), {
       items: [],
       unread: 0,
@@ -305,13 +308,16 @@ describe('watchSession', () => {
   it("drops the last Account's Library and Favorites, and keeps them while the Account stays", () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     const libraryKey = [...queryKeys.allLibrary, { page: 1 }];
     const favoritesKey = [...queryKeys.allFavorites, { page: 1 }];
     client.setQueryData(libraryKey, { items: [] });
     client.setQueryData(favoritesKey, { items: [] });
 
-    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    client.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...user, login: 'bobby' })
+    );
     expect(client.getQueryState(libraryKey)).toBeDefined();
     expect(client.getQueryState(favoritesKey)).toBeDefined();
 
@@ -323,11 +329,14 @@ describe('watchSession', () => {
   it("drops the last Account's own Reading lists, and keeps them while the Account stays", () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     const key = queryKeys.myListsForWork({ bookId: 7 });
     client.setQueryData(key, { items: [] });
 
-    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    client.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...user, login: 'bobby' })
+    );
     expect(client.getQueryState(key)).toBeDefined();
 
     client.setQueryData(queryKeys.session, null);
@@ -337,7 +346,7 @@ describe('watchSession', () => {
   it("drops the last Account's Favorites and My works lists, and keeps everyone else's", () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
     const favoriteSeries = queryKeys.series({ favoritedBy: 'me', limit: 20 });
     const myBooks = queryKeys.books({ userId: user.id, pageSize: 20 });
@@ -356,7 +365,10 @@ describe('watchSession', () => {
     ];
     all.forEach((key) => client.setQueryData(key, { items: [] }));
 
-    client.setQueryData(queryKeys.session, { ...user, login: 'bobby' });
+    client.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...user, login: 'bobby' })
+    );
     all.forEach((key) => expect(client.getQueryState(key)).toBeDefined());
 
     client.setQueryData(queryKeys.session, null);
@@ -371,11 +383,14 @@ describe('watchSession', () => {
   it("drops Account A's lists when Account B signs in directly", () => {
     const client = createTestQueryClient();
     watchSession(client, null);
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
     const favoriteBooks = queryKeys.books({ favoritedBy: 'me' });
     client.setQueryData(favoriteBooks, { items: [] });
 
-    client.setQueryData(queryKeys.session, { ...user, id: 2, login: 'amy' });
+    client.setQueryData(
+      queryKeys.session,
+      sessionOf({ ...user, id: 2, login: 'amy' })
+    );
 
     expect(client.getQueryState(favoriteBooks)).toBe(undefined);
   });
@@ -405,7 +420,7 @@ describe('watchSession', () => {
       async (_kind, fail) => {
         const client = createTestQueryClient();
         watchSession(client, null);
-        client.setQueryData(queryKeys.session, user);
+        client.setQueryData(queryKeys.session, sessionOf(user));
 
         await fail(client, new ApiError(401, 'Authentication required'));
 
@@ -420,7 +435,7 @@ describe('watchSession', () => {
       await failMutation(client, new ApiError(401, 'Invalid credentials'));
       expect(sessionIsInvalidated(client)).toBe(false);
 
-      client.setQueryData(queryKeys.session, user);
+      client.setQueryData(queryKeys.session, sessionOf(user));
       await failQuery(client, new ApiError(403, 'Forbidden'));
       await failMutation(client, new ApiError(500, 'Server error'));
       expect(sessionIsInvalidated(client)).toBe(false);
@@ -432,7 +447,7 @@ describe('useRequestReset', () => {
   it('sends the address and leaves the session alone', async () => {
     mockedAuth.requestReset.mockResolvedValue(undefined);
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
 
     const { result } = renderHook(() => useRequestReset(), {
       wrapper: wrapper(client),
@@ -440,7 +455,7 @@ describe('useRequestReset', () => {
     await result.current.mutateAsync('bob@example.com');
 
     expect(mockedAuth.requestReset).toHaveBeenCalledWith('bob@example.com');
-    expect(client.getQueryData(queryKeys.session)).toEqual(user);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
   });
 });
 
@@ -448,7 +463,7 @@ describe('useConfirmReset', () => {
   it('signs the client out, since the server kills every session', async () => {
     mockedAuth.confirmReset.mockResolvedValue(undefined);
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, user);
+    client.setQueryData(queryKeys.session, sessionOf(user));
 
     const { result } = renderHook(() => useConfirmReset(), {
       wrapper: wrapper(client),

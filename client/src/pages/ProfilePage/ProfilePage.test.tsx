@@ -63,7 +63,7 @@ const LocationProbe = () => {
 // click or a redirect landed.
 const renderWithSession = (data: PublicUser | null, route = '/profile') => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, data);
+  queryClient.setQueryData(queryKeys.session, data && sessionOf(data));
   return renderWithProviders(
     <>
       <ProfilePage />
