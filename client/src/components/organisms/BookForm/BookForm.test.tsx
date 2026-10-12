@@ -16,6 +16,14 @@ const series = [
 
 const genres = [genreItem(4, 'Gothic'), genreItem(5, 'Hard SF')];
 
+const existing = {
+  title: 'A Tale of Dragons',
+  description: 'Long ago.',
+  tags: [],
+  seriesId: 7,
+  genreId: 4,
+};
+
 const renderForm = (props: Partial<ComponentProps<typeof BookForm>> = {}) =>
   renderWithProviders(
     <BookForm
@@ -94,10 +102,8 @@ describe('BookForm', () => {
       submitLabel: 'Save',
       showStatus: true,
       initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
+        ...existing,
         tags: ['epic'],
-        seriesId: 7,
         genreId: null,
         status: 'draft',
       },
@@ -173,14 +179,7 @@ describe('BookForm', () => {
     renderForm({
       submitLabel: 'Save',
       showStatus: true,
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: ['epic'],
-        seriesId: 7,
-        genreId: 4,
-        status: 'draft',
-      },
+      initialValues: { ...existing, tags: ['epic'], status: 'draft' },
       onSubmit,
     });
 
@@ -209,13 +208,7 @@ describe('BookForm', () => {
     const onSubmit = jest.fn();
     renderForm({
       submitLabel: 'Save',
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: [],
-        seriesId: 7,
-        genreId: 4,
-      },
+      initialValues: existing,
       onSubmit,
     });
 
@@ -230,20 +223,20 @@ describe('BookForm', () => {
     );
   });
 
-  it.each([
-    ['Genre', { seriesId: null, genreId: 4 }, { genreId: 4 }],
-    ['Series', { seriesId: 7, genreId: null }, { seriesId: 7 }],
+  it.each<[string, 'seriesId' | 'genreId', number]>([
+    ['Genre', 'genreId', 4],
+    ['Series', 'seriesId', 7],
   ])(
     'leaves a %s alone when Delete is pressed while its dropdown is open',
-    async (label, ids, expected) => {
+    async (label, key, id) => {
       const onSubmit = jest.fn();
       renderForm({
         submitLabel: 'Save',
         initialValues: {
-          title: 'A Tale of Dragons',
-          description: 'Long ago.',
-          tags: [],
-          ...ids,
+          ...existing,
+          seriesId: null,
+          genreId: null,
+          [key]: id,
         },
         onSubmit,
       });
@@ -254,7 +247,7 @@ describe('BookForm', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
       expect(onSubmit).toHaveBeenLastCalledWith(
-        expect.objectContaining(expected)
+        expect.objectContaining({ [key]: id })
       );
     }
   );
@@ -263,13 +256,7 @@ describe('BookForm', () => {
     const onSubmit = jest.fn();
     renderForm({
       submitLabel: 'Save',
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: [],
-        seriesId: 7,
-        genreId: null,
-      },
+      initialValues: { ...existing, genreId: null },
       onSubmit,
     });
 
@@ -288,14 +275,7 @@ describe('BookForm', () => {
     renderForm({
       submitLabel: 'Save',
       showStatus: true,
-      initialValues: {
-        title: 'A Tale of Dragons',
-        description: 'Long ago.',
-        tags: ['epic'],
-        seriesId: 7,
-        genreId: 4,
-        status: 'draft',
-      },
+      initialValues: { ...existing, tags: ['epic'], status: 'draft' },
       onSubmit,
     });
 
