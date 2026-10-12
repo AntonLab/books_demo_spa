@@ -6,8 +6,7 @@ import {
   useProfileSeries,
 } from './useProfileLists';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
+import { seededClient, sessionOf } from '@/test/session';
 import { genreItem } from '@/test/genres';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
@@ -33,12 +32,6 @@ const row = {
   favoriteId: 41,
 } as unknown as PublicBook & { favoriteId: number };
 const user = { id: 3, role: 'user' } as PublicUser;
-// The lists ask only with a session user; `null` is a Guest.
-const seededClient = (who: PublicUser | null) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, who && sessionOf(who));
-  return queryClient;
-};
 const setup = (
   scope: ProfileScope,
   route: string,

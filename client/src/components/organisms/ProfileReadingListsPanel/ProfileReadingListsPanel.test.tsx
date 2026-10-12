@@ -3,9 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useParams } from 'react-router';
 import { ProfileReadingListsPanel } from './ProfileReadingListsPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seededClient } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as readingListsApi from '@/api/readingLists';
 import type { PublicUser } from '@/types/api';
@@ -36,13 +34,8 @@ const LocationProbe = () => {
   return <div data-testid="search">{location.search}</div>;
 };
 const ListPage = () => <div>{`List page ${useParams().id}`}</div>;
-const renderPanel = (route: string) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(
-    queryKeys.session,
-    sessionOf({ id: 9, role: 'user' } as PublicUser)
-  );
-  return renderWithProviders(
+const renderPanel = (route: string) =>
+  renderWithProviders(
     <>
       <Routes>
         <Route
@@ -53,9 +46,11 @@ const renderPanel = (route: string) => {
       </Routes>
       <LocationProbe />
     </>,
-    { route, queryClient }
+    {
+      route,
+      queryClient: seededClient({ id: 9, role: 'user' } as PublicUser),
+    }
   );
-};
 
 beforeEach(() => {
   jest.resetAllMocks();

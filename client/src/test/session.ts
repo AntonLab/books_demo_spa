@@ -1,5 +1,8 @@
 import { ACTIONS, MODULES, isModeratorRole } from 'shared';
 import type { PermissionScope, SessionPermissions, UserRole } from 'shared';
+import type { QueryClient } from '@tanstack/react-query';
+import { createTestQueryClient } from '@/test/queryClient';
+import { queryKeys } from '@/queries/keys';
 import type { PublicUser, SessionUser } from '@/types/api';
 
 // Mimics the server's permission matrix for the one scope the client reads
@@ -26,3 +29,10 @@ export const sessionOf = (
   ...user,
   permissions: permissionsOf(user.role, usersUpdate),
 });
+
+// `null` seeds a Guest.
+export const seededClient = (user: PublicUser | null): QueryClient => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(queryKeys.session, user && sessionOf(user));
+  return queryClient;
+};

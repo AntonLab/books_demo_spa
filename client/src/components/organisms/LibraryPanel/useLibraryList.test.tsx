@@ -1,9 +1,7 @@
 import { waitFor } from '@testing-library/react';
 import { useLibraryList } from './useLibraryList';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seededClient } from '@/test/session';
 import * as libraryApi from '@/api/library';
 import type { PublicUser } from '@/types/api';
 
@@ -11,14 +9,11 @@ jest.mock('@/api/library');
 const mockedLibrary = jest.mocked(libraryApi);
 
 const user = { id: 3, role: 'user' } as PublicUser;
-const setup = (who: PublicUser | null) => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, who && sessionOf(who));
-  return renderHookWithProviders(() => useLibraryList(), {
+const setup = (who: PublicUser | null) =>
+  renderHookWithProviders(() => useLibraryList(), {
     route: '/profile/library',
-    queryClient,
+    queryClient: seededClient(who),
   });
-};
 
 beforeEach(() => jest.resetAllMocks());
 

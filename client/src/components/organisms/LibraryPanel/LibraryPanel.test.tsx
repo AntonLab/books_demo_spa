@@ -4,9 +4,7 @@ import { useLocation } from 'react-router';
 import type { ReadingStatus } from 'shared';
 import { LibraryPanel } from './LibraryPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
-import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seededClient } from '@/test/session';
 import * as libraryApi from '@/api/library';
 import { ApiError } from '@/api/client';
 import type { PublicUser } from '@/types/api';
@@ -52,20 +50,17 @@ const page = (
 // A clamped title is also rendered once more, hidden, so match the link.
 const titleLink = (title: string) => screen.findByRole('link', { name: title });
 const Probe = () => <div data-testid="search">{useLocation().search}</div>;
-const renderPanel = (route = '/profile/library') => {
-  const queryClient = createTestQueryClient();
-  queryClient.setQueryData(
-    queryKeys.session,
-    sessionOf({ id: 3, role: 'user' } as PublicUser)
-  );
-  return renderWithProviders(
+const renderPanel = (route = '/profile/library') =>
+  renderWithProviders(
     <>
       <LibraryPanel />
       <Probe />
     </>,
-    { route, queryClient }
+    {
+      route,
+      queryClient: seededClient({ id: 3, role: 'user' } as PublicUser),
+    }
   );
-};
 
 describe('LibraryPanel', () => {
   beforeEach(() => jest.resetAllMocks());
