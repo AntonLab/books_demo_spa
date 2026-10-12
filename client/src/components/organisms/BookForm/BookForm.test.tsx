@@ -272,7 +272,7 @@ describe('BookForm', () => {
     );
   });
 
-  it('leaves a value alone when Delete is pressed while the dropdown is open', async () => {
+  it('leaves a Genre alone when Delete is pressed while its dropdown is open', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(
       <BookForm

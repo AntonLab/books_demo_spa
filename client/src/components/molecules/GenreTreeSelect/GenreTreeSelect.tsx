@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import type { FC, KeyboardEvent } from 'react';
+import { useMemo } from 'react';
+import type { FC } from 'react';
 import { TreeSelect } from 'antd';
 import type { TreeSelectProps } from 'antd';
 import type { GenreListItem } from 'shared';
 import { buildGenreTree, genrePathOf } from '@/types/genreTree';
-import styles from '@/components/molecules/ClearableSelect/ClearableSelect.module.css';
+import { useClearable } from '@/hooks/useClearable';
 
 // `value` and `onChange` are the pair a Form.Item injects.
 type GenreTreeSelectProps = Omit<
@@ -17,8 +17,8 @@ type GenreTreeSelectProps = Omit<
 };
 
 // A tree of Genres and their Subgenres where any node can be chosen. The list
-// shows each short name; the closed box shows the full path. Clears like
-// ClearableSelect: Delete or Backspace on the focused, closed select.
+// shows each short name; the closed box shows the full path. Clears through
+// `useClearable`.
 export const GenreTreeSelect: FC<GenreTreeSelectProps> = ({
   genres,
   value,
@@ -27,7 +27,7 @@ export const GenreTreeSelect: FC<GenreTreeSelectProps> = ({
   onOpenChange,
   ...rest
 }) => {
-  const [open, setOpen] = useState(false);
+  const clearable = useClearable({ value, onChange, onKeyDown, onOpenChange });
 
   const treeData = useMemo(() => {
     const node = ({ id, name }: GenreListItem) => ({
@@ -41,33 +41,16 @@ export const GenreTreeSelect: FC<GenreTreeSelectProps> = ({
     }));
   }, [genres]);
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    onKeyDown?.(event);
-    if (
-      !open &&
-      value !== undefined &&
-      (event.key === 'Delete' || event.key === 'Backspace')
-    ) {
-      onChange?.(undefined);
-    }
-  };
-
   return (
     <TreeSelect<number | undefined>
       {...rest}
-      className={styles.select}
+      {...clearable}
       treeData={treeData}
       treeNodeLabelProp="label"
-      allowClear
       treeDefaultExpandAll
       virtual={false}
       value={value}
       onChange={(next) => onChange?.(next)}
-      onKeyDown={handleKeyDown}
-      onOpenChange={(next) => {
-        setOpen(next);
-        onOpenChange?.(next);
-      }}
     />
   );
 };

@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import type { FC, KeyboardEvent } from 'react';
+import type { FC } from 'react';
 import { Select } from 'antd';
 import type { SelectProps } from 'antd';
-import styles from './ClearableSelect.module.css';
+import { useClearable } from '@/hooks/useClearable';
 
 // `value` and `onChange` are the pair a Form.Item injects.
 type Props = Omit<
@@ -13,11 +12,7 @@ type Props = Omit<
   onChange?: (value: number | undefined) => void;
 };
 
-// A single Select of ids that can be emptied. antd draws its clear icon only on
-// hover and makes it unfocusable, so a keyboard user could never empty it:
-// the icon stays visible while there is a value, and Delete or Backspace on the
-// focused, closed select clears it. There is no search input, so no typed text
-// can be mistaken for the key.
+// A single Select of ids that can be emptied; clears through `useClearable`.
 export const ClearableSelect: FC<Props> = ({
   value,
   onChange,
@@ -25,31 +20,7 @@ export const ClearableSelect: FC<Props> = ({
   onOpenChange,
   ...rest
 }) => {
-  const [open, setOpen] = useState(false);
+  const clearable = useClearable({ value, onChange, onKeyDown, onOpenChange });
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    onKeyDown?.(event);
-    if (
-      !open &&
-      value !== undefined &&
-      (event.key === 'Delete' || event.key === 'Backspace')
-    ) {
-      onChange?.(undefined);
-    }
-  };
-
-  return (
-    <Select
-      {...rest}
-      className={styles.select}
-      allowClear
-      value={value}
-      onChange={onChange}
-      onKeyDown={handleKeyDown}
-      onOpenChange={(next) => {
-        setOpen(next);
-        onOpenChange?.(next);
-      }}
-    />
-  );
+  return <Select {...rest} {...clearable} value={value} onChange={onChange} />;
 };

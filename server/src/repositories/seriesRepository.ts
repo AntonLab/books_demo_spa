@@ -170,35 +170,22 @@ async function loadBookCounts(
   );
 }
 
-async function withAuthors(
-  series: Series,
-  transaction?: Transaction
-): Promise<PublicSeries> {
-  const [authors, genres, coverUrls, bookCounts] = await Promise.all([
-    loadAuthors(credits, [series.id], transaction),
-    loadGenres([series.genreId], transaction),
-    loadCoverUrls([series.id], transaction),
-    loadBookCounts([series.id], transaction),
-  ]);
-  return toPublicSeries(
-    series,
-    authors.get(series.id) ?? [],
-    genreOf(series.genreId, genres),
-    coverUrls.get(series.id) ?? null,
-    bookCounts.get(series.id) ?? 0
-  );
-}
-
 // A page of rows as PublicSeries, in the order given, with credits and Genres
 // in one query each. Exported for favoriteRepository, whose rows embed the
-// series they point at.
-export async function publicSeriesOf(rows: Series[]): Promise<PublicSeries[]> {
+// series they point at. `transaction` joins an open one.
+export async function publicSeriesOf(
+  rows: Series[],
+  transaction?: Transaction
+): Promise<PublicSeries[]> {
   const ids = rows.map((row) => row.id);
   const [authors, genres, coverUrls, bookCounts] = await Promise.all([
-    loadAuthors(credits, ids),
-    loadGenres(rows.map((row) => row.genreId)),
-    loadCoverUrls(ids),
-    loadBookCounts(ids),
+    loadAuthors(credits, ids, transaction),
+    loadGenres(
+      rows.map((row) => row.genreId),
+      transaction
+    ),
+    loadCoverUrls(ids, transaction),
+    loadBookCounts(ids, transaction),
   ]);
   return rows.map((row) =>
     toPublicSeries(
@@ -209,6 +196,14 @@ export async function publicSeriesOf(rows: Series[]): Promise<PublicSeries[]> {
       bookCounts.get(row.id) ?? 0
     )
   );
+}
+
+// Single-row form of publicSeriesOf, so the single-row and batch reads cannot drift.
+async function publicSeriesRow(
+  series: Series,
+  transaction?: Transaction
+): Promise<PublicSeries> {
+  return (await publicSeriesOf([series], transaction))[0] as PublicSeries;
 }
 
 // Exported for bookRepository, which asks the same question about the series a
@@ -316,7 +311,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
           await assertGenreExists(attributes.genreId, transaction);
           const series = await Series.create(attributes, { transaction });
           await credits.create(series.id, userId, transaction);
-          return withAuthors(series, transaction);
+          return publicSeriesRow(series, transaction);
         });
       } catch (error) {
         asMissingUser(error, input.userId);
@@ -378,7 +373,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       const series = await Series.findOne({
         where: { [Op.and]: [{ id }, await visibleSeriesWhere(viewer)] },
       });
-      return series ? withAuthors(series) : null;
+      return series ? publicSeriesRow(series) : null;
     },
 
     async findDetailById(id, viewer) {
@@ -389,7 +384,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
 
       const viewerId = viewer?.id ?? null;
       const [withCredits, favoriteCount, viewerFavorite] = await Promise.all([
-        withAuthors(series),
+        publicSeriesRow(series),
         Favorite.count({ where: { seriesId: id } }),
         viewerId === null
           ? null
@@ -413,7 +408,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
 
         await assertGenreExists(input.genreId, transaction);
         await series.update(input, { transaction });
-        return withAuthors(series, transaction);
+        return publicSeriesRow(series, transaction);
       });
     },
 
@@ -456,7 +451,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       if (!series) return null;
 
       await addCoAuthor(credits, sequelizeOf(), series, userId, actor);
-      return withAuthors(series);
+      return publicSeriesRow(series);
     },
 
     async removeBook(seriesId, bookId) {
@@ -484,7 +479,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
         if (!series) return null;
 
         await removeCoAuthor(credits, series, userId, actor, transaction);
-        return withAuthors(series, transaction);
+        return publicSeriesRow(series, transaction);
       });
     },
 
