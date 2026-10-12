@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { READING_STATUSES } from 'shared';
 import type { ReadingStatus } from 'shared';
 import { usePageClamp } from '@/components/organisms/ProfileWorksPanel/useProfileLists';
+import { useSession } from '@/queries/auth';
 import { useLibrary } from '@/queries/library';
 import { pagingOf } from '@/types/bookSearch';
 import { DEFAULT_PAGE_SIZE } from '@/constants/pagination';
@@ -14,7 +15,8 @@ export const useLibraryList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const status = libraryStatusOf(searchParams);
   const { page, pageSize } = pagingOf(searchParams);
-  const query = useLibrary({ status, current: page, pageSize });
+  const signedIn = useSession().data != null;
+  const query = useLibrary({ status, current: page, pageSize }, signedIn);
 
   const writeParams = useCallback(
     (

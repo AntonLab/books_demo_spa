@@ -3,8 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useParams } from 'react-router';
 import { ProfileReadingListsPanel } from './ProfileReadingListsPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
+import { queryKeys } from '@/queries/keys';
 import { ApiError } from '@/api/client';
 import * as readingListsApi from '@/api/readingLists';
+import type { PublicUser } from '@/types/api';
 import type { PublicReadingList } from '@/types/readingList';
 
 jest.mock('@/api/readingLists');
@@ -32,8 +36,13 @@ const LocationProbe = () => {
   return <div data-testid="search">{location.search}</div>;
 };
 const ListPage = () => <div>{`List page ${useParams().id}`}</div>;
-const renderPanel = (route: string) =>
-  renderWithProviders(
+const renderPanel = (route: string) => {
+  const queryClient = createTestQueryClient();
+  queryClient.setQueryData(
+    queryKeys.session,
+    sessionOf({ id: 9, role: 'user' } as PublicUser)
+  );
+  return renderWithProviders(
     <>
       <Routes>
         <Route
@@ -44,8 +53,9 @@ const renderPanel = (route: string) =>
       </Routes>
       <LocationProbe />
     </>,
-    { route }
+    { route, queryClient }
   );
+};
 
 beforeEach(() => {
   jest.resetAllMocks();

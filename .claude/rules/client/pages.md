@@ -113,6 +113,9 @@ Routing and the App shell: `routing.md`.
   are antd state" for these two panels only. My works hides the Author field
   and ignores a typed `author`. A non-author on My works is redirected only
   after the session resolves, so an author reloading it stays.
+- The four profile list queries (Favorites and My works Books/Series, Library,
+  Reading lists) are enabled only with a session user, so a Sign out sends no
+  viewer-only request while the panel is still mounted.
 - `ChapterPage`'s reading preferences and Pages layout:
   `.claude/rules/client/chapter-page.md`.
 - `/reset-password` renders `MainPage`; `AuthModals` reads `?token=` from the URL
