@@ -65,6 +65,9 @@ git-ignored.
   the subset if it ran one). Never write that line yourself: a past run
   claimed typecheck and lint that never ran. The `guard-shell` hook refuses a
   package-wide gate in the main session.
+- **A PR body reports only checks that have finished**, with their result: a
+  past PR body listed a plan-check run before it ran. Write a pending check
+  as pending, never as its expected result; update the body once it finishes.
 - **A diff that touches `client/src` gets a `ui-checker` run** after the
   changed-files audit's fixes and before `finishing-a-development-branch`, because it finds
   defects every review passed: a numbered checklist from the spec's
