@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorAccount } from '@/test/editFixtures';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import type { RootState } from '@/store';
 import { formatDate } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
@@ -60,7 +61,7 @@ const withEntries = (
 
 const renderList = (isCoAuthor = true, preloadedState?: Partial<RootState>) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, editorAccount());
+  queryClient.setQueryData(queryKeys.session, sessionOf(editorAccount()));
   return renderWithProviders(
     <ReadingOrderList
       bookId={1}

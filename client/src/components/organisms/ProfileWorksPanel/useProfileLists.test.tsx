@@ -6,17 +6,22 @@ import {
   useProfileSeries,
 } from './useProfileLists';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
+import { seededClient, sessionOf } from '@/test/session';
 import { genreItem } from '@/test/genres';
+import { queryKeys } from '@/queries/keys';
+import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries } from '@/types/api';
+import type { PublicSeries, PublicUser } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import type { ProfileScope } from '@/types/profileScope';
 
+jest.mock('@/api/auth');
 jest.mock('@/api/books');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
+const mockedAuth = jest.mocked(authApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
@@ -26,14 +31,19 @@ const row = {
   title: 'Book 1',
   favoriteId: 41,
 } as unknown as PublicBook & { favoriteId: number };
-const setup = (scope: ProfileScope, route: string) =>
+const user = { id: 3, role: 'user' } as PublicUser;
+const setup = (
+  scope: ProfileScope,
+  route: string,
+  who: PublicUser | null = user
+) =>
   renderHookWithProviders(
     () => ({
       state: useProfileBooks(scope, 3),
       location: useLocation(),
       navType: useNavigationType(),
     }),
-    { route }
+    { route, queryClient: seededClient(who) }
   );
 const rowsOf = ({ current }: ReturnType<typeof setup>['result']) =>
   current.state.list.items;
@@ -46,6 +56,37 @@ beforeEach(() => {
   const body = { items: [row], total: 1, current: 1, pageSize: 20 };
   mockedBooks.listBooks.mockResolvedValue(body);
   mockedBooks.listFavoritedBooks.mockResolvedValue(body);
+});
+
+describe('profile lists without a session user', () => {
+  it.each(['favorites', 'mine'] as const)(
+    'asks for no %s books or series as a Guest',
+    async (scope) => {
+      setup(scope, '/p', null);
+      setupSeries(scope, '/p?tab=series', null);
+
+      await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+      expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+      expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+      expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+      expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps the favorites and sends no extra request when the session refetches', async () => {
+    mockedAuth.me.mockResolvedValue(sessionOf(user));
+    const { result, queryClient } = setup('favorites', '/p');
+    await waitFor(() => expect(rowsOf(result)).toHaveLength(1));
+    mockedBooks.listFavoritedBooks.mockClear();
+
+    await act(() =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.session })
+    );
+
+    expect(mockedAuth.me).toHaveBeenCalled();
+    expect(rowsOf(result)).toHaveLength(1);
+    expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+  });
 });
 
 describe('useProfileBooks', () => {
@@ -153,7 +194,7 @@ const recording = <S extends { list: { page: number; isPending: boolean } }>(
       seen.push({ page: state.list.page, isPending: state.list.isPending });
       return { state, location: useLocation(), navType: useNavigationType() };
     },
-    { route }
+    { route, queryClient: seededClient(user) }
   );
   return { ...view, seen };
 };
@@ -255,14 +296,18 @@ const seriesRow = {
   favoriteId: 61,
 } as unknown as PublicSeries & { favoriteId: number };
 const seriesBody = { items: [seriesRow], total: 1, limit: 20, offset: 0 };
-const setupSeries = (scope: ProfileScope, route: string) =>
+const setupSeries = (
+  scope: ProfileScope,
+  route: string,
+  who: PublicUser | null = user
+) =>
   renderHookWithProviders(
     () => ({
       state: useProfileSeries(scope, 3),
       location: useLocation(),
       navType: useNavigationType(),
     }),
-    { route }
+    { route, queryClient: seededClient(who) }
   );
 
 describe('useProfileSeries', () => {

@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicUser, SeriesDetail } from '@/types/api';
@@ -59,7 +60,7 @@ const onGone = jest.fn();
 
 const renderModal = (session: PublicUser = author) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
+  queryClient.setQueryData(queryKeys.session, sessionOf(session));
   return renderWithProviders(
     <SeriesEditDetailsModal seriesId={12} onClose={onClose} onGone={onGone} />,
     { queryClient }

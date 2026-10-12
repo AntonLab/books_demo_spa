@@ -7,6 +7,7 @@ import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/auth');
@@ -30,7 +31,7 @@ const signedInUser: PublicUser = {
 
 const withSession = (user: PublicUser | null = null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, user);
+  queryClient.setQueryData(queryKeys.session, user && sessionOf(user));
   return { queryClient };
 };
 
@@ -143,7 +144,9 @@ describe('ResetConfirmModal', () => {
       withSession(signedInUser)
     );
 
-    expect(queryClient.getQueryData(queryKeys.session)).toEqual(signedInUser);
+    expect(queryClient.getQueryData(queryKeys.session)).toEqual(
+      sessionOf(signedInUser)
+    );
 
     await userEvent.type(screen.getByLabelText('New password'), 'newsecret1');
     await userEvent.type(

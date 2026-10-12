@@ -4,8 +4,10 @@ import { useLocation } from 'react-router';
 import type { ReadingStatus } from 'shared';
 import { LibraryPanel } from './LibraryPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { seededClient } from '@/test/session';
 import * as libraryApi from '@/api/library';
 import { ApiError } from '@/api/client';
+import type { PublicUser } from '@/types/api';
 import type { LibraryBook } from '@/types/library';
 
 jest.mock('@/api/library');
@@ -54,7 +56,10 @@ const renderPanel = (route = '/profile/library') =>
       <LibraryPanel />
       <Probe />
     </>,
-    { route }
+    {
+      route,
+      queryClient: seededClient({ id: 3, role: 'user' } as PublicUser),
+    }
   );
 
 describe('LibraryPanel', () => {

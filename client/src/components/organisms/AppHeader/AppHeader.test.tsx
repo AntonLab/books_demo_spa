@@ -8,6 +8,7 @@ import { genreItem } from '@/test/genres';
 import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
@@ -42,7 +43,7 @@ const user: PublicUser = {
 // waiting on a request.
 const withSession = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
+  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
   return { queryClient };
 };
 
@@ -621,7 +622,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     const { queryClient } = await renderJumped();
     await screen.findByRole('dialog', { name: 'Log in' });
     act(() => {
-      queryClient.setQueryData(queryKeys.session, user);
+      queryClient.setQueryData(queryKeys.session, sessionOf(user));
     });
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent('/profile')
@@ -632,7 +633,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     const { queryClient } = await renderJumped();
     await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
     act(() => {
-      queryClient.setQueryData(queryKeys.session, user);
+      queryClient.setQueryData(queryKeys.session, sessionOf(user));
     });
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/)
@@ -779,11 +780,14 @@ describe('AppHeader notification stream', () => {
     ).toBeInTheDocument();
 
     act(() => {
-      queryClient.setQueryData(queryKeys.session, {
-        ...user,
-        id: 2,
-        login: 'eve',
-      });
+      queryClient.setQueryData(
+        queryKeys.session,
+        sessionOf({
+          ...user,
+          id: 2,
+          login: 'eve',
+        })
+      );
     });
 
     await screen.findByText('eve');

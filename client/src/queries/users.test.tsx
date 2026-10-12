@@ -110,7 +110,7 @@ describe('useChangePassword', () => {
   it('updates the user and clears the session without a logout request', async () => {
     mockedUsers.updateUser.mockResolvedValue(session);
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, session);
+    client.setQueryData(queryKeys.session, sessionOf(session));
 
     const { result } = renderHook(() => useChangePassword(7), {
       wrapper: wrapper(client),
@@ -124,14 +124,14 @@ describe('useChangePassword', () => {
   it('keeps the session when the update fails', async () => {
     mockedUsers.updateUser.mockRejectedValue(new Error('nope'));
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, session);
+    client.setQueryData(queryKeys.session, sessionOf(session));
 
     const { result } = renderHook(() => useChangePassword(7), {
       wrapper: wrapper(client),
     });
     await expect(result.current.mutateAsync(input)).rejects.toThrow('nope');
 
-    expect(client.getQueryData(queryKeys.session)).toEqual(session);
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(session));
   });
 });
 

@@ -4,6 +4,7 @@ import { ReadingListEditModal } from './ReadingListEditModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import * as readingListsApi from '@/api/readingLists';
 import type { PublicUser } from '@/types/api';
 import type {
@@ -55,7 +56,7 @@ const renderModal = (
   session: PublicUser = owner
 ) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
+  queryClient.setQueryData(queryKeys.session, sessionOf(session));
   return renderWithProviders(<ReadingListEditModal listId={4} {...props} />, {
     queryClient,
   });

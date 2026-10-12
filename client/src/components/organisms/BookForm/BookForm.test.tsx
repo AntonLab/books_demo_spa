@@ -300,6 +300,34 @@ describe('BookForm', () => {
     );
   });
 
+  it('leaves a Series alone when Delete is pressed while its dropdown is open', async () => {
+    const onSubmit = jest.fn();
+    renderWithProviders(
+      <BookForm
+        seriesOptions={series}
+        genreOptions={genres}
+        submitLabel="Save"
+        initialValues={{
+          title: 'A Tale of Dragons',
+          description: 'Long ago.',
+          tags: [],
+          seriesId: 7,
+          genreId: null,
+        }}
+        onSubmit={onSubmit}
+      />
+    );
+
+    await userEvent.click(screen.getByLabelText('Series'));
+    await userEvent.keyboard('{Delete}');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ seriesId: 7 })
+    );
+  });
+
   it('submits the picked id after a select was cleared', async () => {
     const onSubmit = jest.fn();
     renderWithProviders(

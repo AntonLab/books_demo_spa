@@ -34,14 +34,17 @@ interface SessionChannel {
 
 const sessionHash = hashKey(queryKeys.session);
 
-// A list key is `['books' | 'series', params]`; a detail key has a number at
+// A list key is `['books' | 'series' | 'readingLists', params]`; a detail key has a number at
 // index 1 and never matches. Another user's `userId` list is public and stays.
 const isAccountList = (
   queryKey: readonly unknown[],
   accountId: number | null
 ): boolean => {
   const [scope, params] = queryKey;
-  if ((scope !== 'books' && scope !== 'series') || typeof params !== 'object') {
+  if (
+    (scope !== 'books' && scope !== 'series' && scope !== 'readingLists') ||
+    typeof params !== 'object'
+  ) {
     return false;
   }
   if (params === null) return false;
@@ -156,6 +159,10 @@ export const useSession = () => {
     },
   });
 };
+
+export function useSignedIn(): boolean {
+  return useSession().data != null;
+}
 
 // Every mutation below writes the session with `setQueryData` rather than
 // `invalidateQueries`: the response body *is* the new session, so refetching

@@ -3,8 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation, useParams } from 'react-router';
 import { ProfileReadingListsPanel } from './ProfileReadingListsPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { seededClient } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as readingListsApi from '@/api/readingLists';
+import type { PublicUser } from '@/types/api';
 import type { PublicReadingList } from '@/types/readingList';
 
 jest.mock('@/api/readingLists');
@@ -44,7 +46,10 @@ const renderPanel = (route: string) =>
       </Routes>
       <LocationProbe />
     </>,
-    { route }
+    {
+      route,
+      queryClient: seededClient({ id: 9, role: 'user' } as PublicUser),
+    }
   );
 
 beforeEach(() => {

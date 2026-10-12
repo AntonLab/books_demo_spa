@@ -1,10 +1,11 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { sessionOf } from '@/test/session';
+import { watchSession } from '@/queries/auth';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -63,7 +64,7 @@ const LocationProbe = () => {
 // click or a redirect landed.
 const renderWithSession = (data: PublicUser | null, route = '/profile') => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, data);
+  queryClient.setQueryData(queryKeys.session, data && sessionOf(data));
   return renderWithProviders(
     <>
       <ProfilePage />
@@ -119,6 +120,69 @@ describe('ProfilePage when the session fails to load', () => {
       await screen.findByText('Could not load your profile.')
     ).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).toBeNull();
+  });
+});
+
+describe('ProfilePage when the session ends', () => {
+  it('asks for no Favorites once the session ends', async () => {
+    const queryClient = createTestQueryClient();
+    // The app wires this on its own client only; it is what removes the cached
+    // Favorites query when the Account changes.
+    watchSession(queryClient, null);
+    queryClient.setQueryData(queryKeys.session, sessionOf(session));
+    renderWithProviders(
+      <>
+        <ProfilePage />
+        <LocationProbe />
+      </>,
+      { queryClient, route: '/profile/favorites' }
+    );
+    await waitFor(() =>
+      expect(mockedBooks.listFavoritedBooks).toHaveBeenCalledTimes(1)
+    );
+    mockedBooks.listFavoritedBooks.mockClear();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, null);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+    expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+  });
+
+  it('asks for no Reading lists once the session ends', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    const queryClient = createTestQueryClient();
+    watchSession(queryClient, null);
+    queryClient.setQueryData(queryKeys.session, sessionOf(session));
+    renderWithProviders(
+      <>
+        <ProfilePage />
+        <LocationProbe />
+      </>,
+      { queryClient, route: '/profile/lists' }
+    );
+    await waitFor(() =>
+      expect(mockedReadingLists.listReadingLists).toHaveBeenCalledTimes(1)
+    );
+    mockedReadingLists.listReadingLists.mockClear();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, null);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
   });
 });
 

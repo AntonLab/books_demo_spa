@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import * as reportsApi from '@/api/reports';
@@ -75,7 +76,7 @@ const reply: CommentWithAuthor = {
 // think somebody is signed in; useSession reads this exact key.
 const renderSignedIn = (preloadedState?: Partial<RootState>) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, viewer);
+  queryClient.setQueryData(queryKeys.session, sessionOf(viewer));
   return renderWithProviders(<CommentSection bookId={1} />, {
     queryClient,
     preloadedState,
@@ -85,7 +86,7 @@ const renderSignedIn = (preloadedState?: Partial<RootState>) => {
 const renderAs = (role: PublicUser['role'] | 'guest') => {
   const queryClient = createTestQueryClient();
   if (role !== 'guest') {
-    queryClient.setQueryData(queryKeys.session, { ...viewer, role });
+    queryClient.setQueryData(queryKeys.session, sessionOf({ ...viewer, role }));
   }
   return renderWithProviders(<CommentSection bookId={1} />, { queryClient });
 };
@@ -262,7 +263,7 @@ describe('CommentSection', () => {
 
   it('is read-only when closed, even for a signed-in visitor', async () => {
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData(queryKeys.session, viewer);
+    queryClient.setQueryData(queryKeys.session, sessionOf(viewer));
     renderWithProviders(<CommentSection bookId={1} closed />, { queryClient });
 
     expect(await screen.findByText('A fine book')).toBeInTheDocument();
@@ -749,6 +750,64 @@ describe('a failed Delete, Remove or Restore', () => {
     expect(mockedComments.restoreComment).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(restore).toBeDisabled());
     await act(async () => finish(root));
+  });
+});
+
+describe('busy Comments', () => {
+  const deferred = () => {
+    let settle: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    return { promise, settle };
+  };
+
+  it('keeps each Comment disabled until its own request settles', async () => {
+    const first = deferred();
+    const second = deferred();
+    mockedComments.deleteComment
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    renderAs('admin');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+
+    await act(async () => second.settle());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled()
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+
+    await act(async () => first.settle());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    );
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled();
+  });
+
+  it('re-enables a Comment whose request failed', async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(500, 'Server error')
+    );
+    renderAs('admin');
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Server error')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled();
   });
 });
 

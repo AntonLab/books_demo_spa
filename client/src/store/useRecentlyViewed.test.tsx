@@ -1,5 +1,6 @@
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import { sessionOf } from '@/test/session';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import type { RootState } from '@/store';
@@ -33,7 +34,7 @@ const account = (id: number): PublicUser => ({
 const withSession = (session: PublicUser | null | undefined) => {
   const queryClient = createTestQueryClient();
   if (session !== undefined) {
-    queryClient.setQueryData(queryKeys.session, session);
+    queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
   }
   return queryClient;
 };

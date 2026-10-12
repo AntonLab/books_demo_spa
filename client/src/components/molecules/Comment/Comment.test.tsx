@@ -68,6 +68,10 @@ describe('Comment', () => {
     expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled();
     unmount();
 
+    const own = render(<Comment {...baseProps} isOwn busy />);
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    own.unmount();
+
     render(
       <Comment {...baseProps} comment={removedComment} canModerate busy />
     );

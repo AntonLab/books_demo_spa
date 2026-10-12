@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import type { BookSort, GenreListItem } from 'shared';
+import { useSignedIn } from '@/queries/auth';
 import { useBookSearch, useFavoritedBooks } from '@/queries/books';
 import { useGenres } from '@/queries/genres';
 import { useFavoritedSeries, useSeriesList } from '@/queries/series';
@@ -90,6 +91,9 @@ export const usePageClamp = (
   return overshooting;
 };
 
+// Profile list queries run only with a session user. Their cache keys carry no
+// Account, and `watchSession` removes them on logout while the panel is
+// mounted. Without `enabled` they would refetch as a Guest (401).
 export const useProfileBooks = (
   scope: ProfileScope,
   viewerId: number
@@ -105,13 +109,14 @@ export const useProfileBooks = (
 
   // The forced userId goes last: My works is the viewer's own works, Drafts
   // included, whatever the Author field says.
+  const signedIn = useSignedIn();
   const mine = useBookSearch(
     { ...params, userId: viewerId },
-    scope === 'mine' && !blocked
+    scope === 'mine' && !blocked && signedIn
   );
   const favorites = useFavoritedBooks(
     params,
-    scope === 'favorites' && !blocked
+    scope === 'favorites' && !blocked && signedIn
   );
   const query = scope === 'mine' ? mine : favorites;
 
@@ -176,13 +181,14 @@ export const useProfileSeries = (
   const { genres, genre, genreId, blocked } = useGenreFilter(search.genre);
   const params = seriesListParamsOf(search, genreId);
 
+  const signedIn = useSignedIn();
   const mine = useSeriesList(
     { ...params, userId: viewerId },
-    scope === 'mine' && !blocked
+    scope === 'mine' && !blocked && signedIn
   );
   const favorites = useFavoritedSeries(
     params,
-    scope === 'favorites' && !blocked
+    scope === 'favorites' && !blocked && signedIn
   );
   const query = scope === 'mine' ? mine : favorites;
 
