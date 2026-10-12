@@ -1,6 +1,5 @@
 ---
 paths:
-  - '.claude/agents/**'
   - 'scripts/sdd-step.sh'
   - 'scripts/plan-check.mjs'
   - 'scripts/worktree.mjs'
@@ -11,11 +10,10 @@ paths:
 
 Six pipeline subagents (`code-mapper`, `plan-writer`, `sdd-implementer`,
 `sdd-task-reviewer`, `sdd-re-reviewer`, `sdd-final-reviewer`; `gate-runner`,
-`ui-checker` and `repo-auditor` sit outside the pipeline) carry the
-superpowers pipeline's role rules, so a dispatch sends only per-call values.
-Bodies come from superpowers 6.4.1 templates (named under each frontmatter);
-re-sync them when those change. `claude-config.md` covers why the files are
-git-ignored.
+`ui-checker` and `repo-auditor` sit outside the pipeline) come from the
+`swarm` plugin: dispatch each as `swarm:<name>` (`swarm:code-mapper`). They
+carry the superpowers pipeline's role rules, so a dispatch sends only
+per-call values.
 
 - **Before `plan-writer`, save the spec** to
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored) and
@@ -58,7 +56,7 @@ git-ignored.
   `gh issue close <n> --comment "Fixed in #<pr>"`.
 - **`dev` and `main` change only through a PR**, a main→dev sync included;
   never push to either directly, even though the ruleset lets an admin
-  through. `guard-shell.mjs` refuses such a push. When a protection rule,
+  through. The `guard-shell` hook refuses such a push. When a protection rule,
   permission or hook blocks a push or `gh pr create`, stop and ask the user;
   never work around it.
 - **Run the gates through `gate-runner` before the final review**, in every
@@ -127,9 +125,6 @@ git-ignored.
   fix stay in the main session: a subagent cannot ask the user anything.
 - **`/db-reset` is the user's command** (`disable-model-invocation`): when the
   database needs a rebuild, ask the user to type it; the Skill call is refused.
-- **Each agent body carries a `<!-- Revised: YYYY-MM-DD … -->` line.** Bump it
-  with every change: the bodies are not in git, and a session diagnosis can
-  tell which version ran only from that line and the file's mtime.
 - **The controller creates the worktree before Task 1 with
   `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
   `.env.local` files an agent may not copy, and an install. Name the worktree

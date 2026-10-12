@@ -1,7 +1,6 @@
 ---
 paths:
   - '.claude/settings.json'
-  - '.claude/hooks/**'
   - '.claude/skills/db-reset/**'
   - '.mcp.json'
   - '.gitignore'
@@ -16,31 +15,16 @@ paths:
   `npm *seed*` ask holds even beside a broad `Bash(npm run *)`.
 - **Ask rules list both shells.** On Windows Claude runs commands through
   `PowerShell` as well as `Bash`; a `Bash(...)` rule alone misses the other.
-- **`format-edited.mjs`** (PostToolUse on Edit/Write) runs Prettier from the
-  nearest directory holding `.prettierrc.json`, because Prettier reads ignore
-  files only from its working directory: from the main checkout, `/.claude/*`
-  would hide every worktree file. ESLint is left to the pre-commit hook; typed
-  linting per edit is too slow.
-- **`guard-shell.mjs`** (PreToolUse on Bash and PowerShell) refuses `sed -i`,
-  shell redirects, `tee`, `cp` and `mv` (not `git mv`) into anything but a
-  temp or scratchpad path,
-  scripts calling `writeFileSync`/`open(…, 'w')`, `find` over a drive root,
-  and, outside a subagent (`agent_type` absent), a package-wide
-  `npm run typecheck|lint|format:check` or `npm test`; a focused
-  `npm test -w client -- <path>` passes. Prose rules alone failed: one
-  session broke each of them. A redirect to `$VAR/file` is refused too,
-  since the hook cannot resolve the variable; write the path literally.
-  Quoted text is skipped (a commit message may name `sed -i`), except a
-  quoted redirect target and a `node`/`python` script body. A heredoc body
-  is skipped the same way (a PR body may name `npm run typecheck`), unless
-  a shell or interpreter on the opening line runs it. It also refuses a
-  `git push` whose destination is `dev` or `main`: a named refspec,
-  `HEAD`, `--all`/`--mirror`, or no refspec while on either branch.
-- **`after-pr.mjs`** (PostToolUse on Bash and PowerShell) adds one reminder
-  after the main session's `gh pr create`. The reminder says to `/clear`
-  before the next spec, and to close the PR's issues by hand after the merge,
-  because a PR into `dev` ignores closing keywords. It is silent on every
-  other command and inside a subagent.
+- **Tool hooks come from the `swarm` plugin**, whose README lists what each
+  one does: `guard-shell` refuses shell writes into repo files, `sed -i`,
+  pushes to `dev` or `main`, and package-wide gates in the main session (a
+  focused `npm test -w client -- <path>` passes); `format-edited` runs
+  Prettier from the nearest folder holding `.prettierrc.json`; `after-pr`
+  reminds the main session to `/clear` after `gh pr create`. Change them in
+  `AntonLab/custom-agents-swarm`, not here. ESLint is left to the pre-commit
+  hook; typed linting per edit is too slow. A redirect to `$VAR/file` is
+  refused, since the guard cannot resolve the variable; write the path
+  literally.
 - **SessionStart runs `branch-check.mjs --warn`** on `startup` only: it
   fetches `origin/dev` and prints one line when the branch is behind, nothing
   otherwise, so a fresh branch costs no context. A failed fetch exits 0.
@@ -52,10 +36,9 @@ paths:
 - **`.claude/skills/`** is ignored except `db-reset/`: the rest are junctions
   `scripts/link-skills.mjs` makes, and that script leaves a real directory
   alone.
-- **`.claude/agents/`** is ignored and was removed from history with
-  `git filter-repo`: subagent definitions are per clone. Do not `git add -f`
-  them back. Without them, the pipeline falls back to the skills' own
-  templates.
+- **`.claude/agents/`** stays ignored and empty: the pipeline agents come
+  from the `swarm` plugin as `swarm:<name>`. Copies left there from before
+  the plugin are stale; delete them.
 - **`.mcp.json`** starts Playwright through `node -e` spawning `npx` with
   `shell: true`: Claude Code spawns without a shell, so a bare `npx` fails on
   native Windows (it is `npx.cmd`) and `cmd /c npx` fails everywhere else.
@@ -72,9 +55,8 @@ paths:
 - **Plugin versions are not pinned.** A marketplace `ref` takes only a branch
   or tag, ponytail has no tag for the version in use, and a project entry
   sharing a name with a contributor's user-level marketplace would shadow it.
-  Re-sync `.claude/agents/` when `/plugin` shows a newer superpowers.
 - **`swarm` comes from `AntonLab/custom-agents-swarm`**, a private
   marketplace, so installing it needs git credentials for that repo. It ships
-  `/swarm:ship` (gates, PR into `dev`, CI, optional merge and cleanup) and
-  `swarm:`-prefixed copies of the agents; the local `.claude/agents/` copies
-  stay until the plugin's versions replace them.
+  the pipeline agents (`swarm:code-mapper` and the rest), `/swarm:ship`,
+  `/swarm:queue` and the tool hooks. Run `/plugin marketplace update` after
+  a change there lands.
