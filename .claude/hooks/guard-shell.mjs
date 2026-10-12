@@ -10,6 +10,7 @@
  * path, `/dev/null` or `$null` passes: logs there are not repo files and skip
  * no Prettier hook. Anything the hook misreads can still run from a terminal.
  */
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const input = JSON.parse(readFileSync(0, 'utf8'));
@@ -109,6 +110,47 @@ if (inPlace[0].test(bare)) deny(inPlace[1]);
 // A script's body is quoted, so this one reads the whole command.
 if (RUNS_SCRIPT.test(bare) && scriptWrite[0].test(code)) deny(scriptWrite[1]);
 if (driveFind[0].test(bare)) deny(driveFind[1]);
+
+// `dev` and `main` change only through a PR. The ruleset lets an admin push
+// past it, and a session once synced main into dev with a direct push, so the
+// hook refuses a push whose destination is either branch, a sync included.
+// A push with no refspec, or to `HEAD`, goes to the current branch.
+const PROTECTED = new Set(['dev', 'main']);
+const branchIn = (dir) => {
+  try {
+    return execFileSync('git', ['-C', dir, 'branch', '--show-current'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 5000,
+    }).trim();
+  } catch {
+    return '';
+  }
+};
+const pushesProtected = () => {
+  for (const m of bare.matchAll(/\bgit\s+(?:-C\s+(\S+)\s+)?push\b([^;&|]*)/g)) {
+    // A quoted `-C` path is blanked in `bare`; fall back to the session's cwd.
+    const dir = m[1] && m[1] !== '""' ? m[1] : (input.cwd ?? '.');
+    const args = m[2].trim().split(/\s+/).filter(Boolean);
+    if (args.includes('--all') || args.includes('--mirror')) return true;
+    const refspecs = args.filter((a) => !a.startsWith('-')).slice(1);
+    if (!refspecs.length && PROTECTED.has(branchIn(dir))) return true;
+    for (const spec of refspecs) {
+      const dest = spec
+        .replace(/^\+/, '')
+        .split(':')
+        .at(-1)
+        .replace(/^refs\/heads\//, '');
+      if (PROTECTED.has(dest === 'HEAD' ? branchIn(dir) : dest)) return true;
+    }
+  }
+  return false;
+};
+if (pushesProtected())
+  deny(
+    '`dev` and `main` change only through a PR, a main→dev sync included. Push a feature branch and open a PR; ' +
+      'if a protection rule or permission blocks that, stop and ask the user. Never work around it.'
+  );
 
 const targets = writeTargets();
 if (targets.length)
