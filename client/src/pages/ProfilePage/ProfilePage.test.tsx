@@ -152,6 +152,38 @@ describe('ProfilePage when the session ends', () => {
     expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
     expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
   });
+
+  it('asks for no Reading lists once the session ends', async () => {
+    mockedReadingLists.listReadingLists.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    const queryClient = createTestQueryClient();
+    watchSession(queryClient, null);
+    queryClient.setQueryData(queryKeys.session, sessionOf(session));
+    renderWithProviders(
+      <>
+        <ProfilePage />
+        <LocationProbe />
+      </>,
+      { queryClient, route: '/profile/lists' }
+    );
+    await waitFor(() =>
+      expect(mockedReadingLists.listReadingLists).toHaveBeenCalledTimes(1)
+    );
+    mockedReadingLists.listReadingLists.mockClear();
+
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, null);
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
+  });
 });
 
 describe('ProfilePage, signed out', () => {
