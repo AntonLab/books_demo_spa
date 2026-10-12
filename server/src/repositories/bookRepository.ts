@@ -243,35 +243,23 @@ async function loadSeriesRefs(
   return refs;
 }
 
-async function withAuthors(
-  book: Book,
-  transaction?: Transaction
-): Promise<PublicBook> {
-  const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
-    loadAuthors(credits, [book.id], transaction),
-    loadCoverUrls([book.id], transaction),
-    loadGenres([book.genreId], transaction),
-    loadSeriesRefs([book], transaction),
-  ]);
-  return toPublicBook(
-    book,
-    authors.get(book.id) ?? [],
-    coverUrls.get(book.id) ?? null,
-    genreOf(book.genreId, genres),
-    seriesRefs.get(book.id) ?? null
-  );
-}
-
 // A page of rows as PublicBooks, in the order given: credits, Covers and
 // Genres in one query each, so a LIMIT keeps paging over books. Exported for
-// favoriteRepository, whose rows embed the books they point at.
-export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
+// favoriteRepository, whose rows embed the books they point at. The optional
+// transaction is for single-row reads inside one.
+export async function publicBooksOf(
+  rows: Book[],
+  transaction?: Transaction
+): Promise<PublicBook[]> {
   const ids = rows.map((row) => row.id);
   const [authors, coverUrls, genres, seriesRefs] = await Promise.all([
-    loadAuthors(credits, ids),
-    loadCoverUrls(ids),
-    loadGenres(rows.map((row) => row.genreId)),
-    loadSeriesRefs(rows),
+    loadAuthors(credits, ids, transaction),
+    loadCoverUrls(ids, transaction),
+    loadGenres(
+      rows.map((row) => row.genreId),
+      transaction
+    ),
+    loadSeriesRefs(rows, transaction),
   ]);
   return rows.map((row) =>
     toPublicBook(
@@ -282,6 +270,14 @@ export async function publicBooksOf(rows: Book[]): Promise<PublicBook[]> {
       seriesRefs.get(row.id) ?? null
     )
   );
+}
+
+// One row through the batch path.
+async function publicBook(
+  book: Book,
+  transaction?: Transaction
+): Promise<PublicBook> {
+  return (await publicBooksOf([book], transaction))[0];
 }
 
 // The Publication time of a book's earliest (MIN) or latest (MAX) Published
@@ -516,7 +512,7 @@ export function createSequelizeBookRepository(): BookRepository {
             { transaction }
           );
           await credits.create(book.id, userId, transaction);
-          return withAuthors(book, transaction);
+          return publicBook(book, transaction);
         });
       } catch (error) {
         asMissingUser(error, input.userId);
@@ -599,7 +595,7 @@ export function createSequelizeBookRepository(): BookRepository {
 
     async findById(id) {
       const book = await Book.findByPk(id);
-      return book ? withAuthors(book) : null;
+      return book ? publicBook(book) : null;
     },
 
     async findDetailById(id, viewer) {
@@ -660,7 +656,7 @@ export function createSequelizeBookRepository(): BookRepository {
       ]);
 
       return {
-        ...(await withAuthors(book)),
+        ...(await publicBook(book)),
         likeCount,
         viewerLikeId: viewerLike?.id ?? null,
         commentCount,
@@ -731,7 +727,7 @@ export function createSequelizeBookRepository(): BookRepository {
           );
         }
 
-        return withAuthors(book, transaction);
+        return publicBook(book, transaction);
       });
     },
 
@@ -770,7 +766,7 @@ export function createSequelizeBookRepository(): BookRepository {
       if (!book) return null;
 
       await addCoAuthor(credits, sequelizeOf(), book, userId, actor);
-      return withAuthors(book);
+      return publicBook(book);
     },
 
     // Under a lock on the book row, which removeCoAuthor (coAuthors.ts)
@@ -784,7 +780,7 @@ export function createSequelizeBookRepository(): BookRepository {
         if (!book) return null;
 
         await removeCoAuthor(credits, book, userId, actor, transaction);
-        return withAuthors(book, transaction);
+        return publicBook(book, transaction);
       });
     },
 
