@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorAccount, editorBook, editorChapter } from '@/test/editFixtures';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
@@ -42,7 +43,7 @@ const renderModal = (
   preloadedState?: Partial<RootState>
 ) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
+  queryClient.setQueryData(queryKeys.session, sessionOf(session));
   return renderWithProviders(
     <ChapterEditorModal bookId={1} chapterId={chapterId} onClose={onClose} />,
     { queryClient, preloadedState }

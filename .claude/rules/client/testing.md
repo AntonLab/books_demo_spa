@@ -41,8 +41,10 @@ is load-bearing:
   `act`, or `fail(FakeEventSource.CLOSED)`.
 - `renderWithProviders` wraps the same providers as `App` around a
   `MemoryRouter` and returns `{ store, queryClient }`, so a test seeds a
-  session with `queryClient.setQueryData(queryKeys.session, user)` and client
-  state with `preloadedState`, or passes `store` to remount on the same state.
+  session with `queryClient.setQueryData(queryKeys.session, sessionOf(user))` and
+  client state with `preloadedState`, or passes `store` to remount on the same
+  state. The seed must be a `SessionUser` (`sessionOf`): `setQueryData` on a key
+  is untyped, so a bare `PublicUser` would type-check.
   Without `preloadedState` the store starts from `{}`, never from
   `localStorage`, which an earlier test may have written. Pass `path` beside
   `route` for a page that reads params, or `useParams()` is empty and the page

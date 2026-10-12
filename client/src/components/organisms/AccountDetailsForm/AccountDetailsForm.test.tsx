@@ -33,7 +33,7 @@ const session: PublicUser = {
 
 const renderForm = () => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session);
+  queryClient.setQueryData(queryKeys.session, sessionOf(session));
   return renderWithProviders(<AccountDetailsForm user={session} />, {
     queryClient,
   });

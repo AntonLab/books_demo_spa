@@ -5,6 +5,7 @@ import { BookRowActions, SeriesRowActions } from './WorkRowActions';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
@@ -45,7 +46,7 @@ const series = {
 
 const renderAs = (who: PublicUser, ui: ReactElement) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, who);
+  queryClient.setQueryData(queryKeys.session, sessionOf(who));
   return renderWithProviders(ui, { queryClient });
 };
 const author = viewer(3, 'author');

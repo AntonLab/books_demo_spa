@@ -5,6 +5,7 @@ import { ApiError } from '@/api/client';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
+import { sessionOf } from '@/test/session';
 import * as commentsApi from '@/api/comments';
 import * as likesApi from '@/api/likes';
 import * as reportsApi from '@/api/reports';
@@ -75,7 +76,7 @@ const reply: CommentWithAuthor = {
 // think somebody is signed in; useSession reads this exact key.
 const renderSignedIn = (preloadedState?: Partial<RootState>) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, viewer);
+  queryClient.setQueryData(queryKeys.session, sessionOf(viewer));
   return renderWithProviders(<CommentSection bookId={1} />, {
     queryClient,
     preloadedState,
@@ -85,7 +86,7 @@ const renderSignedIn = (preloadedState?: Partial<RootState>) => {
 const renderAs = (role: PublicUser['role'] | 'guest') => {
   const queryClient = createTestQueryClient();
   if (role !== 'guest') {
-    queryClient.setQueryData(queryKeys.session, { ...viewer, role });
+    queryClient.setQueryData(queryKeys.session, sessionOf({ ...viewer, role }));
   }
   return renderWithProviders(<CommentSection bookId={1} />, { queryClient });
 };
@@ -262,7 +263,7 @@ describe('CommentSection', () => {
 
   it('is read-only when closed, even for a signed-in visitor', async () => {
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData(queryKeys.session, viewer);
+    queryClient.setQueryData(queryKeys.session, sessionOf(viewer));
     renderWithProviders(<CommentSection bookId={1} closed />, { queryClient });
 
     expect(await screen.findByText('A fine book')).toBeInTheDocument();

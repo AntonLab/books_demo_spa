@@ -36,7 +36,7 @@ const session: PublicUser = {
 // GET /me.
 const renderWithSession = (data: PublicUser) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, data);
+  queryClient.setQueryData(queryKeys.session, sessionOf(data));
   return renderWithProviders(<ProfileSettings />, { queryClient });
 };
 
