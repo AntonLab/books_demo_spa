@@ -116,7 +116,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 - **`repo-auditor`** (Sonnet, read-only) takes any "check / audit / find all"
   request, `/ponytail-audit` included, and returns numbered findings. Grilling
   and the question of which findings to fix stay in the main session. The
-  picked findings go into a brief file for `sdd-implementer`.
+  picked findings go into a brief file for `sdd-implementer`. Each declined
+  finding gets a line in `docs/agents/rejected-findings.md`, with the user's
+  reason, so later audits skip it.
 - **`gate-runner`** (Haiku) runs the quality gates or reads a CI run and
   returns only the failures. Dispatch it instead of running the gates inline.
 - **`ui-checker`** (Sonnet, no edits) checks pages and flows in the browser
