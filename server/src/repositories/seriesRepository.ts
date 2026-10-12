@@ -204,7 +204,7 @@ async function publicSeriesRow(
   series: Series,
   transaction?: Transaction
 ): Promise<PublicSeries> {
-  return (await publicSeriesOf([series], transaction))[0];
+  return (await publicSeriesOf([series], transaction))[0] as PublicSeries;
 }
 
 // Exported for bookRepository, which asks the same question about the series a

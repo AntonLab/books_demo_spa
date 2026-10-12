@@ -277,7 +277,7 @@ async function publicBook(
   book: Book,
   transaction?: Transaction
 ): Promise<PublicBook> {
-  return (await publicBooksOf([book], transaction))[0];
+  return (await publicBooksOf([book], transaction))[0] as PublicBook;
 }
 
 // The Publication time of a book's earliest (MIN) or latest (MAX) Published
