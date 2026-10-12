@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form } from 'antd';
 import type { FormInstance } from 'antd';
@@ -212,9 +212,9 @@ describe('BookForm', () => {
       onSubmit,
     });
 
-    screen.getByLabelText('Series').focus();
+    act(() => screen.getByLabelText('Series').focus());
     await userEvent.keyboard('{Delete}');
-    screen.getByLabelText('Genre').focus();
+    act(() => screen.getByLabelText('Genre').focus());
     await userEvent.keyboard('{Backspace}');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
