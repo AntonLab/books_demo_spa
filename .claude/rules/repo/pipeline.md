@@ -51,9 +51,10 @@ git-ignored.
   next spec: a long context compacts repeatedly and costs far more. The spec,
   code map, plan, ledger and follow-ups files carry the state. A PostToolUse
   hook prints this reminder after `gh pr create`.
-- **One PR per spec** (or per two or three small related specs): a giant PR is
-  unreviewable. A PR into `dev` does not run its closing keywords, so after
-  the merge, close each issue it fixes with
+- **One PR per spec** (or per two or three small related specs, or per
+  `/swarm:queue` run of up to 5 issues with one commit group per issue): a
+  giant PR is unreviewable. A PR into `dev` does not run its closing keywords,
+  so after the merge, close each issue it fixes with
   `gh issue close <n> --comment "Fixed in #<pr>"`.
 - **`dev` and `main` change only through a PR**, a main→dev sync included;
   never push to either directly, even though the ruleset lets an admin
