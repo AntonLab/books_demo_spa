@@ -99,8 +99,9 @@ that read like mistakes and are not.
 - `BookForm` / `SeriesForm`: the Series select is a `ClearableSelect` and the
   Genre select a `GenreTreeSelect` (a tree of Genres and Subgenres, any node
   choosable). Both are `allowClear`; antd shows the icon only on hover and it
-  takes no focus, so each keeps the icon visible and clears on Delete or
-  Backspace while closed,
+  takes no focus, so the shared `useClearable` hook
+  (`client/src/hooks/useClearable.ts`) makes each keep the icon visible and
+  clear on Delete or Backspace while closed,
   with "No series" / "No genre" as placeholders, not options. An empty or
   cleared select is `undefined` inside the form and leaves as an explicit
   `null` (the server accepts `null` for both). A stored `null` is seeded as
