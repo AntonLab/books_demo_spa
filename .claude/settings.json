@@ -19,6 +19,12 @@
         "source": "git",
         "url": "https://github.com/juliusbrussee/caveman.git"
       }
+    },
+    "custom-agents-swarm": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/AntonLab/custom-agents-swarm.git"
+      }
     }
   },
   "enabledPlugins": {
@@ -26,7 +32,8 @@
     "mattpocock-skills@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "ponytail@ponytail": true,
-    "caveman@caveman": true
+    "caveman@caveman": true,
+    "swarm@custom-agents-swarm": true
   },
   "permissions": {
     "allow": [
