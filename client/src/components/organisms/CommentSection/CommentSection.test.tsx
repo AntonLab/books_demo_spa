@@ -752,6 +752,64 @@ describe('a failed Delete, Remove or Restore', () => {
   });
 });
 
+describe('busy Comments', () => {
+  const deferred = () => {
+    let settle: () => void = () => {};
+    const promise = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    return { promise, settle };
+  };
+
+  it('keeps each Comment disabled until its own request settles', async () => {
+    const first = deferred();
+    const second = deferred();
+    mockedComments.deleteComment
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    renderAs('admin');
+    await screen.findByText('Agreed');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Yes, remove' })
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeDisabled()
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+
+    await act(async () => second.settle());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled()
+    );
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+
+    await act(async () => first.settle());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled()
+    );
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled();
+  });
+
+  it('re-enables a Comment whose request failed', async () => {
+    mockedComments.deleteComment.mockRejectedValue(
+      new ApiError(500, 'Server error')
+    );
+    renderAs('admin');
+    await screen.findByText('A fine book');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('Server error')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled();
+  });
+});
+
 describe('CommentSection Unsaved text', () => {
   it('restores the root composer after a remount', async () => {
     const { store, queryClient, unmount } = renderSignedIn();

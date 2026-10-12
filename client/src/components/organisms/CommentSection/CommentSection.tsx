@@ -66,6 +66,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const [composing, setComposing] = useState<Composing | null>(null);
   const [reporting, setReporting] = useState<number | null>(null);
+  const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set());
 
   // The Book page's tab label names the region, so no heading here. Every
   // branch renders the row, so the section keeps its height while the thread
@@ -202,7 +203,8 @@ export const CommentSection: FC<CommentSectionProps> = ({
   // A ref, not isPending: TanStack notifies it on a later tick, so a double
   // click would send two requests. mutateAsync as in submit() above. Remove is
   // a delete too: the server makes a Removed comment when another Account
-  // calls it.
+  // calls it. busyIds, not mutation.variables: that holds only the latest
+  // call, so two Comments in flight would re-enable the first early.
   const act = (
     mutation: typeof remove,
     id: number,
@@ -211,6 +213,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
   ) => {
     if (acting.current.has(id)) return;
     acting.current.add(id);
+    setBusyIds((ids) => new Set(ids).add(id));
     void mutation
       .mutateAsync(id)
       .then(onDone, (error: unknown) => {
@@ -218,6 +221,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
       })
       .finally(() => {
         acting.current.delete(id);
+        setBusyIds((ids) => {
+          const next = new Set(ids);
+          next.delete(id);
+          return next;
+        });
       });
   };
 
@@ -239,10 +247,6 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   const restoreComment = (id: number) =>
     act(restore, id, 'Could not restore the comment.');
-
-  const busyId = (id: number) =>
-    (remove.isPending && remove.variables === id) ||
-    (restore.isPending && restore.variables === id);
 
   const renderComment = (comment: CommentWithAuthor, canReply: boolean) => (
     <Comment
@@ -268,7 +272,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
       canModerate={moderating && session?.id !== comment.userId}
       onRemove={removeComment}
       onRestore={restoreComment}
-      busy={busyId(comment.id)}
+      busy={busyIds.has(comment.id)}
     />
   );
 

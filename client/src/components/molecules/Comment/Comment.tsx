@@ -156,6 +156,7 @@ export const Comment: FC<CommentProps> = ({
               icon={<EditOutlined />}
               size="small"
               type="text"
+              disabled={busy}
               onClick={() => onEdit(comment.id)}
             />
             <IconButton
