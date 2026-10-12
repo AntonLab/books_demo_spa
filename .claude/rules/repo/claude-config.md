@@ -66,10 +66,15 @@ paths:
   `extraKnownMarketplaces` in `settings.json` make Claude Code offer to install
   them once the folder is trusted. The agents preload `caveman`, `tdd`,
   `ponytail` and `domain-modeling`, and a missing skill preloads nothing,
-  silently, so `/plugin` must list all five after a fresh clone. `caveman` is
+  silently, so `/plugin` must list all six after a fresh clone. `caveman` is
   mandatory: project settings beat user settings, so turning it off takes
   `settings.local.json`.
 - **Plugin versions are not pinned.** A marketplace `ref` takes only a branch
   or tag, ponytail has no tag for the version in use, and a project entry
   sharing a name with a contributor's user-level marketplace would shadow it.
   Re-sync `.claude/agents/` when `/plugin` shows a newer superpowers.
+- **`swarm` comes from `AntonLab/custom-agents-swarm`**, a private
+  marketplace, so installing it needs git credentials for that repo. It ships
+  `/swarm:ship` (gates, PR into `dev`, CI, optional merge and cleanup) and
+  `swarm:`-prefixed copies of the agents; the local `.claude/agents/` copies
+  stay until the plugin's versions replace them.

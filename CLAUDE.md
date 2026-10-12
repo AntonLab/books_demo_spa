@@ -108,7 +108,7 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 - **Project skills**: `npm run skills` restores them after a fresh clone or a
   lock change. See `.claude/rules/repo/skills.md`.
 - **Plugins**: `.claude/settings.json` enables superpowers, mattpocock-skills,
-  code-review, ponytail and caveman (mandatory). Accept the install prompt on a
+  code-review, ponytail, caveman and swarm (mandatory). Accept the install prompt on a
   fresh clone. See `.claude/rules/repo/claude-config.md`.
 
 ### Context-saving agents
