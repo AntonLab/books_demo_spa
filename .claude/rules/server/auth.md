@@ -47,6 +47,16 @@ paths:
   transaction and inserts nothing unless the hash is unchanged and the account
   not blocked. `register` skips this: a new account has nothing in flight.
 
+## Registration
+
+- A taken login or email answers 409 naming the field (`ConflictError`,
+  `asConflict` in `userRepository.ts`). This is a deliberate exception to the
+  "one answer" stance of Login and reset: there is no email-verification step
+  yet (the Pending status is reserved for it), so a generic answer would leave a
+  real user unable to tell why registration failed. The register rate limit
+  (5 per hour per IP, table below) bounds enumeration through it. Revisit when
+  email verification lands.
+
 ## Blocking and password changes
 
 - Blocking ends the account's sessions in the same transaction, only on the
@@ -59,19 +69,21 @@ paths:
 
 ## Password reset
 
-- A request always answers 202, or the endpoint would enumerate accounts. A new
-  request invalidates the outstanding token. Tokens live one hour: a link sits
-  in a mailbox.
+- A request always answers 202, or the endpoint would enumerate accounts. The
+  202 goes out right after validation, before the account lookup, token
+  invalidation, token creation and the send, all of which run detached
+  (`void … .catch(...)`). A new request invalidates the outstanding token.
+  Tokens live one hour: a link sits in a mailbox.
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
-  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`. The
-  202 is answered before the send, which then runs detached
-  (`void … .catch(...)`): awaiting it, or branching on its outcome, would let
-  timing or a 500 tell an attacker the address exists. A failed send is
-  logged (`authController.ts`, no address or token in the line) and not
-  retried; the account can just ask again, and the new request supersedes the
-  stored token.
+  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`.
+- Awaiting the lookup, the token writes or the send, or branching on their
+  outcome, would let response time or a 500 tell an attacker the address
+  exists. A failure anywhere in the chain is logged (`authController.ts`:
+  `Password reset request failed`, or `Password reset mail failed` for the
+  send; no address or token in the line) and not retried; the account can just
+  ask again, and the new request supersedes the stored token.
 
 ## CSRF (`middleware/csrfProtection.ts`)
 
