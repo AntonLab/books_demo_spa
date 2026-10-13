@@ -26,6 +26,16 @@ test('registerSchema rejects a login under 3 characters', () => {
   );
 });
 
+test('registerSchema rejects a login containing @', () => {
+  const result = registerSchema.safeParse({
+    ...validRegistration,
+    login: 'bob@home',
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error?.issues[0]?.message, 'Login cannot contain @');
+});
+
 test('registerSchema rejects a password under 8 characters', () => {
   assert.equal(
     registerSchema.safeParse({ ...validRegistration, password: 'short' })

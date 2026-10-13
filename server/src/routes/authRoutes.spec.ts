@@ -247,6 +247,20 @@ test('POST /register reports which field collided', async () => {
   });
 });
 
+test('POST /register refuses a login containing @ with a 400 naming login', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const response = await post(base, 'register', {
+      ...registration,
+      login: 'bob@home',
+    });
+
+    assert.equal(response.status, 400);
+    const { details } = await json<{ details: { path: string[] }[] }>(response);
+    assert.ok(details.some((issue) => issue.path[0] === 'login'));
+  });
+});
+
 test('POST /register creates an author when the box is ticked', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {

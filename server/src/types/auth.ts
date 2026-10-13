@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   EMAIL_MAX_LENGTH,
+  LOGIN_FORBIDDEN_CHARACTER,
+  LOGIN_FORBIDDEN_CHARACTER_MESSAGE,
   LOGIN_MAX_LENGTH,
   LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
@@ -13,7 +15,13 @@ import {
 // registrant does not get to choose their own account state, so the key is
 // absent here and set by the controller.
 export const registerSchema = z.object({
-  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  login: z
+    .string()
+    .min(LOGIN_MIN_LENGTH)
+    .max(LOGIN_MAX_LENGTH)
+    .refine((value) => !value.includes(LOGIN_FORBIDDEN_CHARACTER), {
+      message: LOGIN_FORBIDDEN_CHARACTER_MESSAGE,
+    }),
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   firstName: z.string().trim().min(1).max(NAME_MAX_LENGTH),

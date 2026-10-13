@@ -37,6 +37,10 @@ export const AUTHOR_SEARCH_MAX_LENGTH = 64;
 // the schemas.
 export const LOGIN_MIN_LENGTH = 3;
 export const LOGIN_MAX_LENGTH = 64;
+// Sign-in picks the email or login column by the presence of this character, so
+// a login must never contain it.
+export const LOGIN_FORBIDDEN_CHARACTER = '@';
+export const LOGIN_FORBIDDEN_CHARACTER_MESSAGE = 'Login cannot contain @';
 export const NAME_MAX_LENGTH = 64;
 // The column width of `users.email`.
 export const EMAIL_MAX_LENGTH = 255;

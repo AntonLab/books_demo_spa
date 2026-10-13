@@ -2,6 +2,8 @@ import {
   ABOUT_MAX_LENGTH,
   AUTHOR_SEARCH_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
+  LOGIN_FORBIDDEN_CHARACTER,
+  LOGIN_FORBIDDEN_CHARACTER_MESSAGE,
   LOGIN_MAX_LENGTH,
   LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
@@ -20,7 +22,13 @@ import { limitOffsetShape } from './pagination.ts';
 // PATCH /api/users/:id/role, never through a body that also carries other
 // fields.
 export const createUserSchema = z.object({
-  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  login: z
+    .string()
+    .min(LOGIN_MIN_LENGTH)
+    .max(LOGIN_MAX_LENGTH)
+    .refine((value) => !value.includes(LOGIN_FORBIDDEN_CHARACTER), {
+      message: LOGIN_FORBIDDEN_CHARACTER_MESSAGE,
+    }),
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   // Names are trimmed, so a blank one fails `min(1)`; About is not (below).
