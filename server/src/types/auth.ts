@@ -1,19 +1,18 @@
 import { z } from 'zod';
 import {
   EMAIL_MAX_LENGTH,
-  LOGIN_MAX_LENGTH,
-  LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   REGISTRABLE_ROLES,
 } from 'shared';
+import { loginFieldSchema } from './fields.ts';
 
 // The field rules match createUserSchema in ./user.ts, minus `status`: a
 // registrant does not get to choose their own account state, so the key is
 // absent here and set by the controller.
 export const registerSchema = z.object({
-  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  login: loginFieldSchema,
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   firstName: z.string().trim().min(1).max(NAME_MAX_LENGTH),

@@ -1,8 +1,9 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
+import { LOGIN_FORBIDDEN_CHARACTER } from 'shared';
 import type { PublicUser, SessionUser } from 'shared';
 import { permissionsFor } from '../permissions/permissionStore.ts';
-import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
+import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import { passwordResetMail } from '../delivery/passwordResetMail.ts';
 import { logger, messageOf } from '../logger.ts';
 import { validatedBody } from '../middleware/validate.ts';
@@ -95,8 +96,10 @@ export function createAuthController(deps: AuthControllerDeps) {
 
     login: async (req, res) => {
       const { login, password } = validatedBody<LoginInput>(req);
-      const credential =
-        await deps.userRepository.findByLoginWithPassword(login);
+      // Logins cannot contain the character, so it picks the column.
+      const credential = login.includes(LOGIN_FORBIDDEN_CHARACTER)
+        ? await deps.userRepository.findByEmailWithPassword(login)
+        : await deps.userRepository.findByLoginWithPassword(login);
 
       if (!credential) {
         // Burn the same argon2 cost a real verify would, so response timing
@@ -169,10 +172,20 @@ export function createAuthController(deps: AuthControllerDeps) {
 
     requestReset: async (req, res) => {
       const { email } = validatedBody<ResetRequestInput>(req);
-      const user = await deps.userRepository.findByEmail(email);
-      let mail: MailMessage | undefined;
 
-      if (user) {
+      // 202 before any account-dependent work. Branching, or a lookup/token
+      // write delaying the response, makes status or timing an enumeration
+      // oracle.
+      res.status(202).end();
+
+      // Detached: a failure cannot become a 500 that leaks the same signal.
+      // Log policy: .claude/rules/server/auth.md.
+      void (async () => {
+        // a tick later, so the 202 call returns before the lookup starts
+        await new Promise((resolve) => setImmediate(resolve));
+        const user = await deps.userRepository.findByEmail(email);
+        if (!user) return;
+
         // Supersede any outstanding token: two live links for one account
         // widens the window a stolen one is useful in.
         await deps.passwordResetRepository.invalidateAllForUser(user.id);
@@ -183,25 +196,22 @@ export function createAuthController(deps: AuthControllerDeps) {
           hashToken(token),
           new Date(Date.now() + RESET_TTL_MS)
         );
-        mail = passwordResetMail(deps.appBaseUrl, user.email, token);
-      }
+        const mail = passwordResetMail(deps.appBaseUrl, user.email, token);
 
-      // 202 whether or not the address exists. Branching the response here
-      // would turn this endpoint into an account-enumeration oracle.
-      res.status(202).end();
-
-      // Sent after the response and not awaited: awaiting would let response
-      // time reveal whether the address exists, and a rejection would turn a
-      // slow mail server into a 500 that does the same. Logged without the
-      // address or token; no retry, the account can ask again.
-      if (user && mail) {
+        // Not awaited, so a mail failure is logged once by its own catch.
         void deps.mailDelivery.send(mail).catch((error: unknown) => {
           logger.error('Password reset mail failed', {
             userId: user.id,
             error: messageOf(error),
           });
         });
-      }
+      })().catch((error: unknown) => {
+        // The error name, not its message: a MySQL data error quotes the
+        // address, and this line must not tie a failure to an account.
+        logger.error('Password reset request failed', {
+          error: error instanceof Error ? error.name : 'unknown',
+        });
+      });
     },
 
     confirmReset: async (req, res) => {

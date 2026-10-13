@@ -12,6 +12,7 @@ import type { PasswordResetRepository } from '../repositories/passwordResetRepos
 import type { MailMessage } from '../delivery/mailDelivery.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
+import { flushDetached } from '../flush.testkit.ts';
 import { recordLogs } from '../logger.testkit.ts';
 import type { PublicUser, SessionUser } from 'shared';
 
@@ -247,6 +248,20 @@ test('POST /register reports which field collided', async () => {
   });
 });
 
+test('POST /register refuses a login containing @ with a 400 naming login', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const response = await post(base, 'register', {
+      ...registration,
+      login: 'bob@home',
+    });
+
+    assert.equal(response.status, 400);
+    const { details } = await json<{ details: { path: string[] }[] }>(response);
+    assert.ok(details.some((issue) => issue.path[0] === 'login'));
+  });
+});
+
 test('POST /register creates an author when the box is ticked', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
@@ -318,6 +333,60 @@ test('POST /login returns the user and a session cookie', async () => {
 
     assert.equal(response.status, 200);
     assert.ok(sessionCookie(response));
+  });
+});
+
+test('POST /login accepts the email, in any case, in the login field', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    for (const login of ['bob@example.com', 'BOB@Example.COM']) {
+      const response = await post(base, 'login', {
+        login,
+        password: 'hunter2hunter2',
+      });
+
+      assert.equal(response.status, 200, login);
+      assert.ok(sessionCookie(response));
+      assert.equal((await json<PublicUser>(response)).login, 'Bob');
+    }
+  });
+});
+
+test('an unknown email and a wrong password are indistinguishable', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    const wrong = await post(base, 'login', {
+      login: 'bob@example.com',
+      password: 'wrongpassword',
+    });
+    const unknown = await post(base, 'login', {
+      login: 'nobody@example.com',
+      password: 'wrongpassword',
+    });
+
+    assert.equal(wrong.status, 401);
+    assert.equal(unknown.status, 401);
+    assert.deepEqual(await json(wrong), await json(unknown));
+  });
+});
+
+test('a blocked account signing in by email is refused with 403', async () => {
+  const { deps, users } = authDeps();
+  await withApp(deps, async (base) => {
+    const { id } = await json<PublicUser>(
+      await post(base, 'register', registration)
+    );
+    await users.update(id, { status: 'blocked' });
+    const response = await post(base, 'login', {
+      login: 'bob@example.com',
+      password: 'hunter2hunter2',
+    });
+
+    assert.equal(response.status, 403);
   });
 });
 
@@ -457,6 +526,7 @@ test('a reset request for a known address is accepted and delivers a link', asyn
     const response = await post(base, 'password-reset/request', {
       email: 'bob@example.com',
     });
+    await flushDetached();
 
     assert.equal(response.status, 202);
     assert.equal(delivered.length, 1);
@@ -474,6 +544,7 @@ test('a reset request for an unknown address is accepted identically', async () 
     const unknown = await post(base, 'password-reset/request', {
       email: 'nobody@example.com',
     });
+    await flushDetached();
 
     assert.equal(known.status, unknown.status);
     assert.equal(await known.text(), await unknown.text());
@@ -504,6 +575,10 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
       email: 'bob@example.com',
     });
 
+    // The detached work reaches send() after the 202; wait for it, so
+    // rejectSend is assigned.
+    await flushDetached();
+
     // 202 already answered while the send is still pending: the request did
     // not wait on it.
     assert.equal(response.status, 202);
@@ -511,7 +586,7 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
 
     rejectSend(new Error('smtp down'));
     // Flushes the microtask the rejection's .catch runs on.
-    await new Promise((resolve) => setImmediate(resolve));
+    await flushDetached();
 
     assert.deepEqual(lines, [
       {
@@ -523,11 +598,36 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
   });
 });
 
+test('a reset request answers 202 when the token write fails', async (t) => {
+  recordLogs(t); // silences the failure log; the controller spec owns its content
+  const { deps } = authDeps();
+  const failingDeps = {
+    ...deps,
+    passwordResetRepository: {
+      ...deps.passwordResetRepository,
+      create: async () => {
+        throw new Error('db down');
+      },
+    },
+  };
+
+  await withApp(failingDeps, async (base) => {
+    await post(base, 'register', registration);
+    const response = await post(base, 'password-reset/request', {
+      email: 'bob@example.com',
+    });
+    await flushDetached();
+
+    assert.equal(response.status, 202);
+  });
+});
+
 test('the delivered token is not the value stored', async () => {
   const { deps, delivered, resets } = authDeps();
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const token = delivered[0]?.token;
     assert.ok(token);
@@ -541,6 +641,7 @@ test('confirming a reset lets the new password log in', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const confirm = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -566,6 +667,7 @@ test('confirming a reset kills sessions opened before it', async () => {
     const token = sessionCookie(await post(base, 'register', registration));
     const cookie = `${SESSION_COOKIE_NAME}=${token}`;
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -584,6 +686,7 @@ test('a reset token cannot be used twice', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     const token = delivered[0]?.token;
 
     await post(base, 'password-reset/confirm', {
@@ -604,6 +707,7 @@ test('an unknown token and a used token fail identically', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     const token = delivered[0]?.token;
     await post(base, 'password-reset/confirm', {
       token,
@@ -628,7 +732,9 @@ test('a second reset request supersedes the first token', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const response = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -644,6 +750,7 @@ test('a reset password under 8 characters is rejected', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const response = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,

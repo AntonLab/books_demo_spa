@@ -7,6 +7,7 @@ import {
   LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
 } from 'shared';
+import { loginForbiddenCharacterRule } from '@/constants/loginRule';
 import { useRegister } from '@/queries/auth';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ApiError } from '@/api/client';
@@ -100,6 +101,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
               max: LOGIN_MAX_LENGTH,
               message: `Login must be ${LOGIN_MIN_LENGTH} to ${LOGIN_MAX_LENGTH} characters`,
             },
+            loginForbiddenCharacterRule,
           ]}
         >
           <Input autoComplete="username" />

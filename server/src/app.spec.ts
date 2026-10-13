@@ -15,8 +15,9 @@ import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
 import { createLogMailDelivery } from './delivery/mailDelivery.ts';
 import { XSRF_HEADER_NAME } from './middleware/csrfProtection.ts';
-import { XSRF_COOKIE } from './sessionCookie.ts';
+import { SESSION_COOKIE_NAME, XSRF_COOKIE } from './sessionCookie.ts';
 import { initModels } from './models/index.ts';
+import { Session } from './models/Session.ts';
 import { User } from './models/User.ts';
 import {
   createOnlineRegistry,
@@ -66,9 +67,41 @@ const PASSWORD = 'Password123!';
 
 type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
+interface SetCookie {
+  name: string;
+  value: string;
+  path: string;
+  // An Expires in the past, or Max-Age=0: what res.clearCookie sends.
+  expired: boolean;
+}
+
 interface Reply<T> {
   status: number;
   body: T;
+  setCookies: SetCookie[];
+}
+
+function parseSetCookies(response: Response): SetCookie[] {
+  return response.headers.getSetCookie().map((line) => {
+    const [pair = '', ...attributes] = line.split(';');
+    const separator = pair.indexOf('=');
+    const attribute = (wanted: string) => {
+      for (const entry of attributes) {
+        const [key = '', value = ''] = entry.split('=');
+        if (key.trim().toLowerCase() === wanted) return value.trim();
+      }
+      return undefined;
+    };
+    const expires = attribute('expires');
+    return {
+      name: pair.slice(0, separator).trim(),
+      value: pair.slice(separator + 1).trim(),
+      path: attribute('path') ?? '/',
+      expired:
+        (expires !== undefined && Date.parse(expires) <= Date.now()) ||
+        attribute('max-age') === '0',
+    };
+  });
 }
 
 interface ErrorBody {
@@ -80,6 +113,15 @@ interface ErrorBody {
 function assertRefused(reply: Reply<unknown>, error: string): void {
   assert.equal(reply.status, 403);
   assert.equal((reply.body as ErrorBody).error, error);
+}
+
+async function logOutAndExpectCleared(browser: Browser): Promise<void> {
+  const reply = await browser.send('POST', '/auth/logout');
+  assert.equal(reply.status, 204);
+  for (const name of [SESSION_COOKIE_NAME, XSRF_COOKIE]) {
+    const clearing = reply.setCookies.find((cookie) => cookie.name === name);
+    assert.ok(clearing?.expired, `${name} is cleared by the response`);
+  }
 }
 
 interface SendOptions {
@@ -108,28 +150,32 @@ interface Browser {
 }
 
 function createBrowser(base: string, trustedOrigin: string): Browser {
-  const jar = new Map<string, string>();
+  // Keyed by name and path, as a browser keys them (the domain is constant
+  // here): a Set-Cookie for another path must not replace or clear this one.
+  const jar = new Map<string, { name: string; value: string; path: string }>();
 
   // Just enough of a cookie jar: a cleared cookie comes back with an Expires
   // in the past (res.clearCookie), and every other Set-Cookie replaces the
   // stored value.
   const store = (response: Response): void => {
-    for (const line of response.headers.getSetCookie()) {
-      const [pair = '', ...attributes] = line.split(';');
-      const separator = pair.indexOf('=');
-      const name = pair.slice(0, separator).trim();
-      const expired = attributes.some((attribute) => {
-        const [key = '', value = ''] = attribute.split('=');
-        return (
-          key.trim().toLowerCase() === 'expires' &&
-          Date.parse(value) <= Date.now()
-        );
-      });
-
-      if (expired) jar.delete(name);
-      else jar.set(name, pair.slice(separator + 1).trim());
+    for (const { name, value, path, expired } of parseSetCookies(response)) {
+      const key = `${path} ${name}`;
+      if (expired) jar.delete(key);
+      else jar.set(key, { name, value, path });
     }
   };
+
+  const pathMatches = (cookiePath: string, requestPath: string): boolean =>
+    requestPath === cookiePath ||
+    requestPath.startsWith(
+      cookiePath.endsWith('/') ? cookiePath : `${cookiePath}/`
+    );
+
+  const cookiesFor = (requestPath: string) =>
+    [...jar.values()].filter(({ path }) => pathMatches(path, requestPath));
+
+  const valueOf = (name: string) =>
+    [...jar.values()].find((cookie) => cookie.name === name)?.value;
 
   return {
     async send<T>(
@@ -139,9 +185,10 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
       { withXsrfToken = true }: SendOptions = {}
     ): Promise<Reply<T>> {
       const headers: Record<string, string> = {};
-      if (jar.size > 0) {
-        headers.cookie = [...jar]
-          .map(([name, value]) => `${name}=${value}`)
+      const cookies = cookiesFor(`/api${path}`);
+      if (cookies.length > 0) {
+        headers.cookie = cookies
+          .map(({ name, value }) => `${name}=${value}`)
           .join('; ');
       }
       if (body !== undefined) headers['content-type'] = 'application/json';
@@ -149,7 +196,7 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
         // The client reaches the API through its dev proxy, so its writes name
         // APP_BASE_URL rather than the API's own host.
         headers.origin = trustedOrigin;
-        const token = jar.get(XSRF_COOKIE);
+        const token = valueOf(XSRF_COOKIE);
         if (withXsrfToken && token !== undefined) {
           headers[XSRF_HEADER_NAME] = decodeURIComponent(token);
         }
@@ -167,13 +214,16 @@ function createBrowser(base: string, trustedOrigin: string): Browser {
       return {
         status: response.status,
         body: (text === '' ? undefined : JSON.parse(text)) as T,
+        setCookies: parseSetCookies(response),
       };
     },
     cookieHeader(): string {
-      return [...jar].map(([name, value]) => `${name}=${value}`).join('; ');
+      return cookiesFor('/api')
+        .map(({ name, value }) => `${name}=${value}`)
+        .join('; ');
     },
     xsrfToken(): string {
-      const token = jar.get(XSRF_COOKIE);
+      const token = valueOf(XSRF_COOKIE);
       if (token === undefined) {
         throw new Error('No XSRF token issued to this browser yet');
       }
@@ -318,6 +368,52 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
 
     assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
     assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+  });
+
+  test('logout answers 204 for each account that signs in and out in one browser', async () => {
+    const first = await signUp('switchOne');
+    const second = await signUp('switchTwo');
+    const { browser } = first;
+
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+
+    const login = await browser.send<PublicUser>('POST', '/auth/login', {
+      login: 'switchTwo',
+      password: PASSWORD,
+    });
+    assert.equal(login.status, 200);
+    assert.equal(login.body.id, second.user.id);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 200);
+
+    await logOutAndExpectCleared(browser);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+
+    // Nothing left to sign out of: still a 204, never a CSRF refusal.
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+  });
+
+  test('logout answers 204 after a sign-in over another account without signing out', async () => {
+    const first = await signUp('switchThree');
+    await signUp('switchFour');
+    const { browser } = first;
+
+    const login = await browser.send<PublicUser>('POST', '/auth/login', {
+      login: 'switchFour',
+      password: PASSWORD,
+    });
+    assert.equal(login.status, 200);
+
+    await logOutAndExpectCleared(browser);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+  });
+
+  test('logout answers 204 and clears the cookies when the session row is already gone', async () => {
+    const { browser, user } = await signUp('vanishing');
+    await Session.destroy({ where: { userId: user.id } });
+
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+    await logOutAndExpectCleared(browser);
   });
 
   test("a Book's Co-author may edit it, and another Author may not until credited", async () => {

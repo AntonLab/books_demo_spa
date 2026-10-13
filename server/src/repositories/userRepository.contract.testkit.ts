@@ -92,6 +92,10 @@ export function userRepositoryContract(
     assert.equal(await repository.updateRole(MISSING_ID, 'author'), null);
     assert.equal(await repository.findPasswordHashById(MISSING_ID), null);
     assert.equal(await repository.findByLoginWithPassword('Nobody'), null);
+    assert.equal(
+      await repository.findByEmailWithPassword('nobody@example.com'),
+      null
+    );
     assert.equal(await repository.findByEmail('nobody@example.com'), null);
   });
 
@@ -162,6 +166,32 @@ export function userRepositoryContract(
       await repository.findPasswordHashById(created.id),
       credential?.password
     );
+  });
+
+  test('contract: findByEmailWithPassword finds the credential without case, with status and a verifying hash', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create({
+      ...input('Emailer'),
+      status: 'blocked',
+    });
+
+    const credential = await repository.findByEmailWithPassword(
+      'EMAILER@example.com'
+    );
+
+    assert.equal(credential?.id, created.id);
+    assert.equal(credential?.status, 'blocked');
+    assert.equal(
+      await verifyPassword(credential?.password ?? '', 'contract-password'),
+      true
+    );
+  });
+
+  test('contract: findByEmailWithPassword ignores a value that matches only a login', async () => {
+    const { repository } = await setUp();
+    await repository.create(input('Loginonly'));
+
+    assert.equal(await repository.findByEmailWithPassword('Loginonly'), null);
   });
 
   test('contract: findByEmail finds the account without case, and without its hash', async () => {

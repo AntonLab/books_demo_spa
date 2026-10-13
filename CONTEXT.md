@@ -9,7 +9,8 @@ their role.
 ### People and access
 
 **Account**:
-Any registered person, whatever their role.
+Any registered person, whatever their role. An Account signs in with its login
+or its email; a login cannot contain `@`.
 _Avoid_: User (for a registered person in general)
 
 **Guest**:

@@ -29,11 +29,17 @@ paths:
 
 ## Login
 
-- **One answer to two questions**: an unknown login and a wrong password give
-  the same 401, and the unknown-login path spends an argon2 verify on a cached
-  dummy hash so timing cannot tell them apart. `authController.spec.ts` drives
-  the `verify` seam: a wall-clock assertion would flake, and an ESM binding
-  cannot be spied on.
+- **Sign-in takes a login or an email** in the one `login` field. An `@` in the
+  value picks the column: with one it is an email (case-insensitive), without
+  one a login (case-sensitive). A login may not contain `@`
+  (`createUserSchema` and `registerSchema`), so the two cannot collide; an old
+  row with `@` in its login signs in by email only, and gets 400 on a
+  `PATCH /api/users/:id` that resends its unchanged login.
+- **One answer to two questions**: an unknown login or email and a wrong
+  password give the same 401, and the unknown-login path spends an argon2
+  verify on a cached dummy hash so timing cannot tell them apart.
+  `authController.spec.ts` drives the `verify` seam: a wall-clock assertion
+  would flake, and an ESM binding cannot be spied on.
 - A blocked account is checked **after** the password, or the 403 would confirm
   the account to someone without it.
 - **A login in flight cannot outlive a block or a password change.** argon2 is
@@ -41,6 +47,16 @@ paths:
   re-reads the account under `SELECT … FOR SHARE` in the session insert's
   transaction and inserts nothing unless the hash is unchanged and the account
   not blocked. `register` skips this: a new account has nothing in flight.
+
+## Registration
+
+- A taken login or email answers 409 naming the field (`ConflictError`,
+  `asConflict` in `userRepository.ts`). This is a deliberate exception to the
+  "one answer" stance of Login and reset: there is no email-verification step
+  yet (the Pending status is reserved for it), so a generic answer would leave a
+  real user unable to tell why registration failed. The register rate limit
+  (5 per hour per IP, table below) bounds enumeration through it. Revisit when
+  email verification lands.
 
 ## Blocking and password changes
 
@@ -54,19 +70,20 @@ paths:
 
 ## Password reset
 
-- A request always answers 202, or the endpoint would enumerate accounts. A new
-  request invalidates the outstanding token. Tokens live one hour: a link sits
-  in a mailbox.
+- A request always answers 202, or the endpoint would enumerate accounts. The
+  202 goes out right after validation, before the account lookup, token
+  invalidation, token creation and the send, all of which run detached
+  (`void … .catch(...)`). A new request invalidates the outstanding token.
+  Tokens live one hour: a link sits in a mailbox.
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
-  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`. The
-  202 is answered before the send, which then runs detached
-  (`void … .catch(...)`): awaiting it, or branching on its outcome, would let
-  timing or a 500 tell an attacker the address exists. A failed send is
-  logged (`authController.ts`, no address or token in the line) and not
-  retried; the account can just ask again, and the new request supersedes the
-  stored token.
+  `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`.
+- Never await or branch on the lookup, token writes or send. A failure anywhere
+  in the chain is logged (`authController.ts`: `Password reset request failed`,
+  or `Password reset mail failed` for the send; no address or token in the
+  line) and not retried. The account can ask again; the new request supersedes
+  the stored token.
 
 ## CSRF (`middleware/csrfProtection.ts`)
 
@@ -106,8 +123,8 @@ lookup or argon2. A limited Account is not Blocked.
   per-IP budget survives a success, or one real account buys fresh guesses at
   every other.
 - The login half of the key is trimmed, lower-cased and SHA-256 hashed, so case
-  or whitespace buys no fresh budget and an unbounded `login` (this runs before
-  `validate`) cannot leave an unbounded key in memory.
+  or whitespace buys no fresh budget, and an unbounded `login` (this runs
+  before `validate`) cannot leave an unbounded key in memory.
 - Refusal is 429 with `Retry-After` in whole seconds and "Try again in N
   minutes." (singular at 1).
 - Keyed on `req.ip`, so `TRUST_PROXY` matters behind a proxy. Each process keeps

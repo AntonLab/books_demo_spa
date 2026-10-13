@@ -301,6 +301,30 @@ test('PATCH trims a name and refuses one that is only whitespace', async () => {
   );
 });
 
+test('PATCH and POST refuse a login containing @ with a 400 naming login', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<{ id: number }>(await post(base, valid));
+      const patched = await patch(
+        base,
+        created.id,
+        { login: 'bob@home' },
+        ROLE_COOKIES.superadmin
+      );
+      const posted = await post(base, { ...valid, login: 'carl@home' });
+
+      for (const response of [patched, posted]) {
+        assert.equal(response.status, 400);
+        const { details } = await json<{ details: { path: string[] }[] }>(
+          response
+        );
+        assert.ok(details.some((issue) => issue.path[0] === 'login'));
+      }
+    }
+  );
+});
+
 test('POST (administrative create) refuses a whitespace-only name', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository() },

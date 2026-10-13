@@ -9,6 +9,9 @@ export type PageAccess = 'pending' | 'allowed' | 'guest' | 'denied';
 const ACCESS_DENIED_MESSAGE = "You don't have access to this page.";
 
 // What the guard leaves in the router state for AppHeader to open Log in with.
+// It lives only in this navigation entry, so closing the modal or navigating
+// elsewhere forgets it: a Guest who moved on changed intent, and a later
+// sign-in from the header must not send them back to the old page.
 export interface LoginReturnState {
   loginReturnTo: string;
 }

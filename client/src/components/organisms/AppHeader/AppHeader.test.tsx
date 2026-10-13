@@ -1,5 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { QueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
@@ -591,6 +592,7 @@ const Jump = () => {
       >
         jump
       </button>
+      <button onClick={() => void navigate('/search')}>wander</button>
     </>
   );
 };
@@ -618,26 +620,50 @@ describe('AppHeader returning a Guest after Log in', () => {
     ).toBeInTheDocument();
   });
 
-  it('goes to the page asked for once signed in', async () => {
-    const { queryClient } = await renderJumped();
-    await screen.findByRole('dialog', { name: 'Log in' });
+  const signInAndExpectPath = async (
+    queryClient: QueryClient,
+    path: string | RegExp
+  ) => {
     act(() => {
       queryClient.setQueryData(queryKeys.session, sessionOf(user));
     });
     await waitFor(() =>
-      expect(screen.getByTestId('path')).toHaveTextContent('/profile')
+      expect(screen.getByTestId('path')).toHaveTextContent(path)
     );
+  };
+
+  it('goes to the page asked for once signed in', async () => {
+    const { queryClient } = await renderJumped();
+    await screen.findByRole('dialog', { name: 'Log in' });
+    await signInAndExpectPath(queryClient, '/profile');
   });
 
   it('forgets the page once Log in is closed without signing in', async () => {
     const { queryClient } = await renderJumped();
     await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
-    act(() => {
+    await signInAndExpectPath(queryClient, /^\/$/);
+  });
+
+  it('stays on the current page when Log in is opened later from the header', async () => {
+    const { queryClient } = await renderJumped();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    await userEvent.click(screen.getByRole('button', { name: 'wander' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
+    await screen.findByRole('dialog', { name: 'Log in' });
+    await signInAndExpectPath(queryClient, /^\/search$/);
+  });
+
+  it('stays on the page navigated to while Log in is still open', async () => {
+    const { queryClient } = await renderJumped();
+    await screen.findByRole('dialog', { name: 'Log in' });
+    await userEvent.click(screen.getByRole('button', { name: 'wander' }));
+    await act(async () => {
       queryClient.setQueryData(queryKeys.session, sessionOf(user));
     });
-    await waitFor(() =>
-      expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/)
-    );
+    // The header re-renders signed in; only then can a stray redirect have run.
+    await screen.findByRole('button', { name: /bob/i });
+    await act(async () => {});
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/search$/);
   });
 });
 

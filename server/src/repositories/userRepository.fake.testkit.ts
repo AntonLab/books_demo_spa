@@ -172,6 +172,15 @@ export function createFakeUserRepository(
         : null;
     },
 
+    async findByEmailWithPassword(email) {
+      const row = [...rows.values()].find(
+        (candidate) => candidate.email.toLowerCase() === email.toLowerCase()
+      );
+      return row
+        ? { id: row.id, password: row.password, status: row.status }
+        : null;
+    },
+
     async findByEmail(email) {
       const row = [...rows.values()].find(
         (candidate) => candidate.email.toLowerCase() === email.toLowerCase()

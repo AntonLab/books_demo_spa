@@ -9,6 +9,7 @@ import {
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
 } from 'shared';
+import { loginForbiddenCharacterRule } from '@/constants/loginRule';
 import { useUpdateAccount } from '@/queries/users';
 import type { AccountChanges } from '@/api/users';
 import { accountFieldErrors } from '@/types/accountErrors';
@@ -108,6 +109,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
               max: LOGIN_MAX_LENGTH,
               message: `Login must be ${LOGIN_MIN_LENGTH} to ${LOGIN_MAX_LENGTH} characters`,
             },
+            loginForbiddenCharacterRule,
           ]}
         >
           <Input autoComplete="username" />

@@ -2,8 +2,6 @@ import {
   ABOUT_MAX_LENGTH,
   AUTHOR_SEARCH_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
-  LOGIN_MAX_LENGTH,
-  LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -11,6 +9,7 @@ import {
   USER_STATUSES,
 } from 'shared';
 import { z } from 'zod';
+import { loginFieldSchema } from './fields.ts';
 import { limitOffsetShape } from './pagination.ts';
 
 // No `role` here, and none in updateUserSchema below, which is derived from
@@ -20,7 +19,7 @@ import { limitOffsetShape } from './pagination.ts';
 // PATCH /api/users/:id/role, never through a body that also carries other
 // fields.
 export const createUserSchema = z.object({
-  login: z.string().min(LOGIN_MIN_LENGTH).max(LOGIN_MAX_LENGTH),
+  login: loginFieldSchema,
   email: z.email().max(EMAIL_MAX_LENGTH),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
   // Names are trimmed, so a blank one fails `min(1)`; About is not (below).

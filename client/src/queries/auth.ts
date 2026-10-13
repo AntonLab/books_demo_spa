@@ -92,8 +92,9 @@ export const watchSession = (
     const next = (event.action.data as Session)?.id ?? null;
     if (accountId !== undefined && next !== accountId) {
       // Removed, not invalidated: they belong to the Account that left, and a
-      // refetch while the bell is still mounted would ask as the next one (a
-      // Guest's 401 on Sign out). Library and Favorites are private too: the
+      // refetch while the bell or the Account tab's EmailNotificationsSetting
+      // is still mounted would ask as the next one (a Guest's 401 on Sign out).
+      // Library and Favorites are private too: the
       // next Account must not see the last one's lists while the refetch lands.
       // The Favorites and My works lists live under the shared `books` and
       // `series` prefixes, so a predicate finds them.
@@ -106,6 +107,7 @@ export const watchSession = (
       // because an invalidation refetches an observer whose last render still
       // said enabled.
       client.removeQueries({ queryKey: queryKeys.allReports });
+      client.removeQueries({ queryKey: queryKeys.notificationSettings });
       client.removeQueries({
         predicate: (query) => isAccountList(query.queryKey, accountId ?? null),
       });

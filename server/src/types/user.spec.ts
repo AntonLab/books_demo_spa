@@ -186,3 +186,13 @@ test('accepts the shared field limits exactly and refuses one past them', () => 
     );
   }
 });
+
+test('refuses a login containing @ anywhere, on create and on update', () => {
+  for (const login of ['bo@b', '@bob', 'bob@', '@@@']) {
+    const created = createUserSchema.safeParse({ ...valid, login });
+    assert.equal(created.success, false, login);
+    assert.equal(created.error?.issues[0]?.message, 'Login cannot contain @');
+    assert.equal(updateUserSchema.safeParse({ login }).success, false, login);
+  }
+  assert.ok(createUserSchema.safeParse({ ...valid, login: 'bob.b' }).success);
+});

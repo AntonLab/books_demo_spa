@@ -5,7 +5,7 @@ import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { sessionOf } from '@/test/session';
-import { watchSession } from '@/queries/auth';
+import { useLogout, watchSession } from '@/queries/auth';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -183,6 +183,62 @@ describe('ProfilePage when the session ends', () => {
       expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
     );
     expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
+  });
+});
+
+const LogOutButton = () => {
+  const logout = useLogout();
+  return <button onClick={() => logout.mutate(undefined)}>Log out</button>;
+};
+
+describe('ProfilePage after Log out', () => {
+  // Account is the only tab antd keeps mounted once visited, so its settings
+  // are asked for on `/profile` alone; each other tab asks for its own list.
+  it.each([
+    ['/profile', () => mockedNotifications.getNotificationSettings],
+    ['/profile/favorites', () => mockedBooks.listFavoritedBooks],
+    ['/profile/lists', () => mockedReadingLists.listReadingLists],
+    ['/profile/my-books', () => mockedBooks.listBooks],
+  ])('asks for nothing that needs a session on %s', async (route, firstAsk) => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    mockedReadingLists.listReadingLists.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    const queryClient = createTestQueryClient();
+    watchSession(queryClient, null);
+    queryClient.setQueryData(queryKeys.session, sessionOf(author));
+    renderWithProviders(
+      <>
+        <ProfilePage />
+        <LogOutButton />
+        <LocationProbe />
+      </>,
+      { queryClient, route }
+    );
+    await waitFor(() => expect(firstAsk()).toHaveBeenCalled());
+    const sessionAsks = [
+      mockedNotifications.getNotificationSettings,
+      mockedBooks.listFavoritedBooks,
+      mockedBooks.listBooks,
+      mockedSeries.listFavoritedSeries,
+      mockedSeries.listSeries,
+      mockedReadingLists.listReadingLists,
+    ];
+    for (const mocked of sessionAsks) {
+      mocked.mockClear();
+    }
+
+    await userEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
+    );
+    for (const mocked of sessionAsks) {
+      expect(mocked).not.toHaveBeenCalled();
+    }
   });
 });
 
