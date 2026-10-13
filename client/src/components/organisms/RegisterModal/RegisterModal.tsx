@@ -3,12 +3,11 @@ import { useState } from 'react';
 import { Alert, Button, Checkbox, Form, Input } from 'antd';
 import {
   EMAIL_MAX_LENGTH,
-  LOGIN_FORBIDDEN_CHARACTER,
-  LOGIN_FORBIDDEN_CHARACTER_MESSAGE,
   LOGIN_MAX_LENGTH,
   LOGIN_MIN_LENGTH,
   NAME_MAX_LENGTH,
 } from 'shared';
+import { loginForbiddenCharacterRule } from '@/constants/loginRule';
 import { useRegister } from '@/queries/auth';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ApiError } from '@/api/client';
@@ -102,12 +101,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
               max: LOGIN_MAX_LENGTH,
               message: `Login must be ${LOGIN_MIN_LENGTH} to ${LOGIN_MAX_LENGTH} characters`,
             },
-            {
-              validator: (_, value?: string) =>
-                value?.includes(LOGIN_FORBIDDEN_CHARACTER)
-                  ? Promise.reject(new Error(LOGIN_FORBIDDEN_CHARACTER_MESSAGE))
-                  : Promise.resolve(),
-            },
+            loginForbiddenCharacterRule,
           ]}
         >
           <Input autoComplete="username" />
