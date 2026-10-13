@@ -655,6 +655,20 @@ describe('AppHeader returning a Guest after Log in', () => {
     );
     expect(screen.getByTestId('path')).not.toHaveTextContent('/profile');
   });
+
+  it('stays on the page navigated to while Log in is still open', async () => {
+    const { queryClient } = await renderJumped();
+    await screen.findByRole('dialog', { name: 'Log in' });
+    await userEvent.click(screen.getByRole('button', { name: 'wander' }));
+    await act(async () => {
+      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+    });
+    // The header re-renders signed in; only then can a stray redirect have run.
+    await screen.findByRole('button', { name: /bob/i });
+    await act(async () => {});
+    expect(screen.getByTestId('path')).toHaveTextContent(/^\/search$/);
+    expect(screen.getByTestId('path')).not.toHaveTextContent('/profile');
+  });
 });
 
 describe('AppHeader on a phone', () => {
