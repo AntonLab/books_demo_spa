@@ -12,6 +12,7 @@ import type { PasswordResetRepository } from '../repositories/passwordResetRepos
 import type { MailMessage } from '../delivery/mailDelivery.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { createFakeUserRepository } from '../repositories/userRepository.fake.testkit.ts';
+import { flushDetached } from '../flush.testkit.ts';
 import { recordLogs } from '../logger.testkit.ts';
 import type { PublicUser, SessionUser } from 'shared';
 
@@ -174,11 +175,6 @@ const post = (base: string, path: string, body: unknown, cookie?: string) =>
     },
     body: JSON.stringify(body),
   });
-
-// The reset request answers before its lookup and token work run; a test that
-// reads what they did waits one macrotask first.
-const flushDetached = () =>
-  new Promise<void>((resolve) => setImmediate(resolve));
 
 const postFrom = (
   base: string,
@@ -602,24 +598,9 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
   });
 });
 
-test('a reset request for an unknown address writes no token', async () => {
-  const { deps, resets, delivered } = authDeps();
-  await withApp(deps, async (base) => {
-    await post(base, 'register', registration);
-    const response = await post(base, 'password-reset/request', {
-      email: 'nobody@example.com',
-    });
-    await flushDetached();
-
-    assert.equal(response.status, 202);
-    assert.equal(resets.rows.size, 0);
-    assert.equal(delivered.length, 0);
-  });
-});
-
-test('a reset request answers 202 and logs when the token write fails', async (t) => {
-  const lines = recordLogs(t);
-  const { deps, delivered } = authDeps();
+test('a reset request answers 202 when the token write fails', async (t) => {
+  recordLogs(t); // silences the failure log; the controller spec owns its content
+  const { deps } = authDeps();
   const failingDeps = {
     ...deps,
     passwordResetRepository: {
@@ -638,14 +619,6 @@ test('a reset request answers 202 and logs when the token write fails', async (t
     await flushDetached();
 
     assert.equal(response.status, 202);
-    assert.deepEqual(delivered, []);
-    assert.deepEqual(lines, [
-      {
-        level: 'error',
-        message: 'Password reset request failed',
-        meta: { error: 'db down' },
-      },
-    ]);
   });
 });
 

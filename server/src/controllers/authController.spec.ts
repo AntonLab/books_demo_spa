@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import { createAuthController } from './authController.ts';
 import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
+import { flushDetached } from '../flush.testkit.ts';
 import { recordLogs } from '../logger.testkit.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type {
@@ -305,8 +306,6 @@ test('a block that lands during the verify leaves the login without a session', 
   assert.deepEqual(cookies, []);
 });
 
-const flush = () => new Promise((resolve) => setImmediate(resolve));
-
 function resetController(
   events: string[],
   overrides: { createFails?: boolean; lookupFails?: boolean } = {}
@@ -373,7 +372,7 @@ test('a reset request answers 202 before the lookup and the token work run', asy
   );
   assert.deepEqual(events, ['status 202', 'end']);
 
-  await flush();
+  await flushDetached();
   assert.deepEqual(events, [
     'status 202',
     'end',
@@ -392,7 +391,7 @@ test('a reset request for an unknown address still looks up after the 202 and do
     resetRequest('nobody@example.com'),
     resetResponse(events)
   );
-  await flush();
+  await flushDetached();
 
   assert.deepEqual(events, ['status 202', 'end', 'lookup']);
 });
@@ -410,7 +409,7 @@ for (const [name, overrides] of [
       resetRequest('racer@example.com'),
       resetResponse(events)
     );
-    await flush();
+    await flushDetached();
 
     assert.deepEqual(events.slice(0, 2), ['status 202', 'end']);
     assert.equal(events.includes('send'), false);
