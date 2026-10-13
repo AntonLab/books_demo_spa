@@ -602,6 +602,53 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
   });
 });
 
+test('a reset request for an unknown address writes no token', async () => {
+  const { deps, resets, delivered } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    const response = await post(base, 'password-reset/request', {
+      email: 'nobody@example.com',
+    });
+    await flushDetached();
+
+    assert.equal(response.status, 202);
+    assert.equal(resets.rows.size, 0);
+    assert.equal(delivered.length, 0);
+  });
+});
+
+test('a reset request answers 202 and logs when the token write fails', async (t) => {
+  const lines = recordLogs(t);
+  const { deps, delivered } = authDeps();
+  const failingDeps = {
+    ...deps,
+    passwordResetRepository: {
+      ...deps.passwordResetRepository,
+      create: async () => {
+        throw new Error('db down');
+      },
+    },
+  };
+
+  await withApp(failingDeps, async (base) => {
+    await post(base, 'register', registration);
+    const response = await post(base, 'password-reset/request', {
+      email: 'bob@example.com',
+    });
+    await flushDetached();
+
+    assert.equal(response.status, 202);
+    assert.deepEqual(delivered, []);
+    assert.deepEqual(lines, [
+      {
+        level: 'error',
+        message: 'Password reset request failed',
+        meta: { error: 'db down' },
+      },
+    ]);
+  });
+});
+
 test('the delivered token is not the value stored', async () => {
   const { deps, delivered, resets } = authDeps();
   await withApp(deps, async (base) => {
