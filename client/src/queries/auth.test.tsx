@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
@@ -13,15 +13,19 @@ import {
   watchSession,
 } from './auth';
 import { queryKeys } from './keys';
+import { useNotificationSettings } from './notifications';
 import { createTestQueryClient } from '../test/queryClient';
 import { sessionOf } from '../test/session';
 import * as authApi from '../api/auth';
+import * as notificationsApi from '../api/notifications';
 import { ApiError } from '../api/client';
 import type { PublicUser } from '../types/api';
 
 jest.mock('../api/auth');
+jest.mock('../api/notifications');
 
 const mockedAuth = jest.mocked(authApi);
+const mockedNotifications = jest.mocked(notificationsApi);
 
 const user: PublicUser = {
   id: 1,
@@ -252,19 +256,24 @@ describe('watchSession', () => {
     expect(client.getQueryState(statisticsKey)).toBe(undefined);
   });
 
-  it("drops the last Account's notification settings rather than refetching them", () => {
+  it("drops the last Account's notification settings rather than refetching them", async () => {
     const client = createTestQueryClient();
     watchSession(client, null);
     client.setQueryData(queryKeys.session, sessionOf(user));
     client.setQueryData(queryKeys.notificationSettings, {
       emailNotifications: true,
     });
+    // A mounted observer, like the Account tab's switch, is what a refetch
+    // would be sent for.
+    renderHook(() => useNotificationSettings(), { wrapper: wrapper(client) });
 
     client.setQueryData(queryKeys.session, null);
+    await act(async () => {});
 
     expect(client.getQueryState(queryKeys.notificationSettings)).toBe(
       undefined
     );
+    expect(mockedNotifications.getNotificationSettings).not.toHaveBeenCalled();
   });
 
   it('announces a session its own mutation wrote, not one it fetched', async () => {
