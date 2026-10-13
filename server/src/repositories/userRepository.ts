@@ -53,7 +53,6 @@ export interface UserRepository {
   findByLoginWithPassword(
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
-  // The second credential read, for sign-in by email.
   findByEmailWithPassword(
     email: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;

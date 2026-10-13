@@ -96,8 +96,7 @@ export function createAuthController(deps: AuthControllerDeps) {
 
     login: async (req, res) => {
       const { login, password } = validatedBody<LoginInput>(req);
-      // A login can never contain the character, so it picks the column
-      // without the two namespaces colliding.
+      // Logins cannot contain the character, so it picks the column.
       const credential = login.includes(LOGIN_FORBIDDEN_CHARACTER)
         ? await deps.userRepository.findByEmailWithPassword(login)
         : await deps.userRepository.findByLoginWithPassword(login);

@@ -34,11 +34,11 @@ paths:
   one a login (case-sensitive). A login may not contain `@`
   (`createUserSchema` and `registerSchema`), so the two cannot collide; an old
   row with `@` in its login signs in by email only.
-- **One answer to two questions**: an unknown login or email and a wrong password give
-  the same 401, and the unknown-login path spends an argon2 verify on a cached
-  dummy hash so timing cannot tell them apart. `authController.spec.ts` drives
-  the `verify` seam: a wall-clock assertion would flake, and an ESM binding
-  cannot be spied on.
+- **One answer to two questions**: an unknown login or email and a wrong
+  password give the same 401, and the unknown-login path spends an argon2
+  verify on a cached dummy hash so timing cannot tell them apart.
+  `authController.spec.ts` drives the `verify` seam: a wall-clock assertion
+  would flake, and an ESM binding cannot be spied on.
 - A blocked account is checked **after** the password, or the 403 would confirm
   the account to someone without it.
 - **A login in flight cannot outlive a block or a password change.** argon2 is
@@ -111,8 +111,8 @@ lookup or argon2. A limited Account is not Blocked.
   per-IP budget survives a success, or one real account buys fresh guesses at
   every other.
 - The login half of the key is trimmed, lower-cased and SHA-256 hashed, so case
-  or whitespace buys no fresh budget (this holds just as well for an email) and an unbounded `login` (this runs before
-  `validate`) cannot leave an unbounded key in memory.
+  or whitespace buys no fresh budget, and an unbounded `login` (this runs
+  before `validate`) cannot leave an unbounded key in memory.
 - Refusal is 429 with `Retry-After` in whole seconds and "Try again in N
   minutes." (singular at 1).
 - Keyed on `req.ip`, so `TRUST_PROXY` matters behind a proxy. Each process keeps
