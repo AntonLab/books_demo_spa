@@ -206,8 +206,10 @@ export function createAuthController(deps: AuthControllerDeps) {
           });
         });
       })().catch((error: unknown) => {
+        // The error name, not its message: a MySQL data error quotes the
+        // address, and this line must not tie a failure to an account.
         logger.error('Password reset request failed', {
-          error: messageOf(error),
+          error: error instanceof Error ? error.name : 'unknown',
         });
       });
     },

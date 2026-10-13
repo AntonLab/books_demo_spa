@@ -316,7 +316,12 @@ function resetController(
     userRepository: {
       async findByEmail(email: string) {
         events.push('lookup');
-        if (overrides.lookupFails) throw new Error('lookup down');
+        // MySQL data errors quote the offending value, the address included
+        if (overrides.lookupFails) {
+          throw new Error(
+            `Incorrect string value for column 'email': '${email}'`
+          );
+        }
         return email === known.email ? known : null;
       },
     } as unknown as UserRepository,
@@ -392,9 +397,9 @@ test('a reset request for an unknown address still looks up after the 202 and do
   assert.deepEqual(events, ['status 202', 'end', 'lookup']);
 });
 
-for (const [name, overrides, error] of [
-  ['a token write', { createFails: true }, 'write down'],
-  ['a lookup', { lookupFails: true }, 'lookup down'],
+for (const [name, overrides] of [
+  ['a token write', { createFails: true }],
+  ['a lookup', { lookupFails: true }],
 ] as const) {
   test(`${name} that fails after the 202 is logged and changes nothing the caller saw`, async (t) => {
     const lines = recordLogs(t);
@@ -413,8 +418,9 @@ for (const [name, overrides, error] of [
       {
         level: 'error',
         message: 'Password reset request failed',
-        meta: { error },
+        meta: { error: 'Error' },
       },
     ]);
+    assert.equal(JSON.stringify(lines).includes('racer@example.com'), false);
   });
 }
