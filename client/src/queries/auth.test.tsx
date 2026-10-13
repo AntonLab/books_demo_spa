@@ -252,6 +252,21 @@ describe('watchSession', () => {
     expect(client.getQueryState(statisticsKey)).toBe(undefined);
   });
 
+  it("drops the last Account's notification settings rather than refetching them", () => {
+    const client = createTestQueryClient();
+    watchSession(client, null);
+    client.setQueryData(queryKeys.session, sessionOf(user));
+    client.setQueryData(queryKeys.notificationSettings, {
+      emailNotifications: true,
+    });
+
+    client.setQueryData(queryKeys.session, null);
+
+    expect(client.getQueryState(queryKeys.notificationSettings)).toBe(
+      undefined
+    );
+  });
+
   it('announces a session its own mutation wrote, not one it fetched', async () => {
     mockedAuth.me.mockResolvedValue(sessionOf(user));
     mockedAuth.logout.mockResolvedValue(undefined);
