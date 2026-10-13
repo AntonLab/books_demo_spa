@@ -55,6 +55,18 @@ describe('RegisterModal validation', () => {
     expect(mockedAuth.register).not.toHaveBeenCalled();
   });
 
+  it('rejects a login containing @', async () => {
+    renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
+
+    await userEvent.type(screen.getByLabelText('Login'), 'bob@home');
+    await userEvent.click(screen.getByRole('button', { name: 'Register' }));
+
+    expect(
+      await screen.findByText('Login cannot contain @')
+    ).toBeInTheDocument();
+    expect(mockedAuth.register).not.toHaveBeenCalled();
+  });
+
   it('rejects a password shorter than the server minimum of 8', async () => {
     renderWithProviders(<RegisterModal onOpen={onOpen} onClose={onClose} />);
 

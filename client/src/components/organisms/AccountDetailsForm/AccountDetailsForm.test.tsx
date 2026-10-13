@@ -321,4 +321,17 @@ describe('AccountDetailsForm', () => {
     ).toBeInTheDocument();
     expect(mockedUsers.updateUser).not.toHaveBeenCalled();
   });
+
+  it('refuses a login containing @ without calling the api', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await replaceText(user, 'Login', 'bobby@home');
+    await user.click(saveButton());
+
+    expect(
+      await screen.findByText('Login cannot contain @')
+    ).toBeInTheDocument();
+    expect(mockedUsers.updateUser).not.toHaveBeenCalled();
+  });
 });

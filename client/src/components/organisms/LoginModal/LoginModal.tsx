@@ -45,8 +45,8 @@ export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
       >
         <Form.Item
           name="login"
-          label="Login"
-          rules={[{ required: true, message: 'Enter your login' }]}
+          label="Login or email"
+          rules={[{ required: true, message: 'Enter your login or email' }]}
         >
           <Input autoComplete="username" />
         </Form.Item>

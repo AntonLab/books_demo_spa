@@ -39,9 +39,30 @@ describe('LoginModal', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
-    expect(await screen.findByText('Enter your login')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Enter your login or email')
+    ).toBeInTheDocument();
     expect(await screen.findByText('Enter your password')).toBeInTheDocument();
     expect(mockedAuth.login).not.toHaveBeenCalled();
+  });
+
+  it('labels the field as a login or an email and submits an email under the login key', async () => {
+    mockedAuth.login.mockResolvedValue(sessionOf(user));
+    renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
+
+    await userEvent.type(
+      screen.getByLabelText('Login or email'),
+      'bob@example.com'
+    );
+    await userEvent.type(screen.getByLabelText('Password'), 'secret123');
+    await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
+
+    await waitFor(() => {
+      expect(mockedAuth.login).toHaveBeenCalledWith({
+        login: 'bob@example.com',
+        password: 'secret123',
+      });
+    });
   });
 
   it('submits the credentials, caches the user and closes the modal', async () => {
@@ -50,7 +71,7 @@ describe('LoginModal', () => {
       <LoginModal onOpen={onOpen} onClose={onClose} />
     );
 
-    await userEvent.type(screen.getByLabelText('Login'), 'bob');
+    await userEvent.type(screen.getByLabelText('Login or email'), 'bob');
     await userEvent.type(screen.getByLabelText('Password'), 'secret123');
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
@@ -72,7 +93,7 @@ describe('LoginModal', () => {
     );
     renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
 
-    await userEvent.type(screen.getByLabelText('Login'), 'bob');
+    await userEvent.type(screen.getByLabelText('Login or email'), 'bob');
     await userEvent.type(screen.getByLabelText('Password'), 'wrongpass');
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
@@ -85,7 +106,7 @@ describe('LoginModal', () => {
     mockedAuth.login.mockRejectedValue(new ApiError(403, 'Account is blocked'));
     renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
 
-    await userEvent.type(screen.getByLabelText('Login'), 'bob');
+    await userEvent.type(screen.getByLabelText('Login or email'), 'bob');
     await userEvent.type(screen.getByLabelText('Password'), 'secret123');
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
@@ -125,7 +146,7 @@ describe('LoginModal', () => {
   it('closes at once, whatever was typed, without asking', async () => {
     renderWithProviders(<LoginModal onOpen={onOpen} onClose={onClose} />);
 
-    await userEvent.type(screen.getByLabelText('Login'), 'bob');
+    await userEvent.type(screen.getByLabelText('Login or email'), 'bob');
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
