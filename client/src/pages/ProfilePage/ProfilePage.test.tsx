@@ -219,14 +219,15 @@ describe('ProfilePage after Log out', () => {
       { queryClient, route }
     );
     await waitFor(() => expect(firstAsk()).toHaveBeenCalled());
-    for (const mocked of [
+    const sessionAsks = [
       mockedNotifications.getNotificationSettings,
       mockedBooks.listFavoritedBooks,
       mockedBooks.listBooks,
       mockedSeries.listFavoritedSeries,
       mockedSeries.listSeries,
       mockedReadingLists.listReadingLists,
-    ]) {
+    ];
+    for (const mocked of sessionAsks) {
       mocked.mockClear();
     }
 
@@ -235,12 +236,9 @@ describe('ProfilePage after Log out', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/)
     );
-    expect(mockedNotifications.getNotificationSettings).not.toHaveBeenCalled();
-    expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
-    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
-    expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
-    expect(mockedSeries.listSeries).not.toHaveBeenCalled();
-    expect(mockedReadingLists.listReadingLists).not.toHaveBeenCalled();
+    for (const mocked of sessionAsks) {
+      expect(mocked).not.toHaveBeenCalled();
+    }
   });
 });
 

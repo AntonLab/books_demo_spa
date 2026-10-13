@@ -106,9 +106,9 @@ export const watchSession = (
       // because an invalidation refetches an observer whose last render still
       // said enabled.
       client.removeQueries({ queryKey: queryKeys.allReports });
-      // Settings are the session's own, so the same holds while the Account
-      // tab's `EmailNotificationsSetting` is mounted: a refetch would ask as
-      // the next Account. A signed-in next Account's switch fetches afresh.
+      // Settings are the session's own: the Account tab's
+      // EmailNotificationsSetting can still be mounted, and a refetch would ask
+      // as the next Account.
       client.removeQueries({ queryKey: queryKeys.notificationSettings });
       client.removeQueries({
         predicate: (query) => isAccountList(query.queryKey, accountId ?? null),

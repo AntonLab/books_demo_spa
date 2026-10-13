@@ -16,17 +16,16 @@ the Atomic Design levels. Every cache key lives in `keys.ts`.
 - **The session is `PublicUser | null`, never `undefined`.** `useSession` maps
   the 401 to `null` inside the `queryFn`; TanStack rejects an `undefined`
   return, which keeps "asked, nobody" apart from "not asked".
-- **The session follows every tab** (`watchSession`, wired to the app's
-  client only): a `setQueryData` on the session is announced on the
-  `books.session` BroadcastChannel and the other tabs refetch `/auth/me`; a
-  changed Account id invalidates every other query, except the notifications
-  and the notification settings, which it removes: the bell and the settings
-  switch can still be mounted then, and a refetch would ask as the next
-  Account (a 401 on Sign out). So only a mutation's own
-  answer may `setQueryData` the session, never a guess. `useSession` also
-  refetches on every focus (`'always'`), and a 401 on any query or mutation
-  while an Account is shown refetches it too (a Lost session): never a
-  `setQueryData(null)`, since a sign-in elsewhere may have overtaken the
+- **The session follows every tab** (`watchSession`, wired to the app's client
+  only): a `setQueryData` on the session is announced on the `books.session`
+  BroadcastChannel and the other tabs refetch `/auth/me`; a changed Account id
+  invalidates every other query, except the notifications and the notification
+  settings, which it removes: the bell and the settings switch can still be
+  mounted then, and a refetch would ask as the next Account (a 401 on Sign out).
+  So only a mutation's own answer may `setQueryData` the session, never a guess.
+  `useSession` also refetches on every focus (`'always'`), and a 401 on any
+  query or mutation while an Account is shown refetches it too (a Lost session):
+  never a `setQueryData(null)`, since a sign-in elsewhere may have overtaken the
   request.
 - **A disabled query reports `isPending: true` forever** (with
   `fetchStatus: 'idle'`). `useBookSearch` is disabled while the URL's Genre is

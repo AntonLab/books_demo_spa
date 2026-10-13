@@ -66,7 +66,6 @@ export const queryKeys = {
   allReadingLists: ['readingLists'] as const,
   allMyReadingLists: ['myReadingLists'] as const,
   // Not keyed by Account, unlike notifications: the answer is always the
-  // session's, so watchSession removes it on an Account change instead of
-  // refetching it.
+  // session's. watchSession removes it on an Account change.
   notificationSettings: ['notificationSettings'] as const,
 };
