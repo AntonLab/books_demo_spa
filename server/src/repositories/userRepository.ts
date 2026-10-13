@@ -53,6 +53,10 @@ export interface UserRepository {
   findByLoginWithPassword(
     login: string
   ): Promise<{ id: number; password: string; status: UserStatus } | null>;
+  // The second credential read, for sign-in by email.
+  findByEmailWithPassword(
+    email: string
+  ): Promise<{ id: number; password: string; status: UserStatus } | null>;
   findByEmail(email: string): Promise<PublicUser | null>;
   // The stored hash for one account, for the controller to check a
   // currentPassword against. As narrow as findByLoginWithPassword, for the
@@ -460,11 +464,19 @@ export function createSequelizeUserRepository(): UserRepository {
       return toPublicUser(user, avatarUrls.get(id) ?? null);
     },
 
-    // The one place the password column is read. unscoped() bypasses the
-    // defaultScope that excludes it; the return type is deliberately narrow so
-    // the hash cannot travel further than the caller that verifies it.
+    // These two are the only places the password column is read for a
+    // sign-in. unscoped() bypasses the defaultScope that excludes it; the
+    // return type is deliberately narrow so the hash cannot travel further
+    // than the caller that verifies it.
     async findByLoginWithPassword(login) {
       const user = await User.unscoped().findOne({ where: { login } });
+      return user
+        ? { id: user.id, password: user.password, status: user.status }
+        : null;
+    },
+
+    async findByEmailWithPassword(email) {
+      const user = await User.unscoped().findOne({ where: { email } });
       return user
         ? { id: user.id, password: user.password, status: user.status }
         : null;
