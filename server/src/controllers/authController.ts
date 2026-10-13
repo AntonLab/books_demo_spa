@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
+import { LOGIN_FORBIDDEN_CHARACTER } from 'shared';
 import type { PublicUser, SessionUser } from 'shared';
 import { permissionsFor } from '../permissions/permissionStore.ts';
 import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
@@ -95,8 +96,11 @@ export function createAuthController(deps: AuthControllerDeps) {
 
     login: async (req, res) => {
       const { login, password } = validatedBody<LoginInput>(req);
-      const credential =
-        await deps.userRepository.findByLoginWithPassword(login);
+      // A login can never contain the character, so it picks the column
+      // without the two namespaces colliding.
+      const credential = login.includes(LOGIN_FORBIDDEN_CHARACTER)
+        ? await deps.userRepository.findByEmailWithPassword(login)
+        : await deps.userRepository.findByLoginWithPassword(login);
 
       if (!credential) {
         // Burn the same argon2 cost a real verify would, so response timing

@@ -335,6 +335,60 @@ test('POST /login returns the user and a session cookie', async () => {
   });
 });
 
+test('POST /login accepts the email, in any case, in the login field', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    for (const login of ['bob@example.com', 'BOB@Example.COM']) {
+      const response = await post(base, 'login', {
+        login,
+        password: 'hunter2hunter2',
+      });
+
+      assert.equal(response.status, 200, login);
+      assert.ok(sessionCookie(response));
+      assert.equal((await json<PublicUser>(response)).login, 'Bob');
+    }
+  });
+});
+
+test('an unknown email and a wrong password are indistinguishable', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    const wrong = await post(base, 'login', {
+      login: 'bob@example.com',
+      password: 'wrongpassword',
+    });
+    const unknown = await post(base, 'login', {
+      login: 'nobody@example.com',
+      password: 'wrongpassword',
+    });
+
+    assert.equal(wrong.status, 401);
+    assert.equal(unknown.status, 401);
+    assert.deepEqual(await json(wrong), await json(unknown));
+  });
+});
+
+test('a blocked account signing in by email is refused with 403', async () => {
+  const { deps, users } = authDeps();
+  await withApp(deps, async (base) => {
+    const { id } = await json<PublicUser>(
+      await post(base, 'register', registration)
+    );
+    await users.update(id, { status: 'blocked' });
+    const response = await post(base, 'login', {
+      login: 'bob@example.com',
+      password: 'hunter2hunter2',
+    });
+
+    assert.equal(response.status, 403);
+  });
+});
+
 test('POST /login stores only the hash of the session token', async () => {
   const { deps, sessions } = authDeps();
   await withApp(deps, async (base) => {

@@ -86,6 +86,68 @@ test('the dummy hash is reused rather than recomputed per attempt', async () => 
   assert.equal(verified[0], verified[1]);
 });
 
+test('a value with @ is looked up by email only, and one without by login only', async () => {
+  const calls: string[] = [];
+  const controller = createAuthController({
+    userRepository: {
+      async findByLoginWithPassword(login: string) {
+        calls.push(`login:${login}`);
+        return null;
+      },
+      async findByEmailWithPassword(email: string) {
+        calls.push(`email:${email}`);
+        return null;
+      },
+    } as unknown as UserRepository,
+    sessionRepository: noSessions,
+    passwordResetRepository: noResets,
+    mailDelivery: noMail,
+    appBaseUrl: 'http://localhost:3000',
+    verify: async () => false,
+  });
+
+  for (const value of ['bob@example.com', 'Bob']) {
+    await assert.rejects(
+      async () =>
+        controller.login(loginRequest(value, 'whatever12345'), unusedResponse),
+      /Invalid credentials/
+    );
+  }
+
+  assert.deepEqual(calls, ['email:bob@example.com', 'login:Bob']);
+});
+
+test('an unknown email still spends a password verify against the dummy hash', async () => {
+  const verified: string[] = [];
+  const controller = createAuthController({
+    userRepository: {
+      async findByEmailWithPassword() {
+        return null;
+      },
+    } as unknown as UserRepository,
+    sessionRepository: noSessions,
+    passwordResetRepository: noResets,
+    mailDelivery: noMail,
+    appBaseUrl: 'http://localhost:3000',
+    verify: async (hashed) => {
+      verified.push(hashed);
+      return false;
+    },
+  });
+
+  await assert.rejects(
+    async () =>
+      controller.login(
+        loginRequest('nobody@example.com', 'whatever12345'),
+        unusedResponse
+      ),
+    /Invalid credentials/
+  );
+
+  assert.equal(verified.length, 1);
+  assert.match(verified[0] ?? '', /^\$argon2id\$/);
+});
+
 // One account behind both repositories login reads it through. The session
 // fake re-reads the stored hash and status at the moment it opens a session,
 // the way the real repository's locking read does, so a change made during the
