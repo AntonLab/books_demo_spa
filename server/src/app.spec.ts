@@ -83,6 +83,11 @@ function assertRefused(reply: Reply<unknown>, error: string): void {
   assert.equal((reply.body as ErrorBody).error, error);
 }
 
+async function logOutAndExpectCleared(browser: Browser): Promise<void> {
+  assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+  assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
+}
+
 interface SendOptions {
   // Off only for the one request that proves a write without it is refused.
   withXsrfToken?: boolean;
@@ -337,9 +342,8 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     assert.equal(login.body.id, second.user.id);
     assert.equal((await browser.send('GET', '/auth/me')).status, 200);
 
-    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    await logOutAndExpectCleared(browser);
     assert.equal((await browser.send('GET', '/auth/me')).status, 401);
-    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
 
     // Nothing left to sign out of: still a 204, never a CSRF refusal.
     assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
@@ -356,9 +360,8 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     });
     assert.equal(login.status, 200);
 
-    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    await logOutAndExpectCleared(browser);
     assert.equal((await browser.send('GET', '/auth/me')).status, 401);
-    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
   });
 
   test('logout answers 204 and clears the cookies when the session row is already gone', async () => {
@@ -366,8 +369,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     await Session.destroy({ where: { userId: user.id } });
 
     assert.equal((await browser.send('GET', '/auth/me')).status, 401);
-    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
-    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
+    await logOutAndExpectCleared(browser);
   });
 
   test("a Book's Co-author may edit it, and another Author may not until credited", async () => {
