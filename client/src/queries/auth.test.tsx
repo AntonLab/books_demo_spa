@@ -221,6 +221,21 @@ describe('useLogout', () => {
 
     expect(client.getQueryData(queryKeys.session)).toBeNull();
   });
+
+  it('keeps the session when the server refuses the sign-out', async () => {
+    mockedAuth.logout.mockRejectedValue(
+      new ApiError(403, 'Missing or invalid CSRF token')
+    );
+    const client = createTestQueryClient();
+    client.setQueryData(queryKeys.session, sessionOf(user));
+
+    const { result } = renderHook(() => useLogout(), {
+      wrapper: wrapper(client),
+    });
+    await expect(result.current.mutateAsync()).rejects.toBeInstanceOf(ApiError);
+
+    expect(client.getQueryData(queryKeys.session)).toEqual(sessionOf(user));
+  });
 });
 
 describe('watchSession', () => {
