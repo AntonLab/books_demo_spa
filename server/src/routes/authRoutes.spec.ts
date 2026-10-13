@@ -175,6 +175,11 @@ const post = (base: string, path: string, body: unknown, cookie?: string) =>
     body: JSON.stringify(body),
   });
 
+// The reset request answers before its lookup and token work run; a test that
+// reads what they did waits one macrotask first.
+const flushDetached = () =>
+  new Promise<void>((resolve) => setImmediate(resolve));
+
 const postFrom = (
   base: string,
   path: string,
@@ -525,6 +530,7 @@ test('a reset request for a known address is accepted and delivers a link', asyn
     const response = await post(base, 'password-reset/request', {
       email: 'bob@example.com',
     });
+    await flushDetached();
 
     assert.equal(response.status, 202);
     assert.equal(delivered.length, 1);
@@ -542,6 +548,7 @@ test('a reset request for an unknown address is accepted identically', async () 
     const unknown = await post(base, 'password-reset/request', {
       email: 'nobody@example.com',
     });
+    await flushDetached();
 
     assert.equal(known.status, unknown.status);
     assert.equal(await known.text(), await unknown.text());
@@ -572,6 +579,10 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
       email: 'bob@example.com',
     });
 
+    // The detached work reaches send() after the 202; wait for it, so
+    // rejectSend is assigned.
+    await flushDetached();
+
     // 202 already answered while the send is still pending: the request did
     // not wait on it.
     assert.equal(response.status, 202);
@@ -579,7 +590,7 @@ test('a reset request answers 202 before the mail send settles, and logs a faile
 
     rejectSend(new Error('smtp down'));
     // Flushes the microtask the rejection's .catch runs on.
-    await new Promise((resolve) => setImmediate(resolve));
+    await flushDetached();
 
     assert.deepEqual(lines, [
       {
@@ -596,6 +607,7 @@ test('the delivered token is not the value stored', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const token = delivered[0]?.token;
     assert.ok(token);
@@ -609,6 +621,7 @@ test('confirming a reset lets the new password log in', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const confirm = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -634,6 +647,7 @@ test('confirming a reset kills sessions opened before it', async () => {
     const token = sessionCookie(await post(base, 'register', registration));
     const cookie = `${SESSION_COOKIE_NAME}=${token}`;
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -652,6 +666,7 @@ test('a reset token cannot be used twice', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     const token = delivered[0]?.token;
 
     await post(base, 'password-reset/confirm', {
@@ -672,6 +687,7 @@ test('an unknown token and a used token fail identically', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     const token = delivered[0]?.token;
     await post(base, 'password-reset/confirm', {
       token,
@@ -696,7 +712,9 @@ test('a second reset request supersedes the first token', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const response = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,
@@ -712,6 +730,7 @@ test('a reset password under 8 characters is rejected', async () => {
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
     await post(base, 'password-reset/request', { email: 'bob@example.com' });
+    await flushDetached();
 
     const response = await post(base, 'password-reset/confirm', {
       token: delivered[0]?.token,

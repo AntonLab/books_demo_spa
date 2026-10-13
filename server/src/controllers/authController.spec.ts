@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request, Response } from 'express';
 import { createAuthController } from './authController.ts';
-import type { MailDelivery } from '../delivery/mailDelivery.ts';
+import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
+import { recordLogs } from '../logger.testkit.ts';
 import type { PasswordResetRepository } from '../repositories/passwordResetRepository.ts';
 import type {
   SessionOpening,
@@ -303,3 +304,117 @@ test('a block that lands during the verify leaves the login without a session', 
   assert.deepEqual(deps.touched, []);
   assert.deepEqual(cookies, []);
 });
+
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+function resetController(
+  events: string[],
+  overrides: { createFails?: boolean; lookupFails?: boolean } = {}
+) {
+  const known = { id: 7, email: 'racer@example.com' };
+  return createAuthController({
+    userRepository: {
+      async findByEmail(email: string) {
+        events.push('lookup');
+        if (overrides.lookupFails) throw new Error('lookup down');
+        return email === known.email ? known : null;
+      },
+    } as unknown as UserRepository,
+    sessionRepository: noSessions,
+    passwordResetRepository: {
+      async invalidateAllForUser() {
+        events.push('invalidate');
+        return 0;
+      },
+      async create() {
+        events.push('create');
+        if (overrides.createFails) throw new Error('write down');
+      },
+    } as unknown as PasswordResetRepository,
+    mailDelivery: {
+      async send(_message: MailMessage) {
+        events.push('send');
+      },
+    },
+    appBaseUrl: 'http://localhost:3000',
+  });
+}
+
+function resetRequest(email: string): Request {
+  return { validated: { body: { email } } } as unknown as Request;
+}
+
+function resetResponse(events: string[]) {
+  const response = {
+    status(code: number) {
+      events.push(`status ${code}`);
+      return response;
+    },
+    end() {
+      events.push('end');
+      return response;
+    },
+  } as unknown as Response;
+  return response;
+}
+
+test('a reset request answers 202 before the lookup and the token work run', async () => {
+  const events: string[] = [];
+  const controller = resetController(events);
+
+  await controller.requestReset(
+    resetRequest('racer@example.com'),
+    resetResponse(events)
+  );
+  assert.deepEqual(events, ['status 202', 'end']);
+
+  await flush();
+  assert.deepEqual(events, [
+    'status 202',
+    'end',
+    'lookup',
+    'invalidate',
+    'create',
+    'send',
+  ]);
+});
+
+test('a reset request for an unknown address still looks up after the 202 and does no token work', async () => {
+  const events: string[] = [];
+  const controller = resetController(events);
+
+  await controller.requestReset(
+    resetRequest('nobody@example.com'),
+    resetResponse(events)
+  );
+  await flush();
+
+  assert.deepEqual(events, ['status 202', 'end', 'lookup']);
+});
+
+for (const [name, overrides, error] of [
+  ['a token write', { createFails: true }, 'write down'],
+  ['a lookup', { lookupFails: true }, 'lookup down'],
+] as const) {
+  test(`${name} that fails after the 202 is logged and changes nothing the caller saw`, async (t) => {
+    const lines = recordLogs(t);
+    const events: string[] = [];
+    const controller = resetController(events, overrides);
+
+    await controller.requestReset(
+      resetRequest('racer@example.com'),
+      resetResponse(events)
+    );
+    await flush();
+
+    assert.deepEqual(events.slice(0, 2), ['status 202', 'end']);
+    assert.equal(events.includes('send'), false);
+    assert.deepEqual(lines, [
+      {
+        level: 'error',
+        message: 'Password reset request failed',
+        meta: { error },
+      },
+    ]);
+  });
+}

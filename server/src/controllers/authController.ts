@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { LOGIN_FORBIDDEN_CHARACTER } from 'shared';
 import type { PublicUser, SessionUser } from 'shared';
 import { permissionsFor } from '../permissions/permissionStore.ts';
-import type { MailDelivery, MailMessage } from '../delivery/mailDelivery.ts';
+import type { MailDelivery } from '../delivery/mailDelivery.ts';
 import { passwordResetMail } from '../delivery/passwordResetMail.ts';
 import { logger, messageOf } from '../logger.ts';
 import { validatedBody } from '../middleware/validate.ts';
@@ -172,10 +172,22 @@ export function createAuthController(deps: AuthControllerDeps) {
 
     requestReset: async (req, res) => {
       const { email } = validatedBody<ResetRequestInput>(req);
-      const user = await deps.userRepository.findByEmail(email);
-      let mail: MailMessage | undefined;
 
-      if (user) {
+      // 202 whether or not the address exists, and sent before anything that
+      // depends on the account: branching the response, or letting the lookup
+      // and token writes delay it, would turn this endpoint into an
+      // account-enumeration oracle through status or response time.
+      res.status(202).end();
+
+      // Detached: a failure cannot become a 500 that does the same. Logged
+      // without the address or token; no retry, the account can ask again.
+      void (async () => {
+        // A tick later, so the first lookup call does not run ahead of the
+        // response being flushed.
+        await new Promise((resolve) => setImmediate(resolve));
+        const user = await deps.userRepository.findByEmail(email);
+        if (!user) return;
+
         // Supersede any outstanding token: two live links for one account
         // widens the window a stolen one is useful in.
         await deps.passwordResetRepository.invalidateAllForUser(user.id);
@@ -186,25 +198,20 @@ export function createAuthController(deps: AuthControllerDeps) {
           hashToken(token),
           new Date(Date.now() + RESET_TTL_MS)
         );
-        mail = passwordResetMail(deps.appBaseUrl, user.email, token);
-      }
+        const mail = passwordResetMail(deps.appBaseUrl, user.email, token);
 
-      // 202 whether or not the address exists. Branching the response here
-      // would turn this endpoint into an account-enumeration oracle.
-      res.status(202).end();
-
-      // Sent after the response and not awaited: awaiting would let response
-      // time reveal whether the address exists, and a rejection would turn a
-      // slow mail server into a 500 that does the same. Logged without the
-      // address or token; no retry, the account can ask again.
-      if (user && mail) {
+        // Not awaited, so a mail failure is logged once by its own catch.
         void deps.mailDelivery.send(mail).catch((error: unknown) => {
           logger.error('Password reset mail failed', {
             userId: user.id,
             error: messageOf(error),
           });
         });
-      }
+      })().catch((error: unknown) => {
+        logger.error('Password reset request failed', {
+          error: messageOf(error),
+        });
+      });
     },
 
     confirmReset: async (req, res) => {
