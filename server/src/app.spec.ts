@@ -17,6 +17,7 @@ import { createLogMailDelivery } from './delivery/mailDelivery.ts';
 import { XSRF_HEADER_NAME } from './middleware/csrfProtection.ts';
 import { XSRF_COOKIE } from './sessionCookie.ts';
 import { initModels } from './models/index.ts';
+import { Session } from './models/Session.ts';
 import { User } from './models/User.ts';
 import {
   createOnlineRegistry,
@@ -318,6 +319,55 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
 
     assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
     assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+  });
+
+  test('logout answers 204 for each account that signs in and out in one browser', async () => {
+    const first = await signUp('switchOne');
+    const second = await signUp('switchTwo');
+    const { browser } = first;
+
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+
+    const login = await browser.send<PublicUser>('POST', '/auth/login', {
+      login: 'switchTwo',
+      password: PASSWORD,
+    });
+    assert.equal(login.status, 200);
+    assert.equal(login.body.id, second.user.id);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 200);
+
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
+
+    // Nothing left to sign out of: still a 204, never a CSRF refusal.
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+  });
+
+  test('logout answers 204 after a sign-in over another account without signing out', async () => {
+    const first = await signUp('switchThree');
+    await signUp('switchFour');
+    const { browser } = first;
+
+    const login = await browser.send<PublicUser>('POST', '/auth/login', {
+      login: 'switchFour',
+      password: PASSWORD,
+    });
+    assert.equal(login.status, 200);
+
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
+  });
+
+  test('logout answers 204 and clears the cookies when the session row is already gone', async () => {
+    const { browser, user } = await signUp('vanishing');
+    await Session.destroy({ where: { userId: user.id } });
+
+    assert.equal((await browser.send('GET', '/auth/me')).status, 401);
+    assert.equal((await browser.send('POST', '/auth/logout')).status, 204);
+    assert.doesNotMatch(browser.cookieHeader(), /sid=|xsrfToken=/);
   });
 
   test("a Book's Co-author may edit it, and another Author may not until credited", async () => {
