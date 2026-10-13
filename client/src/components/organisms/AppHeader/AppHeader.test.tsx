@@ -653,7 +653,6 @@ describe('AppHeader returning a Guest after Log in', () => {
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(/^\/search$/)
     );
-    expect(screen.getByTestId('path')).not.toHaveTextContent('/profile');
   });
 
   it('stays on the page navigated to while Log in is still open', async () => {
@@ -667,7 +666,6 @@ describe('AppHeader returning a Guest after Log in', () => {
     await screen.findByRole('button', { name: /bob/i });
     await act(async () => {});
     expect(screen.getByTestId('path')).toHaveTextContent(/^\/search$/);
-    expect(screen.getByTestId('path')).not.toHaveTextContent('/profile');
   });
 });
 
