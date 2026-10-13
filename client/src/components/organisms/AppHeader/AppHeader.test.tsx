@@ -591,6 +591,7 @@ const Jump = () => {
       >
         jump
       </button>
+      <button onClick={() => void navigate('/search')}>wander</button>
     </>
   );
 };
@@ -638,6 +639,21 @@ describe('AppHeader returning a Guest after Log in', () => {
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(/^\/$/)
     );
+  });
+
+  it('stays on the current page when Log in is opened later from the header', async () => {
+    const { queryClient } = await renderJumped();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    await userEvent.click(screen.getByRole('button', { name: 'wander' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
+    await screen.findByRole('dialog', { name: 'Log in' });
+    act(() => {
+      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('path')).toHaveTextContent(/^\/search$/)
+    );
+    expect(screen.getByTestId('path')).not.toHaveTextContent('/profile');
   });
 });
 

@@ -43,8 +43,8 @@ export const AppHeader: FC = () => {
   const [returnTo, setReturnTo] = useState<string | null>(null);
 
   // Read once per navigation, not per render: the router state outlives the
-  // modal and must not reopen it each time the session changes. Any navigation,
-  // the return trip included, also forgets the previous page.
+  // modal and must not reopen it each time the session changes. Any navigation
+  // forgets the URL on purpose; see LoginReturnState in usePageGuard for why.
   const [seenKey, setSeenKey] = useState(location.key);
   if (seenKey !== location.key) {
     setSeenKey(location.key);
