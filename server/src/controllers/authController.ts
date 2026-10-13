@@ -173,17 +173,15 @@ export function createAuthController(deps: AuthControllerDeps) {
     requestReset: async (req, res) => {
       const { email } = validatedBody<ResetRequestInput>(req);
 
-      // 202 whether or not the address exists, and sent before anything that
-      // depends on the account: branching the response, or letting the lookup
-      // and token writes delay it, would turn this endpoint into an
-      // account-enumeration oracle through status or response time.
+      // 202 before any account-dependent work. Branching, or a lookup/token
+      // write delaying the response, makes status or timing an enumeration
+      // oracle.
       res.status(202).end();
 
-      // Detached: a failure cannot become a 500 that does the same. Logged
-      // without the address or token; no retry, the account can ask again.
+      // Detached: a failure cannot become a 500 that leaks the same signal.
+      // Log policy: .claude/rules/server/auth.md.
       void (async () => {
-        // A tick later, so the first lookup call does not run ahead of the
-        // response being flushed.
+        // a tick later, so the 202 call returns before the lookup starts
         await new Promise((resolve) => setImmediate(resolve));
         const user = await deps.userRepository.findByEmail(email);
         if (!user) return;

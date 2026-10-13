@@ -78,12 +78,11 @@ paths:
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
   `passwordResetMail` composes it, `MAIL_DELIVERY` picks `log` or `smtp`.
-- Awaiting the lookup, the token writes or the send, or branching on their
-  outcome, would let response time or a 500 tell an attacker the address
-  exists. A failure anywhere in the chain is logged (`authController.ts`:
-  `Password reset request failed`, or `Password reset mail failed` for the
-  send; no address or token in the line) and not retried; the account can just
-  ask again, and the new request supersedes the stored token.
+- Never await or branch on the lookup, token writes or send. A failure anywhere
+  in the chain is logged (`authController.ts`: `Password reset request failed`,
+  or `Password reset mail failed` for the send; no address or token in the
+  line) and not retried. The account can ask again; the new request supersedes
+  the stored token.
 
 ## CSRF (`middleware/csrfProtection.ts`)
 
