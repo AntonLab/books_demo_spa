@@ -187,6 +187,13 @@ export function userRepositoryContract(
     );
   });
 
+  test('contract: findByEmailWithPassword ignores a value that matches only a login', async () => {
+    const { repository } = await setUp();
+    await repository.create(input('Loginonly'));
+
+    assert.equal(await repository.findByEmailWithPassword('Loginonly'), null);
+  });
+
   test('contract: findByEmail finds the account without case, and without its hash', async () => {
     const { repository } = await setUp();
     const created = await repository.create(input('Mailed'));
