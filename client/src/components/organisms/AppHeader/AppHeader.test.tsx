@@ -371,6 +371,48 @@ describe('AppHeader when logged in', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the Log in dialog when the session expires after a logout and a later sign-in', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const Home = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => void navigate('/private')}>enter</button>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+    await waitFor(() => {
+      expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
+    });
+    act(() => {
+      seedSession(queryClient, user);
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'enter' }));
+    expect(await screen.findByText('secret')).toBeInTheDocument();
+    act(() => {
+      seedSession(queryClient, null);
+    });
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+
   it('is reachable by keyboard and opens the dropdown on Enter', async () => {
     await renderHeader(<AppHeader />, withSession(user));
 
