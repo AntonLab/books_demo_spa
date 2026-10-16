@@ -162,22 +162,6 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
     assert.equal(await verifyPassword(user.password, 'hunter2hunter2'), true);
   });
 
-  test('invalidateAllForUser stops earlier tokens being redeemed', async () => {
-    const userId = await makeUser('SupersededOwner');
-    await repository.create(
-      userId,
-      hashToken('r6'),
-      new Date(Date.now() + hour)
-    );
-
-    await repository.invalidateAllForUser(userId);
-
-    assert.equal(
-      await repository.redeem(hashToken('r6'), 'newpassword123'),
-      false
-    );
-  });
-
   const live = (userId: number) =>
     PasswordResetToken.findAll({ where: { userId, usedAt: null } });
 
@@ -305,9 +289,8 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
       hashToken('p-31-used'),
       new Date(moment - 31 * day)
     );
-    // Stamps usedAt on p-31-used: a used row is purged all the same.
-    await repository.invalidateAllForUser(userId);
-    await repository.create(
+    // Stamps usedAt on p-31-used and stores p-31: a used row is purged all the same.
+    await repository.replaceForUser(
       userId,
       hashToken('p-31'),
       new Date(moment - 31 * day)

@@ -106,16 +106,6 @@ function createFakeResets(
     async create(userId, tokenHash, expiresAt) {
       rows.set(tokenHash, { userId, usedAt: null, expiresAt });
     },
-    async invalidateAllForUser(userId) {
-      let affected = 0;
-      for (const row of rows.values()) {
-        if (row.userId === userId && row.usedAt === null) {
-          row.usedAt = new Date();
-          affected += 1;
-        }
-      }
-      return affected;
-    },
     // Models the repository's one locked transaction: synchronous in-memory
     // work is atomic, so no await may sit before or between the two steps.
     async replaceForUser(userId, tokenHash, expiresAt) {

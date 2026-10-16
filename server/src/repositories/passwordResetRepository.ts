@@ -9,7 +9,6 @@ export const RESET_TOKEN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface PasswordResetRepository {
   create(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
-  invalidateAllForUser(userId: number): Promise<number>;
   // Supersedes the Account's live tokens and stores a new one atomically.
   replaceForUser(
     userId: number,
@@ -32,17 +31,6 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
     // reset was requested, and the same single-use check covers both. The
     // evidence is kept until 30 days past the token's expiry
     // (RESET_TOKEN_RETENTION_MS), when the hourly expiry purge deletes it.
-    async invalidateAllForUser(userId) {
-      const [affected] = await PasswordResetToken.update(
-        { usedAt: new Date() },
-        { where: { userId, usedAt: null } }
-      );
-      return affected;
-    },
-
-    // Stamping usedAt rather than deleting keeps the row as evidence that a
-    // reset was requested, and the single-use check covers both. The evidence
-    // stays until the hourly expiry purge (RESET_TOKEN_RETENTION_MS).
     async replaceForUser(userId, tokenHash, expiresAt) {
       const sequelize = PasswordResetToken.sequelize;
       if (!sequelize) {

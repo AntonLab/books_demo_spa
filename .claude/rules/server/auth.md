@@ -73,8 +73,9 @@ paths:
 - A request always answers 202, or the endpoint would enumerate accounts. The
   202 goes out right after validation, before the account lookup, token
   invalidation, token creation and the send, all of which run detached
-  (`void … .catch(...)`). A new request invalidates the outstanding token.
-  Tokens live one hour: a link sits in a mailbox.
+  (`void … .catch(...)`). A new request supersedes the outstanding token in
+  one transaction that locks the Account's row, so concurrent requests leave
+  one live token. Tokens live one hour: a link sits in a mailbox.
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):
