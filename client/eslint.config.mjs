@@ -93,6 +93,24 @@ export default createConfig(
     files: ['src/api/client.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
+  // Tests only: queries/auth.ts writes the session key in production. No other
+  // block sets no-restricted-syntax, so nothing overrides this; a later block
+  // that does must repeat this option set.
+  {
+    files: tests,
+    ignores: ['src/test/session.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.property.name='setQueryData'][arguments.0.object.name='queryKeys'][arguments.0.property.name='session']",
+          message:
+            'Seed the session with seedSession(client, user) from @/test/session: setQueryData on a key is untyped.',
+        },
+      ],
+    },
+  },
   // Jest's CSS and SVG mappings and the CSS Modules and SVG declarations need
   // a default export.
   {
