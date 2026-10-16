@@ -1,4 +1,4 @@
-// Demo data: ten accounts, three authors' worth of published work, and the
+// Demo data: twelve accounts, three authors' worth of published work, and the
 // comment threads and likes that make the reader-facing pages look lived-in.
 //
 // It writes through the models, not the HTTP API: register can only mint a
@@ -60,7 +60,7 @@ import { RNG_SEED, createRng, itemAt } from './rng.ts';
 import { assertSafeTarget } from './seedGuards.ts';
 import { createSequelize } from '../sequelize.ts';
 
-// One password for all ten accounts: demo data, not a credential. It is
+// One password for all twelve accounts: demo data, not a credential. It is
 // printed at the end of a run.
 const DEMO_PASSWORD = 'Password123!';
 
@@ -120,7 +120,7 @@ async function writeAccounts(
       password: DEMO_PASSWORD,
       firstName: spec.firstName,
       lastName: spec.lastName,
-      status: 'active',
+      status: spec.status ?? 'active',
       about: spec.about,
       showLastSeen: spec.showLastSeen,
     });
@@ -792,7 +792,7 @@ async function main(): Promise<void> {
 
     logger.info(`Seeded ${config.db.database}`, totals);
     logger.info(
-      `Sign in as superadmin, admin, mhale, ipetrov, nquinn or user1-user5 — password ${DEMO_PASSWORD}`
+      `Sign in as superadmin, admin, mhale, ipetrov, nquinn or user1-user5 — password ${DEMO_PASSWORD}. blocked1 (Blocked) and pending1 (Pending) cannot sign in.`
     );
   } finally {
     await sequelize.close();

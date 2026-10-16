@@ -1,4 +1,4 @@
-import type { UserRole } from 'shared';
+import type { UserRole, UserStatus } from 'shared';
 import { GOTHIC, HARD_SF, URBAN_FANTASY, type ContentBank } from './content.ts';
 
 const MINUTE_MS = 60 * 1000;
@@ -10,6 +10,8 @@ export interface AccountSpec {
   firstName: string;
   lastName: string;
   role: UserRole;
+  // Omitted means active.
+  status?: UserStatus;
   // Empty means no About.
   about: string;
   // Relative to the run, like the chapter dates, so the demo never looks
@@ -134,3 +136,27 @@ export const READERS: readonly AccountSpec[] = [
     showLastSeen: true,
   },
 ];
+
+// The two non-Active Accounts, so the UI has a name that renders without a
+// link. buildPlan attaches their activity after every random draw.
+export const BLOCKED_AUTHOR: AccountSpec = {
+  login: 'blocked1',
+  firstName: 'Victor',
+  lastName: 'Lindqvist',
+  role: 'author',
+  status: 'blocked',
+  about: '',
+  lastSeenAgoMs: 60 * DAY_MS,
+  showLastSeen: true,
+};
+
+export const PENDING_USER: AccountSpec = {
+  login: 'pending1',
+  firstName: 'Priya',
+  lastName: 'Raman',
+  role: 'user',
+  status: 'pending',
+  about: '',
+  lastSeenAgoMs: null,
+  showLastSeen: true,
+};
