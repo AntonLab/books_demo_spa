@@ -67,7 +67,8 @@ describe('GenreTreeSelect', () => {
     expect(onChange).not.toHaveBeenCalledWith(undefined);
     // rc-tree-select reads `which`, which user-event does not set.
     fireEvent.keyDown(box, { key: 'Escape', which: 27, keyCode: 27 });
-    // rc-select closes on a macrotask, not inside the keydown.
+    // rc-tree-select (built on rc-select) closes on a macrotask, not inside
+    // the keydown.
     await waitFor(() => expect(box).toHaveAttribute('aria-expanded', 'false'));
     await user.keyboard('{Delete}');
     expect(onChange).toHaveBeenLastCalledWith(undefined);
@@ -76,17 +77,23 @@ describe('GenreTreeSelect', () => {
   it.each([
     ['Delete', 46],
     ['Backspace', 8],
-  ])('%s clears a closed select and keeps it closed', async (key, code) => {
+  ])('%s clears a closed select and keeps it closed', (key, code) => {
     const onChange = jest.fn();
     renderHarness({ initial: 3, onChange });
     const box = screen.getByRole('combobox', { name: 'Genre' });
     act(() => box.focus());
-    // rc-tree-select reads `which`, which user-event does not set.
-    fireEvent.keyDown(box, { key, which: code, keyCode: code });
-    expect(onChange).toHaveBeenLastCalledWith(undefined);
-    // rc-select opens on a macrotask; wait past it.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-    expect(box).toHaveAttribute('aria-expanded', 'false');
+    jest.useFakeTimers();
+    try {
+      // rc-tree-select reads `which`, which user-event does not set.
+      fireEvent.keyDown(box, { key, which: code, keyCode: code });
+      expect(onChange).toHaveBeenLastCalledWith(undefined);
+      // rc-tree-select (built on rc-select) opens on a macrotask; run every
+      // pending timer.
+      act(() => jest.runAllTimers());
+      expect(box).toHaveAttribute('aria-expanded', 'false');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('shows an orphan Subgenre at the top level, not hidden', async () => {

@@ -46,9 +46,9 @@ export const useClearable = ({
         value !== undefined &&
         (event.key === 'Delete' || event.key === 'Backspace')
       ) {
-        onChange?.(undefined);
         event.preventDefault();
         setOpen(false);
+        onChange?.(undefined);
       }
     },
     onOpenChange: (next) => {

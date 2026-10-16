@@ -27,16 +27,21 @@ describe('ClearableSelect', () => {
   it.each([
     ['Delete', 46],
     ['Backspace', 8],
-  ])('%s clears a closed select and keeps it closed', async (key, code) => {
+  ])('%s clears a closed select and keeps it closed', (key, code) => {
     const onChange = jest.fn();
     renderHarness(onChange);
     const box = screen.getByRole('combobox', { name: 'Series' });
     act(() => box.focus());
-    // rc-select reads `which`, which user-event does not set.
-    fireEvent.keyDown(box, { key, which: code, keyCode: code });
-    expect(onChange).toHaveBeenLastCalledWith(undefined);
-    // rc-select opens on a macrotask; wait past it.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-    expect(box).toHaveAttribute('aria-expanded', 'false');
+    jest.useFakeTimers();
+    try {
+      // rc-select reads `which`, which user-event does not set.
+      fireEvent.keyDown(box, { key, which: code, keyCode: code });
+      expect(onChange).toHaveBeenLastCalledWith(undefined);
+      // rc-select opens on a macrotask; run every pending timer.
+      act(() => jest.runAllTimers());
+      expect(box).toHaveAttribute('aria-expanded', 'false');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
