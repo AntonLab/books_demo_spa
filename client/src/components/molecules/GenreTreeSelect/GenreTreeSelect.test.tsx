@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form } from 'antd';
 import type { GenreListItem } from 'shared';
@@ -71,6 +71,22 @@ describe('GenreTreeSelect', () => {
     await waitFor(() => expect(box).toHaveAttribute('aria-expanded', 'false'));
     await user.keyboard('{Delete}');
     expect(onChange).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it.each([
+    ['Delete', 46],
+    ['Backspace', 8],
+  ])('%s clears a closed select and keeps it closed', async (key, code) => {
+    const onChange = jest.fn();
+    renderHarness({ initial: 3, onChange });
+    const box = screen.getByRole('combobox', { name: 'Genre' });
+    act(() => box.focus());
+    // rc-tree-select reads `which`, which user-event does not set.
+    fireEvent.keyDown(box, { key, which: code, keyCode: code });
+    expect(onChange).toHaveBeenLastCalledWith(undefined);
+    // rc-select opens on a macrotask, not inside the keydown.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(box).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('shows an orphan Subgenre at the top level, not hidden', async () => {
