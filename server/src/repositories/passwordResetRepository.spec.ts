@@ -289,7 +289,7 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
       hashToken('p-31-used'),
       new Date(moment - 31 * day)
     );
-    // Stamps usedAt on p-31-used and stores p-31: a used row is purged all the same.
+    // replaceForUser stamps p-31-used used: a used row is purged all the same.
     await repository.replaceForUser(
       userId,
       hashToken('p-31'),
