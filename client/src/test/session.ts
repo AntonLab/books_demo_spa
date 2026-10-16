@@ -30,8 +30,8 @@ export const sessionOf = (
   permissions: permissionsOf(user.role, usersUpdate),
 });
 
-// `null` seeds a Guest. Seed through this, never `setQueryData` directly: that
-// key is untyped, so a bare `PublicUser` would type-check.
+// `null` seeds a Guest. Never call `setQueryData` on the session key
+// directly: it is untyped, so a bare `PublicUser` type-checks.
 export const seedSession = (
   client: QueryClient,
   user: PublicUser | null,

@@ -93,9 +93,8 @@ export default createConfig(
     files: ['src/api/client.ts'],
     rules: { 'no-restricted-globals': 'off' },
   },
-  // Tests only: queries/auth.ts writes the session key in production. No other
-  // block sets no-restricted-syntax, so nothing overrides this; a later block
-  // that does must repeat this option set.
+  // Tests only: queries/auth.ts writes the session key in production.
+  // Another block that sets no-restricted-syntax must repeat this option.
   {
     files: tests,
     ignores: ['src/test/session.ts'],
@@ -106,7 +105,7 @@ export default createConfig(
           selector:
             "CallExpression[callee.property.name='setQueryData'][arguments.0.object.name='queryKeys'][arguments.0.property.name='session']",
           message:
-            'Seed the session with seedSession(client, user) from @/test/session: setQueryData on a key is untyped.',
+            'Seed the session with seedSession(client, user) from @/test/session.',
         },
       ],
     },
