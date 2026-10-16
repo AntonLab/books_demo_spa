@@ -55,7 +55,8 @@ export function createFakeUserRepository(
     return { ...user, avatarUrl: avatarUrlOf(row.id) };
   };
 
-  // Stands in for the unique indexes; mirrors the login and email collations in models/User.ts.
+  // Stands in for the unique indexes; mirrors the login and email collations
+  // in models/User.ts.
   const assertAvailable = (
     login: string,
     email: string,
