@@ -30,11 +30,11 @@ paths:
 ## Login
 
 - **Sign-in takes a login or an email** in the one `login` field. An `@` in the
-  value picks the column: with one it is an email (case-insensitive), without
-  one a login (case-sensitive). A login may not contain `@`
-  (`createUserSchema` and `registerSchema`), so the two cannot collide; an old
-  row with `@` in its login signs in by email only, and gets 400 on a
-  `PATCH /api/users/:id` that resends its unchanged login.
+  value picks the column: with one it is an email (case-insensitive,
+  accent-sensitive), without one a login (case-sensitive). A login may not
+  contain `@` (`createUserSchema` and `registerSchema`), so the two cannot
+  collide; an old row with `@` in its login signs in by email only, and gets
+  400 on a `PATCH /api/users/:id` that resends its unchanged login.
 - **One answer to two questions**: an unknown login or email and a wrong
   password give the same 401, and the unknown-login path spends an argon2
   verify on a cached dummy hash so timing cannot tell them apart.
@@ -71,10 +71,11 @@ paths:
 ## Password reset
 
 - A request always answers 202, or the endpoint would enumerate accounts. The
-  202 goes out right after validation, before the account lookup, token
-  invalidation, token creation and the send, all of which run detached
-  (`void … .catch(...)`). A new request invalidates the outstanding token.
-  Tokens live one hour: a link sits in a mailbox.
+  202 goes out right after validation, before the account lookup, the token
+  swap (`replaceForUser`) and the send, all of which run detached
+  (`void … .catch(...)`). A new request supersedes the outstanding token in
+  one transaction that locks the Account's row, so concurrent requests leave
+  one live token. Tokens live one hour: a link sits in a mailbox.
 - Confirmation stores the password, stamps the token used and revokes every
   session in one transaction. Unknown, expired and used tokens share one 400.
 - The link leaves through `MailDelivery` (`delivery/mailDelivery.ts`):

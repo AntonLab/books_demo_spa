@@ -53,10 +53,11 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         allowNull: false,
         unique: true,
       },
-      // No column collation: email inherits the case-insensitive table default,
-      // because addresses are treated case-insensitively in practice.
+      // Raw type string, as for login. utf8mb4_0900_as_ci: case-insensitive, as
+      // addresses are in practice; accent-sensitive, so distinct addresses
+      // never share an Account.
       email: {
-        type: DataTypes.STRING(EMAIL_MAX_LENGTH),
+        type: `VARCHAR(${EMAIL_MAX_LENGTH}) COLLATE utf8mb4_0900_as_ci`,
         allowNull: false,
         unique: true,
       },

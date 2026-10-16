@@ -41,11 +41,11 @@ test('login is case-sensitive through an explicit column collation', () => {
   );
 });
 
-test('email carries no column collation, inheriting the case-insensitive table default', () => {
-  const sql = generateCreateTable();
-
-  assert.match(sql, /`email` VARCHAR\(255\) NOT NULL UNIQUE/);
-  assert.doesNotMatch(sql, /`email` VARCHAR\(255\) COLLATE/);
+test('email is case-insensitive but accent-sensitive through an explicit column collation', () => {
+  assert.match(
+    generateCreateTable(),
+    /`email` VARCHAR\(255\) COLLATE utf8mb4_0900_as_ci NOT NULL UNIQUE/
+  );
 });
 
 test('login and email are both unique', () => {

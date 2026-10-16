@@ -106,15 +106,15 @@ function createFakeResets(
     async create(userId, tokenHash, expiresAt) {
       rows.set(tokenHash, { userId, usedAt: null, expiresAt });
     },
-    async invalidateAllForUser(userId) {
-      let affected = 0;
+    // Models the repository's one locked transaction: synchronous in-memory
+    // work is atomic, so no await may sit before or between the two steps.
+    async replaceForUser(userId, tokenHash, expiresAt) {
       for (const row of rows.values()) {
         if (row.userId === userId && row.usedAt === null) {
           row.usedAt = new Date();
-          affected += 1;
         }
       }
-      return affected;
+      rows.set(tokenHash, { userId, usedAt: null, expiresAt });
     },
     // Mirrors the real repository's single-use + expiry filter; the real one
     // does it in SQL inside a transaction, this one in memory.
@@ -374,6 +374,26 @@ test('an unknown email and a wrong password are indistinguishable', async () => 
   });
 });
 
+test('an accented lookalike of a registered email answers the same 401 as an unknown one', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    const lookalike = await post(base, 'login', {
+      login: 'bob@ex\xe4mple.com',
+      password: 'hunter2hunter2',
+    });
+    const unknown = await post(base, 'login', {
+      login: 'nobody@example.com',
+      password: 'hunter2hunter2',
+    });
+
+    assert.equal(lookalike.status, 401);
+    assert.equal(unknown.status, 401);
+    assert.deepEqual(await json(lookalike), await json(unknown));
+  });
+});
+
 test('a blocked account signing in by email is refused with 403', async () => {
   const { deps, users } = authDeps();
   await withApp(deps, async (base) => {
@@ -605,7 +625,7 @@ test('a reset request answers 202 when the token write fails', async (t) => {
     ...deps,
     passwordResetRepository: {
       ...deps.passwordResetRepository,
-      create: async () => {
+      replaceForUser: async () => {
         throw new Error('db down');
       },
     },
@@ -742,6 +762,27 @@ test('a second reset request supersedes the first token', async () => {
     });
 
     assert.equal(response.status, 400);
+  });
+});
+
+// The in-memory fake cannot race; the lock is covered against MySQL in
+// repositories/passwordResetRepository.spec.ts.
+test('each reset request supersedes the earlier token', async () => {
+  const { deps, delivered, resets } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    await Promise.all([
+      post(base, 'password-reset/request', { email: 'bob@example.com' }),
+      post(base, 'password-reset/request', { email: 'bob@example.com' }),
+    ]);
+    await flushDetached();
+
+    assert.equal(delivered.length, 2);
+    const liveRows = [...resets.rows.values()].filter(
+      (row) => row.usedAt === null
+    );
+    assert.equal(liveRows.length, 1);
   });
 });
 

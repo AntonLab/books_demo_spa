@@ -162,19 +162,120 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
     assert.equal(await verifyPassword(user.password, 'hunter2hunter2'), true);
   });
 
-  test('invalidateAllForUser stops earlier tokens being redeemed', async () => {
-    const userId = await makeUser('SupersededOwner');
+  const live = (userId: number) =>
+    PasswordResetToken.findAll({ where: { userId, usedAt: null } });
+
+  test('replaceForUser stamps the earlier token used and stores the new one live', async () => {
+    const userId = await makeUser('ReplaceOwner');
     await repository.create(
       userId,
-      hashToken('r6'),
+      hashToken('rp1'),
       new Date(Date.now() + hour)
     );
 
-    await repository.invalidateAllForUser(userId);
+    await repository.replaceForUser(
+      userId,
+      hashToken('rp2'),
+      new Date(Date.now() + hour)
+    );
 
     assert.equal(
-      await repository.redeem(hashToken('r6'), 'newpassword123'),
+      await repository.redeem(hashToken('rp1'), 'newpassword123'),
       false
+    );
+    assert.deepEqual(
+      (await live(userId)).map((row) => row.tokenHash),
+      [hashToken('rp2')]
+    );
+  });
+
+  test('replaceForUser leaves another account’s live token alone', async () => {
+    const mine = await makeUser('ReplaceMine');
+    const theirs = await makeUser('ReplaceTheirs');
+    await repository.create(
+      theirs,
+      hashToken('rp-other'),
+      new Date(Date.now() + hour)
+    );
+
+    await repository.replaceForUser(
+      mine,
+      hashToken('rp-mine'),
+      new Date(Date.now() + hour)
+    );
+
+    assert.equal((await live(theirs)).length, 1);
+  });
+
+  test('concurrent replaceForUser calls for one account leave exactly one live token, the last committed', async () => {
+    for (let round = 0; round < 10; round += 1) {
+      const userId = await makeUser(`Race${round}`);
+      const hashes = ['a', 'b', 'c'].map((n) =>
+        hashToken(`race-${round}-${n}`)
+      );
+
+      await Promise.all(
+        hashes.map((hash) =>
+          repository.replaceForUser(userId, hash, new Date(Date.now() + hour))
+        )
+      );
+
+      const rows = await PasswordResetToken.findAll({
+        where: { userId },
+        order: [['id', 'ASC']],
+      });
+      assert.equal(
+        rows.length,
+        3,
+        `round ${round}: every call stored its token`
+      );
+      const liveRows = rows.filter((row) => row.usedAt === null);
+      assert.equal(liveRows.length, 1, `round ${round}: one live token`);
+      assert.equal(liveRows[0]?.tokenHash, rows.at(-1)?.tokenHash);
+    }
+  });
+
+  test('replaceForUser for a missing account writes nothing and does not throw', async () => {
+    const missing = 4_000_000_000;
+
+    await repository.replaceForUser(
+      missing,
+      hashToken('rp-ghost'),
+      new Date(Date.now() + hour)
+    );
+
+    assert.equal(
+      await PasswordResetToken.count({ where: { userId: missing } }),
+      0
+    );
+  });
+
+  test('replaceForUser rolls the invalidation back when the insert fails', async () => {
+    const userId = await makeUser('ReplaceRollback');
+    const other = await makeUser('ReplaceRollbackOther');
+    await repository.create(
+      userId,
+      hashToken('rp-keep'),
+      new Date(Date.now() + hour)
+    );
+    await repository.create(
+      other,
+      hashToken('rp-dup'),
+      new Date(Date.now() + hour)
+    );
+
+    // rp-dup is already taken (tokenHash is unique), so the insert throws.
+    await assert.rejects(
+      repository.replaceForUser(
+        userId,
+        hashToken('rp-dup'),
+        new Date(Date.now() + hour)
+      )
+    );
+
+    assert.deepEqual(
+      (await live(userId)).map((row) => row.tokenHash),
+      [hashToken('rp-keep')]
     );
   });
 
@@ -188,9 +289,8 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
       hashToken('p-31-used'),
       new Date(moment - 31 * day)
     );
-    // Stamps usedAt on p-31-used: a used row is purged all the same.
-    await repository.invalidateAllForUser(userId);
-    await repository.create(
+    // replaceForUser stamps p-31-used used: a used row is purged all the same.
+    await repository.replaceForUser(
       userId,
       hashToken('p-31'),
       new Date(moment - 31 * day)

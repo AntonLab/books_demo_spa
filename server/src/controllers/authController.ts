@@ -187,11 +187,10 @@ export function createAuthController(deps: AuthControllerDeps) {
         if (!user) return;
 
         // Supersede any outstanding token: two live links for one account
-        // widens the window a stolen one is useful in.
-        await deps.passwordResetRepository.invalidateAllForUser(user.id);
-
+        // widens the window a stolen one is useful in. The repository does it
+        // under a row lock.
         const token = createToken();
-        await deps.passwordResetRepository.create(
+        await deps.passwordResetRepository.replaceForUser(
           user.id,
           hashToken(token),
           new Date(Date.now() + RESET_TTL_MS)

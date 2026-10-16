@@ -308,7 +308,7 @@ test('a block that lands during the verify leaves the login without a session', 
 
 function resetController(
   events: string[],
-  overrides: { createFails?: boolean; lookupFails?: boolean } = {}
+  overrides: { writeFails?: boolean; lookupFails?: boolean } = {}
 ) {
   const known = { id: 7, email: 'racer@example.com' };
   return createAuthController({
@@ -326,13 +326,9 @@ function resetController(
     } as unknown as UserRepository,
     sessionRepository: noSessions,
     passwordResetRepository: {
-      async invalidateAllForUser() {
-        events.push('invalidate');
-        return 0;
-      },
-      async create() {
-        events.push('create');
-        if (overrides.createFails) throw new Error('write down');
+      async replaceForUser() {
+        events.push('replace');
+        if (overrides.writeFails) throw new Error('write down');
       },
     } as unknown as PasswordResetRepository,
     mailDelivery: {
@@ -373,14 +369,7 @@ test('a reset request answers 202 before the lookup and the token work run', asy
   assert.deepEqual(events, ['status 202', 'end']);
 
   await flushDetached();
-  assert.deepEqual(events, [
-    'status 202',
-    'end',
-    'lookup',
-    'invalidate',
-    'create',
-    'send',
-  ]);
+  assert.deepEqual(events, ['status 202', 'end', 'lookup', 'replace', 'send']);
 });
 
 test('a reset request for an unknown address still looks up after the 202 and does no token work', async () => {
@@ -397,7 +386,7 @@ test('a reset request for an unknown address still looks up after the 202 and do
 });
 
 for (const [name, overrides] of [
-  ['a token write', { createFails: true }],
+  ['a token write', { writeFails: true }],
   ['a lookup', { lookupFails: true }],
 ] as const) {
   test(`${name} that fails after the 202 is logged and changes nothing the caller saw`, async (t) => {
