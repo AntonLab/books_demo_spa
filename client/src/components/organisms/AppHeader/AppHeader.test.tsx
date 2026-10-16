@@ -1,7 +1,9 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { QueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { usePageGuard } from '@/hooks/usePageGuard';
+import { useSession } from '@/queries/auth';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -232,6 +234,63 @@ describe('AppHeader when logged in', () => {
       await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('lands on / with no Log in dialog after logging out of a guarded page', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens the Log in dialog when the session expires on a guarded page', async () => {
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    act(() => {
+      seedSession(queryClient, null);
+    });
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
   });
 
   it('is reachable by keyboard and opens the dropdown on Enter', async () => {

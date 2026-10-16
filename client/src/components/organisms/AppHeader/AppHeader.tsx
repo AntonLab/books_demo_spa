@@ -125,6 +125,9 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
+      // Leave first: a guarded page that sees the session vanish cannot tell
+      // this from an expiry, and would reopen Log in.
+      void navigate('/');
       signOut();
       return;
     }
