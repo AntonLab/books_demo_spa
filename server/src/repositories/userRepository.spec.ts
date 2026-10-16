@@ -164,6 +164,22 @@ describe('userRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('email is accent-sensitive, so bob@exämple.com does not collide with bob@example.com', async () => {
+    await repository.create({
+      ...base,
+      login: 'first',
+      email: 'bob@example.com',
+    });
+
+    const second = await repository.create({
+      ...base,
+      login: 'second',
+      email: 'bob@exämple.com',
+    });
+
+    assert.equal(second.email, 'bob@exämple.com');
+  });
+
   test('paginates and reports the total', async () => {
     for (let i = 0; i < 5; i += 1) {
       await repository.create({
@@ -209,6 +225,17 @@ describe('userRepository against real MySQL', { skip }, () => {
     });
 
     const found = await repository.list({ limit: 20, offset: 0, q: 'bob' });
+    assert.equal(found.total, 1);
+  });
+
+  test('search matching only the email still runs under the email collation', async () => {
+    await repository.create({
+      ...base,
+      login: 'Bob',
+      email: 'bob@example.com',
+    });
+
+    const found = await repository.list({ limit: 20, offset: 0, q: 'example' });
     assert.equal(found.total, 1);
   });
 
@@ -686,6 +713,42 @@ describe('userRepository against real MySQL', { skip }, () => {
     });
 
     assert.ok(await repository.findByEmail('AUTH4@EXAMPLE.COM'));
+  });
+
+  test('findByEmail ignores case but not accents', async () => {
+    await repository.create({
+      ...base,
+      login: 'plain',
+      email: 'bob@example.com',
+    });
+    await repository.create({
+      ...base,
+      login: 'accented',
+      email: 'bob@exämple.com',
+    });
+
+    assert.equal(
+      (await repository.findByEmail('BOB@example.com'))?.login,
+      'plain'
+    );
+    assert.equal(
+      (await repository.findByEmail('BOB@EXÄMPLE.com'))?.login,
+      'accented'
+    );
+    assert.equal(await repository.findByEmail('bob@exaemple.com'), null);
+  });
+
+  test('findByEmailWithPassword does not resolve an accented lookalike', async () => {
+    await repository.create({
+      ...base,
+      login: 'plain',
+      email: 'bob@example.com',
+    });
+
+    assert.equal(
+      await repository.findByEmailWithPassword('bob@exämple.com'),
+      null
+    );
   });
 
   test('findByEmail never exposes the password hash', async () => {
