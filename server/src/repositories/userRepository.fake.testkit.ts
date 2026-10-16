@@ -55,8 +55,9 @@ export function createFakeUserRepository(
     return { ...user, avatarUrl: avatarUrlOf(row.id) };
   };
 
-  // Stands in for the unique indexes: login is case-sensitive, email is not,
-  // as their collations make them in MySQL.
+  // Stands in for the unique indexes: login is case-sensitive, email is
+  // case-insensitive and accent-sensitive, as their collations make them in
+  // MySQL.
   const assertAvailable = (
     login: string,
     email: string,

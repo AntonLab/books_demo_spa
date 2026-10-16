@@ -374,6 +374,26 @@ test('an unknown email and a wrong password are indistinguishable', async () => 
   });
 });
 
+test('an accented lookalike of a registered email answers the same 401 as an unknown one', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    const lookalike = await post(base, 'login', {
+      login: 'bob@exämple.com',
+      password: 'hunter2hunter2',
+    });
+    const unknown = await post(base, 'login', {
+      login: 'nobody@example.com',
+      password: 'hunter2hunter2',
+    });
+
+    assert.equal(lookalike.status, 401);
+    assert.equal(unknown.status, 401);
+    assert.deepEqual(await json(lookalike), await json(unknown));
+  });
+});
+
 test('a blocked account signing in by email is refused with 403', async () => {
   const { deps, users } = authDeps();
   await withApp(deps, async (base) => {

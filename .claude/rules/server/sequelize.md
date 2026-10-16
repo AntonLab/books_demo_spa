@@ -18,7 +18,8 @@ paths:
   drops emoji. Past `VARCHAR(255)`, index with a prefix.
 - **`login` is `utf8mb4_0900_as_cs`**, given as a raw type string because
   Sequelize 6 has no per-column collation, so `Bob` and `bob` are two Accounts.
-  `email` inherits the case-insensitive default. A query matching `login`
+  `email` is `utf8mb4_0900_as_ci` (case-insensitive, accent-sensitive),
+  declared as a raw type string like `login`. A query matching `login`
   alongside such fields needs an explicit `COLLATE` (`buildWhere` in
   `userRepository.ts`).
 - Uniqueness is a unique index, never a validator running `findOne` first.
