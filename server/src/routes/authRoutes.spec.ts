@@ -765,7 +765,9 @@ test('a second reset request supersedes the first token', async () => {
   });
 });
 
-test('two reset requests sent together leave one live token', async () => {
+// The in-memory fake cannot race; the lock is covered against MySQL in
+// repositories/passwordResetRepository.spec.ts.
+test('each reset request supersedes the earlier token', async () => {
   const { deps, delivered, resets } = authDeps();
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
