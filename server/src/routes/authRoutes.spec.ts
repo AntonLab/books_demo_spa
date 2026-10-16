@@ -116,6 +116,16 @@ function createFakeResets(
       }
       return affected;
     },
+    // Models the repository's one locked transaction: synchronous in-memory
+    // work is atomic, so no await may sit before or between the two steps.
+    async replaceForUser(userId, tokenHash, expiresAt) {
+      for (const row of rows.values()) {
+        if (row.userId === userId && row.usedAt === null) {
+          row.usedAt = new Date();
+        }
+      }
+      rows.set(tokenHash, { userId, usedAt: null, expiresAt });
+    },
     // Mirrors the real repository's single-use + expiry filter; the real one
     // does it in SQL inside a transaction, this one in memory.
     async redeem(tokenHash, newPassword) {
@@ -625,7 +635,7 @@ test('a reset request answers 202 when the token write fails', async (t) => {
     ...deps,
     passwordResetRepository: {
       ...deps.passwordResetRepository,
-      create: async () => {
+      replaceForUser: async () => {
         throw new Error('db down');
       },
     },
@@ -762,6 +772,25 @@ test('a second reset request supersedes the first token', async () => {
     });
 
     assert.equal(response.status, 400);
+  });
+});
+
+test('two reset requests sent together leave one live token', async () => {
+  const { deps, delivered, resets } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+
+    await Promise.all([
+      post(base, 'password-reset/request', { email: 'bob@example.com' }),
+      post(base, 'password-reset/request', { email: 'bob@example.com' }),
+    ]);
+    await flushDetached();
+
+    assert.equal(delivered.length, 2);
+    const liveRows = [...resets.rows.values()].filter(
+      (row) => row.usedAt === null
+    );
+    assert.equal(liveRows.length, 1);
   });
 });
 
