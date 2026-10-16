@@ -73,6 +73,7 @@ const AUTHOR: AuthorSummary = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active',
   avatarUrl: null,
 };
 
@@ -87,6 +88,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'otherAuthor',
       firstName: 'O',
       lastName: 'A',
+      status: 'active',
       avatarUrl: null,
     },
   ],
@@ -97,6 +99,7 @@ const SUMMARIES = new Map<number, AuthorSummary>([
       login: 'TestUser',
       firstName: 'Test',
       lastName: 'User',
+      status: 'active',
       avatarUrl: null,
     },
   ],

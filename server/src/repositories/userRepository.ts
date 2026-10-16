@@ -249,7 +249,7 @@ export function createSequelizeUserRepository(): UserRepository {
 
       const authors = await User.findAll({
         where: { [Op.and]: clauses },
-        attributes: ['id', 'login', 'firstName', 'lastName'],
+        attributes: ['id', 'login', 'firstName', 'lastName', 'status'],
         limit: query.limit,
         order: [['id', 'ASC']],
       });

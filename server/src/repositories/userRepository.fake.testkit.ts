@@ -110,14 +110,15 @@ export function createFakeUserRepository(
     async listAuthors(query) {
       authorQueries.push(query);
       return [...rows.values()]
-        .filter((row) => row.role === 'author')
+        .filter((row) => row.role === 'author' && row.status !== 'blocked')
         .sort((a, b) => a.id - b.id)
         .slice(0, query.limit)
-        .map(({ id, login, firstName, lastName }) => ({
+        .map(({ id, login, firstName, lastName, status }) => ({
           id,
           login,
           firstName,
           lastName,
+          status,
           avatarUrl: avatarUrlOf(id),
         }));
     },

@@ -46,6 +46,7 @@ const SUMMARIES = new Map<number, AuthorSummary>(
       login: `persona-${id}`,
       firstName: 'First',
       lastName: `Last${id}`,
+      status: 'active',
       avatarUrl: null,
     },
   ])

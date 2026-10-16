@@ -31,6 +31,7 @@ export function aLibraryBook(
       login: `author${authorId}`,
       firstName: 'Author',
       lastName: `${authorId}`,
+      status: 'active',
       avatarUrl: null,
     })),
   };

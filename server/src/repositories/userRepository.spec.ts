@@ -836,6 +836,7 @@ describe('userRepository against real MySQL', { skip }, () => {
       'id',
       'lastName',
       'login',
+      'status',
     ]);
 
     assert.deepEqual(
