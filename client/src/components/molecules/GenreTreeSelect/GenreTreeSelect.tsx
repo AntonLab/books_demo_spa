@@ -9,7 +9,7 @@ import { useClearable } from '@/hooks/useClearable';
 // `value` and `onChange` are the pair a Form.Item injects.
 type GenreTreeSelectProps = Omit<
   TreeSelectProps<number | undefined>,
-  'treeData' | 'value' | 'onChange' | 'allowClear' | 'showSearch'
+  'treeData' | 'value' | 'onChange' | 'allowClear' | 'showSearch' | 'open'
 > & {
   genres: readonly GenreListItem[];
   value?: number;

@@ -6,7 +6,7 @@ import { useClearable } from '@/hooks/useClearable';
 // `value` and `onChange` are the pair a Form.Item injects.
 type Props = Omit<
   SelectProps<number>,
-  'value' | 'onChange' | 'allowClear' | 'showSearch'
+  'value' | 'onChange' | 'allowClear' | 'showSearch' | 'open'
 > & {
   value?: number;
   onChange?: (value: number | undefined) => void;

@@ -14,6 +14,7 @@ export interface UseClearableInput {
 export interface ClearableProps {
   className: string | undefined;
   allowClear: true;
+  open: boolean;
   onKeyDown: KeyDown;
   onOpenChange: (open: boolean) => void;
 }
@@ -21,6 +22,10 @@ export interface ClearableProps {
 // antd draws its clear icon only on hover and makes it unfocusable, so a
 // keyboard user could not empty the select: the icon stays visible while there
 // is a value, and Delete or Backspace on the focused, closed select clears it.
+// rc-select opens on Delete in the input's keydown handler, which runs before
+// this root handler, so `preventDefault` cannot stop it. The hook owns `open`
+// and sets it back to false after a clear, in the same batch as the opening
+// request. `preventDefault` stops the key's default action only.
 // Precondition: only for selects without `showSearch`, since typed text would
 // collide with Backspace.
 export const useClearable = ({
@@ -34,6 +39,7 @@ export const useClearable = ({
   return {
     className: styles.select,
     allowClear: true,
+    open,
     onKeyDown: (event) => {
       onKeyDown?.(event);
       if (
@@ -42,6 +48,8 @@ export const useClearable = ({
         (event.key === 'Delete' || event.key === 'Backspace')
       ) {
         onChange?.(undefined);
+        event.preventDefault();
+        setOpen(false);
       }
     },
     onOpenChange: (next) => {

@@ -2,9 +2,62 @@ import { act, renderHook } from '@testing-library/react';
 import type { KeyboardEvent } from 'react';
 import { useClearable } from './useClearable';
 
-const keyEvent = (key: string) => ({ key }) as KeyboardEvent<HTMLDivElement>;
+const keyEvent = (key: string) =>
+  ({
+    key,
+    preventDefault: jest.fn(),
+  }) as unknown as KeyboardEvent<HTMLDivElement>;
 
 describe('useClearable', () => {
+  test.each(['Delete', 'Backspace'])(
+    '%s that clears prevents default and keeps open false',
+    (key) => {
+      const { result } = renderHook(() =>
+        useClearable({ value: 3, onChange: jest.fn() })
+      );
+      const event = keyEvent(key);
+      act(() => {
+        result.current.onOpenChange(true); // rc-select's input handler runs first
+        result.current.onKeyDown(event);
+      });
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(result.current.open).toBe(false);
+    }
+  );
+
+  test('a key that does not clear leaves default and open alone', () => {
+    const { result } = renderHook(() =>
+      useClearable({ value: 3, onChange: jest.fn() })
+    );
+    const event = keyEvent('ArrowDown');
+    act(() => {
+      result.current.onOpenChange(true);
+      result.current.onKeyDown(event);
+    });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(result.current.open).toBe(true);
+  });
+
+  test('Delete with no value does not prevent default or close', () => {
+    const { result } = renderHook(() => useClearable({ onChange: jest.fn() }));
+    const event = keyEvent('Delete');
+    act(() => {
+      result.current.onOpenChange(true);
+      result.current.onKeyDown(event);
+    });
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(result.current.open).toBe(true);
+  });
+
+  test('Delete while open does not clear or close', () => {
+    const onChange = jest.fn();
+    const { result } = renderHook(() => useClearable({ value: 3, onChange }));
+    act(() => result.current.onOpenChange(true));
+    act(() => result.current.onKeyDown(keyEvent('Delete')));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(result.current.open).toBe(true);
+  });
+
   test.each(['Delete', 'Backspace'])(
     '%s clears a closed select with a value',
     (key) => {
