@@ -101,8 +101,8 @@ that read like mistakes and are not.
   choosable). Both are `allowClear`; antd shows the icon only on hover and it
   takes no focus, so the shared `useClearable` hook
   (`client/src/hooks/useClearable.ts`) makes each keep the icon visible and
-  clear on Delete or Backspace while closed (the select stays closed after the
-  clear), with "No series" / "No genre" as placeholders, not options. An empty or
+  clear on Delete or Backspace while closed and stay closed, with "No series" /
+  "No genre" as placeholders, not options. An empty or
   cleared select is `undefined` inside the form and leaves as an explicit
   `null` (the server accepts `null` for both). A stored `null` is seeded as
   `undefined`, since a select shows its placeholder only for that. Creating

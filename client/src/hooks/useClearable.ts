@@ -24,8 +24,7 @@ export interface ClearableProps {
 // is a value, and Delete or Backspace on the focused, closed select clears it.
 // rc-select opens on Delete in the input's keydown handler, which runs before
 // this root handler, so `preventDefault` cannot stop it. The hook owns `open`
-// and sets it back to false after a clear, in the same batch as the opening
-// request. `preventDefault` stops the key's default action only.
+// and resets it to false in the same batch after a clear.
 // Precondition: only for selects without `showSearch`, since typed text would
 // collide with Backspace.
 export const useClearable = ({

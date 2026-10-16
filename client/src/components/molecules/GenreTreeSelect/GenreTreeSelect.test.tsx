@@ -84,7 +84,7 @@ describe('GenreTreeSelect', () => {
     // rc-tree-select reads `which`, which user-event does not set.
     fireEvent.keyDown(box, { key, which: code, keyCode: code });
     expect(onChange).toHaveBeenLastCalledWith(undefined);
-    // rc-select opens on a macrotask, not inside the keydown.
+    // rc-select opens on a macrotask; wait past it.
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
     expect(box).toHaveAttribute('aria-expanded', 'false');
   });
