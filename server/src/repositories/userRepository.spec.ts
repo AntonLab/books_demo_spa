@@ -228,7 +228,7 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(found.total, 1);
   });
 
-  test('search matching only the email still runs under the email collation', async () => {
+  test('search matching only the email finds the row', async () => {
     await repository.create({
       ...base,
       login: 'Bob',

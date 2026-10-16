@@ -30,11 +30,11 @@ paths:
 ## Login
 
 - **Sign-in takes a login or an email** in the one `login` field. An `@` in the
-  value picks the column: with one it is an email (case-insensitive, accent-sensitive), without
-  one a login (case-sensitive). A login may not contain `@`
-  (`createUserSchema` and `registerSchema`), so the two cannot collide; an old
-  row with `@` in its login signs in by email only, and gets 400 on a
-  `PATCH /api/users/:id` that resends its unchanged login.
+  value picks the column: with one it is an email (case-insensitive,
+  accent-sensitive), without one a login (case-sensitive). A login may not
+  contain `@` (`createUserSchema` and `registerSchema`), so the two cannot
+  collide; an old row with `@` in its login signs in by email only, and gets
+  400 on a `PATCH /api/users/:id` that resends its unchanged login.
 - **One answer to two questions**: an unknown login or email and a wrong
   password give the same 401, and the unknown-login path spends an argon2
   verify on a cached dummy hash so timing cannot tell them apart.

@@ -53,9 +53,9 @@ export function initUserModel(sequelize: Sequelize): typeof User {
         allowNull: false,
         unique: true,
       },
-      // Raw type string for the same reason as login. utf8mb4_0900_as_ci is
-      // case-insensitive because addresses are in practice, and accent-sensitive
-      // so two different addresses never resolve to one Account.
+      // Raw type string, as for login. utf8mb4_0900_as_ci: case-insensitive, as
+      // addresses are in practice; accent-sensitive, so distinct addresses
+      // never share an Account.
       email: {
         type: `VARCHAR(${EMAIL_MAX_LENGTH}) COLLATE utf8mb4_0900_as_ci`,
         allowNull: false,
