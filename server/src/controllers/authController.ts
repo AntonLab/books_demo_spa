@@ -186,7 +186,9 @@ export function createAuthController(deps: AuthControllerDeps) {
         const user = await deps.userRepository.findByEmail(email);
         if (!user) return;
 
-        // Supersede any outstanding token: two live links for one account widens the window a stolen one is useful in. The repository does it under a row lock.
+        // Supersede any outstanding token: two live links for one account
+        // widens the window a stolen one is useful in. The repository does it
+        // under a row lock.
         const token = createToken();
         await deps.passwordResetRepository.replaceForUser(
           user.id,

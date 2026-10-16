@@ -37,7 +37,8 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
 
     async replaceForUser(userId, tokenHash, expiresAt) {
       await getSequelize().transaction(async (t) => {
-        // Serialises requests per Account across processes: the second waits for the first commit.
+        // Serialises requests per Account across processes: the second waits
+        // for the first commit.
         const user = await User.findByPk(userId, {
           transaction: t,
           lock: t.LOCK.UPDATE,
@@ -45,7 +46,8 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
         // Deleted after the controller's lookup: nothing to supersede or store.
         if (!user) return;
 
-        // Stamp usedAt, do not delete: the row stays as evidence a reset was requested, and the single-use check covers both.
+        // Stamp usedAt, do not delete: the row stays as evidence a reset was
+        // requested, and the single-use check covers both.
         await PasswordResetToken.update(
           { usedAt: new Date() },
           { where: { userId, usedAt: null }, transaction: t }
