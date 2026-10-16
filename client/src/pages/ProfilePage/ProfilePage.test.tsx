@@ -4,9 +4,8 @@ import { useLocation } from 'react-router';
 import { ProfilePage } from './ProfilePage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
+import { seedSession, sessionOf } from '@/test/session';
 import { useLogout, watchSession } from '@/queries/auth';
-import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
@@ -64,7 +63,7 @@ const LocationProbe = () => {
 // click or a redirect landed.
 const renderWithSession = (data: PublicUser | null, route = '/profile') => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, data && sessionOf(data));
+  seedSession(queryClient, data);
   return renderWithProviders(
     <>
       <ProfilePage />
@@ -129,7 +128,7 @@ describe('ProfilePage when the session ends', () => {
     // The app wires this on its own client only; it is what removes the cached
     // Favorites query when the Account changes.
     watchSession(queryClient, null);
-    queryClient.setQueryData(queryKeys.session, sessionOf(session));
+    seedSession(queryClient, session);
     renderWithProviders(
       <>
         <ProfilePage />
@@ -143,7 +142,7 @@ describe('ProfilePage when the session ends', () => {
     mockedBooks.listFavoritedBooks.mockClear();
 
     act(() => {
-      queryClient.setQueryData(queryKeys.session, null);
+      seedSession(queryClient, null);
     });
 
     await waitFor(() =>
@@ -162,7 +161,7 @@ describe('ProfilePage when the session ends', () => {
     });
     const queryClient = createTestQueryClient();
     watchSession(queryClient, null);
-    queryClient.setQueryData(queryKeys.session, sessionOf(session));
+    seedSession(queryClient, session);
     renderWithProviders(
       <>
         <ProfilePage />
@@ -176,7 +175,7 @@ describe('ProfilePage when the session ends', () => {
     mockedReadingLists.listReadingLists.mockClear();
 
     act(() => {
-      queryClient.setQueryData(queryKeys.session, null);
+      seedSession(queryClient, null);
     });
 
     await waitFor(() =>
@@ -209,7 +208,7 @@ describe('ProfilePage after Log out', () => {
     });
     const queryClient = createTestQueryClient();
     watchSession(queryClient, null);
-    queryClient.setQueryData(queryKeys.session, sessionOf(author));
+    seedSession(queryClient, author);
     renderWithProviders(
       <>
         <ProfilePage />

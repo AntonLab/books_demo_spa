@@ -5,8 +5,7 @@ import { AdminPage } from './AdminPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { adminGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import * as genresApi from '@/api/genres';
 import type { PublicUser } from '@/types/api';
 
@@ -44,7 +43,7 @@ const expectSentHome = () =>
 // on a request.
 const renderPage = (session: PublicUser | null, route: string) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(
     <>
       <AdminPage />

@@ -5,7 +5,7 @@ import { useChangePassword } from './auth';
 import { queryKeys } from './keys';
 import { useDeleteAvatar, useUpdateAccount, useUploadAvatar } from './users';
 import { createTestQueryClient } from '../test/queryClient';
-import { sessionOf } from '../test/session';
+import { seedSession, sessionOf } from '../test/session';
 import * as usersApi from '../api/users';
 import type { PublicUser } from '../types/api';
 
@@ -93,7 +93,7 @@ describe('the session after an Account change', () => {
     const withPermissions = sessionOf(session, 'any');
     mockedUsers.updateUser.mockResolvedValue({ ...session, about: 'Hi' });
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, withPermissions);
+    seedSession(client, session, 'any');
 
     const { result } = renderHook(() => useUpdateAccount(7), {
       wrapper: wrapper(client),
@@ -110,7 +110,7 @@ describe('useChangePassword', () => {
   it('updates the user and clears the session without a logout request', async () => {
     mockedUsers.updateUser.mockResolvedValue(session);
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, sessionOf(session));
+    seedSession(client, session);
 
     const { result } = renderHook(() => useChangePassword(7), {
       wrapper: wrapper(client),
@@ -124,7 +124,7 @@ describe('useChangePassword', () => {
   it('keeps the session when the update fails', async () => {
     mockedUsers.updateUser.mockRejectedValue(new Error('nope'));
     const client = createTestQueryClient();
-    client.setQueryData(queryKeys.session, sessionOf(session));
+    seedSession(client, session);
 
     const { result } = renderHook(() => useChangePassword(7), {
       wrapper: wrapper(client),

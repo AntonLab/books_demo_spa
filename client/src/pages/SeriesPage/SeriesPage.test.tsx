@@ -5,8 +5,7 @@ import { SeriesPage } from './SeriesPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
@@ -85,7 +84,7 @@ const renderPage = (
   session: PublicUser | null = null
 ) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(
     <Routes>
       <Route path="/series/:id" element={<SeriesPage />} />

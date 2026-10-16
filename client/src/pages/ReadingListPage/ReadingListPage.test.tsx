@@ -4,8 +4,7 @@ import { Route, Routes, useNavigationType } from 'react-router';
 import { ReadingListPage } from './ReadingListPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import * as readingListsApi from '@/api/readingLists';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
@@ -94,7 +93,7 @@ const HomeProbe = () => <p>{`Home|${useNavigationType()}`}</p>;
 
 const renderPage = (route: string, session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(
     <Routes>
       <Route path="/lists/:id" element={<ReadingListPage />} />
