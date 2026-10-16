@@ -267,6 +267,51 @@ describe('AppHeader when logged in', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('lands on / with no Log in dialog when the user navigates while the logout is in flight', async () => {
+    let finishLogout = () => {};
+    mockedAuth.logout.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishLogout = resolve;
+      })
+    );
+    const GuardedPage = () => {
+      const session = useSession();
+      const navigate = useNavigate();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return (
+        <button onClick={() => void navigate('/private?tab=2')}>move</button>
+      );
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+    await userEvent.click(screen.getByRole('button', { name: 'move' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/private?tab=2'
+      );
+    });
+    await act(async () => {
+      finishLogout();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('stays signed in on the guarded page when the server refuses the logout', async () => {
     mockedAuth.logout.mockRejectedValue(
       new ApiError(403, 'Missing or invalid CSRF token')
