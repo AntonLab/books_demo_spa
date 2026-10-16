@@ -174,10 +174,10 @@ describe('userRepository against real MySQL', { skip }, () => {
     const second = await repository.create({
       ...base,
       login: 'second',
-      email: 'bob@exämple.com',
+      email: 'bob@ex\xe4mple.com',
     });
 
-    assert.equal(second.email, 'bob@exämple.com');
+    assert.equal(second.email, 'bob@ex\xe4mple.com');
   });
 
   test('paginates and reports the total', async () => {
@@ -243,7 +243,7 @@ describe('userRepository against real MySQL', { skip }, () => {
     await repository.create({
       ...base,
       login: 'bob',
-      email: 'bob@exämple.com',
+      email: 'bob@ex\xe4mple.com',
     });
 
     const found = await repository.list({ limit: 20, offset: 0, q: 'example' });
@@ -735,7 +735,7 @@ describe('userRepository against real MySQL', { skip }, () => {
     await repository.create({
       ...base,
       login: 'accented',
-      email: 'bob@exämple.com',
+      email: 'bob@ex\xe4mple.com',
     });
 
     assert.equal(
@@ -743,7 +743,7 @@ describe('userRepository against real MySQL', { skip }, () => {
       'plain'
     );
     assert.equal(
-      (await repository.findByEmail('BOB@EXÄMPLE.com'))?.login,
+      (await repository.findByEmail('BOB@EX\xc4MPLE.com'))?.login,
       'accented'
     );
     assert.equal(await repository.findByEmail('bob@exaemple.com'), null);
@@ -757,7 +757,7 @@ describe('userRepository against real MySQL', { skip }, () => {
     });
 
     assert.equal(
-      await repository.findByEmailWithPassword('bob@exämple.com'),
+      await repository.findByEmailWithPassword('bob@ex\xe4mple.com'),
       null
     );
   });

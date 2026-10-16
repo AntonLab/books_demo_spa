@@ -380,7 +380,7 @@ test('an accented lookalike of a registered email answers the same 401 as an unk
     await post(base, 'register', registration);
 
     const lookalike = await post(base, 'login', {
-      login: 'bob@exämple.com',
+      login: 'bob@ex\xe4mple.com',
       password: 'hunter2hunter2',
     });
     const unknown = await post(base, 'login', {
