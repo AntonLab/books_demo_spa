@@ -127,12 +127,15 @@ function buildWhere(query: ListUsersQuery): WhereOptions {
     const pattern = containsPattern(query.q);
     clauses.push({
       [Op.or]: [
-        // `login` carries a case-sensitive collation, so a plain LIKE there
-        // would stop "bob" from finding "Bob". Identity is strict; search is not.
+        // `login` is case-sensitive and `email` accent-sensitive, so a plain LIKE
+        // would stop "bob" finding "Bob" or "example" finding "exämple".
+        // Identity is strict; search is not.
         sequelizeWhere(literal('`login` COLLATE utf8mb4_0900_ai_ci'), {
           [Op.like]: pattern,
         }),
-        { email: { [Op.like]: pattern } },
+        sequelizeWhere(literal('`email` COLLATE utf8mb4_0900_ai_ci'), {
+          [Op.like]: pattern,
+        }),
         { firstName: { [Op.like]: pattern } },
         { lastName: { [Op.like]: pattern } },
       ],

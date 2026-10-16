@@ -239,6 +239,17 @@ describe('userRepository against real MySQL', { skip }, () => {
     assert.equal(found.total, 1);
   });
 
+  test('search by email ignores accents even though the column keeps them', async () => {
+    await repository.create({
+      ...base,
+      login: 'bob',
+      email: 'bob@exämple.com',
+    });
+
+    const found = await repository.list({ limit: 20, offset: 0, q: 'example' });
+    assert.equal(found.total, 1);
+  });
+
   test('a literal % in q is escaped rather than matching every row', async () => {
     await repository.create({
       ...base,

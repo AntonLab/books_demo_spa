@@ -20,8 +20,9 @@ paths:
   Sequelize 6 has no per-column collation, so `Bob` and `bob` are two Accounts.
   `email` is `utf8mb4_0900_as_ci` (case-insensitive, accent-sensitive),
   declared as a raw type string like `login`. A query matching `login`
-  alongside such fields needs an explicit `COLLATE` (`buildWhere` in
-  `userRepository.ts`).
+  alongside such fields needs an explicit `COLLATE`, and so does an admin
+  search that must ignore accents in `email`: both go through
+  `COLLATE utf8mb4_0900_ai_ci` (`buildWhere` in `userRepository.ts`).
 - Uniqueness is a unique index, never a validator running `findOne` first.
 - A hook passes `options.transaction` to every query it runs. External side
   effects stay out of hooks: `afterCreate` fires before commit, and a rollback
