@@ -4,8 +4,7 @@ import { useLocation } from 'react-router';
 import { ProfileWorksPanel } from './ProfileWorksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
@@ -96,7 +95,7 @@ const seriesPage = (items: PublicSeries[]) => ({
 const Probe = () => <div data-testid="search">{useLocation().search}</div>;
 const renderPanel = (scope: ProfileScope, route = '/p') => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(author));
+  seedSession(queryClient, author);
   return renderWithProviders(
     <>
       <ProfileWorksPanel scope={scope} viewerId={3} />

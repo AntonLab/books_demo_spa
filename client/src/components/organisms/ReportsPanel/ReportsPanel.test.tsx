@@ -10,8 +10,9 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { emptyStatistics, reportRow } from '@/test/reports';
 import type { QueryClient } from '@tanstack/react-query';
 import * as usersApi from '@/api/users';
-import { sessionOf } from '@/test/session';
-import type { PublicUser, ReportRow, SessionUser } from '@/types/api';
+import { seedSession } from '@/test/session';
+import type { PermissionScope } from 'shared';
+import type { PublicUser, ReportRow } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/reports');
@@ -33,7 +34,6 @@ const adminAccount: PublicUser = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
-const admin: SessionUser = sessionOf(adminAccount);
 
 const listOf = (items: ReportRow[], total = items.length) => ({
   items,
@@ -44,9 +44,10 @@ const listOf = (items: ReportRow[], total = items.length) => ({
 
 const renderPanel = (
   queryClient: QueryClient = createTestQueryClient(),
-  session: SessionUser | null = admin
+  session: PublicUser | null = adminAccount,
+  usersUpdate?: PermissionScope
 ) => {
-  queryClient.setQueryData(queryKeys.session, session);
+  seedSession(queryClient, session, usersUpdate);
   return renderWithProviders(<ReportsPanel />, { queryClient });
 };
 
@@ -124,7 +125,7 @@ describe('ReportsPanel', () => {
   });
 
   it('asks for nothing when the session is not a Moderator', async () => {
-    renderPanel(undefined, sessionOf({ ...adminAccount, role: 'author' }));
+    renderPanel(undefined, { ...adminAccount, role: 'author' });
     await act(async () => {});
     expect(mockedReports.listReports).not.toHaveBeenCalled();
     expect(mockedReports.getReportStatistics).not.toHaveBeenCalled();
@@ -138,7 +139,7 @@ describe('ReportsPanel', () => {
     await screen.findByRole('button', { name: 'Take' });
 
     act(() => {
-      queryClient.setQueryData(queryKeys.session, null);
+      seedSession(queryClient, null);
     });
     await act(async () => {});
 
@@ -478,7 +479,7 @@ describe('ReportsPanel', () => {
         }),
       ])
     );
-    mockedUsers.blockUser.mockResolvedValue(admin);
+    mockedUsers.blockUser.mockResolvedValue(adminAccount);
     renderPanel();
     expect(await screen.findByText('Ban mark')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ban user' }));
@@ -536,7 +537,7 @@ describe('ReportsPanel', () => {
         }),
       ])
     );
-    renderPanel(undefined, sessionOf(adminAccount, 'none'));
+    renderPanel(undefined, adminAccount, 'none');
     expect(
       await screen.findByRole('button', { name: 'Ban user' })
     ).toBeDisabled();

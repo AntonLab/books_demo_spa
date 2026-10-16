@@ -4,7 +4,7 @@ import { ChangePasswordForm } from './ChangePasswordForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession, sessionOf } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as usersApi from '@/api/users';
 import type { PublicUser } from '@/types/api';
@@ -29,7 +29,7 @@ const session: PublicUser = {
 
 const renderForm = () => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  seedSession(queryClient, session);
   renderWithProviders(<ChangePasswordForm userId={1} />, { queryClient });
   return queryClient;
 };

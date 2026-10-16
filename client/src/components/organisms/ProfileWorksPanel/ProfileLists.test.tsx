@@ -6,8 +6,7 @@ import { ProfileBooksList } from './ProfileBooksList';
 import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
@@ -72,7 +71,7 @@ const page = (items: PublicBook[], total = items.length) => ({
 const Probe = () => <div data-testid="search">{useLocation().search}</div>;
 const renderAs = (ui: ReactElement, route = '/p') => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(author));
+  seedSession(queryClient, author);
   return renderWithProviders(
     <>
       {ui}

@@ -3,8 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { BookUnsavedTextNotices } from './BookUnsavedTextNotices';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import type { RootState } from '@/store';
 import type { PublicUser } from '@/types/api';
 
@@ -37,7 +36,7 @@ const preloadedState: Partial<RootState> = {
 
 const renderNotices = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(<BookUnsavedTextNotices bookId={1} />, {
     queryClient,
     preloadedState,

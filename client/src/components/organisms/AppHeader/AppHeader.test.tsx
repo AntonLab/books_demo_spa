@@ -9,7 +9,7 @@ import { genreItem } from '@/test/genres';
 import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
@@ -44,7 +44,7 @@ const user: PublicUser = {
 // waiting on a request.
 const withSession = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return { queryClient };
 };
 
@@ -625,7 +625,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     path: string | RegExp
   ) => {
     act(() => {
-      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+      seedSession(queryClient, user);
     });
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(path)
@@ -658,7 +658,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     await screen.findByRole('dialog', { name: 'Log in' });
     await userEvent.click(screen.getByRole('button', { name: 'wander' }));
     await act(async () => {
-      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+      seedSession(queryClient, user);
     });
     // The header re-renders signed in; only then can a stray redirect have run.
     await screen.findByRole('button', { name: /bob/i });
@@ -806,14 +806,7 @@ describe('AppHeader notification stream', () => {
     ).toBeInTheDocument();
 
     act(() => {
-      queryClient.setQueryData(
-        queryKeys.session,
-        sessionOf({
-          ...user,
-          id: 2,
-          login: 'eve',
-        })
-      );
+      seedSession(queryClient, { ...user, id: 2, login: 'eve' });
     });
 
     await screen.findByText('eve');

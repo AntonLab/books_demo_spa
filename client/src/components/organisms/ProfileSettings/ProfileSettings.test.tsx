@@ -3,8 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ProfileSettings } from './ProfileSettings';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession, sessionOf } from '@/test/session';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as usersApi from '@/api/users';
@@ -36,7 +35,7 @@ const session: PublicUser = {
 // GET /me.
 const renderWithSession = (data: PublicUser) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(data));
+  seedSession(queryClient, data);
   return renderWithProviders(<ProfileSettings />, { queryClient });
 };
 

@@ -4,8 +4,7 @@ import { ABOUT_MAX_LENGTH, LOGIN_MAX_LENGTH } from 'shared';
 import { AccountDetailsForm } from './AccountDetailsForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession, sessionOf } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as authApi from '@/api/auth';
 import * as usersApi from '@/api/users';
@@ -33,7 +32,7 @@ const session: PublicUser = {
 
 const renderForm = () => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(<AccountDetailsForm user={session} />, {
     queryClient,
   });
