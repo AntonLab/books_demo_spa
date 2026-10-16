@@ -217,8 +217,16 @@ export function createSequelizeReportRepository(): ReportRepository {
             attributes: ['id', 'bookId', 'text', 'tombstone', 'userId'],
             required: true,
           },
-          { model: User, as: 'reporter', attributes: ['id', 'login'] },
-          { model: User, as: 'moderator', attributes: ['id', 'login'] },
+          {
+            model: User,
+            as: 'reporter',
+            attributes: ['id', 'login', 'status'],
+          },
+          {
+            model: User,
+            as: 'moderator',
+            attributes: ['id', 'login', 'status'],
+          },
           {
             model: User,
             as: 'reportedAccount',
@@ -244,7 +252,11 @@ export function createSequelizeReportRepository(): ReportRepository {
             id: row.id,
             createdAt: row.createdAt,
             reporter: reporter
-              ? { id: reporter.id, login: reporter.login }
+              ? {
+                  id: reporter.id,
+                  login: reporter.login,
+                  status: reporter.status,
+                }
               : null,
             isSystem: row.isSystem,
             reason: row.reason,
@@ -267,6 +279,7 @@ export function createSequelizeReportRepository(): ReportRepository {
             status: row.status,
             moderatorId: moderator?.id ?? null,
             moderatorLogin: moderator?.login ?? null,
+            moderatorStatus: moderator?.status ?? null,
             isOwnComment: comment.userId === viewer.id,
           };
         }),

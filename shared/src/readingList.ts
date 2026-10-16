@@ -1,5 +1,6 @@
 import type { PublicBook } from './book.ts';
 import type { PublicSeries } from './series.ts';
+import type { UserStatus } from './user.ts';
 
 // Reading list (CONTEXT.md): the longest a title may be.
 export const READING_LIST_TITLE_MAX_LENGTH = 200;
@@ -10,6 +11,7 @@ export const READING_LIST_MAX_ITEMS = 100;
 interface ReadingListOwner {
   id: number;
   login: string;
+  status: UserStatus;
 }
 
 // Reading list (CONTEXT.md): one row of the paged list. `itemCount` counts

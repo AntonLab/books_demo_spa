@@ -55,6 +55,7 @@ async function createAccount(role: 'user' | 'author' = 'user') {
     firstName: 'Lee',
     lastName: `Owner${accountCount}`,
     role,
+    status: 'active',
   });
 }
 
@@ -138,6 +139,26 @@ describe('readingListRepository against real MySQL', { skip }, () => {
   readingListContract(setUp);
   readingListItemsContract(setUp);
   readingListCopyContract(setUp);
+
+  test('the owner carries its status, Pending included, on create, findById and listByOwner', async () => {
+    const owner = await createAccount();
+    await owner.update({ status: 'pending' });
+    const created = await repository.create(NEW_LIST, as(owner.id));
+    const found = await repository.findById(created.id);
+    const listed = await repository.listByOwner({
+      userId: owner.id,
+      current: 1,
+      pageSize: 10,
+    });
+    assert.deepEqual(
+      [
+        created.owner.status,
+        found?.owner.status,
+        listed.items[0]?.owner.status,
+      ],
+      ['pending', 'pending', 'pending']
+    );
+  });
 
   test('deleting an account deletes its lists and their items, and keeps the works', async () => {
     const world = await setUp();

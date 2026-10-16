@@ -14,6 +14,7 @@ import {
   type ReadingListDetail,
   type ReadingListEditItem,
   type ReadingListItem,
+  type UserStatus,
 } from 'shared';
 import { Book } from '../models/Book.ts';
 import { ReadingList } from '../models/ReadingList.ts';
@@ -102,7 +103,7 @@ const NEWEST_FIRST: [string, string][] = [
 const withOwner = {
   model: User,
   as: 'owner',
-  attributes: ['login'],
+  attributes: ['login', 'status'],
   required: true,
 };
 
@@ -126,12 +127,12 @@ async function ownedList(
 
 function toPublicReadingList(
   list: ReadingList,
-  ownerLogin: string,
+  owner: { login: string; status: UserStatus },
   itemCount: number
 ): PublicReadingList {
   return {
     id: list.id,
-    owner: { id: list.userId, login: ownerLogin },
+    owner: { id: list.userId, login: owner.login, status: owner.status },
     title: list.title,
     description: list.description,
     tags: list.tags,
@@ -279,10 +280,12 @@ function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
 export function createSequelizeReadingListRepository(): ReadingListRepository {
   const repository: ReadingListRepository = {
     async create(input, account) {
-      const owner = await User.findByPk(account.id, { attributes: ['login'] });
+      const owner = await User.findByPk(account.id, {
+        attributes: ['login', 'status'],
+      });
       if (!owner) throw new NotFoundError('User', account.id);
       const list = await ReadingList.create({ ...input, userId: account.id });
-      return toPublicReadingList(list, owner.login, 0);
+      return toPublicReadingList(list, owner, 0);
     },
 
     async findById(id) {
@@ -290,14 +293,14 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       if (!list) return null;
       const items = await shownItemsOf(await placedItems(id));
       return {
-        ...toPublicReadingList(list, joined(list.owner).login, items.length),
+        ...toPublicReadingList(list, joined(list.owner), items.length),
         items,
       };
     },
 
     async listByOwner(query) {
       const owner = await User.findByPk(query.userId, {
-        attributes: ['login'],
+        attributes: ['login', 'status'],
       });
       if (!owner) return { items: [], total: 0 };
       const { rows, count } = await ReadingList.findAndCountAll({
@@ -309,7 +312,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       const counts = await shownCounts(rows.map((list) => list.id));
       return {
         items: rows.map((list) =>
-          toPublicReadingList(list, owner.login, counts.get(list.id) ?? 0)
+          toPublicReadingList(list, owner, counts.get(list.id) ?? 0)
         ),
         total: count,
       };
@@ -336,7 +339,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
         items: rows.map((list) =>
           toPublicReadingList(
             list,
-            joined(list.owner).login,
+            joined(list.owner),
             counts.get(list.id) ?? 0
           )
         ),
@@ -348,11 +351,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       const list = await ownedList(id, account);
       await list.update(input);
       const counts = await shownCounts([id]);
-      return toPublicReadingList(
-        list,
-        joined(list.owner).login,
-        counts.get(id) ?? 0
-      );
+      return toPublicReadingList(list, joined(list.owner), counts.get(id) ?? 0);
     },
 
     async remove(id, account) {

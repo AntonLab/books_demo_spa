@@ -98,7 +98,11 @@ export function createFakeReadingListRepository(
 
   const toPublic = (list: ListRow): PublicReadingList => ({
     id: list.id,
-    owner: { id: list.userId, login: accounts.get(list.userId) ?? '' },
+    owner: {
+      id: list.userId,
+      login: accounts.get(list.userId) ?? '',
+      status: 'active',
+    },
     title: list.title,
     description: list.description,
     tags: list.tags,

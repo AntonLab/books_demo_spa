@@ -174,7 +174,11 @@ export function createFakeReportRepository(options: {
             createdAt: row.createdAt,
             reporter:
               reporter && row.reporterId !== null
-                ? { id: row.reporterId, login: reporter.login }
+                ? {
+                    id: row.reporterId,
+                    login: reporter.login,
+                    status: reporter.status,
+                  }
                 : null,
             isSystem: row.isSystem,
             reason: row.reason,
@@ -204,6 +208,10 @@ export function createFakeReportRepository(options: {
             moderatorLogin:
               (row.moderatorId !== null &&
                 accounts.get(row.moderatorId)?.login) ||
+              null,
+            moderatorStatus:
+              (row.moderatorId !== null &&
+                accounts.get(row.moderatorId)?.status) ||
               null,
             isOwnComment: comment?.userId === viewer.id,
           };
