@@ -43,6 +43,12 @@ describe('ReportedAccountCell', () => {
     );
   });
 
+  it('names a Blocked Account as plain text', () => {
+    setup({ account: account({ status: 'blocked' }) });
+    expect(screen.getByText('Writer')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('shows the login, and the Ban mark only at the threshold', () => {
     const { unmount } = render(
       <ReportedAccountCell

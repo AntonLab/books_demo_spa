@@ -39,6 +39,16 @@ describe('ReadingListCard', () => {
     expect(screen.getByText('3 items')).toBeInTheDocument();
   });
 
+  it('names a Blocked owner as plain text', () => {
+    renderWithProviders(
+      <ReadingListCard
+        list={{ ...list, owner: { ...list.owner, status: 'blocked' } }}
+      />
+    );
+    expect(screen.getByText('by reader')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'reader' })).toBeNull();
+  });
+
   it('says "1 item" for one and links the title to the page when given an href', () => {
     renderWithProviders(
       <ReadingListCard list={{ ...list, itemCount: 1 }} href="/lists/4" />

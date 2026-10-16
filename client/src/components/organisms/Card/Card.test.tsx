@@ -103,6 +103,18 @@ describe('Card', () => {
     );
   });
 
+  it('names a Blocked author as plain text', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        authors={[{ ...props.authors[0], status: 'blocked' as const }]}
+      />
+    );
+
+    expect(screen.getByText('Margaret Hale')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Margaret Hale' })).toBeNull();
+  });
+
   it('keeps the comma between Co-authors outside the links', () => {
     renderWithProviders(
       <Card
