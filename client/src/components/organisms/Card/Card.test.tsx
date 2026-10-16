@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import type { AuthorSummary } from 'shared';
 import { Card } from './Card';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
@@ -11,10 +12,10 @@ const props = {
       login: 'mhale',
       firstName: 'Margaret',
       lastName: 'Hale',
-      status: 'active' as const,
+      status: 'active',
       avatarUrl: null,
     },
-  ],
+  ] as AuthorSummary[],
   description: 'Letters found in a manor that should have stayed shut.',
   genre: null,
   tags: [],
@@ -105,10 +106,7 @@ describe('Card', () => {
 
   it('names a Blocked author as plain text', () => {
     renderWithProviders(
-      <Card
-        {...props}
-        authors={[{ ...props.authors[0], status: 'blocked' as const }]}
-      />
+      <Card {...props} authors={[{ ...props.authors[0], status: 'blocked' }]} />
     );
 
     expect(screen.getByText('Margaret Hale')).toBeInTheDocument();
