@@ -6,7 +6,7 @@ import {
   Op,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
+import type { Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { Series, toPublicSeries } from '../models/Series.ts';
@@ -40,6 +40,7 @@ import type {
   UpdateSeriesInput,
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
 import {
   publishedSeriesWhere,
@@ -99,12 +100,6 @@ export interface SeriesRepository {
     seriesId: number,
     viewer: Viewer
   ): Promise<{ data: Buffer; updatedAt: Date } | null>;
-}
-
-function sequelizeOf(): Sequelize {
-  const sequelize = Series.sequelize;
-  if (!sequelize) throw new Error('Series model is not initialised');
-  return sequelize;
 }
 
 const credits: CreditTable = {
@@ -239,7 +234,7 @@ function seriesRankOf(sort: BookSort): Utils.Literal {
       "(SELECT COUNT(*) FROM `likes` JOIN `books` ON `books`.`id` = `likes`.`bookId` WHERE `books`.`seriesId` = `Series`.`id` AND `books`.`status` <> 'draft' AND `likes`.`isLike` = true)"
     );
   }
-  const now = sequelizeOf().escape(new Date());
+  const now = sequelizeOf(Series).escape(new Date());
   return literal(
     `(SELECT ${sort === 'new' ? 'MIN' : 'MAX'}(\`chapters\`.\`publishedAt\`) FROM \`chapters\` JOIN \`books\` ON \`books\`.\`id\` = \`chapters\`.\`bookId\` WHERE \`books\`.\`seriesId\` = \`Series\`.\`id\` AND \`books\`.\`status\` <> 'draft' AND \`chapters\`.\`publishedAt\` <= ${now})`
   );
@@ -306,7 +301,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     async create(input) {
       try {
         // One transaction, so a series never exists without its first credit.
-        return await sequelizeOf().transaction(async (transaction) => {
+        return await sequelizeOf(Series).transaction(async (transaction) => {
           const { userId, ...attributes } = input;
           await assertGenreExists(attributes.genreId, transaction);
           const series = await Series.create(attributes, { transaction });
@@ -402,7 +397,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async update(id, input) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(id, { transaction });
         if (!series) return null;
 
@@ -413,7 +408,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async remove(id, actor) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(id, {
           attributes: ['id', 'title'],
           transaction,
@@ -450,7 +445,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       const series = await Series.findByPk(seriesId);
       if (!series) return null;
 
-      await addCoAuthor(credits, sequelizeOf(), series, userId, actor);
+      await addCoAuthor(credits, sequelizeOf(Series), series, userId, actor);
       return publicSeriesRow(series);
     },
 
@@ -471,7 +466,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     // Under a lock on the series row, which removeCoAuthor (coAuthors.ts)
     // relies on.
     async removeCoAuthor(seriesId, userId, actor) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {
           transaction,
           lock: transaction.LOCK.UPDATE,

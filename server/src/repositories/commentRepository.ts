@@ -1,5 +1,5 @@
 import { ForeignKeyConstraintError, Op } from 'sequelize';
-import type { Sequelize, WhereOptions } from 'sequelize';
+import type { WhereOptions } from 'sequelize';
 import {
   Comment,
   toCommentWithAuthor,
@@ -10,6 +10,7 @@ import { Like } from '../models/Like.ts';
 import { Report } from '../models/Report.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { loadAvatarUrls } from './userRepository.ts';
 import { shouldReopen } from '../reportText.ts';
 import { OPEN_REPORT_STATUSES } from 'shared';
@@ -90,12 +91,6 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
   if (query.parentId !== undefined) clauses.push({ parentId: query.parentId });
 
   return clauses.length > 0 ? { [Op.and]: clauses } : {};
-}
-
-function sequelizeOf(): Sequelize {
-  const sequelize = Comment.sequelize;
-  if (!sequelize) throw new Error('Comment model is not initialised');
-  return sequelize;
 }
 
 export function createSequelizeCommentRepository(): CommentRepository {
@@ -246,7 +241,7 @@ export function createSequelizeCommentRepository(): CommentRepository {
     // lose the race to a moderator's removal — and text written onto the
     // hidden row would be published by a later restore no moderator saw.
     async update(id, input) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Comment).transaction(async (transaction) => {
         // Locked first, the order reportRepository uses, so the two cannot
         // deadlock. A missing row or a tombstone is refused.
         const locked = await Comment.findByPk(id, {
@@ -302,7 +297,7 @@ export function createSequelizeCommentRepository(): CommentRepository {
     // reply is somebody else's writing and is not theirs to remove. Scoped to
     // live rows, so a second call reports false and the route answers 404.
     async remove(id, kind, actorId) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Comment).transaction(async (transaction) => {
         const live = await Comment.findOne({
           where: { id, tombstone: null },
           attributes: ['id'],

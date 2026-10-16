@@ -1,6 +1,7 @@
 import { QueryTypes } from 'sequelize';
 import type { AccountProfile } from 'shared';
 import { User } from '../models/User.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { loadAvatarUrls } from './userRepository.ts';
 
 export interface AccountRepository {
@@ -30,14 +31,14 @@ const COUNTED_SERIES_BOOK_IDS =
 // Model.count takes no replacements, so the eight totals are scalar
 // subqueries of one raw SELECT that binds `:id`.
 const PROFILE_COUNTS = `SELECT
-  (SELECT COUNT(*) FROM \`books\` WHERE \`id\` IN ${PUBLISHED_BOOK_IDS}) AS bookCount,
-  (SELECT COUNT(*) FROM \`series\` WHERE \`id\` IN ${COUNTED_SERIES_IDS}) AS seriesCount,
-  (SELECT COUNT(*) FROM \`likes\` WHERE \`isLike\` = TRUE AND \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
-  (SELECT COUNT(*) FROM \`likes\` WHERE \`isLike\` = TRUE AND \`bookId\` IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
-  (SELECT COUNT(*) FROM \`comments\` WHERE \`tombstone\` IS NULL AND \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
-  (SELECT COUNT(*) FROM \`favorites\` WHERE \`bookId\` IN ${PUBLISHED_BOOK_IDS} OR \`seriesId\` IN ${COUNTED_SERIES_IDS}) AS favorites,
-  (SELECT COUNT(*) FROM \`reading_list_items\` WHERE \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
-  (SELECT COUNT(*) FROM \`reading_list_items\` WHERE \`seriesId\` IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
+  (SELECT COUNT(*) FROM books WHERE id IN ${PUBLISHED_BOOK_IDS}) AS bookCount,
+  (SELECT COUNT(*) FROM series WHERE id IN ${COUNTED_SERIES_IDS}) AS seriesCount,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
+  (SELECT COUNT(*) FROM comments WHERE tombstone IS NULL AND bookId IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
+  (SELECT COUNT(*) FROM favorites WHERE bookId IN ${PUBLISHED_BOOK_IDS} OR seriesId IN ${COUNTED_SERIES_IDS}) AS favorites,
+  (SELECT COUNT(*) FROM reading_list_items WHERE bookId IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
+  (SELECT COUNT(*) FROM reading_list_items WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
 
 // COUNT(*) is a BIGINT, which the driver may hand back as a string.
 type ProfileCountKey =
@@ -70,12 +71,13 @@ export function createSequelizeAccountRepository(): AccountRepository {
       if (!user || user.status !== 'active') return null;
 
       const avatarUrls = await loadAvatarUrls([id]);
-      const sequelize = User.sequelize;
-      if (!sequelize) throw new Error('User model is not initialised');
-      const [row] = await sequelize.query<ProfileCounts>(PROFILE_COUNTS, {
-        replacements: { id },
-        type: QueryTypes.SELECT,
-      });
+      const [row] = await sequelizeOf(User).query<ProfileCounts>(
+        PROFILE_COUNTS,
+        {
+          replacements: { id },
+          type: QueryTypes.SELECT,
+        }
+      );
       if (!row) throw new Error('Profile counts query returned no row');
       const counts = Object.fromEntries(
         Object.entries(row).map(([key, value]) => [key, Number(value)])

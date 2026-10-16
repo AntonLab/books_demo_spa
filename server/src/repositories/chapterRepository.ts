@@ -20,6 +20,7 @@ import type {
   UpdateChapterInput,
 } from '../types/chapter.ts';
 import { containsPattern } from './likePattern.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { readableChapterScope, type Viewer } from './visibility.ts';
 
 export interface ChapterListResult {
@@ -52,12 +53,6 @@ export interface ChapterRepository {
   // book) is not there.
   findCoAuthorIds(id: number): Promise<number[] | null>;
   findBookCoAuthorIds(bookId: number): Promise<number[] | null>;
-}
-
-function sequelizeOf(): NonNullable<typeof Chapter.sequelize> {
-  const sequelize = Chapter.sequelize;
-  if (!sequelize) throw new Error('Chapter model is not initialised');
-  return sequelize;
 }
 
 function buildWhere(query: ListChaptersQuery): WhereOptions {
@@ -122,7 +117,7 @@ export function createSequelizeChapterRepository(): ChapterRepository {
       const { publishedAt, ...attributes } = input;
       const at = resolvePublishedAt(publishedAt, new Date());
 
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Chapter).transaction(async (transaction) => {
         const book = await Book.findByPk(input.bookId, {
           attributes: ['id'],
           transaction,
@@ -184,7 +179,7 @@ export function createSequelizeChapterRepository(): ChapterRepository {
     // updatedAt could both pass the comparison and the second would still
     // overwrite the first.
     async update(id, input) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Chapter).transaction(async (transaction) => {
         const chapter = await Chapter.findByPk(id, {
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -235,7 +230,7 @@ export function createSequelizeChapterRepository(): ChapterRepository {
     },
 
     async reorder(bookId, chapterIds) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Chapter).transaction(async (transaction) => {
         const book = await Book.findByPk(bookId, {
           attributes: ['id'],
           transaction,

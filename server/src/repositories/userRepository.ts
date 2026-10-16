@@ -16,6 +16,7 @@ import { Session } from '../models/Session.ts';
 import { toAuthorSummary, toPublicUser, User } from '../models/User.ts';
 import { UserAvatar } from '../models/UserAvatar.ts';
 import { containsPattern } from './likePattern.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { notify } from './notificationRepository.ts';
 import { ConflictError } from '../types/errors.ts';
 import type {
@@ -272,12 +273,7 @@ export function createSequelizeUserRepository(): UserRepository {
     // ends land together: a partial apply would leave the old sessions alive
     // beside the new state, the exact thing this exists to prevent.
     async update(id, input) {
-      const sequelize = User.sequelize;
-      if (!sequelize) {
-        throw new Error('User model is not initialised');
-      }
-
-      return sequelize.transaction(async (transaction) => {
+      return sequelizeOf(User).transaction(async (transaction) => {
         // unscoped so the instance carries the password, letting the
         // beforeSave hook see a real change when the caller supplies a new
         // one. FOR UPDATE so two concurrent updates cannot both read the
@@ -324,12 +320,7 @@ export function createSequelizeUserRepository(): UserRepository {
     //
     // Open Reports on its comments are dismissed with the delete.
     async remove(id) {
-      const sequelize = User.sequelize;
-      if (!sequelize) {
-        throw new Error('User model is not initialised');
-      }
-
-      return sequelize.transaction(async (transaction) => {
+      return sequelizeOf(User).transaction(async (transaction) => {
         const creditedSeries = await lockCreditedWorks(
           id,
           (seriesIds) =>

@@ -2,6 +2,7 @@ import { Op } from 'sequelize';
 import { PasswordResetToken } from '../models/PasswordResetToken.ts';
 import { Session } from '../models/Session.ts';
 import { User } from '../models/User.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 
 // How long a reset token outlives its own expiry before the expiry purge
 // deletes it, used or not: a month of evidence that a reset was requested.
@@ -22,14 +23,6 @@ export interface PasswordResetRepository {
   deleteExpiredBefore(cutoff: Date): Promise<number>;
 }
 
-function getSequelize() {
-  const sequelize = PasswordResetToken.sequelize;
-  if (!sequelize) {
-    throw new Error('PasswordResetToken model is not initialised');
-  }
-  return sequelize;
-}
-
 export function createSequelizePasswordResetRepository(): PasswordResetRepository {
   return {
     async create(userId, tokenHash, expiresAt) {
@@ -37,7 +30,7 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
     },
 
     async replaceForUser(userId, tokenHash, expiresAt) {
-      await getSequelize().transaction(async (t) => {
+      await sequelizeOf(PasswordResetToken).transaction(async (t) => {
         // Serialises requests per Account across processes: the second waits
         // for the first commit.
         const user = await User.findByPk(userId, {
@@ -64,7 +57,7 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
       // One transaction across three tables: a partial apply would leave a
       // redeemed token beside a live pre-reset session, which is the exact
       // state this flow exists to prevent.
-      return getSequelize().transaction(async (t) => {
+      return sequelizeOf(PasswordResetToken).transaction(async (t) => {
         const token = await PasswordResetToken.findOne({
           where: {
             tokenHash,

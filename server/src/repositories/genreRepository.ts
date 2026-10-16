@@ -4,7 +4,8 @@ import {
   Op,
   UniqueConstraintError,
 } from 'sequelize';
-import type { Sequelize, Transaction } from 'sequelize';
+import type { Transaction } from 'sequelize';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { Genre, toPublicGenre } from '../models/Genre.ts';
 import {
   BadRequestError,
@@ -65,12 +66,6 @@ export function hasSubgenres(): StateConflictError {
   return new StateConflictError(
     'This genre has subgenres. Move or delete its subgenres first.'
   );
-}
-
-function sequelizeOf(): Sequelize {
-  const sequelize = Genre.sequelize;
-  if (!sequelize) throw new Error('Genre model is not initialised');
-  return sequelize;
 }
 
 function assertTopLevelParent(parent: Genre | null | undefined): Genre {
@@ -228,7 +223,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
 
     async create(input) {
       try {
-        return await sequelizeOf().transaction(async (transaction) => {
+        return await sequelizeOf(Genre).transaction(async (transaction) => {
           const parent =
             typeof input.parentId === 'number'
               ? assertTopLevelParent(
@@ -248,7 +243,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
 
     async update(id, input) {
       try {
-        return await sequelizeOf().transaction(async (transaction) => {
+        return await sequelizeOf(Genre).transaction(async (transaction) => {
           const { parentId } = input;
           const wanted = typeof parentId === 'number' ? parentId : null;
           // The lower id is locked first, so two moves between the same pair
@@ -295,7 +290,7 @@ export function createSequelizeGenreRepository(): GenreRepository {
       // the Genre without one. genres.parentId is RESTRICT, which backs the
       // count below against a Subgenre inserted while this runs.
       try {
-        return await sequelizeOf().transaction(async (transaction) => {
+        return await sequelizeOf(Genre).transaction(async (transaction) => {
           const genre = await Genre.findByPk(id, {
             attributes: ['id'],
             transaction,
