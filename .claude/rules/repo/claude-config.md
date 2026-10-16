@@ -17,8 +17,10 @@ paths:
   `PowerShell` as well as `Bash`; a `Bash(...)` rule alone misses the other.
 - **Tool hooks come from the `swarm` plugin**, whose README lists what each
   one does: `guard-shell` refuses shell writes into repo files, `sed -i`,
-  pushes to `dev` or `main`, and package-wide gates in the main session (a
-  focused `npm test -w client -- <path>` passes); `format-edited` runs
+  pushes to `dev` or `main`, and package-wide gates in the main session. A
+  workspace gate (`npm run lint -w client`) counts as package-wide, and so
+  do `npx tsc`, and `npx jest`/`eslint` or `node --test` with no path; only
+  a run naming a path passes (`npm test -w client -- <path>`); `format-edited` runs
   Prettier from the nearest folder holding `.prettierrc.json`; `after-pr`
   reminds the main session to `/clear` after `gh pr create`. Change them in
   `AntonLab/custom-agents-swarm`, not here. ESLint is left to the pre-commit

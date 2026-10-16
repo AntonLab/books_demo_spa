@@ -29,7 +29,8 @@ per-call values.
   `…-codemap.md` to every plan-writer part. Do not run `Explore` or
   `cavecrew-investigator` before it: they map the same code twice. Plans carry
   contracts and tests, not implementation bodies;
-  `node scripts/plan-check.mjs <plan>` enforces it.
+  `node scripts/plan-check.mjs <plan>` enforces it, and fails a task over
+  180 lines.
 - **Every plan goes through plan-writer.** The main session never writes one:
   it costs several times the plan-writer's tokens for a plan of the same size.
   If plan-writer returns `DONE_WITH_CONCERNS`, put its decisions and concerns
