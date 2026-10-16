@@ -53,6 +53,7 @@ const owner = {
   password: 'hunter2hunter2',
   firstName: 'Ola',
   lastName: 'Owner',
+  status: 'active' as const,
 };
 
 const coAuthor = {
@@ -111,6 +112,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
         login: 'SeriesOwner',
         firstName: 'Ola',
         lastName: 'Owner',
+        status: 'active',
         avatarUrl: null,
       },
     ];

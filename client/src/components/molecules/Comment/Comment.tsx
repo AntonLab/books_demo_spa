@@ -108,6 +108,7 @@ export const Comment: FC<CommentProps> = ({
             <NameLink
               id={comment.author.id}
               name={`${comment.author.firstName} ${comment.author.lastName}`}
+              status={comment.author.status}
             />
           ) : (
             ''

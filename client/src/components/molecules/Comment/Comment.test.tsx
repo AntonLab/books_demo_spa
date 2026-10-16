@@ -19,6 +19,7 @@ const comment: CommentWithAuthor = {
     login: 'Reader',
     firstName: 'Read',
     lastName: 'Er',
+    status: 'active',
     avatarUrl: null,
   },
   likeCount: 2,
@@ -95,6 +96,21 @@ describe('Comment', () => {
 
     render(<Comment {...baseProps} comment={deletedComment} />);
     expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('shows the author of a Blocked Account as plain text', () => {
+    render(
+      <Comment
+        {...baseProps}
+        comment={{
+          ...comment,
+          author: { ...comment.author!, status: 'blocked' },
+        }}
+      />
+    );
+
+    expect(screen.getByText('Read Er')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Read Er' })).toBeNull();
   });
 
   it('dates the comment with the app date helper', () => {

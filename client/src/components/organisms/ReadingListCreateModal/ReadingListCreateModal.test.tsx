@@ -15,7 +15,7 @@ const list: PublicReadingList = {
   title: 'Cold nights',
   description: '',
   tags: [],
-  owner: { id: 9, login: 'reader' },
+  owner: { id: 9, firstName: 'Rita', lastName: 'Reader', status: 'active' },
   itemCount: 0,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',

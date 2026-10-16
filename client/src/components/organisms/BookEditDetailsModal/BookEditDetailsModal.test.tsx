@@ -6,8 +6,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorChapter } from '@/test/editFixtures';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
@@ -31,6 +30,7 @@ const ann = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 
@@ -77,7 +77,7 @@ const onGone = jest.fn();
 
 const renderModal = (session: PublicUser = author) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(
     <BookEditDetailsModal bookId={1} onClose={onClose} onGone={onGone} />,
     { queryClient }

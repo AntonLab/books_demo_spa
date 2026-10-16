@@ -10,8 +10,9 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { emptyStatistics, reportRow } from '@/test/reports';
 import type { QueryClient } from '@tanstack/react-query';
 import * as usersApi from '@/api/users';
-import { sessionOf } from '@/test/session';
-import type { PublicUser, ReportRow, SessionUser } from '@/types/api';
+import { seedSession } from '@/test/session';
+import type { PermissionScope } from 'shared';
+import type { PublicUser, ReportRow } from '@/types/api';
 
 jest.mock('@/api/auth');
 jest.mock('@/api/reports');
@@ -33,7 +34,6 @@ const adminAccount: PublicUser = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
-const admin: SessionUser = sessionOf(adminAccount);
 
 const listOf = (items: ReportRow[], total = items.length) => ({
   items,
@@ -44,9 +44,10 @@ const listOf = (items: ReportRow[], total = items.length) => ({
 
 const renderPanel = (
   queryClient: QueryClient = createTestQueryClient(),
-  session: SessionUser | null = admin
+  session: PublicUser | null = adminAccount,
+  usersUpdate?: PermissionScope
 ) => {
-  queryClient.setQueryData(queryKeys.session, session);
+  seedSession(queryClient, session, usersUpdate);
   return renderWithProviders(<ReportsPanel />, { queryClient });
 };
 
@@ -124,7 +125,7 @@ describe('ReportsPanel', () => {
   });
 
   it('asks for nothing when the session is not a Moderator', async () => {
-    renderPanel(undefined, sessionOf({ ...adminAccount, role: 'author' }));
+    renderPanel(undefined, { ...adminAccount, role: 'author' });
     await act(async () => {});
     expect(mockedReports.listReports).not.toHaveBeenCalled();
     expect(mockedReports.getReportStatistics).not.toHaveBeenCalled();
@@ -138,7 +139,7 @@ describe('ReportsPanel', () => {
     await screen.findByRole('button', { name: 'Take' });
 
     act(() => {
-      queryClient.setQueryData(queryKeys.session, null);
+      seedSession(queryClient, null);
     });
     await act(async () => {});
 
@@ -233,7 +234,12 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockResolvedValue(
       listOf([
         reportRow({ id: 1 }),
-        reportRow({ id: 2, moderatorId: 6, moderatorLogin: 'mod' }),
+        reportRow({
+          id: 2,
+          moderatorId: 6,
+          moderatorLogin: 'mod',
+          moderatorStatus: 'active',
+        }),
       ])
     );
     renderPanel();
@@ -249,6 +255,32 @@ describe('ReportsPanel', () => {
       'href',
       '/accounts/6'
     );
+  });
+
+  it('shows the reporter, reported Account and Moderator of Blocked Accounts as plain text', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({
+          reporter: { id: 8, login: 'Barred', status: 'blocked' },
+          moderatorId: 4,
+          moderatorLogin: 'Gone',
+          moderatorStatus: 'blocked',
+          reportedAccount: {
+            id: 3,
+            login: 'Writer',
+            status: 'blocked',
+            role: 'user',
+            atBanThreshold: false,
+          },
+        }),
+      ])
+    );
+    renderPanel();
+    const row = (await screen.findAllByRole('row', { name: /Barred/ }))[0]!;
+    for (const name of ['Barred', 'Writer', 'Gone']) {
+      expect(within(row).getByText(name)).toBeInTheDocument();
+      expect(within(row).queryByRole('link', { name })).toBeNull();
+    }
   });
 
   it('shows the Tombstone label instead of the text of a Removed comment', async () => {
@@ -269,7 +301,10 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockResolvedValue(
       listOf([
         reportRow({ id: 1 }),
-        reportRow({ id: 2, reporter: { id: 8, login: 'Second' } }),
+        reportRow({
+          id: 2,
+          reporter: { id: 8, login: 'Second', status: 'active' },
+        }),
         reportRow({
           id: 3,
           comment: { id: 9, bookId: 1, text: 'other', tombstone: null },
@@ -332,7 +367,12 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockImplementation(async ({ offset }) =>
       listOf(
         offset === 0
-          ? [reportRow({ id: 7, reporter: { id: 2, login: 'Survivor' } })]
+          ? [
+              reportRow({
+                id: 7,
+                reporter: { id: 2, login: 'Survivor', status: 'active' },
+              }),
+            ]
           : [],
         20
       )
@@ -439,7 +479,7 @@ describe('ReportsPanel', () => {
         }),
       ])
     );
-    mockedUsers.blockUser.mockResolvedValue(admin);
+    mockedUsers.blockUser.mockResolvedValue(adminAccount);
     renderPanel();
     expect(await screen.findByText('Ban mark')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Ban user' }));
@@ -497,7 +537,7 @@ describe('ReportsPanel', () => {
         }),
       ])
     );
-    renderPanel(undefined, sessionOf(adminAccount, 'none'));
+    renderPanel(undefined, adminAccount, 'none');
     expect(
       await screen.findByRole('button', { name: 'Ban user' })
     ).toBeDisabled();

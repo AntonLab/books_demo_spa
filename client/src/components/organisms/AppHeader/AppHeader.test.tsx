@@ -1,7 +1,9 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { QueryClient } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { usePageGuard } from '@/hooks/usePageGuard';
+import { useSession } from '@/queries/auth';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -9,7 +11,7 @@ import { genreItem } from '@/test/genres';
 import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import * as authApi from '@/api/auth';
 import * as notificationsApi from '@/api/notifications';
 import * as genresApi from '@/api/genres';
@@ -44,7 +46,7 @@ const user: PublicUser = {
 // waiting on a request.
 const withSession = (session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return { queryClient };
 };
 
@@ -232,6 +234,183 @@ describe('AppHeader when logged in', () => {
       await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('lands on / with no Log in dialog after logging out of a guarded page', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('lands on / with no Log in dialog when the user navigates while the logout is in flight', async () => {
+    let finishLogout = () => {};
+    mockedAuth.logout.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishLogout = resolve;
+      })
+    );
+    const GuardedPage = () => {
+      const session = useSession();
+      const navigate = useNavigate();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return (
+        <button onClick={() => void navigate('/private?tab=2')}>move</button>
+      );
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+    await userEvent.click(screen.getByRole('button', { name: 'move' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/private?tab=2'
+      );
+    });
+    await act(async () => {
+      finishLogout();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/$/);
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('stays signed in on the guarded page when the server refuses the logout', async () => {
+    mockedAuth.logout.mockRejectedValue(
+      new ApiError(403, 'Missing or invalid CSRF token')
+    );
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await waitFor(() => {
+      expect(mockedAuth.logout).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/private$/);
+    expect(screen.getByText('secret')).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens the Log in dialog when the session expires on a guarded page', async () => {
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    act(() => {
+      seedSession(queryClient, null);
+    });
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the Log in dialog when the session expires after a logout and a later sign-in', async () => {
+    mockedAuth.logout.mockResolvedValue(undefined);
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const Home = () => {
+      const navigate = useNavigate();
+      return <button onClick={() => void navigate('/private')}>enter</button>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+    await waitFor(() => {
+      expect(queryClient.getQueryData(queryKeys.session)).toBeNull();
+    });
+    act(() => {
+      seedSession(queryClient, user);
+    });
+    await userEvent.click(screen.getByRole('button', { name: 'enter' }));
+    expect(await screen.findByText('secret')).toBeInTheDocument();
+    act(() => {
+      seedSession(queryClient, null);
+    });
+
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
   });
 
   it('is reachable by keyboard and opens the dropdown on Enter', async () => {
@@ -625,7 +804,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     path: string | RegExp
   ) => {
     act(() => {
-      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+      seedSession(queryClient, user);
     });
     await waitFor(() =>
       expect(screen.getByTestId('path')).toHaveTextContent(path)
@@ -658,7 +837,7 @@ describe('AppHeader returning a Guest after Log in', () => {
     await screen.findByRole('dialog', { name: 'Log in' });
     await userEvent.click(screen.getByRole('button', { name: 'wander' }));
     await act(async () => {
-      queryClient.setQueryData(queryKeys.session, sessionOf(user));
+      seedSession(queryClient, user);
     });
     // The header re-renders signed in; only then can a stray redirect have run.
     await screen.findByRole('button', { name: /bob/i });
@@ -806,14 +985,7 @@ describe('AppHeader notification stream', () => {
     ).toBeInTheDocument();
 
     act(() => {
-      queryClient.setQueryData(
-        queryKeys.session,
-        sessionOf({
-          ...user,
-          id: 2,
-          login: 'eve',
-        })
-      );
+      seedSession(queryClient, { ...user, id: 2, login: 'eve' });
     });
 
     await screen.findByText('eve');

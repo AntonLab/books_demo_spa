@@ -6,7 +6,7 @@ import {
   Op,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { Sequelize, Transaction, Utils, WhereOptions } from 'sequelize';
+import type { Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
@@ -53,13 +53,8 @@ import type {
   UpdateBookInput,
 } from '../types/book.ts';
 import { containsPattern } from './likePattern.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
-
-function sequelizeOf(): Sequelize {
-  const sequelize = Book.sequelize;
-  if (!sequelize) throw new Error('Book model is not initialised');
-  return sequelize;
-}
 
 export interface BookListResult {
   items: PublicBook[];
@@ -286,7 +281,7 @@ async function publicBook(
 // time has passed on this process's clock, as readableChapterScope judges
 // them; the escaped Date is the only value spliced in.
 function publicationEdge(edge: 'MIN' | 'MAX'): Utils.Literal {
-  const now = sequelizeOf().escape(new Date());
+  const now = sequelizeOf(Book).escape(new Date());
   return literal(
     `(SELECT ${edge}(\`publishedAt\`) FROM \`chapters\` WHERE \`chapters\`.\`bookId\` = \`Book\`.\`id\` AND \`publishedAt\` <= ${now})`
   );
@@ -297,7 +292,7 @@ function publicationEdge(edge: 'MIN' | 'MAX'): Utils.Literal {
 // inclusive bound miss its own exact instant. Formatted by hand instead, in
 // the same UTC the connection assumes (no `timezone` override in db/sequelize.ts).
 function escapeInstant(value: Date): string {
-  return sequelizeOf().escape(
+  return sequelizeOf(Book).escape(
     value.toISOString().replace('T', ' ').replace('Z', '')
   );
 }
@@ -500,7 +495,7 @@ export function createSequelizeBookRepository(): BookRepository {
     async create(input) {
       try {
         // One transaction, so a book never exists without its first credit.
-        return await sequelizeOf().transaction(async (transaction) => {
+        return await sequelizeOf(Book).transaction(async (transaction) => {
           const { userId, ...attributes } = input;
           await assertGenreExists(attributes.genreId, transaction);
           const seriesPosition =
@@ -672,7 +667,7 @@ export function createSequelizeBookRepository(): BookRepository {
     // references an update can write, and asMissingUser (coAuthors.ts) explains why neither
     // can be rejected.
     async update(id, input) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Book).transaction(async (transaction) => {
         const book = await Book.findByPk(id, {
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -734,7 +729,7 @@ export function createSequelizeBookRepository(): BookRepository {
     // Under a lock on the book row, so the Co-authors told are exactly the ones
     // credited when it went.
     async remove(id, actor) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Book).transaction(async (transaction) => {
         const book = await Book.findByPk(id, {
           attributes: ['id', 'title'],
           transaction,
@@ -765,14 +760,14 @@ export function createSequelizeBookRepository(): BookRepository {
       const book = await Book.findByPk(bookId);
       if (!book) return null;
 
-      await addCoAuthor(credits, sequelizeOf(), book, userId, actor);
+      await addCoAuthor(credits, sequelizeOf(Book), book, userId, actor);
       return publicBook(book);
     },
 
     // Under a lock on the book row, which removeCoAuthor (coAuthors.ts)
     // relies on.
     async removeCoAuthor(bookId, userId, actor) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Book).transaction(async (transaction) => {
         const book = await Book.findByPk(bookId, {
           transaction,
           lock: transaction.LOCK.UPDATE,
@@ -816,7 +811,7 @@ export function createSequelizeBookRepository(): BookRepository {
     },
 
     async reorderInSeries(seriesId, bookIds) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Book).transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {
           attributes: ['id'],
           transaction,

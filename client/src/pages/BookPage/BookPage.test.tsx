@@ -6,8 +6,7 @@ import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import { ApiError } from '@/api/client';
 import { formatDate } from '@/format/date';
 import * as booksApi from '@/api/books';
@@ -54,6 +53,7 @@ const book: BookDetail = {
       login: 'Author',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
     {
@@ -61,6 +61,7 @@ const book: BookDetail = {
       login: 'Cowriter',
       firstName: 'Cora',
       lastName: 'Writer',
+      status: 'active',
       avatarUrl: null,
     },
   ],
@@ -105,7 +106,7 @@ const renderPage = (
   id = '1'
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  if (session) seedSession(queryClient, session);
 
   return renderWithProviders(<BookPage />, {
     route: `/books/${id}`,
@@ -128,7 +129,7 @@ const renderWithHome = (
   }: { session?: PublicUser; preloadedState?: Partial<RootState> } = {}
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  if (session) seedSession(queryClient, session);
 
   return renderWithProviders(
     <Routes>
@@ -554,7 +555,12 @@ describe('BookPage lower tabs', () => {
         title: 'Cold nights',
         description: '',
         tags: [],
-        owner: { id: 9, login: 'reader' },
+        owner: {
+          id: 9,
+          firstName: 'Rita',
+          lastName: 'Reader',
+          status: 'active' as const,
+        },
         itemCount: 2,
         createdAt: '2026-09-01T00:00:00.000Z',
         updatedAt: '2026-09-01T00:00:00.000Z',
@@ -851,10 +857,7 @@ describe('BookPage Edit button', () => {
   ])('after delete from the modal, %s', async (_name, who, landing) => {
     mockedBooks.deleteBook.mockResolvedValue(undefined);
     const queryClient = createTestQueryClient();
-    queryClient.setQueryData(
-      queryKeys.session,
-      sessionOf({ ...reader, ...who })
-    );
+    seedSession(queryClient, { ...reader, ...who });
     renderWithProviders(
       <Routes>
         <Route path="/books/:id" element={<BookPage />} />

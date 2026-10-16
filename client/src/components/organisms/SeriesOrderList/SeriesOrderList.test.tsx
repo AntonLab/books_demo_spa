@@ -16,6 +16,7 @@ const ann = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 const cora = {
@@ -23,6 +24,7 @@ const cora = {
   login: 'cora',
   firstName: 'Cora',
   lastName: 'Writer',
+  status: 'active' as const,
   avatarUrl: null,
 };
 

@@ -75,6 +75,7 @@ export function reportListContract(
     assert.deepEqual(items[0]?.reporter, {
       id: w.reporterId,
       login: await w.loginOf(w.reporterId),
+      status: 'active',
     });
     assert.equal(items[0]?.reportedAccount?.login, await w.loginOf(w.ownerId));
     assert.equal(items[0]?.reportedAccount?.atBanThreshold, false);
@@ -91,9 +92,43 @@ export function reportListContract(
         items[0]?.explanation,
         items[0]?.moderatorLogin,
         items[0]?.moderatorId,
+        items[0]?.moderatorStatus,
         items[0]?.isOwnComment,
       ],
-      ['new', 'other', 'rude', null, null, false]
+      ['new', 'other', 'rude', null, null, null, false]
+    );
+  });
+
+  test('contract list: a settled row carries its moderator with the moderator status', async () => {
+    const w = await withComment();
+    const moderatorId = await w.anAccount();
+    await w.aReport(w.commentId, { status: 'upheld', moderatorId });
+    const { items } = await w.repository.list(
+      { ...EVER, limit: 20, offset: 0 },
+      as(w.reporterId)
+    );
+    assert.deepEqual(
+      [items[0]?.moderatorId, items[0]?.moderatorStatus],
+      [moderatorId, 'active']
+    );
+  });
+
+  test('contract list: a deleted moderator nulls id, login and status together', async () => {
+    const w = await withComment();
+    const moderatorId = await w.anAccount();
+    await w.aReport(w.commentId, { status: 'upheld', moderatorId });
+    await w.deleteAccount(moderatorId);
+    const { items } = await w.repository.list(
+      { ...EVER, limit: 20, offset: 0 },
+      as(w.reporterId)
+    );
+    assert.deepEqual(
+      [
+        items[0]?.moderatorId,
+        items[0]?.moderatorLogin,
+        items[0]?.moderatorStatus,
+      ],
+      [null, null, null]
     );
   });
 

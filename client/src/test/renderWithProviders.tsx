@@ -42,8 +42,8 @@ type ProviderOptions = ProviderSetup & Omit<RenderOptions, 'wrapper'>;
 // The query client is fresh per render unless the test supplies one, so cached
 // data cannot leak between tests. The store starts from `preloadedState` or
 // `{}`, never from localStorage, which a previous test may have written. Both
-// are returned so a test can seed a session (`queryClient.setQueryData`), read
-// client state (`store.getState()`), or remount on the same store.
+// are returned so a test can seed a session (`seedSession(queryClient, user)`),
+// read client state (`store.getState()`), or remount on the same store.
 const setUpProviders = ({
   preloadedState = {},
   store = createAppStore(preloadedState),

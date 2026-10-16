@@ -7,8 +7,7 @@ import {
 } from './useUnsavedText';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as authApi from '@/api/auth';
 import type { RootState } from '@/store';
@@ -43,7 +42,7 @@ const ownedBy = (accountId: number | null): Partial<RootState> => ({
 const withSession = (session: PublicUser | null | undefined) => {
   const queryClient = createTestQueryClient();
   if (session !== undefined) {
-    queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+    seedSession(queryClient, session);
   }
   return queryClient;
 };
@@ -141,7 +140,7 @@ describe('useUnsavedTextAccountBinding', () => {
 
     // An expiry, a Block or a password reset: the session just becomes null.
     act(() => {
-      queryClient.setQueryData(queryKeys.session, null);
+      seedSession(queryClient, null);
     });
 
     expect(store.getState().unsavedText).toEqual({ accountId: 1, entries });
@@ -162,7 +161,7 @@ describe('useSignOut', () => {
       preloadedState: ownedBy(1),
     });
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
     expect(store.getState().unsavedText).toEqual({ accountId: 1, entries });
 
@@ -183,7 +182,7 @@ describe('useSignOut', () => {
       preloadedState: ownedBy(1),
     });
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
     await act(async () => {});
 
@@ -203,7 +202,7 @@ describe('useSignOut', () => {
       { queryClient: withSession(account(1)), preloadedState: ownedBy(1) }
     );
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
 
     unmount();

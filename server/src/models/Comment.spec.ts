@@ -189,6 +189,7 @@ test('toCommentWithAuthor names no author for a tombstone', () => {
     login: 'Cass',
     firstName: 'Cass',
     lastName: 'Owner',
+    status: 'active' as const,
     avatarUrl: null,
   };
 

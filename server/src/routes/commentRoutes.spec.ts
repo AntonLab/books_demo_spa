@@ -28,6 +28,7 @@ const AUTHOR: AuthorSummary = {
   login: TEST_USER.login,
   firstName: TEST_USER.firstName,
   lastName: TEST_USER.lastName,
+  status: 'active',
   avatarUrl: null,
 };
 
@@ -43,6 +44,7 @@ const ACCOUNTS = new Map<number, AuthorSummary>(
           login: `persona-${id}`,
           firstName: 'Persona',
           lastName: `${id}`,
+          status: 'active',
           avatarUrl: null,
         },
   ])

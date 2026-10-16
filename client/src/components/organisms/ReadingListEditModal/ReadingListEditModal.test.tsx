@@ -3,8 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { ReadingListEditModal } from './ReadingListEditModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import * as readingListsApi from '@/api/readingLists';
 import type { PublicUser } from '@/types/api';
 import type {
@@ -34,7 +33,7 @@ const list: ReadingListDetail = {
   title: 'Cold nights',
   description: 'Long reads.',
   tags: ['winter'],
-  owner: { id: 9, login: 'reader' },
+  owner: { id: 9, firstName: 'Rita', lastName: 'Reader', status: 'active' },
   itemCount: 0,
   items: [],
   createdAt: '2026-09-01T00:00:00.000Z',
@@ -56,7 +55,7 @@ const renderModal = (
   session: PublicUser = owner
 ) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(<ReadingListEditModal listId={4} {...props} />, {
     queryClient,
   });

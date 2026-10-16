@@ -124,7 +124,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 - **`ui-checker`** (Sonnet, no edits) checks pages and flows in the browser
   through the Playwright MCP and returns pass/fail per item. Dispatch it after
   a UI change and for a PR test plan's manual items; the main session starts
-  no dev server, takes no snapshot and never Reads a screenshot.
+  no dev server, takes no snapshot and never Reads a screenshot. It never
+  deletes, edits, blocks or bans seed records: a destructive check acts on a
+  record it created first.
 - **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
   `general-purpose`: the latter ran on Sonnet and loaded the full context.
   While a plan pipeline runs, `code-mapper` does the mapping and

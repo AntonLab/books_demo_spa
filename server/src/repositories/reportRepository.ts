@@ -4,9 +4,9 @@ import {
   col,
   Op,
   UniqueConstraintError,
-  type Sequelize,
   type Transaction,
 } from 'sequelize';
+import { sequelizeOf } from './sequelizeOf.ts';
 import {
   BAN_MARK_THRESHOLD,
   OPEN_REPORT_STATUSES,
@@ -84,12 +84,6 @@ export interface ReportRepository {
   statistics(range: ReportRange): Promise<ReportStatistics>;
 }
 
-function sequelizeOf(): Sequelize {
-  const sequelize = Report.sequelize;
-  if (!sequelize) throw new Error('Report model is not initialised');
-  return sequelize;
-}
-
 const inRange = ({ from, to }: ReportRange) => ({
   [Op.gte]: from,
   [Op.lt]: to,
@@ -147,7 +141,7 @@ export function createSequelizeReportRepository(): ReportRepository {
     changes: (comment: Comment) => Partial<Report['dataValues']>,
     afterwards?: (transaction: Transaction) => Promise<unknown>
   ) => {
-    await sequelizeOf().transaction(async (transaction) => {
+    await sequelizeOf(Report).transaction(async (transaction) => {
       const comment = await lockedComment(commentId, transaction);
       if (comment.userId === moderator.id) throw new ForbiddenError();
       const [affected] = await Report.update(
@@ -163,7 +157,7 @@ export function createSequelizeReportRepository(): ReportRepository {
 
   return {
     async create(commentId, input, reporter) {
-      return sequelizeOf().transaction(async (transaction) => {
+      return sequelizeOf(Report).transaction(async (transaction) => {
         const comment = await lockedComment(commentId, transaction);
         if (comment.userId === reporter.id) throw new ForbiddenError();
         if (comment.tombstone) {
@@ -217,8 +211,16 @@ export function createSequelizeReportRepository(): ReportRepository {
             attributes: ['id', 'bookId', 'text', 'tombstone', 'userId'],
             required: true,
           },
-          { model: User, as: 'reporter', attributes: ['id', 'login'] },
-          { model: User, as: 'moderator', attributes: ['id', 'login'] },
+          {
+            model: User,
+            as: 'reporter',
+            attributes: ['id', 'login', 'status'],
+          },
+          {
+            model: User,
+            as: 'moderator',
+            attributes: ['id', 'login', 'status'],
+          },
           {
             model: User,
             as: 'reportedAccount',
@@ -244,7 +246,11 @@ export function createSequelizeReportRepository(): ReportRepository {
             id: row.id,
             createdAt: row.createdAt,
             reporter: reporter
-              ? { id: reporter.id, login: reporter.login }
+              ? {
+                  id: reporter.id,
+                  login: reporter.login,
+                  status: reporter.status,
+                }
               : null,
             isSystem: row.isSystem,
             reason: row.reason,
@@ -267,6 +273,7 @@ export function createSequelizeReportRepository(): ReportRepository {
             status: row.status,
             moderatorId: moderator?.id ?? null,
             moderatorLogin: moderator?.login ?? null,
+            moderatorStatus: moderator?.status ?? null,
             isOwnComment: comment.userId === viewer.id,
           };
         }),

@@ -7,6 +7,8 @@ import {
 } from './content.ts';
 import {
   AUTHORS,
+  BLOCKED_AUTHOR,
+  PENDING_USER,
   READERS,
   STAFF,
   type AccountSpec,
@@ -881,9 +883,32 @@ function planReports(
   return reports;
 }
 
+// The Blocked author joins the first standalone Published book as a second
+// Co-author, so an Active one stays on the byline and the Book stays visible.
+function addBlockedCoAuthor(authors: readonly PlannedAuthor[]): {
+  authors: PlannedAuthor[];
+  book: PlannedBook;
+} {
+  const original = authors
+    .flatMap((author) => author.books)
+    .find((book) => book.seriesIndex === null && book.status !== 'draft');
+  if (!original) throw new Error('No standalone Published book to share');
+  const book = {
+    ...original,
+    coAuthorLogins: [...original.coAuthorLogins, BLOCKED_AUTHOR.login],
+  };
+  return {
+    book,
+    authors: authors.map((author) => ({
+      ...author,
+      books: author.books.map((b) => (b === original ? book : b)),
+    })),
+  };
+}
+
 export function buildPlan(rng: Rng): Plan {
-  const authors = shareSeries(
-    shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec)))
+  const { authors, book: sharedBook } = addBlockedCoAuthor(
+    shareSeries(shareBooks(AUTHORS.map((spec) => planAuthor(rng, spec))))
   );
   const earliest = Math.min(
     ...authors.map((author) => author.createdAt.getTime())
@@ -934,13 +959,46 @@ export function buildPlan(rng: Rng): Plan {
     accounts
   );
 
+  // The Blocked author's activity is fixed rather than drawn, after every draw
+  // above, so it never moves the rest of the demo.
+  const now = Date.now();
+  const blockedIndex = accounts.length;
+  const blockedCreatedAt = new Date(earliest - 20 * DAY_MS);
+  const activityAt = new Date(now - 2 * DAY_MS);
+
   return {
-    accounts,
+    accounts: [
+      ...accounts,
+      withLastSeen(BLOCKED_AUTHOR, blockedCreatedAt),
+      withLastSeen(PENDING_USER, new Date(now - 2 * DAY_MS)),
+    ],
     authors,
     ...threads,
+    comments: [
+      ...threads.comments,
+      {
+        book: sharedBook,
+        accountIndex: blockedIndex,
+        text: itemAt(TOP_LEVEL_COMMENTS, 0, 'top-level comment'),
+        createdAt: activityAt,
+        depth: 0,
+        parent: null,
+      },
+    ],
     favorites,
     library,
-    readingLists,
+    readingLists: [
+      ...readingLists,
+      {
+        accountIndex: blockedIndex,
+        title: itemAt(LIST_TITLES, 0, 'list title'),
+        description: itemAt(LIST_DESCRIPTIONS, 0, 'list description'),
+        tags: [],
+        items: [{ book: sharedBook, series: null }],
+        createdAt: activityAt,
+        updatedAt: activityAt,
+      },
+    ],
     reports,
   };
 }

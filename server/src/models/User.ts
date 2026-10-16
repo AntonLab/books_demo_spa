@@ -153,6 +153,7 @@ export function toAuthorSummary(
     login: user.login,
     firstName: user.firstName,
     lastName: user.lastName,
+    status: user.status,
     avatarUrl,
   };
 }

@@ -107,6 +107,7 @@ export const Card: FC<CardProps> = ({
                   <NameLink
                     id={author.id}
                     name={`${author.firstName} ${author.lastName}`}
+                    status={author.status}
                   />
                   {index < authors.length - 1 && ','}
                 </Typography.Text>

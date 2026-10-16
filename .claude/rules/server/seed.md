@@ -7,9 +7,18 @@ paths:
 
 ## Accounts
 
-All accounts are `active` with the password in `DEMO_PASSWORD` (`seed.ts`);
-names are real on purpose because the UI shows them ("User Two" answering "User
-Four" reads as a test run, not a demo). Personas are in `db/seed/personas.ts`.
+All accounts share the password in `DEMO_PASSWORD` (`seed.ts`) and are `active`
+except two; names are real on purpose because the UI shows them ("User Two"
+answering "User Four" reads as a test run, not a demo). Personas are in
+`db/seed/personas.ts`.
+
+- `blocked1` (Blocked, `author`) co-authors the first standalone Published book
+  beside an Active author, writes one Comment on it and owns one Reading list
+  holding it. Its activity is fixed, added after every random draw in
+  `buildPlan`, so it never shifts the rest of the demo. It exists so the UI has
+  a name that renders without a link.
+- `pending1` (Pending, `user`) owns nothing. Plan steps that give every
+  `user` content (Library, Favorites, Reading lists) run before it exists.
 
 ## Rules that keep the data honest
 

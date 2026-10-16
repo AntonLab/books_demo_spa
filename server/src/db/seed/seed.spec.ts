@@ -266,6 +266,18 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
       ])
     );
 
+    const statuses = await offending(
+      `SELECT login, status FROM users WHERE status <> 'active'`
+    );
+    assert.deepEqual(
+      statuses
+        .map((row) => row as { login: string; status: string })
+        .sort((a, b) => a.login.localeCompare(b.login)),
+      [
+        { login: 'blocked1', status: 'blocked' },
+        { login: 'pending1', status: 'pending' },
+      ]
+    );
     assert.equal(byLogin.get('user3')?.showLastSeen, 0);
     assert.notEqual(byLogin.get('user3')?.lastSeenAt, null);
     assert.equal(byLogin.get('user1')?.lastSeenAt, null);
@@ -308,7 +320,7 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
       await offending(
         `SELECT u.login FROM users u
          LEFT JOIN favorites f ON f.userId = u.id
-         WHERE u.role = 'user'
+         WHERE u.role = 'user' AND u.status = 'active'
          GROUP BY u.id, u.login
          HAVING COUNT(f.id) = 0`
       ),

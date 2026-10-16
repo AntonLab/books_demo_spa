@@ -53,6 +53,7 @@ async function createAccount(role: 'user' | 'author' = 'user') {
     firstName: 'Rae',
     lastName: `Account${accountCount}`,
     role,
+    status: 'active',
   });
 }
 
@@ -203,6 +204,24 @@ describe('reportRepository against real MySQL', { skip }, () => {
       'rejected',
     ]);
     assert.equal((await w.storedReports(commentId)).length, 1);
+  });
+
+  test('a Blocked reporter lists with its status', async () => {
+    const w = await setUp();
+    const reporter = await createAccount();
+    await reporter.update({ status: 'blocked' });
+    const commentId = await w.aComment(await w.anAccount());
+    await w.aReport(commentId, { reporterId: reporter.id });
+    const { items } = await w.repository.list(
+      {
+        from: new Date('2000-01-01T00:00:00Z'),
+        to: new Date('2100-01-01T00:00:00Z'),
+        limit: 20,
+        offset: 0,
+      },
+      as(await w.anAccount())
+    );
+    assert.equal(items[0]?.reporter?.status, 'blocked');
   });
 
   test('system Reports with no reporter coexist on one Comment', async () => {

@@ -229,6 +229,20 @@ describe('accountRepository against real MySQL', { skip }, () => {
     assert.equal(totals?.seriesLikes, 3);
   });
 
+  test('a dislike on a Book in a counted Series is not a Like', async () => {
+    const w = await scenario();
+    await Like.create({
+      userId: w.f1.id,
+      bookId: w.inSeries.id,
+      isLike: false,
+    });
+
+    const totals = (await repository.findProfile(w.a.id))?.totals;
+
+    assert.equal(totals?.bookLikes, 0);
+    assert.equal(totals?.seriesLikes, 0);
+  });
+
   test('Comments count on Published Books, Tombstones and Drafts excluded', async () => {
     const w = await scenario();
     await Comment.create({ userId: w.f1.id, bookId: w.inSeries.id, text: 'a' });
@@ -317,5 +331,59 @@ describe('accountRepository against real MySQL', { skip }, () => {
     assert.ok(
       Object.values(profile?.totals ?? { missing: 1 }).every((n) => n === 0)
     );
+  });
+
+  test('Likes on a standalone Draft do not count while the Account has Published Books', async () => {
+    const w = await scenario();
+    await Like.create({
+      userId: w.f1.id,
+      bookId: w.draftSolo.id,
+      isLike: true,
+    });
+
+    const profile = await repository.findProfile(w.a.id);
+
+    assert.equal(profile?.totals.bookLikes, 0);
+    assert.equal(profile?.totals.seriesLikes, 0);
+  });
+
+  test('Comments on a partner Book in a counted Series are not counted', async () => {
+    const w = await scenario();
+    await Comment.create({
+      userId: w.f1.id,
+      bookId: w.partnersInS1.id,
+      text: 'p',
+    });
+
+    assert.equal(
+      (await repository.findProfile(w.a.id))?.totals.commentsOnBooks,
+      0
+    );
+  });
+
+  test('a Series whose only Published Book is another author is counted once, with its Likes', async () => {
+    const me = await active('SeriesOnly');
+    const partner = await active('SeriesPartner');
+    const fan = await active('SeriesFan');
+    const series = await createCreditedSeries(seriesFixture, [
+      me.id,
+      partner.id,
+    ]);
+    const theirs = await createCreditedBook(
+      { ...bookFixture, seriesId: series.id },
+      [partner.id]
+    );
+    await createCreditedBook(
+      { ...bookFixture, seriesId: series.id, status: 'draft' },
+      [me.id]
+    );
+    await Like.create({ userId: fan.id, bookId: theirs.id, isLike: true });
+
+    const profile = await repository.findProfile(me.id);
+
+    assert.equal(profile?.bookCount, 0);
+    assert.equal(profile?.seriesCount, 1);
+    assert.equal(profile?.totals.bookLikes, 0);
+    assert.equal(profile?.totals.seriesLikes, 1);
   });
 });

@@ -41,6 +41,11 @@ export const AppHeader: FC = () => {
   const phone = Grid.useBreakpoint().xs === true;
   // Where usePageGuard's Guest was headed; kept until Log in resolves.
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  // 'pending' from the Log out click; 'ended' once the session is gone, so
+  // the next sign-in can tell the flag is stale.
+  const [signingOut, setSigningOut] = useState<false | 'pending' | 'ended'>(
+    false
+  );
 
   // Read once per navigation, not per render: the router state outlives the
   // modal and must not reopen it each time the session changes. Any navigation
@@ -48,10 +53,22 @@ export const AppHeader: FC = () => {
   const [seenKey, setSeenKey] = useState(location.key);
   if (seenKey !== location.key) {
     setSeenKey(location.key);
-    const loginReturnTo = (location.state as Partial<LoginReturnState> | null)
-      ?.loginReturnTo;
+    const state = location.state as Partial<LoginReturnState> | null;
+    // A guarded page that sees the session vanish cannot tell our own Log out
+    // from an expiry; it leaves for / itself, and Log in must stay shut. Only
+    // that redirect carries loginReturnTo, so only it spends the flag: an
+    // unrelated navigation during the request must not.
+    const ownRedirect = signingOut !== false && !!state?.loginReturnTo;
+    if (ownRedirect) setSigningOut(false);
+    const loginReturnTo = ownRedirect ? undefined : state?.loginReturnTo;
     setReturnTo(loginReturnTo ?? null);
     if (loginReturnTo) setAuthModal('login');
+  }
+
+  if (signingOut && !user) {
+    if (signingOut === 'pending') setSigningOut('ended');
+  } else if (signingOut === 'ended') {
+    setSigningOut(false);
   }
 
   useEffect(() => {
@@ -125,7 +142,10 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      signOut();
+      setSigningOut('pending');
+      void signOut().then((ended) => {
+        if (!ended) setSigningOut(false);
+      });
       return;
     }
     void navigate(key);

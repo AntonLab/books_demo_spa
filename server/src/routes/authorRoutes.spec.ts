@@ -19,6 +19,7 @@ const AUTHORS: AuthorSummary[] = [
     login: 'mhale',
     firstName: 'Margaret',
     lastName: 'Hale',
+    status: 'active',
     avatarUrl: null,
   },
   {
@@ -26,6 +27,7 @@ const AUTHORS: AuthorSummary[] = [
     login: 'ipetrov',
     firstName: 'Ivan',
     lastName: 'Petrov',
+    status: 'active',
     avatarUrl: null,
   },
 ];

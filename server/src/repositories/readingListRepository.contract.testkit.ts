@@ -54,7 +54,11 @@ export function readingListContract(
     const { repository, ownerId } = await withOwner();
     const list = await repository.create(NEW, as(ownerId));
     assert.equal(list.owner.id, ownerId);
-    assert.equal(typeof list.owner.login, 'string');
+    assert.deepEqual(
+      [typeof list.owner.firstName, typeof list.owner.lastName],
+      ['string', 'string']
+    );
+    assert.equal(list.owner.status, 'active');
     assert.deepEqual(
       [list.title, list.description, list.tags, list.itemCount],
       ['Cold nights', 'Stories', ['winter'], 0]

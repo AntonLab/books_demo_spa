@@ -38,6 +38,10 @@ const shapeOf = (plan: Plan) => ({
   reports: plan.reports.map((r) => `${r.status}:${r.reason}:${r.comment.text}`),
 });
 
+// Readers are the active `user` Accounts; the Pending one has no activity.
+const isActiveReader = ({ spec }: Plan['accounts'][number]): boolean =>
+  spec.role === 'user' && (spec.status ?? 'active') === 'active';
+
 const loginOf = (plan: Plan, accountIndex: number): string => {
   const account = plan.accounts[accountIndex];
   assert.ok(account, `no account at index ${accountIndex}`);
@@ -51,16 +55,42 @@ test('the same seed plans the same demo, down to every chapter title', () => {
   );
 });
 
-test('plans the ten personas the demo is signed in as', () => {
+test('plans the twelve personas the demo is signed in as', () => {
   const plan = buildPlan(createRng(RNG_SEED));
   const roles = plan.accounts.map(({ spec }) => spec.role);
 
-  assert.equal(plan.accounts.length, 10);
+  assert.equal(plan.accounts.length, 12);
   assert.equal(roles.filter((role) => role === 'superadmin').length, 1);
   assert.equal(roles.filter((role) => role === 'admin').length, 1);
-  assert.equal(roles.filter((role) => role === 'author').length, 3);
-  assert.equal(roles.filter((role) => role === 'user').length, 5);
-  assert.equal(new Set(plan.accounts.map(({ spec }) => spec.login)).size, 10);
+  assert.equal(roles.filter((role) => role === 'author').length, 4);
+  assert.equal(roles.filter((role) => role === 'user').length, 6);
+  assert.equal(new Set(plan.accounts.map(({ spec }) => spec.login)).size, 12);
+});
+
+test('plans a Blocked author who co-authors a Published book, comments and owns a Reading list, and a Pending Account with nothing', () => {
+  const plan = buildPlan(createRng(RNG_SEED));
+  const indexOf = (login: string) =>
+    plan.accounts.findIndex(({ spec }) => spec.login === login);
+  const blocked = indexOf('blocked1');
+  const pending = indexOf('pending1');
+
+  assert.equal(plan.accounts[blocked]?.spec.status, 'blocked');
+  assert.equal(plan.accounts[blocked]?.spec.role, 'author');
+  assert.equal(plan.accounts[pending]?.spec.status, 'pending');
+  const sharedBook = plan.authors
+    .flatMap((author) => author.books)
+    .find((book) => book.coAuthorLogins.includes('blocked1'));
+  assert.ok(sharedBook && sharedBook.status !== 'draft');
+  assert.ok(
+    sharedBook.coAuthorLogins.some((login) => login !== 'blocked1'),
+    'an Active Co-author keeps the Book visible'
+  );
+  assert.ok(plan.comments.some((c) => c.accountIndex === blocked));
+  const lists = plan.readingLists.filter((l) => l.accountIndex === blocked);
+  assert.equal(lists.length, 1);
+  assert.ok((lists[0]?.items.length ?? 0) >= 1);
+  assert.ok(!plan.comments.some((c) => c.accountIndex === pending));
+  assert.ok(!plan.readingLists.some((l) => l.accountIndex === pending));
 });
 
 test('spreads Last online over the display classes, hides one stamp and never dates one before its account', () => {
@@ -178,7 +208,7 @@ test('dates nothing before it could have happened, and only tombstones a comment
 test('gives every reader a Library of Published books, one status each, every status held', () => {
   const plan = buildPlan(createRng(RNG_SEED));
   const readerIndexes = plan.accounts.flatMap((account, index) =>
-    account.spec.role === 'user' ? [index] : []
+    isActiveReader(account) ? [index] : []
   );
   const seen = new Set<string>();
 
@@ -212,7 +242,7 @@ test('gives every reader a Library of Published books, one status each, every st
 test('gives every reader one or two Reading lists of distinct shown works, mixing Books and Series', () => {
   const plan = buildPlan(createRng(RNG_SEED));
   const readerIndexes = plan.accounts.flatMap((account, index) =>
-    account.spec.role === 'user' ? [index] : []
+    isActiveReader(account) ? [index] : []
   );
   const owned = (index: number) =>
     plan.readingLists.filter((list) => list.accountIndex === index);
@@ -226,11 +256,16 @@ test('gives every reader one or two Reading lists of distinct shown works, mixin
     )
   );
 
-  for (const list of plan.readingLists) {
-    assert.ok(
-      readerIndexes.includes(list.accountIndex),
-      'only readers own a list'
-    );
+  const readerLists = plan.readingLists.filter((list) =>
+    readerIndexes.includes(list.accountIndex)
+  );
+  assert.equal(
+    plan.readingLists.length - readerLists.length,
+    1,
+    'only the Blocked author owns a list besides the readers'
+  );
+
+  for (const list of readerLists) {
     assert.ok(list.items.length >= 3 && list.items.length <= 6);
     assert.ok(
       list.title.length >= 1 &&
@@ -357,7 +392,7 @@ test('leaves every earlier draw as it was when Reading lists are added', () => {
 test('gives every reader a few favorites the API would accept, and nobody else any', () => {
   const plan = buildPlan(createRng(RNG_SEED));
   const readerIndexes = plan.accounts.flatMap((account, index) =>
-    account.spec.role === 'user' ? [index] : []
+    isActiveReader(account) ? [index] : []
   );
   // A Series has no status: a reader can see it once it holds one non-draft
   // book, and not before.

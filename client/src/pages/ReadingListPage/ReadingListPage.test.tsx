@@ -4,8 +4,7 @@ import { Route, Routes, useNavigationType } from 'react-router';
 import { ReadingListPage } from './ReadingListPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { sessionOf } from '@/test/session';
-import { queryKeys } from '@/queries/keys';
+import { seedSession } from '@/test/session';
 import * as readingListsApi from '@/api/readingLists';
 import { ApiError } from '@/api/client';
 import type { PublicBook } from '@/types/book';
@@ -26,6 +25,7 @@ const coAuthor = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 
@@ -62,7 +62,12 @@ const detail: ReadingListDetail = {
   title: 'Cold nights',
   description: 'Long reads.',
   tags: ['winter'],
-  owner: { id: 9, login: 'reader' },
+  owner: {
+    id: 9,
+    firstName: 'Rita',
+    lastName: 'Reader',
+    status: 'active' as const,
+  },
   itemCount: 2,
   items: [
     { id: 1, kind: 'book', book },
@@ -93,7 +98,7 @@ const HomeProbe = () => <p>{`Home|${useNavigationType()}`}</p>;
 
 const renderPage = (route: string, session: PublicUser | null) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, session && sessionOf(session));
+  seedSession(queryClient, session);
   return renderWithProviders(
     <Routes>
       <Route path="/lists/:id" element={<ReadingListPage />} />
@@ -135,7 +140,16 @@ describe('ReadingListPage', () => {
   });
 
   it('lets another Account, an admin included, copy the list and opens the copy', async () => {
-    const copy = { ...detail, id: 8, owner: { id: 10, login: 'other' } };
+    const copy = {
+      ...detail,
+      id: 8,
+      owner: {
+        id: 10,
+        firstName: 'Otto',
+        lastName: 'Other',
+        status: 'active' as const,
+      },
+    };
     mocked.getReadingList.mockImplementation((id) =>
       Promise.resolve(id === 8 ? copy : detail)
     );

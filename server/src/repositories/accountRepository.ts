@@ -1,13 +1,7 @@
-import { Op } from 'sequelize';
+import { QueryTypes } from 'sequelize';
 import type { AccountProfile } from 'shared';
-import { Book } from '../models/Book.ts';
-import { BookAuthor } from '../models/BookAuthor.ts';
-import { Comment } from '../models/Comment.ts';
-import { Favorite } from '../models/Favorite.ts';
-import { Like } from '../models/Like.ts';
-import { ReadingListItem } from '../models/ReadingListItem.ts';
-import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { loadAvatarUrls } from './userRepository.ts';
 
 export interface AccountRepository {
@@ -16,52 +10,48 @@ export interface AccountRepository {
   findProfile(id: number): Promise<AccountProfile | null>;
 }
 
-// The Published Books an Account co-authors, and its Series that hold a
-// Published Book (of any author), so a Series with only Drafts is dropped.
-async function publishedWorks(
-  id: number
-): Promise<{ bookIds: number[]; seriesIds: number[] }> {
-  const credits = await BookAuthor.findAll({
-    where: { userId: id },
-    attributes: ['bookId'],
-    include: [
-      {
-        model: Book,
-        as: 'book',
-        attributes: [],
-        required: true,
-        where: { status: { [Op.ne]: 'draft' } },
-      },
-    ],
-  });
+// Subqueries, not id lists: an id list grows with an Account's works. The only
+// runtime value is the `:id` replacement.
 
-  const seriesCredits = await SeriesAuthor.findAll({
-    where: { userId: id },
-    attributes: ['seriesId'],
-  });
-  const withBook = await Book.findAll({
-    where: {
-      seriesId: seriesCredits.map((credit) => credit.seriesId),
-      status: { [Op.ne]: 'draft' },
-    },
-    attributes: ['seriesId'],
-    group: ['seriesId'],
-  });
-  const seriesWithBook = new Set(withBook.map((book) => book.seriesId));
+// The Published Books the Account co-authors.
+const PUBLISHED_BOOK_IDS =
+  "(SELECT ba.`bookId` FROM `book_authors` ba JOIN `books` pb ON pb.`id` = ba.`bookId` WHERE ba.`userId` = :id AND pb.`status` <> 'draft')";
 
-  return {
-    bookIds: credits.map((credit) => credit.bookId),
-    seriesIds: seriesCredits
-      .map((credit) => credit.seriesId)
-      .filter((seriesId) => seriesWithBook.has(seriesId)),
-  };
-}
+// The Account's Series that hold a Published Book (of any author), so a Series
+// with only Drafts is dropped.
+const COUNTED_SERIES_IDS =
+  "(SELECT sa.`seriesId` FROM `series_authors` sa WHERE sa.`userId` = :id AND EXISTS (SELECT 1 FROM `books` sb WHERE sb.`seriesId` = sa.`seriesId` AND sb.`status` <> 'draft'))";
 
-// An empty id list is 0 without a query: MySQL rejects `IN ()`.
-const countWhere = (
-  ids: number[],
-  run: (ids: number[]) => Promise<number>
-): Promise<number> => (ids.length ? run(ids) : Promise.resolve(0));
+// Every Published Book of those Series, whoever wrote it.
+const COUNTED_SERIES_BOOK_IDS =
+  "(SELECT cb.`id` FROM `books` cb WHERE cb.`status` <> 'draft' AND cb.`seriesId` IN " +
+  COUNTED_SERIES_IDS +
+  ')';
+
+// Model.count takes no replacements, so the eight totals are scalar
+// subqueries of one raw SELECT that binds `:id`.
+const PROFILE_COUNTS = `SELECT
+  (SELECT COUNT(*) FROM books WHERE id IN ${PUBLISHED_BOOK_IDS}) AS bookCount,
+  (SELECT COUNT(*) FROM series WHERE id IN ${COUNTED_SERIES_IDS}) AS seriesCount,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
+  (SELECT COUNT(*) FROM comments WHERE tombstone IS NULL AND bookId IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
+  (SELECT COUNT(*) FROM favorites WHERE bookId IN ${PUBLISHED_BOOK_IDS})
+    + (SELECT COUNT(*) FROM favorites WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS favorites,
+  (SELECT COUNT(*) FROM reading_list_items WHERE bookId IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
+  (SELECT COUNT(*) FROM reading_list_items WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
+
+// COUNT(*) is a BIGINT, which the driver may hand back as a string.
+type ProfileCountKey =
+  | 'bookCount'
+  | 'seriesCount'
+  | 'bookLikes'
+  | 'seriesLikes'
+  | 'commentsOnBooks'
+  | 'favorites'
+  | 'booksInReadingLists'
+  | 'seriesInReadingLists';
+type ProfileCounts = Record<ProfileCountKey, number | string>;
 
 export function createSequelizeAccountRepository(): AccountRepository {
   return {
@@ -82,50 +72,17 @@ export function createSequelizeAccountRepository(): AccountRepository {
       if (!user || user.status !== 'active') return null;
 
       const avatarUrls = await loadAvatarUrls([id]);
-      const { bookIds, seriesIds } = await publishedWorks(id);
-
-      const seriesBookIds = seriesIds.length
-        ? (
-            await Book.findAll({
-              where: {
-                seriesId: seriesIds,
-                status: { [Op.ne]: 'draft' },
-              },
-              attributes: ['id'],
-            })
-          ).map((book) => book.id)
-        : [];
-      const favoriteMatches = [
-        ...(bookIds.length ? [{ bookId: bookIds }] : []),
-        ...(seriesIds.length ? [{ seriesId: seriesIds }] : []),
-      ];
-      const [
-        bookLikes,
-        seriesLikes,
-        commentsOnBooks,
-        favorites,
-        booksInReadingLists,
-        seriesInReadingLists,
-      ] = await Promise.all([
-        countWhere(bookIds, (ids) =>
-          Like.count({ where: { bookId: ids, isLike: true } })
-        ),
-        countWhere(seriesBookIds, (ids) =>
-          Like.count({ where: { bookId: ids, isLike: true } })
-        ),
-        countWhere(bookIds, (ids) =>
-          Comment.count({ where: { bookId: ids, tombstone: null } })
-        ),
-        favoriteMatches.length
-          ? Favorite.count({ where: { [Op.or]: favoriteMatches } })
-          : 0,
-        countWhere(bookIds, (ids) =>
-          ReadingListItem.count({ where: { bookId: ids } })
-        ),
-        countWhere(seriesIds, (ids) =>
-          ReadingListItem.count({ where: { seriesId: ids } })
-        ),
-      ]);
+      const [row] = await sequelizeOf(User).query<ProfileCounts>(
+        PROFILE_COUNTS,
+        {
+          replacements: { id },
+          type: QueryTypes.SELECT,
+        }
+      );
+      if (!row) throw new Error('Profile counts query returned no row');
+      const counts = Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, Number(value)])
+      ) as Record<ProfileCountKey, number>;
 
       return {
         id: user.id,
@@ -134,15 +91,15 @@ export function createSequelizeAccountRepository(): AccountRepository {
         avatarUrl: avatarUrls.get(id) ?? null,
         about: user.about ?? '',
         lastSeenAt: user.showLastSeen ? user.lastSeenAt : null,
-        bookCount: bookIds.length,
-        seriesCount: seriesIds.length,
+        bookCount: counts.bookCount,
+        seriesCount: counts.seriesCount,
         totals: {
-          booksInReadingLists,
-          seriesInReadingLists,
-          bookLikes,
-          seriesLikes,
-          commentsOnBooks,
-          favorites,
+          booksInReadingLists: counts.booksInReadingLists,
+          seriesInReadingLists: counts.seriesInReadingLists,
+          bookLikes: counts.bookLikes,
+          seriesLikes: counts.seriesLikes,
+          commentsOnBooks: counts.commentsOnBooks,
+          favorites: counts.favorites,
         },
       };
     },

@@ -3,8 +3,7 @@ import { useChapterEdit } from './useChapterEdit';
 import type { ChapterEdit } from './useChapterEdit';
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
-import { queryKeys } from '@/queries/keys';
-import { sessionOf } from '@/test/session';
+import { seedSession } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as chaptersApi from '@/api/chapters';
 import type { AppStore, RootState } from '@/store';
@@ -67,7 +66,7 @@ const renderEdit = async (
   onSaved?: () => void
 ) => {
   const queryClient = createTestQueryClient();
-  queryClient.setQueryData(queryKeys.session, sessionOf(viewer));
+  seedSession(queryClient, viewer);
   const rendered = renderHookWithProviders(
     () => useChapterEdit(1, 9, onSaved),
     {

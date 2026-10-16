@@ -5,6 +5,7 @@ import {
   type PublicSeries,
   type ReadingListEditItem,
   type ReadingListItem,
+  type UserStatus,
 } from 'shared';
 import {
   BadRequestError,
@@ -19,8 +20,12 @@ import type {
 } from './readingListRepository.ts';
 
 export interface FakeReadingListRepositoryOptions {
-  // The accounts that exist, with their logins. Stands in for users.
-  accounts?: Map<number, string>;
+  // The accounts that exist, with their names and status (Active by default).
+  // Stands in for users.
+  accounts?: Map<
+    number,
+    { firstName: string; lastName: string; status?: UserStatus }
+  >;
   // The books and series that exist, as a list row embeds them.
   books?: Map<number, PublicBook>;
   series?: Map<number, PublicSeries>;
@@ -98,7 +103,12 @@ export function createFakeReadingListRepository(
 
   const toPublic = (list: ListRow): PublicReadingList => ({
     id: list.id,
-    owner: { id: list.userId, login: accounts.get(list.userId) ?? '' },
+    owner: {
+      id: list.userId,
+      firstName: accounts.get(list.userId)?.firstName ?? '',
+      lastName: accounts.get(list.userId)?.lastName ?? '',
+      status: accounts.get(list.userId)?.status ?? 'active',
+    },
     title: list.title,
     description: list.description,
     tags: list.tags,

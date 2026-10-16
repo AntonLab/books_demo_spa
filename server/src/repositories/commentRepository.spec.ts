@@ -54,6 +54,7 @@ const reader = {
   password: 'hunter2hunter2',
   firstName: 'Remy',
   lastName: 'Reader',
+  status: 'active' as const,
 };
 
 describe('commentRepository against real MySQL', { skip }, () => {
@@ -396,8 +397,25 @@ describe('commentRepository against real MySQL', { skip }, () => {
     // The email is the whole reason /api/users is guarded; an embedded author
     // must not carry one.
     assert.equal('email' in (items[0]?.author ?? {}), false);
+    assert.equal(items[0]?.author?.status, 'active');
     assert.equal(items[0]?.likeCount, 0);
     assert.equal(items[0]?.viewerLikeId, null);
+  });
+
+  test('list keeps the comment of a blocked author and reports its status', async () => {
+    await repository.create(
+      { bookId, parentId: null, text: 'hello' },
+      readerId
+    );
+    await User.update({ status: 'blocked' }, { where: { id: readerId } });
+
+    const { items } = await repository.list(
+      { limit: 20, offset: 0, bookId },
+      null
+    );
+
+    assert.equal(items.length, 1);
+    assert.equal(items[0]?.author?.status, 'blocked');
   });
 
   test('list counts likes and reports only the viewer own one', async () => {

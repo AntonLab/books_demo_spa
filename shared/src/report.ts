@@ -54,7 +54,7 @@ export interface ReportedAccount {
 export interface ReportRow {
   id: number;
   createdAt: Date;
-  reporter: { id: number; login: string } | null;
+  reporter: { id: number; login: string; status: UserStatus } | null;
   isSystem: boolean;
   reason: ReportReason;
   explanation: string | null;
@@ -68,6 +68,8 @@ export interface ReportRow {
   status: ReportStatus;
   moderatorId: number | null;
   moderatorLogin: string | null;
+  // Null exactly when `moderatorId` is.
+  moderatorStatus: UserStatus | null;
   isOwnComment: boolean;
 }
 

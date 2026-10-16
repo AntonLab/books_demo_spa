@@ -14,6 +14,7 @@ const series: PublicSeries = {
       login: 'mhale',
       firstName: 'Margaret',
       lastName: 'Hale',
+      status: 'active',
       avatarUrl: null,
     },
     {
@@ -21,6 +22,7 @@ const series: PublicSeries = {
       login: 'ipetrov',
       firstName: 'Ivan',
       lastName: 'Petrov',
+      status: 'active',
       avatarUrl: null,
     },
   ],

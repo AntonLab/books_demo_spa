@@ -22,6 +22,7 @@ const ann: AuthorSummary = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 const cora: AuthorSummary = {
@@ -29,6 +30,7 @@ const cora: AuthorSummary = {
   login: 'cora',
   firstName: 'Cora',
   lastName: 'Writer',
+  status: 'active' as const,
   avatarUrl: null,
 };
 const ivan: AuthorSummary = {
@@ -36,6 +38,7 @@ const ivan: AuthorSummary = {
   login: 'ipetrov',
   firstName: 'Ivan',
   lastName: 'Petrov',
+  status: 'active' as const,
   avatarUrl: null,
 };
 

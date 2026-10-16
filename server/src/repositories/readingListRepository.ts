@@ -4,9 +4,9 @@ import {
   ForeignKeyConstraintError,
   Op,
   UniqueConstraintError,
-  type Sequelize,
   type Transaction,
 } from 'sequelize';
+import { sequelizeOf } from './sequelizeOf.ts';
 import {
   READING_LIST_MAX_ITEMS,
   type MyReadingList,
@@ -14,6 +14,7 @@ import {
   type ReadingListDetail,
   type ReadingListEditItem,
   type ReadingListItem,
+  type UserStatus,
 } from 'shared';
 import { Book } from '../models/Book.ts';
 import { ReadingList } from '../models/ReadingList.ts';
@@ -88,12 +89,6 @@ export interface ReadingListRepository {
   ): Promise<MyReadingList[]>;
 }
 
-function sequelizeOf(): Sequelize {
-  const sequelize = ReadingList.sequelize;
-  if (!sequelize) throw new Error('ReadingList model is not initialised');
-  return sequelize;
-}
-
 const NEWEST_FIRST: [string, string][] = [
   ['updatedAt', 'DESC'],
   ['id', 'DESC'],
@@ -102,7 +97,7 @@ const NEWEST_FIRST: [string, string][] = [
 const withOwner = {
   model: User,
   as: 'owner',
-  attributes: ['login'],
+  attributes: ['firstName', 'lastName', 'status'],
   required: true,
 };
 
@@ -126,12 +121,17 @@ async function ownedList(
 
 function toPublicReadingList(
   list: ReadingList,
-  ownerLogin: string,
+  owner: { firstName: string; lastName: string; status: UserStatus },
   itemCount: number
 ): PublicReadingList {
   return {
     id: list.id,
-    owner: { id: list.userId, login: ownerLogin },
+    owner: {
+      id: list.userId,
+      firstName: owner.firstName,
+      lastName: owner.lastName,
+      status: owner.status,
+    },
     title: list.title,
     description: list.description,
     tags: list.tags,
@@ -279,10 +279,12 @@ function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
 export function createSequelizeReadingListRepository(): ReadingListRepository {
   const repository: ReadingListRepository = {
     async create(input, account) {
-      const owner = await User.findByPk(account.id, { attributes: ['login'] });
+      const owner = await User.findByPk(account.id, {
+        attributes: ['firstName', 'lastName', 'status'],
+      });
       if (!owner) throw new NotFoundError('User', account.id);
       const list = await ReadingList.create({ ...input, userId: account.id });
-      return toPublicReadingList(list, owner.login, 0);
+      return toPublicReadingList(list, owner, 0);
     },
 
     async findById(id) {
@@ -290,14 +292,14 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       if (!list) return null;
       const items = await shownItemsOf(await placedItems(id));
       return {
-        ...toPublicReadingList(list, joined(list.owner).login, items.length),
+        ...toPublicReadingList(list, joined(list.owner), items.length),
         items,
       };
     },
 
     async listByOwner(query) {
       const owner = await User.findByPk(query.userId, {
-        attributes: ['login'],
+        attributes: ['firstName', 'lastName', 'status'],
       });
       if (!owner) return { items: [], total: 0 };
       const { rows, count } = await ReadingList.findAndCountAll({
@@ -309,7 +311,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       const counts = await shownCounts(rows.map((list) => list.id));
       return {
         items: rows.map((list) =>
-          toPublicReadingList(list, owner.login, counts.get(list.id) ?? 0)
+          toPublicReadingList(list, owner, counts.get(list.id) ?? 0)
         ),
         total: count,
       };
@@ -336,7 +338,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
         items: rows.map((list) =>
           toPublicReadingList(
             list,
-            joined(list.owner).login,
+            joined(list.owner),
             counts.get(list.id) ?? 0
           )
         ),
@@ -348,11 +350,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
       const list = await ownedList(id, account);
       await list.update(input);
       const counts = await shownCounts([id]);
-      return toPublicReadingList(
-        list,
-        joined(list.owner).login,
-        counts.get(id) ?? 0
-      );
+      return toPublicReadingList(list, joined(list.owner), counts.get(id) ?? 0);
     },
 
     async remove(id, account) {
@@ -373,69 +371,69 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
     },
 
     async addItem(id, account, target) {
-      const { rowId, book, series } = await sequelizeOf().transaction(
-        async (transaction) => {
-          const list = await ownedList(id, account, transaction);
+      const { rowId, book, series } = await sequelizeOf(
+        ReadingList
+      ).transaction(async (transaction) => {
+        const list = await ownedList(id, account, transaction);
 
-          // A work the reader may not see is the same 404 as a missing one.
-          const book =
-            target.bookId === null
-              ? null
-              : await Book.findOne({
-                  where: { id: target.bookId, status: { [Op.ne]: 'draft' } },
-                  transaction,
-                });
-          if (target.bookId !== null && !book) {
-            throw new NotFoundError('Book', target.bookId);
-          }
-          const series =
-            target.seriesId === null
-              ? null
-              : await Series.findOne({
-                  where: {
-                    [Op.and]: [
-                      { id: target.seriesId },
-                      await visibleSeriesWhere(null),
-                    ],
-                  },
-                  transaction,
-                });
-          if (target.seriesId !== null && !series) {
-            throw new NotFoundError('Series', target.seriesId);
-          }
-
-          // Hidden rows count: they come back when the work is shown again.
-          const held = await ReadingListItemRow.count({
-            where: { listId: id },
-            transaction,
-          });
-          if (held >= READING_LIST_MAX_ITEMS) {
-            throw new BadRequestError(
-              `A reading list holds at most ${READING_LIST_MAX_ITEMS} items`
-            );
-          }
-          const last = await ReadingListItemRow.max<number, ReadingListItemRow>(
-            'position',
-            { where: { listId: id }, transaction }
-          );
-
-          try {
-            const row = await ReadingListItemRow.create(
-              { listId: id, ...target, position: (Number(last) || 0) + 1 },
-              { transaction }
-            );
-            await touch(list, transaction);
-            return { rowId: row.id, book, series };
-          } catch (error) {
-            // One row per work per list comes from the unique indexes, never
-            // a findOne first.
-            if (error instanceof UniqueConstraintError) {
-              throw new ConflictError('reading list item');
-            }
-            return asMissingWork(error, target);
-          }
+        // A work the reader may not see is the same 404 as a missing one.
+        const book =
+          target.bookId === null
+            ? null
+            : await Book.findOne({
+                where: { id: target.bookId, status: { [Op.ne]: 'draft' } },
+                transaction,
+              });
+        if (target.bookId !== null && !book) {
+          throw new NotFoundError('Book', target.bookId);
         }
-      );
+        const series =
+          target.seriesId === null
+            ? null
+            : await Series.findOne({
+                where: {
+                  [Op.and]: [
+                    { id: target.seriesId },
+                    await visibleSeriesWhere(null),
+                  ],
+                },
+                transaction,
+              });
+        if (target.seriesId !== null && !series) {
+          throw new NotFoundError('Series', target.seriesId);
+        }
+
+        // Hidden rows count: they come back when the work is shown again.
+        const held = await ReadingListItemRow.count({
+          where: { listId: id },
+          transaction,
+        });
+        if (held >= READING_LIST_MAX_ITEMS) {
+          throw new BadRequestError(
+            `A reading list holds at most ${READING_LIST_MAX_ITEMS} items`
+          );
+        }
+        const last = await ReadingListItemRow.max<number, ReadingListItemRow>(
+          'position',
+          { where: { listId: id }, transaction }
+        );
+
+        try {
+          const row = await ReadingListItemRow.create(
+            { listId: id, ...target, position: (Number(last) || 0) + 1 },
+            { transaction }
+          );
+          await touch(list, transaction);
+          return { rowId: row.id, book, series };
+        } catch (error) {
+          // One row per work per list comes from the unique indexes, never
+          // a findOne first.
+          if (error instanceof UniqueConstraintError) {
+            throw new ConflictError('reading list item');
+          }
+          return asMissingWork(error, target);
+        }
+      });
 
       if (book) {
         const [shown] = await publicBooksOf([book]);
@@ -446,7 +444,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
     },
 
     async removeItem(id, itemId, account) {
-      await sequelizeOf().transaction(async (transaction) => {
+      await sequelizeOf(ReadingList).transaction(async (transaction) => {
         const list = await ownedList(id, account, transaction);
         const removed = await ReadingListItemRow.destroy({
           where: { id: itemId, listId: id },
@@ -457,7 +455,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
     },
 
     async reorderItems(id, account, itemIds) {
-      await sequelizeOf().transaction(async (transaction) => {
+      await sequelizeOf(ReadingList).transaction(async (transaction) => {
         const list = await ownedList(id, account, transaction);
         const current = await ReadingListItemRow.findAll({
           where: { listId: id },
@@ -487,37 +485,39 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
     },
 
     async copy(id, account) {
-      const copyId = await sequelizeOf().transaction(async (transaction) => {
-        const source = await ReadingList.findByPk(id, { transaction });
-        if (!source) throw new NotFoundError('ReadingList', id);
-        const shown = (await placedItems(id, transaction)).filter(
-          (item) => item.book ?? item.series
-        );
-        const owner = await User.findByPk(account.id, {
-          attributes: ['id'],
-          transaction,
-        });
-        if (!owner) throw new NotFoundError('User', account.id);
-        const copy = await ReadingList.create(
-          {
-            userId: account.id,
-            title: source.title,
-            description: source.description,
-            tags: source.tags,
-          },
-          { transaction }
-        );
-        await ReadingListItemRow.bulkCreate(
-          shown.map((item, index) => ({
-            listId: copy.id,
-            bookId: item.bookId,
-            seriesId: item.seriesId,
-            position: index + 1,
-          })),
-          { transaction }
-        );
-        return copy.id;
-      });
+      const copyId = await sequelizeOf(ReadingList).transaction(
+        async (transaction) => {
+          const source = await ReadingList.findByPk(id, { transaction });
+          if (!source) throw new NotFoundError('ReadingList', id);
+          const shown = (await placedItems(id, transaction)).filter(
+            (item) => item.book ?? item.series
+          );
+          const owner = await User.findByPk(account.id, {
+            attributes: ['id'],
+            transaction,
+          });
+          if (!owner) throw new NotFoundError('User', account.id);
+          const copy = await ReadingList.create(
+            {
+              userId: account.id,
+              title: source.title,
+              description: source.description,
+              tags: source.tags,
+            },
+            { transaction }
+          );
+          await ReadingListItemRow.bulkCreate(
+            shown.map((item, index) => ({
+              listId: copy.id,
+              bookId: item.bookId,
+              seriesId: item.seriesId,
+              position: index + 1,
+            })),
+            { transaction }
+          );
+          return copy.id;
+        }
+      );
       const detail = await repository.findById(copyId);
       if (!detail) throw new Error('A copied list vanished before it was read');
       return detail;

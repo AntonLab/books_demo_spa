@@ -17,7 +17,14 @@ const mockedSeries = jest.mocked(seriesApi);
 
 const author = (id: number, login: string, name: string) => {
   const [firstName = '', lastName = ''] = name.split(' ');
-  return { id, login, firstName, lastName, avatarUrl: null };
+  return {
+    id,
+    login,
+    firstName,
+    lastName,
+    status: 'active' as const,
+    avatarUrl: null,
+  };
 };
 
 const bookOf = (

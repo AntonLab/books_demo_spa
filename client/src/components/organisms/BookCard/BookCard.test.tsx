@@ -13,6 +13,7 @@ const book: PublicBook = {
       login: 'Author',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
     {
@@ -20,6 +21,7 @@ const book: PublicBook = {
       login: 'Cowriter',
       firstName: 'Cora',
       lastName: 'Writer',
+      status: 'active',
       avatarUrl: null,
     },
   ],

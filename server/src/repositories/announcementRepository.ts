@@ -1,5 +1,6 @@
 import { Op, type CreationAttributes, type Transaction } from 'sequelize';
 import type { PublicNotification } from 'shared';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
@@ -55,12 +56,6 @@ function gatheredFor(gathering: Gathering, userId: number): Gathered {
     gathering.set(userId, gathered);
   }
   return gathered;
-}
-
-function sequelizeOf(): NonNullable<typeof Notification.sequelize> {
-  const sequelize = Notification.sequelize;
-  if (!sequelize) throw new Error('Notification model is not initialised');
-  return sequelize;
 }
 
 // Each Book's Co-authors, who are never told about their own work.
@@ -391,7 +386,7 @@ export function createSequelizeAnnouncementRepository(): AnnouncementRepository 
   return {
     async announce(now) {
       const gathering: Gathering = new Map();
-      await sequelizeOf().transaction(async (transaction) => {
+      await sequelizeOf(Notification).transaction(async (transaction) => {
         await silenceDraftBacklog(now, transaction);
         await releaseBooks(now, gathering, transaction);
         await announceChapters(now, gathering, transaction);

@@ -220,6 +220,7 @@ export function userRepositoryContract(
         login: 'Searchable',
         firstName: 'Contract',
         lastName: 'Searchable',
+        status: 'active',
         avatarUrl: null,
       },
     ]);
@@ -231,6 +232,25 @@ export function userRepositoryContract(
     assert.match(
       pictured?.avatarUrl ?? '',
       new RegExp(`^/api/users/${author.id}/avatar\\?v=\\d+$`)
+    );
+  });
+
+  test('contract: the author search lists a Pending author with its status and omits a Blocked one', async () => {
+    const { repository } = await setUp();
+    const pending = await repository.create(
+      { ...input('Waiting'), status: 'pending' },
+      'author'
+    );
+    await repository.create(
+      { ...input('Barred'), status: 'blocked' },
+      'author'
+    );
+
+    const found = await repository.listAuthors({ limit: 20 });
+
+    assert.deepEqual(
+      found.map((a) => [a.id, a.status]),
+      [[pending.id, 'pending']]
     );
   });
 

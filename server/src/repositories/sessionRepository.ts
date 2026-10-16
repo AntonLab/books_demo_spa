@@ -1,6 +1,7 @@
 import { Op } from 'sequelize';
 import { Session } from '../models/Session.ts';
 import { User } from '../models/User.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 
 export interface SessionRecord {
   id: number;
@@ -73,12 +74,7 @@ export function createSequelizeSessionRepository(): SessionRepository {
       expiresAt,
       verifiedPasswordHash
     ) {
-      const sequelize = Session.sequelize;
-      if (!sequelize) {
-        throw new Error('Session model is not initialised');
-      }
-
-      return sequelize.transaction(async (transaction) => {
+      return sequelizeOf(Session).transaction(async (transaction) => {
         // unscoped so the password comes back at all. MySQL receives the
         // lock as LOCK IN SHARE MODE, its older spelling of FOR SHARE.
         const user = await User.unscoped().findByPk(userId, {

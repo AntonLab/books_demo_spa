@@ -52,6 +52,7 @@ const owner = {
   password: 'hunter2hunter2',
   firstName: 'Ola',
   lastName: 'Owner',
+  status: 'active' as const,
 };
 
 const coAuthor = {
@@ -127,6 +128,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
         login: 'BookOwner',
         firstName: 'Ola',
         lastName: 'Owner',
+        status: 'active',
         avatarUrl: null,
       },
     ]);
@@ -136,6 +138,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
         login: 'BookOwner',
         firstName: 'Ola',
         lastName: 'Owner',
+        status: 'active',
         avatarUrl: null,
       },
     ]);

@@ -11,6 +11,7 @@ const props = {
       login: 'mhale',
       firstName: 'Margaret',
       lastName: 'Hale',
+      status: 'active' as const,
       avatarUrl: null,
     },
   ],
@@ -102,6 +103,27 @@ describe('Card', () => {
     );
   });
 
+  it('names a Blocked author as plain text', () => {
+    renderWithProviders(
+      <Card
+        {...props}
+        authors={[
+          {
+            id: 3,
+            login: 'mhale',
+            firstName: 'Margaret',
+            lastName: 'Hale',
+            status: 'blocked',
+            avatarUrl: null,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Margaret Hale')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Margaret Hale' })).toBeNull();
+  });
+
   it('keeps the comma between Co-authors outside the links', () => {
     renderWithProviders(
       <Card
@@ -113,6 +135,7 @@ describe('Card', () => {
             login: 'jdoe',
             firstName: 'Jon',
             lastName: 'Doe',
+            status: 'active' as const,
             avatarUrl: null,
           },
         ]}
