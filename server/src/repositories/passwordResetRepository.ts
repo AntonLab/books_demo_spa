@@ -10,6 +10,12 @@ export const RESET_TOKEN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 export interface PasswordResetRepository {
   create(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
   invalidateAllForUser(userId: number): Promise<number>;
+  // Supersedes the Account's live tokens and stores a new one atomically.
+  replaceForUser(
+    userId: number,
+    tokenHash: string,
+    expiresAt: Date
+  ): Promise<void>;
   redeem(tokenHash: string, newPassword: string): Promise<boolean>;
   // The expiry purge's: deletes every token, used or not, whose expiresAt is
   // before `cutoff` — the purge passes now minus RESET_TOKEN_RETENTION_MS.
@@ -32,6 +38,36 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
         { where: { userId, usedAt: null } }
       );
       return affected;
+    },
+
+    // Stamping usedAt rather than deleting keeps the row as evidence that a
+    // reset was requested, and the single-use check covers both. The evidence
+    // stays until the hourly expiry purge (RESET_TOKEN_RETENTION_MS).
+    async replaceForUser(userId, tokenHash, expiresAt) {
+      const sequelize = PasswordResetToken.sequelize;
+      if (!sequelize) {
+        throw new Error('PasswordResetToken model is not initialised');
+      }
+
+      await sequelize.transaction(async (t) => {
+        // A second request for the same Account waits here until the first
+        // commits, then stamps its token; holds across server processes.
+        const user = await User.findByPk(userId, {
+          transaction: t,
+          lock: t.LOCK.UPDATE,
+        });
+        // Deleted after the controller's lookup: nothing to supersede or store.
+        if (!user) return;
+
+        await PasswordResetToken.update(
+          { usedAt: new Date() },
+          { where: { userId, usedAt: null }, transaction: t }
+        );
+        await PasswordResetToken.create(
+          { userId, tokenHash, expiresAt },
+          { transaction: t }
+        );
+      });
     },
 
     async redeem(tokenHash, newPassword) {
