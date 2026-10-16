@@ -11,7 +11,7 @@ import { createFakeReadingListRepository } from './readingListRepository.fake.te
 
 describe('the fake readingListRepository', () => {
   const setUp = async () => {
-    const accounts = new Map<number, { login: string }>();
+    const accounts = new Map<number, { firstName: string; lastName: string }>();
     const books = new Map<number, PublicBook>();
     const series = new Map<number, PublicSeries>();
     const hiddenBooks = new Set<number>();
@@ -26,7 +26,7 @@ describe('the fake readingListRepository', () => {
       }),
       async anAccount() {
         const id = accounts.size + 1;
-        accounts.set(id, { login: `Reader${id}` });
+        accounts.set(id, { firstName: 'Lee', lastName: `Reader${id}` });
         return id;
       },
       async aBook() {

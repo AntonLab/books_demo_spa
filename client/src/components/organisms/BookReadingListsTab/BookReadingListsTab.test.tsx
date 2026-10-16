@@ -16,7 +16,7 @@ const list = (id: number, title: string, itemCount = 3): PublicReadingList => ({
   title,
   description: '',
   tags: [],
-  owner: { id: 9, login: 'reader', status: 'active' },
+  owner: { id: 9, firstName: 'Rita', lastName: 'Reader', status: 'active' },
   itemCount,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
@@ -53,7 +53,7 @@ describe('BookReadingListsTab', () => {
     expect(
       await screen.findByRole('link', { name: 'Cold nights' })
     ).toHaveAttribute('href', '/lists/4');
-    expect(screen.getByRole('link', { name: 'reader' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Rita Reader' })).toHaveAttribute(
       'href',
       '/accounts/9'
     );

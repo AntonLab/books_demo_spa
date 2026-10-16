@@ -8,14 +8,14 @@ const list: PublicReadingList = {
   title: 'Cold nights',
   description: '',
   tags: [],
-  owner: { id: 9, login: 'reader', status: 'active' },
+  owner: { id: 9, firstName: 'Rita', lastName: 'Reader', status: 'active' },
   itemCount: 0,
   createdAt: '2026-09-01T00:00:00.000Z',
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
 describe('ReadingListCard', () => {
-  it('shows the title, owner login, Description, Tags and the shown item count', () => {
+  it('shows the title, owner name, Description, Tags and the shown item count', () => {
     renderWithProviders(
       <ReadingListCard
         list={{
@@ -30,10 +30,11 @@ describe('ReadingListCard', () => {
       screen.getByRole('heading', { name: 'Cold nights' })
     ).toBeInTheDocument();
     expect(screen.getByText('by')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'reader' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Rita Reader' })).toHaveAttribute(
       'href',
       '/accounts/9'
     );
+    expect(screen.queryByText('reader')).toBeNull();
     expect(screen.getByText('For rainy days')).toBeInTheDocument();
     expect(screen.getByText('cosy')).toBeInTheDocument();
     expect(screen.getByText('3 items')).toBeInTheDocument();
@@ -45,8 +46,8 @@ describe('ReadingListCard', () => {
         list={{ ...list, owner: { ...list.owner, status: 'blocked' } }}
       />
     );
-    expect(screen.getByText('by reader')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'reader' })).toBeNull();
+    expect(screen.getByText('by Rita Reader')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Rita Reader' })).toBeNull();
   });
 
   it('says "1 item" for one and links the title to the page when given an href', () => {

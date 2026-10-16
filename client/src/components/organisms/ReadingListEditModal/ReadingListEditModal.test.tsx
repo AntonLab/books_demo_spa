@@ -33,7 +33,7 @@ const list: ReadingListDetail = {
   title: 'Cold nights',
   description: 'Long reads.',
   tags: ['winter'],
-  owner: { id: 9, login: 'reader', status: 'active' },
+  owner: { id: 9, firstName: 'Rita', lastName: 'Reader', status: 'active' },
   itemCount: 0,
   items: [],
   createdAt: '2026-09-01T00:00:00.000Z',

@@ -140,6 +140,17 @@ describe('readingListRepository against real MySQL', { skip }, () => {
   readingListItemsContract(setUp);
   readingListCopyContract(setUp);
 
+  test('the owner carries its first and last name, not its login', async () => {
+    const owner = await createAccount();
+    const created = await repository.create(NEW_LIST, as(owner.id));
+    assert.deepEqual(created.owner, {
+      id: owner.id,
+      firstName: 'Lee',
+      lastName: owner.lastName,
+      status: 'active',
+    });
+  });
+
   test('the owner carries its status, Pending included, on create, findById and listByOwner', async () => {
     const owner = await createAccount();
     await owner.update({ status: 'pending' });

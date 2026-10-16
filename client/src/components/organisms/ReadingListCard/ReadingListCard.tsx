@@ -26,7 +26,7 @@ export const ReadingListCard: FC<ReadingListCardProps> = ({ list, href }) => (
           by{' '}
           <NameLink
             id={list.owner.id}
-            name={list.owner.login}
+            name={`${list.owner.firstName} ${list.owner.lastName}`}
             status={list.owner.status}
           />
         </Typography.Text>

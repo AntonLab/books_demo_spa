@@ -555,7 +555,12 @@ describe('BookPage lower tabs', () => {
         title: 'Cold nights',
         description: '',
         tags: [],
-        owner: { id: 9, login: 'reader', status: 'active' as const },
+        owner: {
+          id: 9,
+          firstName: 'Rita',
+          lastName: 'Reader',
+          status: 'active' as const,
+        },
         itemCount: 2,
         createdAt: '2026-09-01T00:00:00.000Z',
         updatedAt: '2026-09-01T00:00:00.000Z',

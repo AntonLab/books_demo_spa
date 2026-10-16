@@ -20,9 +20,12 @@ import type {
 } from './readingListRepository.ts';
 
 export interface FakeReadingListRepositoryOptions {
-  // The accounts that exist, with their logins and status (Active by default).
+  // The accounts that exist, with their names and status (Active by default).
   // Stands in for users.
-  accounts?: Map<number, { login: string; status?: UserStatus }>;
+  accounts?: Map<
+    number,
+    { firstName: string; lastName: string; status?: UserStatus }
+  >;
   // The books and series that exist, as a list row embeds them.
   books?: Map<number, PublicBook>;
   series?: Map<number, PublicSeries>;
@@ -102,7 +105,8 @@ export function createFakeReadingListRepository(
     id: list.id,
     owner: {
       id: list.userId,
-      login: accounts.get(list.userId)?.login ?? '',
+      firstName: accounts.get(list.userId)?.firstName ?? '',
+      lastName: accounts.get(list.userId)?.lastName ?? '',
       status: accounts.get(list.userId)?.status ?? 'active',
     },
     title: list.title,

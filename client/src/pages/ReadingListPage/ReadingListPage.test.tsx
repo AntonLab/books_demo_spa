@@ -62,7 +62,12 @@ const detail: ReadingListDetail = {
   title: 'Cold nights',
   description: 'Long reads.',
   tags: ['winter'],
-  owner: { id: 9, login: 'reader', status: 'active' as const },
+  owner: {
+    id: 9,
+    firstName: 'Rita',
+    lastName: 'Reader',
+    status: 'active' as const,
+  },
   itemCount: 2,
   items: [
     { id: 1, kind: 'book', book },
@@ -138,7 +143,12 @@ describe('ReadingListPage', () => {
     const copy = {
       ...detail,
       id: 8,
-      owner: { id: 10, login: 'other', status: 'active' as const },
+      owner: {
+        id: 10,
+        firstName: 'Otto',
+        lastName: 'Other',
+        status: 'active' as const,
+      },
     };
     mocked.getReadingList.mockImplementation((id) =>
       Promise.resolve(id === 8 ? copy : detail)
