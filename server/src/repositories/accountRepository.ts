@@ -36,7 +36,8 @@ const PROFILE_COUNTS = `SELECT
   (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
   (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
   (SELECT COUNT(*) FROM comments WHERE tombstone IS NULL AND bookId IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
-  (SELECT COUNT(*) FROM favorites WHERE bookId IN ${PUBLISHED_BOOK_IDS} OR seriesId IN ${COUNTED_SERIES_IDS}) AS favorites,
+  (SELECT COUNT(*) FROM favorites WHERE bookId IN ${PUBLISHED_BOOK_IDS})
+    + (SELECT COUNT(*) FROM favorites WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS favorites,
   (SELECT COUNT(*) FROM reading_list_items WHERE bookId IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
   (SELECT COUNT(*) FROM reading_list_items WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
 
