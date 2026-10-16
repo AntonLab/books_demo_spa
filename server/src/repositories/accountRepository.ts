@@ -1,11 +1,5 @@
-import { Op, literal } from 'sequelize';
+import { QueryTypes } from 'sequelize';
 import type { AccountProfile } from 'shared';
-import { Book } from '../models/Book.ts';
-import { Comment } from '../models/Comment.ts';
-import { Favorite } from '../models/Favorite.ts';
-import { Like } from '../models/Like.ts';
-import { ReadingListItem } from '../models/ReadingListItem.ts';
-import { Series } from '../models/Series.ts';
 import { User } from '../models/User.ts';
 import { loadAvatarUrls } from './userRepository.ts';
 
@@ -30,7 +24,29 @@ const COUNTED_SERIES_IDS =
 // Every Published Book of those Series, whoever wrote it.
 const COUNTED_SERIES_BOOK_IDS = `(SELECT cb.\`id\` FROM \`books\` cb WHERE cb.\`status\` <> 'draft' AND cb.\`seriesId\` IN ${COUNTED_SERIES_IDS})`;
 
-const inIds = (fragment: string) => ({ [Op.in]: literal(fragment) });
+// Model.count takes no replacements, so the eight totals are scalar
+// subqueries of one raw SELECT that binds `:id`.
+const PROFILE_COUNTS = `SELECT
+  (SELECT COUNT(*) FROM \`books\` WHERE \`id\` IN ${PUBLISHED_BOOK_IDS}) AS bookCount,
+  (SELECT COUNT(*) FROM \`series\` WHERE \`id\` IN ${COUNTED_SERIES_IDS}) AS seriesCount,
+  (SELECT COUNT(*) FROM \`likes\` WHERE \`isLike\` = TRUE AND \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
+  (SELECT COUNT(*) FROM \`likes\` WHERE \`isLike\` = TRUE AND \`bookId\` IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
+  (SELECT COUNT(*) FROM \`comments\` WHERE \`tombstone\` IS NULL AND \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
+  (SELECT COUNT(*) FROM \`favorites\` WHERE \`bookId\` IN ${PUBLISHED_BOOK_IDS} OR \`seriesId\` IN ${COUNTED_SERIES_IDS}) AS favorites,
+  (SELECT COUNT(*) FROM \`reading_list_items\` WHERE \`bookId\` IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
+  (SELECT COUNT(*) FROM \`reading_list_items\` WHERE \`seriesId\` IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
+
+// COUNT(*) is a BIGINT, which the driver may hand back as a string.
+interface ProfileCounts {
+  bookCount: number | string;
+  seriesCount: number | string;
+  bookLikes: number | string;
+  seriesLikes: number | string;
+  commentsOnBooks: number | string;
+  favorites: number | string;
+  booksInReadingLists: number | string;
+  seriesInReadingLists: number | string;
+}
 
 export function createSequelizeAccountRepository(): AccountRepository {
   return {
@@ -51,53 +67,13 @@ export function createSequelizeAccountRepository(): AccountRepository {
       if (!user || user.status !== 'active') return null;
 
       const avatarUrls = await loadAvatarUrls([id]);
-
-      const replacements = { id };
-      const [
-        bookCount,
-        seriesCount,
-        bookLikes,
-        seriesLikes,
-        commentsOnBooks,
-        favorites,
-        booksInReadingLists,
-        seriesInReadingLists,
-      ] = await Promise.all([
-        Book.count({ where: { id: inIds(PUBLISHED_BOOK_IDS) }, replacements }),
-        Series.count({
-          where: { id: inIds(COUNTED_SERIES_IDS) },
-          replacements,
-        }),
-        Like.count({
-          where: { bookId: inIds(PUBLISHED_BOOK_IDS), isLike: true },
-          replacements,
-        }),
-        Like.count({
-          where: { bookId: inIds(COUNTED_SERIES_BOOK_IDS), isLike: true },
-          replacements,
-        }),
-        Comment.count({
-          where: { bookId: inIds(PUBLISHED_BOOK_IDS), tombstone: null },
-          replacements,
-        }),
-        Favorite.count({
-          where: {
-            [Op.or]: [
-              { bookId: inIds(PUBLISHED_BOOK_IDS) },
-              { seriesId: inIds(COUNTED_SERIES_IDS) },
-            ],
-          },
-          replacements,
-        }),
-        ReadingListItem.count({
-          where: { bookId: inIds(PUBLISHED_BOOK_IDS) },
-          replacements,
-        }),
-        ReadingListItem.count({
-          where: { seriesId: inIds(COUNTED_SERIES_IDS) },
-          replacements,
-        }),
-      ]);
+      const sequelize = User.sequelize;
+      if (!sequelize) throw new Error('User model is not initialised');
+      const [counts] = await sequelize.query<ProfileCounts>(PROFILE_COUNTS, {
+        replacements: { id },
+        type: QueryTypes.SELECT,
+      });
+      if (!counts) throw new Error('Profile counts query returned no row');
 
       return {
         id: user.id,
@@ -106,15 +82,15 @@ export function createSequelizeAccountRepository(): AccountRepository {
         avatarUrl: avatarUrls.get(id) ?? null,
         about: user.about ?? '',
         lastSeenAt: user.showLastSeen ? user.lastSeenAt : null,
-        bookCount,
-        seriesCount,
+        bookCount: Number(counts.bookCount),
+        seriesCount: Number(counts.seriesCount),
         totals: {
-          booksInReadingLists,
-          seriesInReadingLists,
-          bookLikes,
-          seriesLikes,
-          commentsOnBooks,
-          favorites,
+          booksInReadingLists: Number(counts.booksInReadingLists),
+          seriesInReadingLists: Number(counts.seriesInReadingLists),
+          bookLikes: Number(counts.bookLikes),
+          seriesLikes: Number(counts.seriesLikes),
+          commentsOnBooks: Number(counts.commentsOnBooks),
+          favorites: Number(counts.favorites),
         },
       };
     },
