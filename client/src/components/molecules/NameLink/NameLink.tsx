@@ -4,8 +4,8 @@ import type { UserStatus } from 'shared';
 
 // A molecule, not inline `Link`s: five places name an Account (Card, Comment,
 // ReadingListCard, ReportedAccountCell, ReportsPanel) and all point at the
-// same public profile. A Blocked or Pending Account has no public page (it
-// redirects), so only an Active name links.
+// same public profile.
+// Only an Active Account has a Public profile (CONTEXT.md), so only an Active name links.
 export const NameLink: FC<{ id: number; name: string; status: UserStatus }> = ({
   id,
   name,

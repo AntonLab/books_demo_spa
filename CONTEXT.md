@@ -27,8 +27,9 @@ _Avoid_: Settings, Account page, Cabinet
 **Public profile**:
 The page anyone, Guests included, sees for an Account: its Avatar, name, About
 text, when it was last Online (unless it hides that), totals across its
-Published works, and its Published Series and Books. Only an Active Account has one; a Blocked or
-Pending Account's page redirects home, so its name is shown as plain text.
+Published works, and its Published Series and Books. Only an Active Account
+has one; a Blocked or Pending Account's page redirects home, so its
+name is shown as plain text.
 _Avoid_: Profile (that one is private), author page
 
 **Last online**:

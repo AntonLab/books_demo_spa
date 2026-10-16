@@ -51,10 +51,9 @@ export const ABOUT_MAX_LENGTH = 1000;
 // window, and the client calls a stamp within it "Online now".
 export const LAST_ONLINE_WINDOW_MS = 300000;
 
-// PublicUser minus the email address, plus the status. The email omission is
-// what makes an author safe to embed in a public response: the email is the
-// whole reason /api/users is guarded, so a shape without one carries nothing
-// that guard exists to protect. The status lets a client tell a linkable name.
+// PublicUser minus the email, plus `status`. Without the email an author is
+// safe to embed in a public response: the email is why /api/users is guarded.
+// `status` lets a client tell whether the name links.
 export interface AuthorSummary {
   id: number;
   login: string;
