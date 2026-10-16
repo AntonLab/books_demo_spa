@@ -9,7 +9,8 @@ export const RESET_TOKEN_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface PasswordResetRepository {
   create(userId: number, tokenHash: string, expiresAt: Date): Promise<void>;
-  // Stamps the Account's live tokens used and stores a new one in one locked transaction.
+  // Stamps the Account's live tokens used and stores a new one in one locked
+  // transaction.
   replaceForUser(
     userId: number,
     tokenHash: string,
