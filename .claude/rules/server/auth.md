@@ -71,8 +71,8 @@ paths:
 ## Password reset
 
 - A request always answers 202, or the endpoint would enumerate accounts. The
-  202 goes out right after validation, before the account lookup, token
-  invalidation, token creation and the send, all of which run detached
+  202 goes out right after validation, before the account lookup, the token
+  swap (`replaceForUser`) and the send, all of which run detached
   (`void … .catch(...)`). A new request supersedes the outstanding token in
   one transaction that locks the Account's row, so concurrent requests leave
   one live token. Tokens live one hour: a link sits in a mailbox.
