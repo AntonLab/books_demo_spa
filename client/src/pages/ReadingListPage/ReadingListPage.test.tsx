@@ -26,6 +26,7 @@ const coAuthor = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 
@@ -62,7 +63,7 @@ const detail: ReadingListDetail = {
   title: 'Cold nights',
   description: 'Long reads.',
   tags: ['winter'],
-  owner: { id: 9, login: 'reader' },
+  owner: { id: 9, login: 'reader', status: 'active' as const },
   itemCount: 2,
   items: [
     { id: 1, kind: 'book', book },
@@ -135,7 +136,11 @@ describe('ReadingListPage', () => {
   });
 
   it('lets another Account, an admin included, copy the list and opens the copy', async () => {
-    const copy = { ...detail, id: 8, owner: { id: 10, login: 'other' } };
+    const copy = {
+      ...detail,
+      id: 8,
+      owner: { id: 10, login: 'other', status: 'active' as const },
+    };
     mocked.getReadingList.mockImplementation((id) =>
       Promise.resolve(id === 8 ? copy : detail)
     );

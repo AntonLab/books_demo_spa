@@ -22,7 +22,7 @@ export const ReportedAccountCell: FC<Props> = ({
 
   return (
     <Flex gap="small" align="center" wrap>
-      <NameLink id={account.id} name={account.login} />
+      <NameLink id={account.id} name={account.login} status={account.status} />
       {account.atBanThreshold && <Tag color="error">Ban mark</Tag>}
       <Tooltip title={blockedReason}>
         {/* A disabled button swallows mouse events, so the span takes them. */}

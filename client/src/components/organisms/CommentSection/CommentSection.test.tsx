@@ -49,6 +49,7 @@ const root: CommentWithAuthor = {
     login: 'Reader',
     firstName: 'Read',
     lastName: 'Er',
+    status: 'active',
     avatarUrl: null,
   },
   likeCount: 0,
@@ -68,6 +69,7 @@ const reply: CommentWithAuthor = {
     login: 'Other',
     firstName: 'Oth',
     lastName: 'Er',
+    status: 'active',
     avatarUrl: null,
   },
 };

@@ -3,7 +3,7 @@ import type { ReportRow, ReportStatistics } from '../types/api';
 export const reportRow = (overrides: Partial<ReportRow> = {}): ReportRow => ({
   id: 1,
   createdAt: '2026-10-03T10:00:00.000Z',
-  reporter: { id: 2, login: 'Reader' },
+  reporter: { id: 2, login: 'Reader', status: 'active' },
   isSystem: false,
   reason: 'spam',
   explanation: null,
@@ -18,6 +18,7 @@ export const reportRow = (overrides: Partial<ReportRow> = {}): ReportRow => ({
   status: 'new',
   moderatorId: null,
   moderatorLogin: null,
+  moderatorStatus: null,
   isOwnComment: false,
   ...overrides,
 });

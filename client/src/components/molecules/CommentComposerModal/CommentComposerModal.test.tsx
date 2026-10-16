@@ -18,6 +18,7 @@ const target: CommentWithAuthor = {
     login: 'Reader',
     firstName: 'Read',
     lastName: 'Er',
+    status: 'active',
     avatarUrl: null,
   },
   likeCount: 2,

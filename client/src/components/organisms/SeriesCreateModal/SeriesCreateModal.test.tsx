@@ -22,6 +22,7 @@ const created: PublicSeries = {
       login: 'ann',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
   ],

@@ -23,7 +23,12 @@ export const ReadingListCard: FC<ReadingListCardProps> = ({ list, href }) => (
     footer={
       <Space size="small">
         <Typography.Text type="secondary">
-          by <NameLink id={list.owner.id} name={list.owner.login} />
+          by{' '}
+          <NameLink
+            id={list.owner.id}
+            name={list.owner.login}
+            status={list.owner.status}
+          />
         </Typography.Text>
         <Typography.Text type="secondary">
           {list.itemCount === 1 ? '1 item' : `${list.itemCount} items`}

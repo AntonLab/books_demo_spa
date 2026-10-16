@@ -233,7 +233,12 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockResolvedValue(
       listOf([
         reportRow({ id: 1 }),
-        reportRow({ id: 2, moderatorId: 6, moderatorLogin: 'mod' }),
+        reportRow({
+          id: 2,
+          moderatorId: 6,
+          moderatorLogin: 'mod',
+          moderatorStatus: 'active',
+        }),
       ])
     );
     renderPanel();
@@ -249,6 +254,32 @@ describe('ReportsPanel', () => {
       'href',
       '/accounts/6'
     );
+  });
+
+  it('shows the reporter, reported Account and Moderator of Blocked Accounts as plain text', async () => {
+    mockedReports.listReports.mockResolvedValue(
+      listOf([
+        reportRow({
+          reporter: { id: 8, login: 'Barred', status: 'blocked' },
+          moderatorId: 4,
+          moderatorLogin: 'Gone',
+          moderatorStatus: 'blocked',
+          reportedAccount: {
+            id: 3,
+            login: 'Writer',
+            status: 'blocked',
+            role: 'user',
+            atBanThreshold: false,
+          },
+        }),
+      ])
+    );
+    renderPanel();
+    const row = (await screen.findAllByRole('row', { name: /Barred/ }))[0]!;
+    for (const name of ['Barred', 'Writer', 'Gone']) {
+      expect(within(row).getByText(name)).toBeInTheDocument();
+      expect(within(row).queryByRole('link', { name })).toBeNull();
+    }
   });
 
   it('shows the Tombstone label instead of the text of a Removed comment', async () => {
@@ -269,7 +300,10 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockResolvedValue(
       listOf([
         reportRow({ id: 1 }),
-        reportRow({ id: 2, reporter: { id: 8, login: 'Second' } }),
+        reportRow({
+          id: 2,
+          reporter: { id: 8, login: 'Second', status: 'active' },
+        }),
         reportRow({
           id: 3,
           comment: { id: 9, bookId: 1, text: 'other', tombstone: null },
@@ -332,7 +366,12 @@ describe('ReportsPanel', () => {
     mockedReports.listReports.mockImplementation(async ({ offset }) =>
       listOf(
         offset === 0
-          ? [reportRow({ id: 7, reporter: { id: 2, login: 'Survivor' } })]
+          ? [
+              reportRow({
+                id: 7,
+                reporter: { id: 2, login: 'Survivor', status: 'active' },
+              }),
+            ]
           : [],
         20
       )

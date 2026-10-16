@@ -22,6 +22,7 @@ const ann = {
   login: 'ann',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 

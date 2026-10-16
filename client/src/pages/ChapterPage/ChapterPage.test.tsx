@@ -34,6 +34,7 @@ const book: BookDetail = {
       login: 'ann',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
   ],

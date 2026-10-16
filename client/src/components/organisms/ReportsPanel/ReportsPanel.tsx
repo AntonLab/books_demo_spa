@@ -177,7 +177,11 @@ export const ReportsPanel: FC = () => {
                   row.isSystem || row.reporter === null ? (
                     reporterName(row)
                   ) : (
-                    <NameLink id={row.reporter.id} name={row.reporter.login} />
+                    <NameLink
+                      id={row.reporter.id}
+                      name={row.reporter.login}
+                      status={row.reporter.status}
+                    />
                   ),
               },
               {
@@ -240,8 +244,14 @@ export const ReportsPanel: FC = () => {
               {
                 title: 'Moderator',
                 render: (_, row) =>
-                  row.moderatorId !== null && row.moderatorLogin !== null ? (
-                    <NameLink id={row.moderatorId} name={row.moderatorLogin} />
+                  row.moderatorId !== null &&
+                  row.moderatorLogin !== null &&
+                  row.moderatorStatus !== null ? (
+                    <NameLink
+                      id={row.moderatorId}
+                      name={row.moderatorLogin}
+                      status={row.moderatorStatus}
+                    />
                   ) : (
                     '—'
                   ),

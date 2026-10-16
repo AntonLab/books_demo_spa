@@ -11,6 +11,7 @@ const props = {
       login: 'mhale',
       firstName: 'Margaret',
       lastName: 'Hale',
+      status: 'active' as const,
       avatarUrl: null,
     },
   ],
@@ -113,6 +114,7 @@ describe('Card', () => {
             login: 'jdoe',
             firstName: 'Jon',
             lastName: 'Doe',
+            status: 'active' as const,
             avatarUrl: null,
           },
         ]}

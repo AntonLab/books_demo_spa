@@ -21,6 +21,7 @@ const book: PublicBook = {
       login: 'Author',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
   ],

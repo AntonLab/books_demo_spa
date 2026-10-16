@@ -23,6 +23,7 @@ const book: BookDetail = {
       login: 'ada',
       firstName: 'Ada',
       lastName: 'Byron',
+      status: 'active',
       avatarUrl: null,
     },
   ],

@@ -27,6 +27,7 @@ const book = (
       login: 'ann',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
   ],

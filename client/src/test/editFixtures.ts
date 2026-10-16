@@ -11,6 +11,7 @@ export const editorBook: BookDetail = {
       login: 'ann',
       firstName: 'Ann',
       lastName: 'Author',
+      status: 'active',
       avatarUrl: null,
     },
     {
@@ -18,6 +19,7 @@ export const editorBook: BookDetail = {
       login: 'cora',
       firstName: 'Cora',
       lastName: 'Writer',
+      status: 'active',
       avatarUrl: null,
     },
   ],

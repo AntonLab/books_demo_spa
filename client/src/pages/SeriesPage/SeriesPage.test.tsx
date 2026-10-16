@@ -32,6 +32,7 @@ const coAuthor = {
   login: 'Author',
   firstName: 'Ann',
   lastName: 'Author',
+  status: 'active' as const,
   avatarUrl: null,
 };
 
