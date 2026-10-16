@@ -31,7 +31,7 @@ const MISSING_ID = 999;
 function fakeRepository(hiddenBooks = new Set([DRAFT_ID])) {
   return createFakeReadingListRepository({
     accounts: new Map(
-      Object.values(USER_IDS).map((id) => [id, `Account${id}`])
+      Object.values(USER_IDS).map((id) => [id, { login: `Account${id}` }])
     ),
     books: new Map(
       [BOOK_ID, OTHER_BOOK_ID, DRAFT_ID].map((id) => [id, aPublicBook(id)])

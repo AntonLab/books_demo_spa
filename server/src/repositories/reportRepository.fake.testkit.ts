@@ -210,9 +210,9 @@ export function createFakeReportRepository(options: {
                 accounts.get(row.moderatorId)?.login) ||
               null,
             moderatorStatus:
-              (row.moderatorId !== null &&
-                accounts.get(row.moderatorId)?.status) ||
-              null,
+              row.moderatorId !== null && accounts.has(row.moderatorId)
+                ? accounts.get(row.moderatorId)!.status
+                : null,
             isOwnComment: comment?.userId === viewer.id,
           };
         });

@@ -160,6 +160,23 @@ describe('readingListRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('the owner carries its status on listByBook and update, Blocked included', async () => {
+    const world = await setUp();
+    const bookId = await world.aBook();
+    const owner = await createAccount();
+    const { id } = await repository.create(NEW_LIST, as(owner.id));
+    await repository.addItem(id, as(owner.id), { bookId, seriesId: null });
+    const statusOnBoth = async () => [
+      (await repository.listByBook({ bookId, current: 1, pageSize: 10 }))
+        .items[0]?.owner.status,
+      (await repository.update(id, as(owner.id), { title: 'Renamed' })).owner
+        .status,
+    ];
+    assert.deepEqual(await statusOnBoth(), ['active', 'active']);
+    await owner.update({ status: 'blocked' });
+    assert.deepEqual(await statusOnBoth(), ['blocked', 'blocked']);
+  });
+
   test('deleting an account deletes its lists and their items, and keeps the works', async () => {
     const world = await setUp();
     const ownerId = await world.anAccount();
