@@ -168,6 +168,10 @@ export function createFakeReportRepository(options: {
             row.reportedAccountId === null
               ? undefined
               : accounts.get(row.reportedAccountId);
+          const moderator =
+            row.moderatorId === null
+              ? undefined
+              : accounts.get(row.moderatorId);
           const comment = comments.get(row.commentId);
           return {
             id: row.id,
@@ -201,18 +205,9 @@ export function createFakeReportRepository(options: {
               tombstone: comment?.tombstone ?? null,
             },
             status: row.status,
-            moderatorId:
-              row.moderatorId !== null && accounts.has(row.moderatorId)
-                ? row.moderatorId
-                : null,
-            moderatorLogin:
-              (row.moderatorId !== null &&
-                accounts.get(row.moderatorId)?.login) ||
-              null,
-            moderatorStatus:
-              row.moderatorId !== null && accounts.has(row.moderatorId)
-                ? accounts.get(row.moderatorId)!.status
-                : null,
+            moderatorId: moderator ? row.moderatorId : null,
+            moderatorLogin: moderator?.login || null,
+            moderatorStatus: moderator?.status ?? null,
             isOwnComment: comment?.userId === viewer.id,
           };
         });

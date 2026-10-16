@@ -267,6 +267,39 @@ describe('AppHeader when logged in', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('stays signed in on the guarded page when the server refuses the logout', async () => {
+    mockedAuth.logout.mockRejectedValue(
+      new ApiError(403, 'Missing or invalid CSRF token')
+    );
+    const GuardedPage = () => {
+      const session = useSession();
+      usePageGuard(session.data ? 'allowed' : 'guest');
+      return <p>secret</p>;
+    };
+    const { queryClient } = withSession(user);
+    renderWithProviders(
+      <>
+        <AppHeader />
+        <LocationProbe />
+        <Routes>
+          <Route path="/private" element={<GuardedPage />} />
+        </Routes>
+      </>,
+      { queryClient, route: '/private' }
+    );
+
+    await userEvent.click(screen.getByText('bob'));
+    await userEvent.click(await screen.findByText('Log out'));
+
+    await waitFor(() => {
+      expect(mockedAuth.logout).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/private$/);
+    expect(screen.getByText('secret')).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
   it('opens the Log in dialog when the session expires on a guarded page', async () => {
     const GuardedPage = () => {
       const session = useSession();

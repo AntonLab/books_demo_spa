@@ -41,6 +41,7 @@ export const AppHeader: FC = () => {
   const phone = Grid.useBreakpoint().xs === true;
   // Where usePageGuard's Guest was headed; kept until Log in resolves.
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   // Read once per navigation, not per render: the router state outlives the
   // modal and must not reopen it each time the session changes. Any navigation
@@ -48,8 +49,13 @@ export const AppHeader: FC = () => {
   const [seenKey, setSeenKey] = useState(location.key);
   if (seenKey !== location.key) {
     setSeenKey(location.key);
-    const loginReturnTo = (location.state as Partial<LoginReturnState> | null)
-      ?.loginReturnTo;
+    // A guarded page that sees the session vanish cannot tell our own Log out
+    // from an expiry; it leaves for / itself, and Log in must stay shut. That
+    // navigation is the first after the session clears, so it spends the flag.
+    setSigningOut(false);
+    const loginReturnTo = signingOut
+      ? undefined
+      : (location.state as Partial<LoginReturnState> | null)?.loginReturnTo;
     setReturnTo(loginReturnTo ?? null);
     if (loginReturnTo) setAuthModal('login');
   }
@@ -125,10 +131,10 @@ export const AppHeader: FC = () => {
 
   const handleAccountClick = ({ key }: { key: string }) => {
     if (key === 'logout') {
-      // Leave first: a guarded page that sees the session vanish cannot tell
-      // this from an expiry, and would reopen Log in.
-      void navigate('/');
-      signOut();
+      setSigningOut(true);
+      void signOut().then((ended) => {
+        if (!ended) setSigningOut(false);
+      });
       return;
     }
     void navigate(key);

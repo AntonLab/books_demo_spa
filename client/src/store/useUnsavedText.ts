@@ -84,17 +84,20 @@ export const useUnsavedTextAccountBinding = (): void => {
 // Only an explicit Sign out discards Unsaved text, and only once the server
 // has ended the session. It lives here, not in `queries/auth`, because
 // `queries/` never imports the store.
-export const useSignOut = (): (() => void) => {
+export const useSignOut = (): (() => Promise<boolean>) => {
   const logout = useLogout();
   const dispatch = useAppDispatch();
 
-  return () => {
+  // Resolves, never rejects, with whether the server ended the session.
+  return () =>
     // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
     // the caller unmounts first: the promise still settles. A failed sign out
     // keeps every entry.
-    void logout.mutateAsync(undefined).then(
-      () => dispatch(unsavedText.discardAll()),
-      () => {}
+    logout.mutateAsync(undefined).then(
+      () => {
+        dispatch(unsavedText.discardAll());
+        return true;
+      },
+      () => false
     );
-  };
 };

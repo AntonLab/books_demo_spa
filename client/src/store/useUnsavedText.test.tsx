@@ -161,7 +161,7 @@ describe('useSignOut', () => {
       preloadedState: ownedBy(1),
     });
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
     expect(store.getState().unsavedText).toEqual({ accountId: 1, entries });
 
@@ -182,7 +182,7 @@ describe('useSignOut', () => {
       preloadedState: ownedBy(1),
     });
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
     await act(async () => {});
 
@@ -202,7 +202,7 @@ describe('useSignOut', () => {
       { queryClient: withSession(account(1)), preloadedState: ownedBy(1) }
     );
 
-    act(() => result.current());
+    act(() => void result.current());
     await waitFor(() => expect(mockedAuth.logout).toHaveBeenCalledTimes(1));
 
     unmount();
