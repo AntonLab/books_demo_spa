@@ -229,6 +229,20 @@ describe('accountRepository against real MySQL', { skip }, () => {
     assert.equal(totals?.seriesLikes, 3);
   });
 
+  test('a dislike on a Book in a counted Series is not a Like', async () => {
+    const w = await scenario();
+    await Like.create({
+      userId: w.f1.id,
+      bookId: w.inSeries.id,
+      isLike: false,
+    });
+
+    const totals = (await repository.findProfile(w.a.id))?.totals;
+
+    assert.equal(totals?.bookLikes, 0);
+    assert.equal(totals?.seriesLikes, 0);
+  });
+
   test('Comments count on Published Books, Tombstones and Drafts excluded', async () => {
     const w = await scenario();
     await Comment.create({ userId: w.f1.id, bookId: w.inSeries.id, text: 'a' });
@@ -319,7 +333,7 @@ describe('accountRepository against real MySQL', { skip }, () => {
     );
   });
 
-  test('Likes on a co-authored standalone Draft do not count while the Account has Published Books', async () => {
+  test('Likes on a standalone Draft do not count while the Account has Published Books', async () => {
     const w = await scenario();
     await Like.create({
       userId: w.f1.id,
