@@ -8,13 +8,16 @@ import { seedSession } from '@/test/session';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
+import * as illustrationsApi from '@/api/illustrations';
 import type { RootState } from '@/store';
 import type { PublicChapter } from '@/types/chapter';
 import type { PublicUser } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
+jest.mock('@/api/illustrations');
 
+const mockedIllustrations = jest.mocked(illustrationsApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const onClose = jest.fn();
@@ -53,9 +56,30 @@ beforeEach(() => {
   jest.resetAllMocks();
   mockedBooks.getBook.mockResolvedValue(editorBook);
   mockedChapters.getChapter.mockResolvedValue(editorChapter);
+  mockedIllustrations.listIllustrations.mockResolvedValue({ items: [] });
 });
 
 describe('ChapterEditorModal', () => {
+  it('manages Illustrations of an existing chapter only', async () => {
+    renderModal(9);
+    expect(
+      await screen.findByRole('heading', { name: 'Illustrations' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add illustration' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows no Illustrations section for a new chapter', async () => {
+    renderModal(null);
+    await screen.findByLabelText('Title');
+    expect(screen.queryByRole('heading', { name: 'Illustrations' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Add illustration' })
+    ).toBeNull();
+    expect(mockedIllustrations.listIllustrations).not.toHaveBeenCalled();
+  });
+
   it('creates the chapter from restored new-chapter text, closes and drops the entry', async () => {
     mockedChapters.createChapter.mockResolvedValue({
       ...editorChapter,
