@@ -67,17 +67,18 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
   index. Write down what does not follow from the code — traps, rationale,
   conventions that differ from the default — and leave inventories to the
   directory tree and history to git.
-- A comment that says _what_ the code does; rename the code instead. A comment
-  earns its place with why, what breaks otherwise, or which upstream bug it
-  works around.
-- `console.log` in production code (the server logs through `src/logger.ts`);
-  synchronous filesystem APIs in request handlers.
-- Class components. The one exception is the client's `ErrorBoundary` (React has
-  no hook for `getDerivedStateFromError`); do not add a dependency to dodge it.
+- `console.log` in production code (the server logs through `src/logger.ts`).
 - The `setup-pre-commit` skill, Husky or lint-staged: they install a competing
   hook.
-- Direct state mutation; `any` (use `unknown` or a real type); `@ts-ignore`
-  (use `@ts-expect-error` with a reason); `enum` (use `as const`).
+- `any` (use `unknown` or a real type); `@ts-ignore` (use `@ts-expect-error`
+  with a reason); `enum` (use `as const`). Lint and `erasableSyntaxOnly`
+  refuse all three.
+- Class components (lint allows only the client's `ErrorBoundary`, since
+  React has no hook for `getDerivedStateFromError`) and sync calls such as
+  `readFileSync` in server code outside tests (lint refuses them).
+
+Judgement-call rules live in `CODING_STANDARDS.md`. Only the task and final
+reviewers read it; implementers do not, so a rule there costs no context.
 
 ## Security
 

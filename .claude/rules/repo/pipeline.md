@@ -14,7 +14,10 @@ per-call values.
 - **Before `plan-writer`, save the spec** to
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored) and
   dispatch with that path; it refuses to run without one. Grill in the main
-  session first (`mattpocock-skills:grilling`); plan-writer asks only about decisions the
+  session first (`/grill-with-docs`, which also updates `CONTEXT.md` and the
+  ADRs). The spec names the test seam agreed while grilling: the highest
+  existing one the behaviour can be tested through, ideally one. plan-writer
+  asks only about decisions the
   spec left open, as one `NEEDS_CONTEXT` round — put it to the user verbatim
   and resume the agent with the answers through `SendMessage`. A plan over 6
   tasks or two workspaces comes back as part 1 with the other parts listed;
