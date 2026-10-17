@@ -51,6 +51,7 @@ const IllustrationRow: FC<IllustrationRowProps> = ({
   onDelete,
 }) => {
   const [draft, setDraft] = useState(item.caption ?? '');
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <li className={styles.row}>
@@ -88,9 +89,11 @@ const IllustrationRow: FC<IllustrationRowProps> = ({
         okText="Delete"
         okButtonProps={{ danger: true }}
         onConfirm={onDelete}
+        onOpenChange={setConfirming}
       >
         <IconButton
           danger
+          tooltipHidden={confirming}
           label={`Delete illustration ${number}`}
           icon={<DeleteOutlined />}
           disabled={disabled}

@@ -153,6 +153,21 @@ it('explains a 409 on reorder and shows the server order again', async () => {
   );
 });
 
+it('keeps the delete tooltip shut while its confirmation is open', async () => {
+  renderWithProviders(<ChapterIllustrationsEditor chapterId={9} />);
+  await user.click(
+    await screen.findByRole('button', { name: 'Delete illustration 1' })
+  );
+  expect(
+    await screen.findByText('Delete this illustration?')
+  ).toBeInTheDocument();
+  // antd keeps a closed tooltip mounted, marked hidden; the Popconfirm is a
+  // role="tooltip" too, so find the tooltip by its text.
+  expect(
+    screen.getByText('Delete illustration 1').closest('.ant-tooltip')
+  ).toHaveClass('ant-tooltip-hidden');
+});
+
 it('deletes after confirmation only', async () => {
   mocked.deleteIllustration.mockResolvedValue(undefined);
   renderWithProviders(<ChapterIllustrationsEditor chapterId={9} />);
