@@ -129,6 +129,12 @@ shown with a placeholder bearing its title; a Series never borrows a Cover from
 its Books.
 _Avoid_: Image, thumbnail, poster
 
+**Illustration**:
+A picture a Co-author attaches to a Chapter, with an optional caption. A
+Chapter's Illustrations have an explicit order and follow the Chapter's
+visibility: a Draft or Scheduled Chapter's are as hidden as its text.
+_Avoid_: Image, attachment, figure, gallery
+
 **Book status**:
 Where a Book stands: Draft, In progress or Complete. Every Book has exactly one.
 _Avoid_: State (for a Book)

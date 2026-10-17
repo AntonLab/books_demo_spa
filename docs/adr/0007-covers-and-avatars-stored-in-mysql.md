@@ -34,5 +34,8 @@ Avatar of 256×256) before storing it.
   out of the chapter list.
 - Serving goes through the same visibility rules as the Book, so a Draft book's
   Cover is refused by direct link too; `express.static` would bypass them.
+- A Chapter's Illustrations fit the decision: each is a small re-encoded picture
+  (at most 1600×1600, WebP), at most 20 per Chapter. They live in `illustrations`
+  / `illustration_images` with the same cascade.
 - Revisit this if uploads grow beyond small re-encoded pictures — larger
   attachments are what would tip the trade-off towards object storage.

@@ -89,6 +89,18 @@ code alone does not explain.
 - `GET /api/series/:id/books` names every book in the series, drafts
   included, as a `SeriesBookSummary`; see `visibility.md` for why that is safe.
 
+## Illustrations
+
+- `GET /api/chapters/:id/illustrations` returns `{ items }` by position, no
+  bytes. `POST` answers 201. `PATCH /api/illustrations/:id` edits the caption.
+  `DELETE` answers 204.
+- `PUT /api/chapters/:id/illustration-order` (`{ illustrationIds }`) answers 200
+  `{ items }`, or 409 changing nothing when the ids are not exactly the current
+  set. It is `silent`, like the chapter reorder.
+- A caption is trimmed, blank becomes `null`, max 200. Position is never sent.
+- None of these writes moves `chapters.updatedAt`, so an open Chapter editor is
+  not handed a 409, and no Notification is sent.
+
 ## Comments and Notifications
 
 - `GET /api/comments` returns a flat page (`parentId`, embedded `author`,
