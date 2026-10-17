@@ -71,8 +71,8 @@ paths:
   so an owner-less comment is never live.
 - `likes` points at exactly one of `bookId` / `commentId`. Sequelize 6 cannot
   declare the `CHECK`, so the XOR is enforced by a `.refine()` on
-  `createLikeSchema` and a model `validate`; raw SQL can still break it. Add the
-  `CHECK` when migrations arrive. Both targets `CASCADE`, since `SET NULL`
+  `createLikeSchema` and a model `validate`; raw SQL can still break it. The
+  `CHECK` is a future migration. Both targets `CASCADE`, since `SET NULL`
   would produce the state the XOR forbids.
 - `likes` has unique indexes on `(userId, bookId)` and `(userId, commentId)`.
   NULLs are distinct in a unique index, so the two do not interfere. They also
@@ -89,15 +89,11 @@ paths:
 
 ## Changing a table's shape
 
-`sequelize.sync()` runs without `alter`: it creates a missing table and never
-touches an existing one. A new column, index or `ENUM` value reaches a
-developer's database only by dropping it (`DROP DATABASE books_demo_spa`); the
-next boot rebuilds it (`/db-reset` drops it and reseeds). A new table needs no
-drop. Say which one a change needs in its PR.
+A schema change is a model change plus a new migration in
+`server/src/db/migrations/`, named `NNNN-name.ts` and `up` only (a rollback is a
+new migration; ADR-0015). An applied migration is never edited. Boot runs the
+pending ones outside production; production runs `npm run migrate -w server`
+first. `schemaParity.spec.ts` fails when a model and the migrations drift.
 
 `permissions.module` is an `ENUM` built from `MODULES`, so adding a module
-needs the rebuild too. CI and the test schemas are built fresh, so only a
-developer's long-lived database goes stale.
-
-`sequelize-cli` is not installed. When it is, remember the package is ESM:
-name migrations `.cjs` or write them as ESM.
+needs a migration too.
