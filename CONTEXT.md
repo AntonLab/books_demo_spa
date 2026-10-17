@@ -42,7 +42,7 @@ _Avoid_: Last seen, last active
 **About**:
 The plain text an Account writes about itself, up to 1000 characters, shown on
 its Public profile. Empty means the Public profile has no About block.
-_Avoid_: Bio, description (a Book or Series has one of those)
+_Avoid_: Bio, description (a Work has one of those)
 
 **Role**:
 The rank an Account holds: User, Author, Admin or Superadmin. Guest is the
@@ -63,8 +63,8 @@ _Avoid_: "author" for whoever wrote a comment (its Owner) or for someone
 credited on a Book (a Co-author)
 
 **Co-author**:
-An Account credited on a Book or a Series. Every credited Account is one, even
-when it is the only one; all of a work's Co-authors are equal, and a work always
+An Account credited on a Work. Every credited Account is one, even
+when it is the only one; all of a Work's Co-authors are equal, and a Work always
 has at least one. A byline lists Co-authors in credit order; the order carries
 no rank.
 Removing a Co-author and adding them again moves them to the end.
@@ -79,7 +79,7 @@ The top Role, and the only one that reaches Admin and Superadmin Accounts.
 
 **Owner**:
 The Account a Comment or Like belongs to; whoever wrote a comment is its Owner.
-A Book or Series has no single Owner — each of its Co-authors owns it equally —
+A Work has no single Owner — each of its Co-authors owns it equally —
 and a Chapter is owned by its Book's Co-authors.
 _Avoid_: Author (for a comment's writer), creator
 
@@ -124,12 +124,12 @@ _Avoid_: Title
 A Book or a Series; used where a rule applies to both.
 
 **Description**:
-The text a Book's or Series' Co-authors write to tell readers what it is
+The text a Work's Co-authors write to tell readers what it is
 about. It may be empty.
 _Avoid_: Annotation, summary, blurb
 
 **Cover**:
-The one optional picture that stands for a Book or a Series. One without it is
+The one optional picture that stands for a Work. One without it is
 shown with a placeholder bearing its title; a Series never borrows a Cover from
 its Books.
 _Avoid_: Image, thumbnail, poster
@@ -212,7 +212,7 @@ its own. A top-level Genre cannot be deleted while it has Subgenres.
 _Avoid_: Child genre, sub-category
 
 **Tag**:
-A free-form label a Book's or Series' Co-authors attach to it, any number of
+A free-form label a Work's Co-authors attach to it, any number of
 them and from no list.
 _Avoid_: Genre (for a Tag), keyword
 
@@ -305,9 +305,9 @@ _Avoid_: Strike, automatic ban
 
 **Notification**:
 An in-app notice to one Account. It tells a Co-author that someone else changed
-who is credited on a shared Book or Series, or deleted it; or it tells an
+who is credited on a shared Work, or deleted it; or it tells an
 Account that something it holds as a Favorite has a New chapter or a New book.
-It keeps the work's title and the actor's name as they were at the time, so it
+It keeps the Work's title and the actor's name as they were at the time, so it
 outlives both. New chapters of one Book gather into one unread Notification
 until the Account reads it. Opening the Notification list reads every unread
 one at once; a minute after it is read, a Notification is deleted for good.
@@ -332,7 +332,7 @@ until it is read.
 ### Favorites
 
 **Favorite**:
-A Book or Series an Account marks to follow it: it keeps the work on the
+A Work an Account marks to follow it: it keeps the Work on the
 Account's list and brings Notifications of its New chapters (for a Book) or New
 books (for a Series). Private to the Account; it is not approval and does not
 count toward Popularity. A Favorite on a Book that is no longer Published is
