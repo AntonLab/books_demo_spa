@@ -20,7 +20,15 @@ export function createMigrator(sequelize: Sequelize): Umzug<QueryInterface> {
       resolve: ({ name, path: file, context }) => ({
         name,
         up: async () => {
-          const migration = await import(pathToFileURL(file as string).href);
+          if (!file) throw new Error(`Migration ${name} has no file path`);
+          const migration: { up?: unknown } = await import(
+            pathToFileURL(file).href
+          );
+          if (typeof migration.up !== 'function') {
+            throw new Error(
+              `Migration ${name} (${file}) exports no up function`
+            );
+          }
           await migration.up(context);
         },
       }),
