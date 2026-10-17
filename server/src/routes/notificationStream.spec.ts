@@ -31,7 +31,7 @@ const authorToken = ROLE_COOKIES.author.slice(
 
 // Records what the route registers and removes; the registry's own rules are
 // covered in online/onlineRegistry.spec.ts.
-function createFakeRegistry() {
+function createFakeRegistry({ accept = true } = {}) {
   const added: OnlineConnection[] = [];
   const removed: OnlineConnection[] = [];
   let onRemove = (): void => {};
@@ -40,8 +40,8 @@ function createFakeRegistry() {
   };
   const registry: OnlineRegistry = {
     add: (connection) => {
-      added.push(connection);
-      return true;
+      if (accept) added.push(connection);
+      return accept;
     },
     remove: (connection) => {
       removed.push(connection);
@@ -125,6 +125,24 @@ test('closing the connection from the registry ends the stream', async () => {
     const rest = await reader.read();
     assert.equal(rest.done, true);
     await untilRemoved();
+  });
+});
+
+test('a stream the registry refuses is a 429 error, not an event stream, and registers nothing', async () => {
+  const { registry, added, removed } = createFakeRegistry({ accept: false });
+  await withAuthenticatedApp({ onlineRegistry: registry }, async (base) => {
+    const response = await fetch(`${base}/api/notifications/stream`, {
+      headers: { cookie: ROLE_COOKIES.author },
+    });
+
+    assert.equal(response.status, 429);
+    assert.notEqual(response.headers.get('content-type'), 'text/event-stream');
+    assert.match(response.headers.get('content-type') ?? '', /json/);
+    assert.deepEqual(await response.json(), {
+      error: 'Too many open streams',
+    });
+    assert.deepEqual(added, []);
+    assert.deepEqual(removed, []);
   });
 });
 

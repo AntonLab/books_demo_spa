@@ -74,3 +74,11 @@ export class TooManyRequestsError extends AppError {
     super(`Too many attempts. Try again in ${minutes} ${unit}.`, 429);
   }
 }
+
+// The Account already holds its cap of notification streams
+// (online/onlineRegistry.ts).
+export class TooManyStreamsError extends AppError {
+  constructor(message = 'Too many open streams') {
+    super(message, 429);
+  }
+}

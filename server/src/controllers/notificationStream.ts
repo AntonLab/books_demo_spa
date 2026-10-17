@@ -6,11 +6,12 @@ import type {
 import { actorOf } from '../repositories/visibility.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { hashToken } from '../tokens.ts';
-import { UnauthorizedError } from '../types/errors.ts';
+import { TooManyStreamsError, UnauthorizedError } from '../types/errors.ts';
 
 // One Server-Sent Events stream per open tab. It carries only what the Online
 // registry writes: the pass's notifications and its 30 s ping. The registry
-// also decides when the session behind it has ended and closes it then.
+// also decides when the session behind it has ended and closes it then, and
+// caps the streams one Account may hold: past it the request is a 429.
 export function createNotificationStreamHandler(
   registry: Pick<OnlineRegistry, 'add' | 'remove'>
 ): RequestHandler {
@@ -20,6 +21,20 @@ export function createNotificationStreamHandler(
     // narrows the type.
     const token: unknown = req.cookies?.[SESSION_COOKIE_NAME];
     if (typeof token !== 'string') throw new UnauthorizedError();
+
+    const connection: OnlineConnection = {
+      userId: id,
+      tokenHash: hashToken(token),
+      write: (chunk) => {
+        res.write(chunk);
+      },
+      close: () => {
+        res.end();
+      },
+    };
+    // Before the headers, because a refusal must still be a plain JSON error;
+    // the handler is synchronous, so no push can reach `res` before they are out.
+    if (!registry.add(connection)) throw new TooManyStreamsError();
 
     // setHeader, not res.set(): Express's set() appends "; charset=utf-8" to
     // every text/* Content-Type, which SSE must not carry.
@@ -36,17 +51,6 @@ export function createNotificationStreamHandler(
     res.flushHeaders();
     res.write(': connected\n\n');
 
-    const connection: OnlineConnection = {
-      userId: id,
-      tokenHash: hashToken(token),
-      write: (chunk) => {
-        res.write(chunk);
-      },
-      close: () => {
-        res.end();
-      },
-    };
-    registry.add(connection);
     // On the response, not the request: since Node 16 a request's 'close'
     // fires once its body is read, long before the client goes away.
     res.on('close', () => {
