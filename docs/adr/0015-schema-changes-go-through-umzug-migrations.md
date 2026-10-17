@@ -50,6 +50,5 @@ drift apart unnoticed.
   `/db-reset` in development; in production, drop the partial tables by hand and
   rerun `npm run migrate -w server`. `IF NOT EXISTS` is not used on purpose,
   because it would hide drift.
-- An applied migration is never edited; a fix is a new migration.
 - The XOR `CHECK` constraints on `likes` and `favorites`, which Sequelize 6
   cannot declare, are the first future migration.

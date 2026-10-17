@@ -4,8 +4,8 @@ import { createMigrator } from './migrator.ts';
 import { createSequelize } from './sequelize.ts';
 import { logger, messageOf } from '../logger.ts';
 
-// The production way to apply migrations: boot refuses to start while any are
-// pending. Outside production it also creates the schema, like index.ts.
+// Production applies migrations here: boot refuses to start while any are
+// pending. Outside production it creates the database first, like index.ts.
 async function main(): Promise<void> {
   const config = loadConfig();
   if (config.env !== 'production') {

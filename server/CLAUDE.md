@@ -55,9 +55,8 @@ Scripts are in `package.json`; the traps:
 - `npm run seed -- --force` **deletes every row in the content tables**
   (`CONTENT_MODELS` in `src/db/seed/seed.ts`), Covers and Avatars with them;
   without `--force` it only reports row counts.
-- `npm run migrate -w server` applies pending migrations. Production runs it
-  before starting the server, which refuses to boot with any pending. It does
-  not create the database in production.
+- `npm run migrate -w server` applies pending migrations (production runs it
+  before start; see ADR-0015). It does not create the database in production.
 - Keep `--env-file-if-exists` in the `test` script: without it `DB_USER` is
   unset and the MySQL suites fail. `posttest` drops the test schemas, and npm
   runs it only after a green run; never run it by hand. See `testing.md`.

@@ -101,8 +101,8 @@ function runSeed(
   });
 }
 
-// Dropped first, so a schema a red run left behind, or one sync() built, cannot
-// make the baseline fail.
+// Drop first: a schema left by a red run or by sync() would make the baseline
+// fail.
 async function buildSchema(sequelize: Sequelize): Promise<void> {
   await sequelize.getQueryInterface().dropAllTables();
   await createMigrator(sequelize).up();

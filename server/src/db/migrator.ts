@@ -3,9 +3,9 @@ import { pathToFileURL } from 'node:url';
 import type { QueryInterface, Sequelize } from 'sequelize';
 import { SequelizeStorage, Umzug } from 'umzug';
 
-// Silent on purpose: callers log the names up() returns. The `.js` alternative
-// keeps a tsc build from finding zero migrations; the default resolver uses
-// require, which cannot load these ESM modules.
+// Silent: callers log the names up() returns. Globs .js as well as .ts so a tsc
+// build finds its migrations. Custom resolve uses import(): the default
+// resolver uses require, which cannot load ESM.
 export function createMigrator(sequelize: Sequelize): Umzug<QueryInterface> {
   return new Umzug({
     migrations: {
@@ -13,7 +13,7 @@ export function createMigrator(sequelize: Sequelize): Umzug<QueryInterface> {
         '*.{ts,js}',
         {
           cwd: path.join(import.meta.dirname, 'migrations'),
-          // The parity spec lives beside the migrations and must not run as one.
+          // Skip specs: they sit beside the migrations.
           ignore: ['*.d.ts', '*.spec.*'],
         },
       ],
