@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -23,18 +23,6 @@ import {
 import { createSequelizeAccountRepository } from './accountRepository.ts';
 import { accountRepositoryContract } from './accountRepository.contract.testkit.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
-
-// Its own schema, so parallel spec files do not drop each other's tables.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_accounts`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -64,7 +52,7 @@ describe('accountRepository against real MySQL', { skip }, () => {
     });
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('accounts');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

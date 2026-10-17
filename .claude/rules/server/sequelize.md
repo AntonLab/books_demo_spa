@@ -71,17 +71,20 @@ paths:
   so an owner-less comment is never live.
 - `likes` points at exactly one of `bookId` / `commentId`. Sequelize 6 cannot
   declare the `CHECK`, so the XOR is enforced by a `.refine()` on
-  `createLikeSchema` and a model `validate`; raw SQL can still break it. Add the
-  `CHECK` when migrations arrive. Both targets `CASCADE`, since `SET NULL`
-  would produce the state the XOR forbids.
+  `createLikeSchema` and a model `validate`, and by a `CHECK` that migration
+  `0003-xor-checks.ts` adds (`sync()` emits none, so `schemaParity.spec.ts`
+  strips CHECK lines before comparing; `xorChecks.spec.ts` covers them). Both
+  targets are `ON DELETE CASCADE`, since `SET NULL` would produce the state the
+  XOR forbids, and `ON UPDATE RESTRICT`: MySQL refuses a `CHECK` on a column
+  whose foreign key has an `ON UPDATE` action (errno 3823).
 - `likes` has unique indexes on `(userId, bookId)` and `(userId, commentId)`.
   NULLs are distinct in a unique index, so the two do not interfere. They also
   serve `?userId=`; a further index would cost every insert on the busiest
   table.
 - `favorites` copies the `likes` shape: exactly one of `bookId` / `seriesId`
-  (a `.refine()` on `createFavoriteSchema` and a model `validate`, no `CHECK`),
-  unique `(userId, bookId)` and `(userId, seriesId)`, and `CASCADE` on all
-  three references. A duplicate insert is a `UniqueConstraintError`, which the
+  (a `.refine()` on `createFavoriteSchema`, a model `validate` and the same
+  migration `CHECK`), unique `(userId, bookId)` and `(userId, seriesId)`, and
+  `ON DELETE CASCADE` on all three references. A duplicate insert is a `UniqueConstraintError`, which the
   repository maps to 409.
 - Creating a book or series maps a `ForeignKeyConstraintError` to
   `NotFoundError('User')`: the first credit is the only reference that can
@@ -89,15 +92,11 @@ paths:
 
 ## Changing a table's shape
 
-`sequelize.sync()` runs without `alter`: it creates a missing table and never
-touches an existing one. A new column, index or `ENUM` value reaches a
-developer's database only by dropping it (`DROP DATABASE books_demo_spa`); the
-next boot rebuilds it (`/db-reset` drops it and reseeds). A new table needs no
-drop. Say which one a change needs in its PR.
+A schema change is a model change plus a new migration in
+`server/src/db/migrations/`, named `NNNN-name.ts` and `up` only (a rollback is a
+new migration; ADR-0015). An applied migration is never edited. Boot runs the
+pending ones outside production; production runs `npm run migrate -w server`
+first. `schemaParity.spec.ts` fails when a model and the migrations drift.
 
 `permissions.module` is an `ENUM` built from `MODULES`, so adding a module
-needs the rebuild too. CI and the test schemas are built fresh, so only a
-developer's long-lived database goes stale.
-
-`sequelize-cli` is not installed. When it is, remember the package is ESM:
-name migrations `.cjs` or write them as ESM.
+needs a migration too.

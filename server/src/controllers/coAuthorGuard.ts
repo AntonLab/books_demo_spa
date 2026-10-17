@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
 } from '../types/errors.ts';
 
-// The other half of enforcement for Books, Series and Chapters.
+// The other half of enforcement for Books, Series, Chapters and Illustrations.
 // requirePermission already refused `none`; `own` has to look at the row —
 // which is why this cannot live in the middleware, where the row is not
 // loaded yet.
@@ -18,9 +18,13 @@ import {
 // 404 before 403 (a refusal cannot be used to probe which ids exist) and
 // before a handler spends work on the body.
 
+// The refusal for editing or deleting a Chapter or its Illustrations.
+export const MAY_CHANGE_CHAPTERS =
+  'You may only change chapters in books you co-author';
+
 export interface CoAuthorTarget {
   // What a missing row is reported as.
-  resource: 'Book' | 'Series' | 'Chapter';
+  resource: 'Book' | 'Series' | 'Chapter' | 'Illustration';
   id: number;
   // The Co-authors answering for the row, or null when it does not exist.
   coAuthorIds: () => Promise<number[] | null>;

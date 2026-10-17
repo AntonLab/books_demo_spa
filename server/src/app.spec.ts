@@ -8,8 +8,10 @@ import type { AddressInfo } from 'node:net';
 import type { Sequelize } from 'sequelize';
 import sharp from 'sharp';
 import { createApp } from './app.ts';
+import { MAY_CHANGE_CHAPTERS } from './controllers/coAuthorGuard.ts';
 import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { parseConfig } from './db/config.ts';
+import { testDbName } from './db/testDb.testkit.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
@@ -17,6 +19,8 @@ import { createLogMailDelivery } from './delivery/mailDelivery.ts';
 import { XSRF_HEADER_NAME } from './middleware/csrfProtection.ts';
 import { SESSION_COOKIE_NAME, XSRF_COOKIE } from './sessionCookie.ts';
 import { initModels } from './models/index.ts';
+import { Illustration } from './models/Illustration.ts';
+import { IllustrationImage } from './models/IllustrationImage.ts';
 import { Session } from './models/Session.ts';
 import { User } from './models/User.ts';
 import {
@@ -49,15 +53,13 @@ import type {
 // A schema of its own, like every MySQL-backed suite: node:test runs spec
 // files in parallel processes, and two suites calling sync({ force: true }) on
 // one database would drop each other's tables mid-run.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_app`;
-
 // Parsed inside the suite, not at import: parseConfig throws without DB_USER,
 // which is exactly when the suite should skip instead.
 function testConfig() {
   return parseConfig({
     ...process.env,
     NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
+    DB_NAME: testDbName('app'),
   });
 }
 
@@ -65,7 +67,7 @@ const skip = await skipWithoutMysql();
 
 const PASSWORD = 'Password123!';
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface SetCookie {
   name: string;
@@ -514,7 +516,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
         `/chapters/${created.body.id}`,
         edit
       ),
-      'You may only change chapters in books you co-author'
+      MAY_CHANGE_CHAPTERS
     );
 
     const edited = await author.browser.send<PublicChapter>(
@@ -738,5 +740,476 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     assert.equal(metadata.format, 'webp');
     assert.equal(metadata.width, 600);
     assert.equal(metadata.height, 900);
+  });
+
+  const seedIllustration = async (
+    chapterId: number,
+    position: number,
+    caption: string | null
+  ) => {
+    const row = await Illustration.create({ chapterId, position, caption });
+    const data = await sharp({
+      create: { width: 40, height: 30, channels: 3, background: '#336699' },
+    })
+      .webp()
+      .toBuffer();
+    await IllustrationImage.create({ illustrationId: row.id, data });
+    return row;
+  };
+  const imageOf = (id: number, browser?: Browser) =>
+    fetch(`${base}/api/illustrations/${id}/image`, {
+      headers: browser ? { cookie: browser.cookieHeader() } : {},
+    });
+  const publishedBook = async (author: Visitor, title: string) => {
+    const book = await createBook(author, title);
+    const patched = await author.browser.send('PATCH', `/books/${book.id}`, {
+      status: 'in_progress',
+    });
+    assert.equal(patched.status, 200);
+    return book;
+  };
+
+  test('Illustrations of a Draft chapter are for its Co-authors only, on the list and on a direct image link', async () => {
+    const author = await signUp('illusAuthor', 'author');
+    const stranger = await signUp('illusStranger', 'author');
+    const book = await publishedBook(author, 'Pictured');
+    const draft = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      { bookId: book.id, title: 'Draft', text: 'Hidden.' }
+    );
+    const second = await seedIllustration(draft.body.id, 2, 'Second');
+    const first = await seedIllustration(draft.body.id, 1, null);
+    const list = `/chapters/${draft.body.id}/illustrations`;
+
+    for (const reader of [openBrowser(), stranger.browser]) {
+      assert.equal((await reader.send('GET', list)).status, 404);
+      assert.equal((await imageOf(first.id, reader)).status, 404);
+    }
+    const own = await author.browser.send<{ items: Record<string, unknown>[] }>(
+      'GET',
+      list
+    );
+    assert.equal(own.status, 200);
+    assert.deepEqual(
+      own.body.items.map((item) => item.id),
+      [first.id, second.id]
+    );
+    assert.deepEqual(Object.keys(own.body.items[0] ?? {}).sort(), [
+      'caption',
+      'id',
+      'position',
+      'updatedAt',
+    ]);
+    const image = await imageOf(first.id, author.browser);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get('content-type'), 'image/webp');
+    assert.equal(
+      image.headers.get('cache-control'),
+      'private, max-age=31536000, immutable'
+    );
+    assert.equal(
+      (await author.browser.send('GET', '/chapters/999999/illustrations'))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(999999)).status, 404);
+  });
+
+  test('Illustrations of a Scheduled chapter stay hidden until its time, and of a chapter in a Draft book always', async () => {
+    const author = await signUp('illusScheduler', 'author');
+    const book = await publishedBook(author, 'Timed');
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    const scheduled = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      { bookId: book.id, title: 'Later', text: 'Soon.', publishedAt: soon }
+    );
+    const out = await author.browser.send<PublicChapter>('POST', '/chapters', {
+      bookId: book.id,
+      title: 'Now',
+      text: 'Out.',
+      publishedAt: 'now',
+    });
+    const later = await seedIllustration(scheduled.body.id, 1, null);
+    const now = await seedIllustration(out.body.id, 1, 'Out');
+    const guest = openBrowser();
+
+    assert.equal(
+      (await guest.send('GET', `/chapters/${scheduled.body.id}/illustrations`))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(later.id)).status, 404);
+    assert.equal((await imageOf(later.id, author.browser)).status, 200);
+    const published = await guest.send<{ items: { id: number }[] }>(
+      'GET',
+      `/chapters/${out.body.id}/illustrations`
+    );
+    assert.equal(published.status, 200);
+    assert.deepEqual(
+      published.body.items.map((item) => item.id),
+      [now.id]
+    );
+    assert.equal((await imageOf(now.id)).status, 200);
+
+    const draftBook = await createBook(author, 'Still private');
+    const inDraft = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      {
+        bookId: draftBook.id,
+        title: 'Out but hidden',
+        text: '.',
+        publishedAt: 'now',
+      }
+    );
+    const hidden = await seedIllustration(inDraft.body.id, 1, null);
+    assert.equal(
+      (await guest.send('GET', `/chapters/${inDraft.body.id}/illustrations`))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(hidden.id)).status, 404);
+  });
+
+  const uploadIllustration = (
+    who: Visitor,
+    chapterId: number,
+    body: Buffer,
+    type = 'image/png'
+  ) =>
+    fetch(`${base}/api/chapters/${chapterId}/illustrations`, {
+      method: 'POST',
+      headers: {
+        'content-type': type,
+        origin: trustedOrigin,
+        cookie: who.browser.cookieHeader(),
+        [XSRF_HEADER_NAME]: who.browser.xsrfToken(),
+      },
+      body,
+    });
+  const picture = (width: number, height: number) =>
+    sharp({
+      create: { width, height, channels: 3, background: '#336699' },
+    })
+      .png()
+      .toBuffer();
+  const chapterIn = async (who: Visitor, title: string) => {
+    const book = await publishedBook(who, title);
+    const chapter = await who.browser.send<PublicChapter>('POST', '/chapters', {
+      bookId: book.id,
+      title: 'One',
+      text: 'Text.',
+      publishedAt: 'now',
+    });
+    return chapter.body;
+  };
+
+  test('a Co-author uploads an Illustration, which is re-encoded to WebP within 1600x1600, and the Chapter stays unedited', async () => {
+    const author = await signUp('illusUploader', 'author');
+    const chapter = await chapterIn(author, 'Uploads');
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+
+    const created = await uploadIllustration(
+      author,
+      chapter.id,
+      await picture(3200, 800)
+    );
+    assert.equal(created.status, 201);
+    const row = (await created.json()) as {
+      id: number;
+      position: number;
+      caption: string | null;
+    };
+    assert.equal(row.position, 1);
+    assert.equal(row.caption, null);
+    const meta = await sharp(
+      Buffer.from(await (await imageOf(row.id)).arrayBuffer())
+    ).metadata();
+    assert.equal(meta.format, 'webp');
+    assert.equal(meta.width, 1600);
+    assert.equal(meta.height, 400);
+    const small = await uploadIllustration(
+      author,
+      chapter.id,
+      await picture(40, 30)
+    );
+    const smallMeta = await sharp(
+      Buffer.from(
+        await (
+          await imageOf(((await small.json()) as { id: number }).id)
+        ).arrayBuffer()
+      )
+    ).metadata();
+    assert.equal(smallMeta.width, 40);
+
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('uploads are refused by size, type, content and the 20 per Chapter cap', async () => {
+    const author = await signUp('illusRefused', 'author');
+    const chapter = await chapterIn(author, 'Refusals');
+    const png = await picture(20, 20);
+
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('%PDF-1.4'),
+          'application/pdf'
+        )
+      ).status,
+      415
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('<svg/>'),
+          'image/svg+xml'
+        )
+      ).status,
+      415
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('not an image'),
+          'image/png'
+        )
+      ).status,
+      400
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.alloc(0),
+          'image/png'
+        )
+      ).status,
+      400
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.alloc(2 * 1024 * 1024 + 1),
+          'image/png'
+        )
+      ).status,
+      413
+    );
+    assert.equal((await uploadIllustration(author, 999999, png)).status, 404);
+
+    for (let position = 1; position <= 19; position += 1) {
+      await seedIllustration(chapter.id, position, null);
+    }
+    const race = await Promise.all([
+      uploadIllustration(author, chapter.id, png),
+      uploadIllustration(author, chapter.id, png),
+      uploadIllustration(author, chapter.id, png),
+    ]);
+    assert.deepEqual(race.map((r) => r.status).sort(), [201, 409, 409]);
+    assert.equal(
+      await Illustration.count({ where: { chapterId: chapter.id } }),
+      20
+    );
+  });
+
+  test('only a Co-author uploads: 403 with the message, and nothing is stored', async () => {
+    const author = await signUp('illusOwner', 'author');
+    const other = await signUp('illusOther', 'author');
+    const chapter = await chapterIn(author, 'Guarded');
+
+    const upload = await uploadIllustration(
+      other,
+      chapter.id,
+      await picture(20, 20)
+    );
+    assert.equal(upload.status, 403);
+    assert.match(
+      ((await upload.json()) as { error: string }).error,
+      /co-author/i
+    );
+    assert.equal(
+      await Illustration.count({ where: { chapterId: chapter.id } }),
+      0
+    );
+  });
+
+  test('only a Co-author captions, reorders or deletes: 403, and 404 for an unknown id comes first', async () => {
+    const author = await signUp('illusGuard', 'author');
+    const other = await signUp('illusGuardOther', 'author');
+    const chapter = await chapterIn(author, 'Guarded edits');
+    const row = await seedIllustration(chapter.id, 1, 'Mine');
+
+    const patch = await other.browser.send(
+      'PATCH',
+      `/illustrations/${row.id}`,
+      {
+        caption: 'x',
+      }
+    );
+    assert.equal(patch.status, 403);
+    assert.equal(
+      (
+        await other.browser.send(
+          'PUT',
+          `/chapters/${chapter.id}/illustration-order`,
+          { illustrationIds: [row.id] }
+        )
+      ).status,
+      403
+    );
+    assert.equal(
+      (await other.browser.send('DELETE', `/illustrations/${row.id}`)).status,
+      403
+    );
+    assert.equal(
+      (
+        await other.browser.send('PATCH', '/illustrations/999999', {
+          caption: 'x',
+        })
+      ).status,
+      404
+    );
+    assert.equal(
+      (await other.browser.send('DELETE', '/illustrations/999999')).status,
+      404
+    );
+    assert.equal(
+      (
+        await other.browser.send('PUT', '/chapters/999999/illustration-order', {
+          illustrationIds: [1],
+        })
+      ).status,
+      404
+    );
+    assert.equal((await Illustration.findByPk(row.id))?.caption, 'Mine');
+  });
+
+  test('a caption holds 200 characters, blank becomes null, and none of it edits the Chapter', async () => {
+    const author = await signUp('illusCaption', 'author');
+    const chapter = await chapterIn(author, 'Captions');
+    const row = await seedIllustration(chapter.id, 1, null);
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    const patch = (caption: unknown) =>
+      author.browser.send<{ caption: string | null }>(
+        'PATCH',
+        `/illustrations/${row.id}`,
+        { caption }
+      );
+
+    const ok = await patch('c'.repeat(200));
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.caption?.length, 200);
+    assert.equal((await patch('c'.repeat(201))).status, 400);
+    assert.equal((await patch(7)).status, 400);
+    assert.equal((await patch('   ')).body.caption, null);
+    assert.equal((await patch(null)).body.caption, null);
+    assert.equal((await patch('  trimmed  ')).body.caption, 'trimmed');
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('reordering applies a full set, rejects a stale or foreign set, and deleting renumbers nothing it should not', async () => {
+    const author = await signUp('illusOrder', 'author');
+    const chapter = await chapterIn(author, 'Ordering');
+    const elsewhere = await chapterIn(author, 'Elsewhere');
+    const [a, b, c] = [
+      await seedIllustration(chapter.id, 1, 'a'),
+      await seedIllustration(chapter.id, 2, 'b'),
+      await seedIllustration(chapter.id, 3, 'c'),
+    ];
+    const foreign = await seedIllustration(elsewhere.id, 1, 'f');
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    const put = (ids: number[]) =>
+      author.browser.send<{ items: { id: number }[] }>(
+        'PUT',
+        `/chapters/${chapter.id}/illustration-order`,
+        { illustrationIds: ids }
+      );
+    const order = async () =>
+      (
+        await author.browser.send<{ items: { id: number }[] }>(
+          'GET',
+          `/chapters/${chapter.id}/illustrations`
+        )
+      ).body.items.map((i) => i.id);
+
+    const moved = await put([c.id, a.id, b.id]);
+    assert.equal(moved.status, 200);
+    assert.deepEqual(
+      moved.body.items.map((i) => i.id),
+      [c.id, a.id, b.id]
+    );
+    assert.deepEqual(await order(), [c.id, a.id, b.id]);
+    for (const bad of [
+      [a.id, b.id],
+      [a.id, b.id, c.id, foreign.id],
+      [a.id, a.id, b.id, c.id],
+      [a.id, b.id, foreign.id],
+    ]) {
+      assert.ok([400, 409].includes((await put(bad)).status));
+    }
+    assert.equal((await put([a.id, b.id, 999999])).status, 409);
+    assert.equal((await put([])).status, 400);
+    assert.deepEqual(await order(), [c.id, a.id, b.id]);
+
+    assert.equal(
+      (await author.browser.send('DELETE', `/illustrations/${a.id}`)).status,
+      204
+    );
+    assert.deepEqual(await order(), [c.id, b.id]);
+    assert.equal((await imageOf(a.id, author.browser)).status, 404);
+    assert.equal(
+      await IllustrationImage.count({ where: { illustrationId: a.id } }),
+      0
+    );
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('deleting a Chapter takes its Illustrations and their bytes with it', async () => {
+    const author = await signUp('illusCascade', 'author');
+    const chapter = await chapterIn(author, 'Cascade');
+    const row = await seedIllustration(chapter.id, 1, null);
+
+    assert.equal(
+      (await author.browser.send('DELETE', `/chapters/${chapter.id}`)).status,
+      204
+    );
+    assert.equal(await Illustration.count({ where: { id: row.id } }), 0);
+    assert.equal(
+      await IllustrationImage.count({ where: { illustrationId: row.id } }),
+      0
+    );
   });
 });

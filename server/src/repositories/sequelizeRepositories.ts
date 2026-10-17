@@ -23,6 +23,10 @@ import {
   type FavoriteRepository,
 } from './favoriteRepository.ts';
 import {
+  createSequelizeIllustrationRepository,
+  type IllustrationRepository,
+} from './illustrationRepository.ts';
+import {
   createSequelizeLibraryRepository,
   type LibraryRepository,
 } from './libraryRepository.ts';
@@ -68,6 +72,7 @@ export interface Repositories {
   seriesRepository: SeriesRepository;
   bookRepository: BookRepository;
   chapterRepository: ChapterRepository;
+  illustrationRepository: IllustrationRepository;
   genreRepository: GenreRepository;
   commentRepository: CommentRepository;
   likeRepository: LikeRepository;
@@ -89,6 +94,7 @@ export function createSequelizeRepositories(): Repositories {
     seriesRepository: createSequelizeSeriesRepository(),
     bookRepository: createSequelizeBookRepository(),
     chapterRepository: createSequelizeChapterRepository(),
+    illustrationRepository: createSequelizeIllustrationRepository(),
     genreRepository: createSequelizeGenreRepository(),
     commentRepository: createSequelizeCommentRepository(),
     likeRepository: createSequelizeLikeRepository(),

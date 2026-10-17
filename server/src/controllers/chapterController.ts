@@ -6,7 +6,11 @@ import {
 } from '../middleware/validate.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { viewerOf } from '../repositories/visibility.ts';
-import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import {
+  assertMayChange,
+  type CoAuthorTarget,
+  MAY_CHANGE_CHAPTERS,
+} from './coAuthorGuard.ts';
 import { NotFoundError } from '../types/errors.ts';
 import type {
   CreateChapterInput,
@@ -63,11 +67,7 @@ export function createChapterController(repository: ChapterRepository) {
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        chapterTarget(id),
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE_CHAPTERS);
 
       const chapter = await repository.update(
         id,
@@ -79,11 +79,7 @@ export function createChapterController(repository: ChapterRepository) {
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        chapterTarget(id),
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE_CHAPTERS);
 
       const deleted = await repository.remove(id);
       if (!deleted) throw new NotFoundError('Chapter', id);

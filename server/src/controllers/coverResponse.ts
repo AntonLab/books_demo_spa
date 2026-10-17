@@ -6,7 +6,7 @@ export function sendCover(res: Response, cover: { data: Buffer }): void {
     .set({
       'Content-Type': 'image/webp',
       'X-Content-Type-Options': 'nosniff',
-      // Versioned by the URL's own ?v=, so immutable is safe.
+      // Immutable is safe: a Cover URL carries `?v=`, an Illustration URL its never-replaced id.
       'Cache-Control': 'private, max-age=31536000, immutable',
     })
     .send(cover.data);

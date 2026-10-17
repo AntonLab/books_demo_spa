@@ -6,6 +6,11 @@ import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initFavoriteModel, Favorite } from './Favorite.ts';
 import { initGenreModel, Genre } from './Genre.ts';
+import { initIllustrationModel, Illustration } from './Illustration.ts';
+import {
+  initIllustrationImageModel,
+  IllustrationImage,
+} from './IllustrationImage.ts';
 import { initLibraryEntryModel, LibraryEntry } from './LibraryEntry.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
@@ -45,6 +50,8 @@ function initEachModel(sequelize: Sequelize): void {
   initBookCoverModel(sequelize);
   initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
+  initIllustrationModel(sequelize);
+  initIllustrationImageModel(sequelize);
   initCommentModel(sequelize);
   initReportModel(sequelize);
   initLikeModel(sequelize);
@@ -177,6 +184,27 @@ function declareAssociations(): void {
   });
   Chapter.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
+  // A Chapter's Illustrations and each one's picture (ADR-0007): both cascade,
+  // so deleting a Chapter (or its Book) removes them with no application code.
+  Chapter.hasMany(Illustration, {
+    as: 'illustrations',
+    foreignKey: 'chapterId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Illustration.belongsTo(Chapter, { as: 'chapter', foreignKey: 'chapterId' });
+
+  Illustration.hasOne(IllustrationImage, {
+    as: 'image',
+    foreignKey: 'illustrationId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  IllustrationImage.belongsTo(Illustration, {
+    as: 'illustration',
+    foreignKey: 'illustrationId',
+  });
+
   User.hasMany(Comment, {
     as: 'comments',
     foreignKey: { name: 'userId', allowNull: true },
@@ -262,7 +290,9 @@ function declareAssociations(): void {
   // A like points at exactly one of a book or a comment, so both foreign keys
   // are nullable and both cascade, unlike the SET NULL on books.seriesId and
   // comments.parentId: SET NULL would leave a like with neither target, the
-  // state models/Like.ts forbids.
+  // state models/Like.ts forbids. The target keys (here and on favorites) use
+  // onUpdate RESTRICT: MySQL refuses the XOR CHECK on a column whose foreign
+  // key has an ON UPDATE action (migration 0003).
   //
   // No recursion concern, unlike the comment replies: the deepest chain is
   // books -> comments -> likes, inside InnoDB's cascade limit of 15. Users
@@ -281,7 +311,7 @@ function declareAssociations(): void {
     // A like on a comment leaves this column empty.
     foreignKey: { name: 'bookId', allowNull: true },
     onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onUpdate: 'RESTRICT',
   });
   Like.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
@@ -289,7 +319,7 @@ function declareAssociations(): void {
     as: 'likes',
     foreignKey: { name: 'commentId', allowNull: true },
     onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onUpdate: 'RESTRICT',
   });
   Like.belongsTo(Comment, { as: 'comment', foreignKey: 'commentId' });
 
@@ -310,7 +340,7 @@ function declareAssociations(): void {
     // A favorite on a series leaves this column empty.
     foreignKey: { name: 'bookId', allowNull: true },
     onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onUpdate: 'RESTRICT',
   });
   Favorite.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
 
@@ -318,7 +348,7 @@ function declareAssociations(): void {
     as: 'favorites',
     foreignKey: { name: 'seriesId', allowNull: true },
     onDelete: 'CASCADE',
-    onUpdate: 'CASCADE',
+    onUpdate: 'RESTRICT',
   });
   Favorite.belongsTo(Series, { as: 'series', foreignKey: 'seriesId' });
 

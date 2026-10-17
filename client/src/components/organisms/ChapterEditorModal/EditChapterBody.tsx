@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Alert, Button, Divider, Popconfirm, Skeleton, Space } from 'antd';
 import { UnsavedTextNotice } from '@/components/molecules/UnsavedTextNotice/UnsavedTextNotice';
 import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
+import { ChapterIllustrationsEditor } from '@/components/organisms/ChapterIllustrationsEditor/ChapterIllustrationsEditor';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { isBlank } from '@/store/unsavedTextSlice';
@@ -118,6 +119,10 @@ export const EditChapterBody: FC<EditChapterBodyProps> = ({
         onValuesChange={edit.onValuesChange}
         onSubmit={edit.save}
       />
+
+      <Divider />
+
+      <ChapterIllustrationsEditor chapterId={chapterId} />
 
       <Divider />
 

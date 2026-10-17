@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { NotFoundError } from '../types/errors.ts';
 import { initModels } from '../models/index.ts';
@@ -32,20 +32,6 @@ import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
 import { recordLogs } from '../logger.testkit.ts';
 import { setNotificationPublisher } from '../online/notificationPublisher.ts';
-
-// A schema of its own, for the reason every MySQL-backed suite gives: node:test
-// runs spec files in parallel processes, and two suites calling
-// sync({ force: true }) on one database would drop each other's tables.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_notifications`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -132,7 +118,7 @@ describe('notifications against real MySQL', { skip }, () => {
   } as const;
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('notifications');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

@@ -7,6 +7,7 @@ import {
   countPages,
   measureGeometry,
   pageOfChild,
+  trailingSpace,
 } from './measurePages';
 import type { Geometry } from './measurePages';
 import { clampView, hasPage } from './pagination';
@@ -29,6 +30,8 @@ export interface Pages {
   start: number;
   pageCount: number;
   perView: PagesPerView;
+  // Blank height under the text of the chapter's last page, in px.
+  trailingSpace: number;
   animate: boolean;
   windowStyle: CSSProperties | undefined;
   stripStyle: CSSProperties | undefined;
@@ -45,6 +48,7 @@ interface View {
   openAt: OpenAt;
   start: number;
   pageCount: number;
+  trailingSpace: number;
   animate: boolean;
 }
 
@@ -53,6 +57,7 @@ const openedView = (chapterId: number, openOnLastPage: boolean): View => ({
   openAt: openOnLastPage ? 'last' : 'first',
   start: 0,
   pageCount: 1,
+  trailingSpace: 0,
   animate: false,
 });
 
@@ -140,7 +145,14 @@ export const usePages = ({
     if (view.openAt !== 'anchor') {
       anchorRef.current = childOnPage(strip, start, measured);
     }
-    setView({ ...view, openAt: 'anchor', pageCount, start, animate: false });
+    setView({
+      ...view,
+      openAt: 'anchor',
+      pageCount,
+      start,
+      trailingSpace: trailingSpace(strip, measured),
+      animate: false,
+    });
   });
 
   useLayoutEffect(() => {
@@ -157,6 +169,9 @@ export const usePages = ({
     stripRef,
     start: view.start,
     pageCount: view.pageCount,
+    // Zero unless the last page opens the view: on a spread the pulled-up
+    // Illustrations would cover the page to its left.
+    trailingSpace: view.start === view.pageCount - 1 ? view.trailingSpace : 0,
     perView,
     animate: view.animate,
     windowStyle: geometry && {

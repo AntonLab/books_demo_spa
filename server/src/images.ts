@@ -1,10 +1,11 @@
-import sharp, { type Sharp } from 'sharp';
+import sharp, { type ResizeOptions, type Sharp } from 'sharp';
+import { ILLUSTRATION_BOX } from 'shared';
 import { BadRequestError } from './types/errors.ts';
 
-// Every sharp call for a Cover or an Avatar lives here, one function each.
+// Every sharp call for a Cover, Avatar or Illustration lives here.
 // The input-pixel limit is set explicitly. sharp's default (about 268 MP) lets
 // a tiny PNG declaring 16000x16000 through, costing about 1 GB of RAM to
-// decode. The largest output is 600x900, and 25 MP still admits a 6000x4000
+// decode. No output exceeds 1600x1600, and 25 MP still admits a 6000x4000
 // photo. Multi-page input reads only its first frame (sharp default).
 const MAX_INPUT_PIXELS = 25_000_000;
 const DECODABLE_FORMATS = new Set(['jpeg', 'png', 'webp']);
@@ -33,16 +34,11 @@ async function decode(buffer: Buffer): Promise<Sharp> {
 // never does.
 async function reencode(
   buffer: Buffer,
-  width: number,
-  height: number
+  resize: ResizeOptions
 ): Promise<Buffer> {
   const image = await decode(buffer);
   try {
-    return await image
-      .autoOrient()
-      .resize(width, height, { fit: 'cover' })
-      .webp()
-      .toBuffer();
+    return await image.autoOrient().resize(resize).webp().toBuffer();
   } catch {
     throw new BadRequestError('Not a valid image');
   }
@@ -50,10 +46,20 @@ async function reencode(
 
 // A Cover: 600x900.
 export function processCoverImage(buffer: Buffer): Promise<Buffer> {
-  return reencode(buffer, 600, 900);
+  return reencode(buffer, { width: 600, height: 900, fit: 'cover' });
 }
 
 // An Avatar: 256x256, square wherever it appears.
 export function processAvatarImage(buffer: Buffer): Promise<Buffer> {
-  return reencode(buffer, 256, 256);
+  return reencode(buffer, { width: 256, height: 256, fit: 'cover' });
+}
+
+// An Illustration: fitted inside a square box, never cropped or enlarged.
+export function processIllustrationImage(buffer: Buffer): Promise<Buffer> {
+  return reencode(buffer, {
+    width: ILLUSTRATION_BOX,
+    height: ILLUSTRATION_BOX,
+    fit: 'inside',
+    withoutEnlargement: true,
+  });
 }

@@ -25,6 +25,9 @@ export const queryKeys = {
   chapters: (bookId: number) => ['chapters', { bookId }] as const,
   chapter: (id: number) => ['chapters', id] as const,
   comments: (bookId: number) => ['comments', { bookId }] as const,
+  // The `['illustrations']` prefix is what an Illustration write invalidates.
+  illustrations: (chapterId: number) =>
+    ['illustrations', { chapterId }] as const,
   series: (params: ListSeriesParams) => ['series', params] as const,
   // Keyed by a bare id, like `book`, so neither collides with `series`.
   seriesDetail: (id: number) => ['series', id] as const,

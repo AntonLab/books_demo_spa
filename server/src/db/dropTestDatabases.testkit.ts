@@ -16,8 +16,7 @@ import { logger } from '../logger.ts';
 import { parseConfig } from './config.ts';
 import { SAFE_IDENTIFIER } from './ensureDatabase.ts';
 import { connectionErrorText } from './mysqlProbe.testkit.ts';
-
-const TEST_DB_BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
+import { TEST_DB_BASE } from './testDb.testkit.ts';
 
 function isTestSchema(name: string): boolean {
   return name === TEST_DB_BASE || name.startsWith(`${TEST_DB_BASE}_`);

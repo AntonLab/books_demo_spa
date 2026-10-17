@@ -6,7 +6,7 @@ import { UniqueConstraintError, type Sequelize } from 'sequelize';
 import { READING_LIST_MAX_ITEMS } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -26,20 +26,6 @@ import {
 } from './readingListRepository.contract.testkit.ts';
 import { readingListCopyContract } from './readingListRepository.copy.contract.testkit.ts';
 import { readingListItemsContract } from './readingListRepository.items.contract.testkit.ts';
-
-// A schema of its own: node:test runs spec files in parallel processes, and
-// two suites calling sync({ force: true }) on one database drop each other's
-// tables mid-run.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_reading_lists`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -64,7 +50,7 @@ describe('readingListRepository against real MySQL', { skip }, () => {
   const repository = createSequelizeReadingListRepository();
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('reading_lists');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

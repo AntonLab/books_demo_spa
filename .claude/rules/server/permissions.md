@@ -52,8 +52,8 @@ paths:
 - `syncPermissions()` replaces the table wholesale in a transaction
   (destroy-then-`bulkCreate`; an upsert would leave orphan rows). It runs on
   every boot, production included, while `sequelize.sync()` does not run in
-  production: **a production deploy must provision the schema first**, or boot
-  fails loudly. Deliberate.
+  production: **a production deploy must provision the schema first**
+  (`npm run migrate -w server`), or boot fails loudly. Deliberate.
 - `permissions.module` is a MySQL `ENUM` built from `MODULES`; a new module
   needs the table recreated before the sync can insert its rows.
 

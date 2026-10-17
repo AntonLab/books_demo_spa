@@ -32,3 +32,7 @@ therefore elsewhere:
   which it was the last Co-author; from every other work it is merely removed.
 - The permission matrix's `own` scope on books, series and chapters means "the
   caller is one of the work's Co-authors", not "the caller is its owner".
+- A byline lists the Co-authors in the order their credits were given, and that
+  order carries no rank. Removing a Co-author and adding them again puts them
+  last, because the credit row is deleted on removal. Keeping a former position
+  was rejected for the same reason: there is no row left to hold it.

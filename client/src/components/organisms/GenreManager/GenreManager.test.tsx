@@ -99,6 +99,30 @@ describe('GenreManager', () => {
     expect(screen.getByText('Fantasy')).toBeInTheDocument();
   });
 
+  it("keeps a parent's total and Delete lock when a usage filter hides its Subgenres", async () => {
+    mockedGenres.listGenreCounts.mockResolvedValue({
+      items: [
+        adminGenre(1, 'Fantasy', null, 2, 1),
+        adminGenre(2, 'Urban Fantasy', 1, 3, 0),
+        adminGenre(5, 'Mystery'),
+      ],
+    });
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter genres' }));
+    await user.click(await screen.findByTitle('Has series'));
+
+    await waitFor(() => expect(screen.queryByText('Mystery')).toBeNull());
+    expect(screen.queryByText('Urban Fantasy')).toBeNull();
+    expect(screen.getByText('5 books, 1 series')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Cannot delete Fantasy: it has subgenres',
+      })
+    ).toBeDisabled();
+  });
+
   it('opens the create form from the toolbar and from a top-level row', async () => {
     const user = userEvent.setup();
     await renderLoaded();
@@ -216,7 +240,11 @@ describe('GenreManager', () => {
 
     // Drops the row `from` on the middle of the row `onto`. jsdom has no
     // layout, so the target's geometry is stubbed for rc-tree's position maths.
-    const drag = (from: string, onto: string) => {
+    // `drag-over` (rc-tree sets it only for a drop inside) proves the stub drops
+    // inside the collapsed target. A change in rc-tree's position maths fails
+    // here, not as a silent no-drop. `expectInside` false means refused or
+    // disabled.
+    const drag = (from: string, onto: string, expectInside = true) => {
       const source = rowOf(from);
       const target = rowOf(onto);
       const dataTransfer = { setData: jest.fn(), dropEffect: '' };
@@ -234,6 +262,8 @@ describe('GenreManager', () => {
       fireEvent.dragStart(source, { dataTransfer });
       fireEvent.dragEnter(target, { dataTransfer, clientX: 0, clientY: 50 });
       fireEvent.dragOver(target, { dataTransfer, clientX: 0, clientY: 50 });
+      if (expectInside) expect(target).toHaveClass('drag-over');
+      else expect(target).not.toHaveClass('drag-over');
       fireEvent.drop(target, { dataTransfer, clientX: 0, clientY: 50 });
     };
 
@@ -255,7 +285,7 @@ describe('GenreManager', () => {
     it('sends nothing for a refused drop', async () => {
       await renderLoaded();
 
-      drag('Fantasy', 'Mystery');
+      drag('Fantasy', 'Mystery', false);
 
       expect(mockedGenres.updateGenre).not.toHaveBeenCalled();
     });
@@ -289,7 +319,7 @@ describe('GenreManager', () => {
       await waitFor(() =>
         expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1)
       );
-      drag('Romance', 'Fantasy');
+      drag('Romance', 'Fantasy', false);
 
       expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1);
 

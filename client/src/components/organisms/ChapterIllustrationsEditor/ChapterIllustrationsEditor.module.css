@@ -1,0 +1,20 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: var(--ant-margin-sm);
+  margin-block-start: var(--ant-margin);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--ant-margin-xs);
+}
+
+.thumbnail {
+  width: var(--ant-control-height-lg);
+  height: var(--ant-control-height-lg);
+  object-fit: cover;
+  flex: none;
+}

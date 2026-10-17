@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { QueryClient } from '@tanstack/react-query';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
@@ -462,24 +468,40 @@ describe('AppHeader genres submenu', () => {
     ]);
   });
 
-  it('navigates to the genre its item names', async () => {
-    await renderHeader(
-      <>
-        <AppHeader />
-        <LocationProbe />
-      </>,
-      withSession(null)
-    );
+  it.each<[string, (item: HTMLElement) => void | Promise<void>]>([
+    [
+      'clicked',
+      async (item: HTMLElement) => {
+        await userEvent.click(item);
+      },
+    ],
+    [
+      'activated with Enter',
+      (item: HTMLElement) => {
+        fireEvent.keyDown(item, { key: 'Enter', which: 13, keyCode: 13 });
+      },
+    ],
+  ])(
+    'navigates to the genre its item names when %s',
+    async (_activation, activate) => {
+      await renderHeader(
+        <>
+          <AppHeader />
+          <LocationProbe />
+        </>,
+        withSession(null)
+      );
 
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: /Genres/ })
-    );
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Gothic' })
-    );
+      await userEvent.click(
+        await screen.findByRole('menuitem', { name: /Genres/ })
+      );
+      await activate(await screen.findByRole('menuitem', { name: 'Gothic' }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
-  });
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/search?genre=3'
+      );
+    }
+  );
 
   it('highlights the genre the page is showing', async () => {
     await renderHeader(<AppHeader />, {

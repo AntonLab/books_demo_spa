@@ -7,8 +7,8 @@ import { idSchema } from './params.ts';
 const targetIdSchema = idSchema.nullable().default(null);
 
 // Enforced again by the model validate in models/Favorite.ts, because a
-// caller reaching Sequelize directly never passes through zod, and Sequelize 6
-// cannot declare the CHECK constraint.
+// caller reaching Sequelize directly never passes through zod; migration 0003
+// adds the CHECK behind it.
 function exactlyOneTarget(value: {
   bookId: number | null;
   seriesId: number | null;

@@ -1,14 +1,15 @@
 ---
 name: db-reset
-description: Drop the local dev database and rebuild it with the demo seed. Use after a schema change that sync() cannot apply (new column, index or ENUM value).
+description: Drop the local dev database and rebuild it with the demo seed. Use when a migration cannot reach the database (for example one sync() built before migrations existed).
 disable-model-invocation: true
 ---
 
 # Reset the dev database
 
-`sequelize.sync()` never alters an existing table, so a dev database older than
-the models has to be dropped. The seed recreates it: it runs `ensureDatabase`
-and `sync()` before inserting (`server/src/db/seed/seed.ts`).
+A migration cannot repair a dev database whose tables were built some other way
+(for example by `sequelize.sync()` before migrations existed), so it has to be
+dropped. The seed recreates it: it runs `ensureDatabase` and then
+`migrator.up()` before inserting (`server/src/db/seed/seed.ts`).
 
 Both steps destroy every row in the dev database. Say so and wait for the user
 to confirm before step 1; the project settings also ask before any seed run.

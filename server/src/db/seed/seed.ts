@@ -26,6 +26,7 @@ import { Comment } from '../../models/Comment.ts';
 import { Report } from '../../models/Report.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../../models/Genre.ts';
+import { Illustration } from '../../models/Illustration.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -46,6 +47,7 @@ import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
+import { createMigrator } from '../migrator.ts';
 import { GENRE_TREE, parentGenreOf } from './content.ts';
 import {
   DAY_MS,
@@ -83,6 +85,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Like,
   Report,
   Comment,
+  Illustration,
   Chapter,
   BookAuthor,
   Book,
@@ -698,13 +701,13 @@ async function main(): Promise<void> {
   const config = loadConfig();
   assertSafeTarget(config, force);
 
-  // The same two calls index.ts makes outside production, and idempotent, so a
-  // fresh clone can seed before the server has ever run.
+  // The same ensure-and-migrate steps boot takes outside production, and
+  // idempotent, so a fresh clone can seed before the server has ever run.
   await ensureDatabase(config.db);
   const sequelize = createSequelize(config.db);
   initModels(sequelize);
   await sequelize.authenticate();
-  await sequelize.sync();
+  await createMigrator(sequelize).up();
 
   try {
     if (!force) {
