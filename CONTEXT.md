@@ -116,7 +116,7 @@ _Avoid_: Author photo, profile picture, userpic
 ### Content
 
 **Book**:
-A work credited to one or more Co-authors, read as a sequence of Chapters in
+A Work credited to one or more Co-authors, read as a sequence of Chapters in
 its Reading order and optionally grouped into a Series.
 _Avoid_: Title
 
