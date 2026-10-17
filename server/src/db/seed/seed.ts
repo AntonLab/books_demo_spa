@@ -19,7 +19,6 @@
 import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger, messageOf } from '../../logger.ts';
 import { initModels } from '../../models/index.ts';
-import { createMigrator } from '../migrator.ts';
 import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
@@ -48,6 +47,7 @@ import { createSeriesSchema } from '../../types/series.ts';
 import { createUserSchema } from '../../types/user.ts';
 import { loadConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
+import { createMigrator } from '../migrator.ts';
 import { GENRE_TREE, parentGenreOf } from './content.ts';
 import {
   DAY_MS,
