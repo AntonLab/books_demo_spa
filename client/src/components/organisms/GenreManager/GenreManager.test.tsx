@@ -240,9 +240,10 @@ describe('GenreManager', () => {
 
     // Drops the row `from` on the middle of the row `onto`. jsdom has no
     // layout, so the target's geometry is stubbed for rc-tree's position maths.
-    // The `drag-over` class (rc-tree sets it only for a drop inside) proves the
-    // stub yields "drop inside" on the collapsed target, so a change in
-    // rc-tree's position maths fails here, not as a silent no-drop.
+    // `drag-over` (rc-tree sets it only for a drop inside) proves the stub drops
+    // inside the collapsed target. A change in rc-tree's position maths fails
+    // here, not as a silent no-drop. `expectInside` false means refused or
+    // disabled.
     const drag = (from: string, onto: string, expectInside = true) => {
       const source = rowOf(from);
       const target = rowOf(onto);
