@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -22,20 +22,6 @@ import {
   type Account,
 } from './favoriteRepository.ts';
 import { favoriteRepositoryContract } from './favoriteRepository.contract.testkit.ts';
-
-// A schema of its own: node:test runs spec files in parallel processes, and
-// two suites calling sync({ force: true }) on one database drop each other's
-// tables mid-run.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_favorites`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -61,7 +47,7 @@ describe('favoriteRepository against real MySQL', { skip }, () => {
   const repository = createSequelizeFavoriteRepository();
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('favorites');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

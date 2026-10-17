@@ -6,12 +6,9 @@ import type { QueryInterface, Sequelize } from 'sequelize';
 import type { Umzug } from 'umzug';
 import { createSequelize } from './sequelize.ts';
 import { ensureDatabase } from './ensureDatabase.ts';
-import { parseConfig } from './config.ts';
 import { skipWithoutMysql } from './mysqlProbe.testkit.ts';
+import { testDbConfig } from './testDb.testkit.ts';
 import { assertNoPendingMigrations, createMigrator } from './migrator.ts';
-
-// Its own schema: node:test runs spec files in parallel processes.
-const BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
 
 const skip = await skipWithoutMysql();
 
@@ -30,11 +27,7 @@ describe('assertNoPendingMigrations', { skip }, () => {
   let sequelize: Sequelize;
 
   before(async () => {
-    const db = parseConfig({
-      ...process.env,
-      NODE_ENV: 'test',
-      DB_NAME: `${BASE}_migrator`,
-    }).db;
+    const db = testDbConfig('migrator');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     await sequelize.getQueryInterface().dropAllTables();

@@ -11,6 +11,7 @@ import { createApp } from './app.ts';
 import { MAY_CHANGE_CHAPTERS } from './controllers/coAuthorGuard.ts';
 import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { parseConfig } from './db/config.ts';
+import { testDbName } from './db/testDb.testkit.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
 import { skipWithoutMysql } from './db/mysqlProbe.testkit.ts';
 import { createSequelize } from './db/sequelize.ts';
@@ -52,15 +53,13 @@ import type {
 // A schema of its own, like every MySQL-backed suite: node:test runs spec
 // files in parallel processes, and two suites calling sync({ force: true }) on
 // one database would drop each other's tables mid-run.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_app`;
-
 // Parsed inside the suite, not at import: parseConfig throws without DB_USER,
 // which is exactly when the suite should skip instead.
 function testConfig() {
   return parseConfig({
     ...process.env,
     NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
+    DB_NAME: testDbName('app'),
   });
 }
 

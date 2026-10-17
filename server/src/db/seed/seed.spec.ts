@@ -29,9 +29,9 @@ import { ReadingListItem } from '../../models/ReadingListItem.ts';
 import { Series } from '../../models/Series.ts';
 import { SeriesAuthor } from '../../models/SeriesAuthor.ts';
 import { User } from '../../models/User.ts';
-import { parseConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
+import { testDbConfig, testDbName } from '../testDb.testkit.ts';
 import { createMigrator } from '../migrator.ts';
 import { createSequelize } from '../sequelize.ts';
 import { buildPlan } from './plan.ts';
@@ -40,7 +40,7 @@ import { RNG_SEED, createRng } from './rng.ts';
 // seed.ts is a script with a top-level `await main()`, so it cannot be imported
 // without seeding. These tests run it the way `npm run seed` does, as a child
 // process, and watch what it does to a schema of their own.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`;
+const TEST_DB_NAME = testDbName('seed');
 
 const APPLIED_MIGRATIONS = ['0001-baseline.ts', '0002-illustrations.ts'];
 
@@ -159,11 +159,7 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
   let sequelize: Sequelize;
 
   before(async () => {
-    const db = parseConfig({
-      ...process.env,
-      NODE_ENV: 'test',
-      DB_NAME: TEST_DB_NAME,
-    }).db;
+    const db = testDbConfig('seed');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);
@@ -241,11 +237,7 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     sequelize.query(sql, { type: QueryTypes.SELECT });
 
   before(async () => {
-    const db = parseConfig({
-      ...process.env,
-      NODE_ENV: 'test',
-      DB_NAME: TEST_DB_NAME,
-    }).db;
+    const db = testDbConfig('seed');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

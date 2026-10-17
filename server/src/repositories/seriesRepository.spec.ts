@@ -9,7 +9,7 @@ import {
 } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -30,20 +30,6 @@ import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 import type { PublicSeries, WithFavoriteId } from 'shared';
-
-// A schema of its own rather than the users suite's: node:test runs spec
-// files in parallel processes, and two suites calling sync({ force: true })
-// on one database would drop each other's tables mid-run.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_series`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -77,7 +63,7 @@ describe('seriesRepository against real MySQL', { skip }, () => {
   const asModerator: Viewer = { id: 0, role: 'superadmin' };
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('series');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

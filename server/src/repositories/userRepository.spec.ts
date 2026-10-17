@@ -7,7 +7,7 @@ import { DatabaseError, type Sequelize } from 'sequelize';
 import { LAST_ONLINE_WINDOW_MS } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -31,15 +31,6 @@ import { hashToken } from '../tokens.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
 import { userRepositoryContract } from './userRepository.contract.testkit.ts';
 
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: process.env.TEST_DB_NAME ?? 'books_demo_spa_test',
-  });
-  return config.db;
-}
-
 const skip = await skipWithoutMysql();
 
 const base = {
@@ -55,7 +46,7 @@ describe('userRepository against real MySQL', { skip }, () => {
   const repository = createSequelizeUserRepository();
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('users');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     // The whole model graph, not just User: series holds a foreign key into

@@ -6,7 +6,7 @@ import type { Sequelize } from 'sequelize';
 import type { BookStatus, PublicNotification, UserStatus } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
-import { parseConfig } from '../db/config.ts';
+import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
@@ -22,20 +22,6 @@ import { User } from '../models/User.ts';
 import { createSequelizeAnnouncementRepository } from './announcementRepository.ts';
 import { createSequelizeChapterRepository } from './chapterRepository.ts';
 import { createSequelizeUserRepository } from './userRepository.ts';
-
-// A schema of its own, for the reason every MySQL-backed suite gives: node:test
-// runs spec files in parallel processes, and two suites calling
-// sync({ force: true }) on one database would drop each other's tables.
-const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_announcements`;
-
-function testDbConfig() {
-  const config = parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: TEST_DB_NAME,
-  });
-  return config.db;
-}
 
 const skip = await skipWithoutMysql();
 
@@ -55,7 +41,7 @@ describe('announcements against real MySQL', { skip }, () => {
   const users = createSequelizeUserRepository();
 
   before(async () => {
-    const db = testDbConfig();
+    const db = testDbConfig('announcements');
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);

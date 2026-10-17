@@ -5,22 +5,10 @@ import assert from 'node:assert/strict';
 import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../sequelize.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
-import { parseConfig } from '../config.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
+import { testDbConfig } from '../testDb.testkit.ts';
 import { createMigrator } from '../migrator.ts';
 import { initModels } from '../../models/index.ts';
-
-// Two schemas of their own: node:test runs spec files in parallel processes,
-// and sharing a schema with another suite would drop its tables mid-run.
-const BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
-
-function dbConfig(suffix: string) {
-  return parseConfig({
-    ...process.env,
-    NODE_ENV: 'test',
-    DB_NAME: `${BASE}_${suffix}`,
-  }).db;
-}
 
 interface Schema {
   tables: string[];
@@ -55,7 +43,7 @@ describe('migrations vs sync()', { skip }, () => {
   let migrated: Schema;
 
   before(async () => {
-    const syncDb = dbConfig('parity_sync');
+    const syncDb = testDbConfig('parity_sync');
     await ensureDatabase(syncDb);
     const syncSequelize = createSequelize(syncDb);
     initModels(syncSequelize);
@@ -63,7 +51,7 @@ describe('migrations vs sync()', { skip }, () => {
     synced = await readSchema(syncSequelize);
     await syncSequelize.close();
 
-    const migratedDb = dbConfig('parity_migrated');
+    const migratedDb = testDbConfig('parity_migrated');
     await ensureDatabase(migratedDb);
     migratedSequelize = createSequelize(migratedDb);
     await migratedSequelize.getQueryInterface().dropAllTables();
