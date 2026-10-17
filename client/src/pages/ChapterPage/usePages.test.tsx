@@ -91,6 +91,7 @@ describe('usePages', () => {
   });
 
   it('reports the blank space left under the last page', () => {
+    measure.countPages.mockReturnValue(1);
     measure.trailingSpace.mockReturnValue(240);
     render(<Harness {...options()} />);
 
@@ -99,6 +100,31 @@ describe('usePages', () => {
       screen.getByTestId('strip'),
       GEOMETRY
     );
+  });
+
+  it('reports no blank space when the last page is on the right of a spread', () => {
+    measure.measureGeometry.mockImplementation(() => ({
+      ...GEOMETRY,
+      perView: 2,
+    }));
+    measure.countPages.mockReturnValue(2);
+    measure.trailingSpace.mockReturnValue(240);
+    render(<Harness {...options()} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent(/^0$/);
+  });
+
+  it('reports the blank space when the last page is alone on the left of a spread', async () => {
+    measure.measureGeometry.mockImplementation(() => ({
+      ...GEOMETRY,
+      perView: 2,
+    }));
+    measure.trailingSpace.mockReturnValue(240);
+    render(<Harness {...options()} />);
+
+    await forward();
+
+    expect(screen.getByRole('status')).toHaveTextContent('240');
   });
 
   it('turns one page at a time, sliding, and stops at the last', async () => {

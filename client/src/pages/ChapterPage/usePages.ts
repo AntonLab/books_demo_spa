@@ -169,7 +169,9 @@ export const usePages = ({
     stripRef,
     start: view.start,
     pageCount: view.pageCount,
-    trailingSpace: view.trailingSpace,
+    // Zero unless the last page opens the view: on a spread the pulled-up
+    // Illustrations would cover the page to its left.
+    trailingSpace: view.start === view.pageCount - 1 ? view.trailingSpace : 0,
     perView,
     animate: view.animate,
     windowStyle: geometry && {
