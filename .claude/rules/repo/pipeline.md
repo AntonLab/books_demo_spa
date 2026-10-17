@@ -8,24 +8,20 @@ paths:
 
 # Plan pipeline agents
 
-Six pipeline subagents (`code-mapper`, `plan-writer`, `sdd-implementer`,
-`sdd-task-reviewer`, `sdd-re-reviewer`, `sdd-final-reviewer`; `gate-runner`,
-`ui-checker` and `repo-auditor` sit outside the pipeline) come from the
-`swarm` plugin: dispatch each as `swarm:<name>` (`swarm:code-mapper`). They
-carry the superpowers pipeline's role rules, so a dispatch sends only
+The pipeline agents carry the superpowers role rules, so a dispatch sends only
 per-call values.
 
 - **Before `plan-writer`, save the spec** to
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (git-ignored) and
   dispatch with that path; it refuses to run without one. Grill in the main
-  session first (`/grill-with-docs`); plan-writer asks only about decisions the
+  session first (`mattpocock-skills:grilling`); plan-writer asks only about decisions the
   spec left open, as one `NEEDS_CONTEXT` round — put it to the user verbatim
   and resume the agent with the answers through `SendMessage`. A plan over 6
   tasks or two workspaces comes back as part 1 with the other parts listed;
   **resume the same plan-writer through `SendMessage` for each next part**,
   since it already holds the code it read. Dispatch a fresh one only when the
   resume fails.
-- **Dispatch `code-mapper` once per spec, first**, and pass its
+- **Dispatch `code-mapper` once per spec, first** (light mode skips it), and pass its
   `…-codemap.md` to every plan-writer part. Do not run `Explore` or
   `cavecrew-investigator` before it: they map the same code twice. Plans carry
   contracts and tests, not implementation bodies;
@@ -33,18 +29,29 @@ per-call values.
   180 lines.
 - **Every plan goes through plan-writer.** The main session never writes one:
   it costs several times the plan-writer's tokens for a plan of the same size.
-  If plan-writer returns `DONE_WITH_CONCERNS`, put its decisions and concerns
-  to the user verbatim and wait for the answers before Task 1.
+- **A `DONE_WITH_CONCERNS` from any agent:** take a recommendation that stays
+  inside the spec, add `accepted without user: <concern> -> <choice>` to the
+  follow-ups file, and go on; the user reviews those lines with the other
+  follow-ups. Put a concern with no recommendation, or one that changes what
+  the spec asks for, to the user verbatim and wait. In the 2026-10-17 queue
+  five stops all ended in the agent's own recommendation.
 - **The main session edits no source file while a plan runs**, and it fixes
   nothing through `cavecrew-builder` or another ad-hoc agent. Every change
   goes through an `sdd-implementer` brief, so it gets a ledger line and a
   review.
-- **Every plan runs the full `superpowers:subagent-driven-development`.**
-  Every task gets an `sdd-task-reviewer`, whatever the task count; there is
-  no light mode: a task review costs about 0.08M tokens, and skipping it let
-  defects through. Do not run `superpowers:executing-plans` inline: the Opus
-  session pays about as much as all the implementers together and compacts
-  more often.
+- **Every plan runs `superpowers:subagent-driven-development`**, and every
+  task gets an `sdd-task-reviewer`: a task review costs about 0.08M tokens,
+  and skipping it let defects through. Do not run
+  `superpowers:executing-plans` inline: the Opus session pays about as much as
+  all the implementers together and compacts more often.
+- **Light mode** is for a spec that touches no `client/src` and names at most
+  three files to change. Skip `code-mapper`; plan-writer reads those files
+  itself. When the plan has one task, skip `sdd-final-reviewer`: the task
+  review already covered the whole diff. The changed-files audit and
+  `gate-runner` still run, audit first, so the gates run once. A plan that
+  comes back with more than two tasks leaves light mode for the final review.
+  The fixed pipeline cost dominated the 2026-10-17 queue: 115 changed lines
+  per issue cost 6.3M tokens.
 - **One spec, one main session.** After the PR for a spec is opened (or its
   part of a shared branch is finished), have the user run `/clear` before the
   next spec: a long context compacts repeatedly and costs far more. The spec,
@@ -55,11 +62,9 @@ per-call values.
   giant PR is unreviewable. A PR into `dev` does not run its closing keywords,
   so after the merge, close each issue it fixes with
   `gh issue close <n> --comment "Fixed in #<pr>"`.
-- **`dev` and `main` change only through a PR**, a main→dev sync included;
-  never push to either directly, even though the ruleset lets an admin
-  through. The `guard-shell` hook refuses such a push. When a protection rule,
-  permission or hook blocks a push or `gh pr create`, stop and ask the user;
-  never work around it.
+- **`dev` and `main` change only through a PR**, a main→dev sync included,
+  though the ruleset lets an admin through; `guard-shell` refuses a direct
+  push. A blocked push or `gh pr create`: stop and ask the user.
 - **Run the gates through `gate-runner` before the final review**, in every
   mode, and quote its last line in the dispatch (`gates green at <sha>`, with
   the subset if it ran one). Never write that line yourself: a past run
@@ -118,12 +123,15 @@ per-call values.
   totals per subagent role and the main session's compactions for a session
   window. Give its numbers to `superpowers:diagnosing-superpowers` instead of
   rebuilding the tally.
-- **Never pause between tasks.** Stop only on `BLOCKED`, `NEEDS_CONTEXT` or the
-  end of the plan. After `/compact`, re-read the plan's ledger under
-  `.superpowers/sdd/` and resume at its first unfinished task without asking.
-- Tools and preloads live in each frontmatter; reviewers stay read-only by
-  prompt. Grilling, `finishing-a-development-branch` and picking findings to
-  fix stay in the main session: a subagent cannot ask the user anything.
+- **Never pause between tasks.** Stop only on `BLOCKED`, `NEEDS_CONTEXT`, a
+  concern the `DONE_WITH_CONCERNS` rule sends to the user, or the end of the
+  plan. After `/compact`, re-read the plan's ledger under `.superpowers/sdd/`
+  and resume at its first unfinished task without asking.
+- **The ledger holds only `sdd-step.sh next` lines.** Notes go to the
+  follow-ups file through `Edit`; `guard-shell` refuses an `echo >>` into
+  `progress.md`.
+- Grilling, `finishing-a-development-branch` and picking findings to fix stay
+  in the main session: a subagent cannot ask the user anything.
 - **`/db-reset` is the user's command** (`disable-model-invocation`): when the
   database needs a rebuild, ask the user to type it; the Skill call is refused.
 - **The controller creates the worktree before Task 1 with
