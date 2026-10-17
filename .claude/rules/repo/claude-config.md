@@ -31,8 +31,10 @@ paths:
   fetches `origin/dev` and prints one line when the branch is behind, nothing
   otherwise, so a fresh branch costs no context. A failed fetch exits 0.
   It also runs `preflight.mjs`: one line per gap (Node major other than
-  `.nvmrc`, no `server/.env.local`, MySQL not answering), nothing when ready,
-  always exit 0.
+  `.nvmrc`, no `server/.env.local`, MySQL not answering, no Playwright MCP
+  from the swarm plugin or a second `playwright` server beside it), nothing
+  when ready, always exit 0. An MCP fix reaches a session only after a
+  restart: `/clear` keeps the old servers.
 - **`.env.local` is behind `Edit(**/.env.local)`**, which also stops an agent's
   `cp` into a worktree. `npm run worktree` copies it instead; keep the deny.
 - **`.claude/skills/`** is ignored except `db-reset/`: the rest are junctions
