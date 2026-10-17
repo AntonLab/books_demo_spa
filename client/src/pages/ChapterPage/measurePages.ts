@@ -56,6 +56,22 @@ const pageAt = (strip: HTMLElement, left: number, geometry: Geometry) =>
 export const countPages = (strip: HTMLElement, geometry: Geometry): number =>
   Math.max(1, Math.round((strip.scrollWidth + geometry.gap) / step(geometry)));
 
+// The last page is rarely full: the window is a whole page tall, so what
+// follows it (the Illustrations) would sit below this blank space.
+export const trailingSpace = (
+  strip: HTMLElement,
+  geometry: Geometry
+): number => {
+  const fragments = strip.lastElementChild?.getClientRects();
+  const last = fragments?.[fragments.length - 1];
+  return last
+    ? Math.max(
+        0,
+        geometry.pageHeight - (last.bottom - strip.getBoundingClientRect().top)
+      )
+    : 0;
+};
+
 export const pageOfChild = (
   strip: HTMLElement,
   index: number,

@@ -125,6 +125,7 @@ beforeEach(() => {
   measure.countPages.mockReturnValue(3);
   measure.pageOfChild.mockReturnValue(0);
   measure.childOnPage.mockReturnValue(0);
+  measure.trailingSpace.mockReturnValue(0);
 });
 
 describe('ChapterPage', () => {

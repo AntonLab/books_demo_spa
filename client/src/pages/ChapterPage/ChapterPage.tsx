@@ -139,6 +139,7 @@ export const ChapterPage: FC = () => {
     start,
     pageCount,
     perView,
+    trailingSpace,
     animate,
     windowStyle,
     stripStyle,
@@ -313,7 +314,10 @@ export const ChapterPage: FC = () => {
               {!hasPage('next') && (
                 <div
                   className={styles.illustrations}
-                  style={{ width: windowStyle?.width }}
+                  style={{
+                    width: windowStyle?.width,
+                    marginTop: -trailingSpace,
+                  }}
                 >
                   <ChapterIllustrations chapterId={id} />
                 </div>

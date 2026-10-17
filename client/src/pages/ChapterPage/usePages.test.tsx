@@ -27,6 +27,7 @@ const Harness: FC<UsePagesOptions> = (options) => {
     start,
     pageCount,
     perView,
+    trailingSpace,
     turn,
   } = usePages(options);
   return (
@@ -39,6 +40,7 @@ const Harness: FC<UsePagesOptions> = (options) => {
         style={stripStyle}
       />
       <p>{pageIndicator(start, pageCount, perView)}</p>
+      <output>{trailingSpace}</output>
       <button type="button" onClick={() => turn('previous')}>
         Back
       </button>
@@ -70,6 +72,7 @@ beforeEach(() => {
   measure.countPages.mockReturnValue(3);
   measure.pageOfChild.mockReturnValue(0);
   measure.childOnPage.mockReturnValue(0);
+  measure.trailingSpace.mockReturnValue(0);
 });
 
 describe('usePages', () => {
@@ -85,6 +88,17 @@ describe('usePages', () => {
     const strip = screen.getByTestId('strip');
     expect(strip).toHaveStyle({ transform: 'translateX(0px)' });
     expect(strip).toHaveAttribute('data-animate', 'false');
+  });
+
+  it('reports the blank space left under the last page', () => {
+    measure.trailingSpace.mockReturnValue(240);
+    render(<Harness {...options()} />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('240');
+    expect(measure.trailingSpace).toHaveBeenCalledWith(
+      screen.getByTestId('strip'),
+      GEOMETRY
+    );
   });
 
   it('turns one page at a time, sliding, and stops at the last', async () => {
