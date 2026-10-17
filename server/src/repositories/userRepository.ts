@@ -450,8 +450,7 @@ export function createSequelizeUserRepository(): UserRepository {
 
     async updateRole(id, role) {
       return sequelizeOf(User).transaction(async (transaction) => {
-        // FOR UPDATE so a concurrent block or update of the same user cannot
-        // interleave with the role write.
+        // FOR UPDATE: serializes against a concurrent block or update of the same user.
         const user = await User.findByPk(id, {
           transaction,
           lock: transaction.LOCK.UPDATE,
