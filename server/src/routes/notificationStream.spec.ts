@@ -41,6 +41,7 @@ function createFakeRegistry() {
   const registry: OnlineRegistry = {
     add: (connection) => {
       added.push(connection);
+      return true;
     },
     remove: (connection) => {
       removed.push(connection);

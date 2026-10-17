@@ -7,6 +7,11 @@ import type { SessionRepository } from '../repositories/sessionRepository.ts';
 // idle timeouts proxies apply to a quiet connection.
 export const ONLINE_REVALIDATE_INTERVAL_MS = 30_000;
 
+// Streams one Account may hold at once. Past it the new stream is refused, never
+// an old one closed: a closed stream's EventSource reconnects and would evict
+// the next, forever.
+export const MAX_STREAMS_PER_ACCOUNT = 10;
+
 // One open notification stream (GET /api/notifications/stream), as the HTTP
 // layer hands it over. The session's token hash is what revalidation checks.
 export interface OnlineConnection {
@@ -19,7 +24,8 @@ export interface OnlineConnection {
 // Who is Online (CONTEXT.md), held in this process's memory only: a second
 // API instance would see none of these streams (ADR-0013).
 export interface OnlineRegistry {
-  add(connection: OnlineConnection): void;
+  // False when the Account already holds MAX_STREAMS_PER_ACCOUNT other streams.
+  add(connection: OnlineConnection): boolean;
   remove(connection: OnlineConnection): void;
   isOnline(userId: number): boolean;
   push(userId: number, notification: PublicNotification): void;
@@ -41,24 +47,32 @@ export function notificationEvent(notification: PublicNotification): string {
 const PING = ': ping\n\n';
 
 export function createOnlineRegistry(deps: OnlineRegistryDeps): OnlineRegistry {
-  const connections = new Set<OnlineConnection>();
+  // Entries exist only while their set is non-empty.
+  const byUser = new Map<number, Set<OnlineConnection>>();
   let timer: ReturnType<typeof setInterval> | undefined;
 
+  const release = (connection: OnlineConnection): void => {
+    const streams = byUser.get(connection.userId);
+    if (!streams) return;
+    streams.delete(connection);
+    if (streams.size === 0) byUser.delete(connection.userId);
+  };
+
   const drop = (connection: OnlineConnection): void => {
-    connections.delete(connection);
+    release(connection);
     connection.close();
   };
 
   const revalidate = async (): Promise<void> => {
-    if (connections.size === 0) return;
-    const checked = [...connections];
+    if (byUser.size === 0) return;
+    const checked = [...byUser.values()].flatMap((set) => [...set]);
     try {
       const live = await deps.sessionRepository.findLiveSessions([
         ...new Set(checked.map((connection) => connection.tokenHash)),
       ]);
       for (const connection of checked) {
         // Closed by its client while the query ran: nothing left to do.
-        if (!connections.has(connection)) continue;
+        if (!byUser.get(connection.userId)?.has(connection)) continue;
         if (live.get(connection.tokenHash) === connection.userId) {
           connection.write(PING);
         } else {
@@ -74,17 +88,24 @@ export function createOnlineRegistry(deps: OnlineRegistryDeps): OnlineRegistry {
 
   return {
     add: (connection) => {
-      connections.add(connection);
+      const streams = byUser.get(connection.userId);
+      if (
+        streams &&
+        !streams.has(connection) &&
+        streams.size >= MAX_STREAMS_PER_ACCOUNT
+      ) {
+        return false;
+      }
+      if (streams) streams.add(connection);
+      else byUser.set(connection.userId, new Set([connection]));
+      return true;
     },
-    remove: (connection) => {
-      connections.delete(connection);
-    },
-    isOnline: (userId) =>
-      [...connections].some((connection) => connection.userId === userId),
+    remove: release,
+    isOnline: (userId) => byUser.has(userId),
     push: (userId, notification) => {
       const chunk = notificationEvent(notification);
-      for (const connection of connections) {
-        if (connection.userId === userId) connection.write(chunk);
+      for (const connection of byUser.get(userId) ?? []) {
+        connection.write(chunk);
       }
     },
     revalidate,
@@ -100,7 +121,9 @@ export function createOnlineRegistry(deps: OnlineRegistryDeps): OnlineRegistry {
     stop: () => {
       clearInterval(timer);
       timer = undefined;
-      for (const connection of [...connections]) drop(connection);
+      for (const streams of [...byUser.values()]) {
+        for (const connection of [...streams]) drop(connection);
+      }
     },
   };
 }
