@@ -108,12 +108,13 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 In memory, fixed window, mounted before `validate` so a refusal costs no parse,
 lookup or argon2. A limited Account is not Blocked.
 
-| Route                                   | Key        | Limit         | Counts                     |
-| --------------------------------------- | ---------- | ------------- | -------------------------- |
-| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed or aborted attempts |
-| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed or aborted attempts |
-| `POST /api/auth/register`               | IP         | 5 per hour    | every request              |
-| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request              |
+| Route                                   | Key        | Limit         | Counts                                                               |
+| --------------------------------------- | ---------- | ------------- | -------------------------------------------------------------------- |
+| `POST /api/auth/login`                  | IP + login | 10 per 15 min | failed or aborted attempts                                           |
+| `POST /api/auth/login`                  | IP         | 50 per 15 min | failed or aborted attempts                                           |
+| `POST /api/auth/register`               | IP         | 5 per hour    | every request                                                        |
+| `POST /api/auth/password-reset/request` | IP         | 5 per hour    | every request                                                        |
+| `PATCH /api/users/:id`                  | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it |
 
 - **Login claims both budgets on arrival** (`hit`), or parallel attempts would
   all read the same unspent count while argon2 runs. A refusal releases
@@ -123,6 +124,11 @@ lookup or argon2. A limited Account is not Blocked.
   403 or 2xx releases both, and a 2xx also clears the IP + login history. The
   per-IP budget survives a success, or one real account buys fresh guesses at
   every other.
+- **`currentPassword` is charged on arrival**, before argon2, in
+  `userController.assertCurrentPassword`, for the same parallel-guess reason.
+  Over budget is 429 even with the right password. A missing `currentPassword`
+  stays 400 and uncharged, as does a change that needs none (a name, or an
+  admin acting on another row).
 - The login half of the key is trimmed, lower-cased and SHA-256 hashed, so case
   or whitespace buys no fresh budget, and an unbounded `login` (this runs
   before `validate`) cannot leave an unbounded key in memory.
