@@ -34,6 +34,11 @@ export function createNotificationStreamHandler(
     // Before the headers, because a refusal must still be a plain JSON error;
     // the handler is synchronous, so no push can reach `res` before they are out.
     if (!registry.add(connection)) throw new TooManyStreamsError();
+    // On the response, not the request: since Node 16 a request's 'close'
+    // fires once its body is read, long before the client goes away.
+    res.on('close', () => {
+      registry.remove(connection);
+    });
 
     // setHeader, not res.set(): Express's set() appends "; charset=utf-8" to
     // every text/* Content-Type, which SSE must not carry.
@@ -49,11 +54,5 @@ export function createNotificationStreamHandler(
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
     res.write(': connected\n\n');
-
-    // On the response, not the request: since Node 16 a request's 'close'
-    // fires once its body is read, long before the client goes away.
-    res.on('close', () => {
-      registry.remove(connection);
-    });
   };
 }
