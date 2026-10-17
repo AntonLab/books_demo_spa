@@ -25,6 +25,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { removeDir } from './remove-dir.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const git = (...args) =>
@@ -73,21 +74,9 @@ const remove = (name) => {
   // On Windows `git worktree remove` leaves the npm workspace junctions under
   // node_modules/, so the directory itself survives. Their targets are gone by
   // now, and `rmSync` unlinks a junction instead of following it.
-  // EPERM or EBUSY means a process still holds the directory open; the
-  // retries cover one that is just exiting.
-  try {
-    rmSync(target, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 500,
-    });
-  } catch (error) {
-    console.error(
-      `worktree: cannot delete ${target} (${error.code}): a process still holds it. ` +
-        'Stop the UI-check server (ports 3100/4100), close the browser and any ' +
-        'terminal or editor tab inside it, then run --remove again.'
-    );
+  const held = removeDir(target);
+  if (held) {
+    console.error(held);
     process.exit(1);
   }
   git('worktree', 'prune');

@@ -62,7 +62,8 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 
 - Absolute local paths in checked-in governance files. Use relative paths.
 - Documenting a command, script or dependency that `package.json` lacks.
-- **Growing a CLAUDE.md.** Keep each under ~200 lines and each rule under ~150.
+- **Growing a CLAUDE.md.** Keep each at 200 lines or fewer and each rule at 150;
+  `scripts/doc-limits.mjs` fails `lint` and the pre-commit hook above that.
   A new trap goes into the `.claude/rules/` file for its area, or a new one
   with `paths:` naming the files it concerns, and gets a row in that package's
   index. Write down what does not follow from the code — traps, rationale,
@@ -159,7 +160,8 @@ them `ui-checker` reports `BLOCKED`.
 - **Focused test commands:** client `npm test -w client -- <test path>`;
   server, from `server/`,
   `node --env-file-if-exists=.env.local --test <spec path>`
-  (`npm test -w server -- <path>` still runs the whole glob).
+  (`npm test -w server -- <path>` still runs the whole glob); root scripts
+  `npm run test:scripts`.
 
 ### Shell on Windows
 
@@ -167,7 +169,8 @@ Every session runs Git Bash on Windows, so commands are POSIX:
 `cd "D:/path" && …` with forward slashes (a backslash path loses its
 separators; `cd /d` is cmd.exe), `head`/`tail` in Bash only. Create and change
 files only with `Write`/`Edit`: a heredoc breaks on the first unmatched quote,
-and `sed -i`, `cp`, `>` or a `node -e` rewrite skip the Prettier hook. List a
+and `sed -i`, `cp`, `>` or a `node -e` rewrite skip the Prettier hook. `Edit`
+needs the file `Read` first; a Bash `cat` or `sed -n` does not count. List a
 directory with `Glob`, since `Read` on one fails with EISDIR; when `Grep` fails
 with `EPERM ... uv_spawn 'rg'`, fall back to `git grep`.
 

@@ -86,7 +86,11 @@ the types the root CLAUDE.md lists; add a type to both at once. Git's own
 ## `scripts/`
 
 Plain Node (`*.mjs`) and one Bash script, with no dependencies; Prettier
-checks the `.mjs` files, but no package's ESLint config reaches them.
+checks the `.mjs` files, but no package's ESLint config reaches them. Their
+tests sit in `scripts/test/` and run through `npm run test:scripts` (part of
+`npm test` and CI's `lint` job); a script that runs on import keeps its
+testable part in a sibling module, as `worktree.mjs` does with `remove-dir.mjs`.
+`doc-limits.mjs` holds CLAUDE.md files to 200 lines and rules to 150.
 `sdd-step.sh` finds the superpowers scripts by globbing the plugin cache for
 the newest version, so it needs no update when the plugin does.
 `plan-check.mjs` tells a test block from implementation by a `test`/`it`/

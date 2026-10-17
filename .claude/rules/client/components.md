@@ -25,8 +25,7 @@ that read like mistakes and are not.
   while Genres load, on error and when there are none. A Genre with Subgenres
   is a nested submenu (key `genre-<id>`) whose first entry is the Genre's own
   link.
-- There is no Register item: the login modal's "Create an account" is the way
-  in.
+- No Register item: the login modal's "Create an account" is the way in.
 
 ## Comments (`CommentSection`, `Comment`)
 

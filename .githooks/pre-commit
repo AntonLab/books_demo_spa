@@ -125,4 +125,10 @@ run_tool . "$bin/prettier" "$work/staged" \
 # left loose in the working tree.
 run_tool . git "$work/staged" add --
 
+# A staged steering file is checked against its line budget, so a CLAUDE.md
+# or rule never grows past it unnoticed.
+if grep -Eq '(^|/)CLAUDE\.md$|^\.claude/rules/' "$work/staged"; then
+  node scripts/doc-limits.mjs || status=1
+fi
+
 exit $status

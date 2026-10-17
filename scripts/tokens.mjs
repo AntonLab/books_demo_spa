@@ -3,7 +3,8 @@
 // plus every subagent under it. It sums `message.usage` (input, cache write,
 // cache read, output) once per `message.id`, since a response with several
 // content blocks is logged once per block. It prints totals per subagent role
-// and model, and the main session's compactions. It reads transcripts only and
+// and model, the main session's compactions, and failed tool calls per role and
+// per tool. It reads transcripts only and
 // prints counters, never record bodies: one transcript line can be a megabyte.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -31,7 +32,14 @@ const base = join(projects, project, id);
 
 const tally = (file) => {
   const seen = new Set();
-  const out = { total: 0, calls: 0, models: new Set(), compactions: [] };
+  const out = {
+    total: 0,
+    calls: 0,
+    models: new Set(),
+    compactions: [],
+    errors: new Map(),
+  };
+  const tools = new Map();
   for (const line of readFileSync(file, 'utf8').split('\n')) {
     if (!line) continue;
     let record;
@@ -44,6 +52,17 @@ const tally = (file) => {
     if (!(at > after && at <= until)) continue;
     if (record.subtype === 'compact_boundary')
       out.compactions.push(record.compactMetadata?.preTokens);
+    // A failed tool call is a tool_result with is_error, named by its tool_use.
+    const blocks = Array.isArray(record.message?.content)
+      ? record.message.content
+      : [];
+    for (const block of blocks) {
+      if (block.type === 'tool_use') tools.set(block.id, block.name);
+      if (block.type === 'tool_result' && block.is_error) {
+        const name = tools.get(block.tool_use_id) ?? 'unknown';
+        out.errors.set(name, (out.errors.get(name) ?? 0) + 1);
+      }
+    }
     const usage = record.message?.usage;
     if (record.type !== 'assistant' || !usage || seen.has(record.message.id))
       continue;
@@ -60,7 +79,9 @@ const tally = (file) => {
 };
 
 const millions = (n) => `${(n / 1e6).toFixed(2)}M`;
+const count = (errors) => [...errors.values()].reduce((sum, n) => sum + n, 0);
 const main = tally(`${base}.jsonl`);
+const allErrors = new Map(main.errors);
 const roles = new Map();
 const subagents = join(base, 'subagents');
 for (const file of existsSync(subagents) ? readdirSync(subagents) : []) {
@@ -72,23 +93,32 @@ for (const file of existsSync(subagents) ? readdirSync(subagents) : []) {
   const run = tally(join(subagents, file));
   if (!run.calls) continue;
   const key = `${role} (${[...run.models].filter((m) => m !== '<synthetic>').join(', ')})`;
-  const row = roles.get(key) ?? { runs: 0, total: 0, max: 0 };
+  const row = roles.get(key) ?? { runs: 0, total: 0, max: 0, errors: 0 };
   row.runs++;
   row.total += run.total;
   row.max = Math.max(row.max, run.total);
+  row.errors += count(run.errors);
   roles.set(key, row);
+  for (const [name, n] of run.errors)
+    allErrors.set(name, (allErrors.get(name) ?? 0) + n);
 }
 
 const rows = [...roles].sort((a, b) => b[1].total - a[1].total);
 const subTotal = rows.reduce((sum, [, row]) => sum + row.total, 0);
 console.log(
   `main: ${millions(main.total)} in ${main.calls} responses, ` +
-    `${main.compactions.length} compactions`
+    `${main.compactions.length} compactions, ${count(main.errors)} tool errors`
 );
 for (const [key, row] of rows)
   console.log(
-    `${key}: ${millions(row.total)} in ${row.runs} runs, largest ${millions(row.max)}`
+    `${key}: ${millions(row.total)} in ${row.runs} runs, largest ${millions(row.max)}, ${row.errors} tool errors`
   );
 console.log(
   `subagents: ${millions(subTotal)}; total: ${millions(subTotal + main.total)}`
+);
+const byTool = [...allErrors]
+  .sort((a, b) => b[1] - a[1])
+  .map(([name, n]) => `${name} ${n}`);
+console.log(
+  `tool errors: ${count(allErrors)}${byTool.length ? ` (${byTool.join(', ')})` : ''}`
 );
