@@ -65,7 +65,9 @@ credited on a Book (a Co-author)
 **Co-author**:
 An Account credited on a Book or a Series. Every credited Account is one, even
 when it is the only one; all of a work's Co-authors are equal, and a work always
-has at least one.
+has at least one. A byline lists a work's Co-authors in the order their credits
+were given; that order carries no rank, since all Co-authors are equal.
+Removing a Co-author and adding them again moves them to the end.
 _Avoid_: Primary author, creator, "author" for a credit
 
 **Admin**:
