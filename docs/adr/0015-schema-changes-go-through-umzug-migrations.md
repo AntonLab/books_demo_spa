@@ -18,8 +18,8 @@ production. In production it only asserts that nothing is pending and refuses to
 start otherwise; production migrates with `npm run migrate -w server` before the
 server starts. The seed migrates too, so it builds the same schema a deployment
 does. Test schemas stay on `sync({ force: true })`, which is fast and isolated
-per suite, except the two seed suites, which build theirs with the migrations. A
-parity spec compares a `sync()` schema with a migrated one, so the two cannot
+per suite, except the two seed suites in `seed.spec.ts`, which build theirs with
+the migrations. A parity spec compares a `sync()` schema with a migrated one, so the two cannot
 drift apart unnoticed.
 
 ## Considered Options
@@ -44,7 +44,7 @@ drift apart unnoticed.
 - Umzug takes no lock. Two instances migrating at once could both run the same
   migration, so one instance migrates at a time, which fits the single-instance
   deployment of ADR-0013.
-- The baseline runs about 22 `CREATE TABLE` statements and MySQL DDL is not
+- The baseline's `CREATE TABLE` statements are MySQL DDL, which is not
   transactional, so a failure partway leaves some tables and no `SequelizeMeta`
   row. The next `up()` then fails with "table already exists". Recovery:
   `/db-reset` in development; in production, drop the partial tables by hand and
