@@ -136,7 +136,8 @@ export const AppHeader: FC = () => {
   // modifier-click opens a new tab); a keypress or a click beside the
   // anchor reaches only the item, so the menu navigates for those.
   const handleNavClick: MenuProps['onClick'] = ({ key, domEvent }) => {
-    if ((domEvent.target as Element).closest('a')) return;
+    const { target } = domEvent;
+    if (target instanceof Element && target.closest('a')) return;
     void navigate(key);
   };
 

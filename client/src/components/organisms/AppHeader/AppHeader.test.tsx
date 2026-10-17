@@ -1,4 +1,10 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { QueryClient } from '@tanstack/react-query';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
@@ -477,6 +483,27 @@ describe('AppHeader genres submenu', () => {
     await userEvent.click(
       await screen.findByRole('menuitem', { name: 'Gothic' })
     );
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
+  });
+
+  it('navigates when Enter is pressed on a genre item', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      withSession(null)
+    );
+
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: /Genres/ })
+    );
+    fireEvent.keyDown(await screen.findByRole('menuitem', { name: 'Gothic' }), {
+      key: 'Enter',
+      which: 13,
+      keyCode: 13,
+    });
 
     expect(screen.getByTestId('location')).toHaveTextContent('/search?genre=3');
   });
