@@ -1,0 +1,93 @@
+process.env.NODE_ENV ??= 'test';
+
+import { after, before, describe, test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { Sequelize } from 'sequelize';
+import { createSequelize } from '../sequelize.ts';
+import { ensureDatabase } from '../ensureDatabase.ts';
+import { parseConfig } from '../config.ts';
+import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
+import { createMigrator } from '../migrator.ts';
+import { initModels } from '../../models/index.ts';
+
+// Two schemas of their own: node:test runs spec files in parallel processes,
+// and sharing a schema with another suite would drop its tables mid-run.
+const BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
+
+function dbConfig(suffix: string) {
+  return parseConfig({
+    ...process.env,
+    NODE_ENV: 'test',
+    DB_NAME: `${BASE}_${suffix}`,
+  }).db;
+}
+
+interface Schema {
+  tables: string[];
+  ddl: Record<string, string>;
+}
+
+async function readSchema(sequelize: Sequelize): Promise<Schema> {
+  const [rows] = await sequelize.query('SHOW TABLES');
+  const tables = rows
+    .map((row) => Object.values(row as Record<string, string>)[0] as string)
+    // Case-insensitive: MySQL on Windows lowercases table names.
+    .filter((table) => table.toLowerCase() !== 'sequelizemeta')
+    .sort();
+  const ddl: Record<string, string> = {};
+  for (const table of tables) {
+    const [create] = (await sequelize.query(
+      `SHOW CREATE TABLE \`${table}\``
+    )) as [Record<string, string>[], unknown];
+    ddl[table] = (create[0]?.['Create Table'] ?? '').replace(
+      / AUTO_INCREMENT=\d+/,
+      ''
+    );
+  }
+  return { tables, ddl };
+}
+
+const skip = await skipWithoutMysql();
+
+describe('migrations vs sync()', { skip }, () => {
+  let migratedSequelize: Sequelize;
+  let synced: Schema;
+  let migrated: Schema;
+
+  before(async () => {
+    const syncDb = dbConfig('parity_sync');
+    await ensureDatabase(syncDb);
+    const syncSequelize = createSequelize(syncDb);
+    initModels(syncSequelize);
+    await syncSequelize.sync({ force: true });
+    synced = await readSchema(syncSequelize);
+    await syncSequelize.close();
+
+    const migratedDb = dbConfig('parity_migrated');
+    await ensureDatabase(migratedDb);
+    migratedSequelize = createSequelize(migratedDb);
+    await migratedSequelize.getQueryInterface().dropAllTables();
+    await createMigrator(migratedSequelize).up();
+    migrated = await readSchema(migratedSequelize);
+  });
+
+  after(async () => {
+    await migratedSequelize.close();
+  });
+
+  test('both schemas hold the same tables', () => {
+    assert.deepEqual(migrated.tables, synced.tables);
+    assert.ok(synced.tables.length >= 20);
+  });
+
+  test('each table has the same SHOW CREATE TABLE', () => {
+    // Per table, so a failure names it.
+    for (const table of synced.tables) {
+      assert.equal(migrated.ddl[table], synced.ddl[table], table);
+    }
+  });
+
+  test('up() is idempotent: a second run applies nothing', async () => {
+    assert.deepEqual(await createMigrator(migratedSequelize).up(), []);
+  });
+});

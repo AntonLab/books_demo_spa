@@ -23,6 +23,7 @@
     "sequelize": "6.37.8",
     "shared": "*",
     "sharp": "0.35.5",
+    "umzug": "3.8.3",
     "zod": "4.6.5"
   },
   "devDependencies": {
