@@ -729,6 +729,18 @@ describe('ChapterPage illustrations', () => {
     expect(await screen.findByText('A map')).toBeInTheDocument();
   });
 
+  it('pages: they are as wide as the text window', async () => {
+    measure.countPages.mockReturnValue(1);
+    renderPagesAt(9);
+    const pageWindow = (await screen.findByRole('heading', { level: 2 }))
+      .parentElement!.parentElement!;
+    const section = await screen.findByRole('region', {
+      name: 'Illustrations',
+    });
+    expect(pageWindow.style.width).not.toBe('');
+    expect(section.parentElement!.style.width).toBe(pageWindow.style.width);
+  });
+
   it('pages: a one-page chapter shows them at once', async () => {
     measure.countPages.mockReturnValue(1);
     renderPagesAt(9);

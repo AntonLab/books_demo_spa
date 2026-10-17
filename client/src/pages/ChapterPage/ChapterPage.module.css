@@ -42,6 +42,11 @@
   overflow: clip;
 }
 
+/* Same width as the window, set inline beside it. */
+.illustrations {
+  margin-inline: auto;
+}
+
 .strip {
   height: 100%;
   column-fill: auto;

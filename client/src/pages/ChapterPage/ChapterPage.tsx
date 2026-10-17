@@ -310,7 +310,14 @@ export const ChapterPage: FC = () => {
               </div>
               {/* Outside the strip, which measurePages.ts measures: they
                   belong to the chapter's last page only. */}
-              {!hasPage('next') && <ChapterIllustrations chapterId={id} />}
+              {!hasPage('next') && (
+                <div
+                  className={styles.illustrations}
+                  style={{ width: windowStyle?.width }}
+                >
+                  <ChapterIllustrations chapterId={id} />
+                </div>
+              )}
             </div>
           ) : (
             /* Size and spacing are the reader's own numbers, so they go
