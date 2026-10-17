@@ -99,7 +99,6 @@ export function createIllustrationController(
       const { id } = validatedParams<{ id: number }>(req);
       const image = await repository.getImageData(id, viewerOf(req.user));
       if (!image) throw new NotFoundError('Illustration', id);
-      // The cover helper is reused because the headers are the same.
       sendCover(res, image);
     },
   } satisfies Record<string, RequestHandler>;

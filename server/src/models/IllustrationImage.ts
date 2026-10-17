@@ -37,8 +37,7 @@ export function initIllustrationImageModel(
         type: DataTypes.BLOB('medium'),
         allowNull: false,
       },
-      // Millisecond precision, like book_covers.updatedAt: the cache-busting
-      // image URL depends on this value actually changing.
+      // Millisecond precision, like book_covers.updatedAt.
       updatedAt: { type: DataTypes.DATE(3), allowNull: false },
     },
     {

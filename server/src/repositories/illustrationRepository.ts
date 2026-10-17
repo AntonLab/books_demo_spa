@@ -12,10 +12,7 @@ export interface IllustrationRepository {
   // null when the chapter is missing or the viewer may not read it (same 404).
   list(chapterId: number, viewer: Viewer): Promise<PublicIllustration[] | null>;
   // null when the illustration is missing or its chapter is not readable.
-  getImageData(
-    id: number,
-    viewer: Viewer
-  ): Promise<{ data: Buffer; updatedAt: Date } | null>;
+  getImageData(id: number, viewer: Viewer): Promise<{ data: Buffer } | null>;
   // The Co-author ids of the illustration's book; null when it is missing.
   findCoAuthorIds(id: number): Promise<number[] | null>;
   // The Co-author ids of the chapter's book; null when the chapter is missing.
@@ -86,7 +83,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
       }
 
       const image = await IllustrationImage.findByPk(id);
-      return image ? { data: image.data, updatedAt: image.updatedAt } : null;
+      return image ? { data: image.data } : null;
     },
 
     async findCoAuthorIds(id) {

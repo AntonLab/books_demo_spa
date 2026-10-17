@@ -44,7 +44,6 @@ export const queryKeys = {
   allSeries: ['series'] as const,
   allChapters: ['chapters'] as const,
   allComments: ['comments'] as const,
-  allIllustrations: ['illustrations'] as const,
   allAuthors: ['authors'] as const,
   allAccounts: ['accounts'] as const,
   // The prefix a Favorite toggle or removal invalidates.

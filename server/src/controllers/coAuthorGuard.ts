@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
 } from '../types/errors.ts';
 
-// The other half of enforcement for Books, Series and Chapters.
+// The other half of enforcement for Books, Series, Chapters and Illustrations.
 // requirePermission already refused `none`; `own` has to look at the row —
 // which is why this cannot live in the middleware, where the row is not
 // loaded yet.
