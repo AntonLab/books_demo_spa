@@ -81,8 +81,8 @@ export function createUserController(
       );
     }
 
-    // Charged on arrival so parallel guesses cannot share a slot (as
-    // limitFailedLogins); wrong and aborted attempts stay charged.
+    // Charged on arrival so parallel guesses cannot share a slot, as in
+    // limitFailedLogins.
     const budget = currentPasswordLimiter.hit(String(id));
     if (!budget.allowed) throw refusal(res, budget.retryAfterMs);
 

@@ -6,7 +6,7 @@ import { TooManyRequestsError } from '../types/errors.ts';
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-// The sign-in and current-password budgets. A limit is not an Account state: nothing is
+// The auth budgets. A limit is not an Account state: nothing is
 // written anywhere, and a limited Account is not Blocked.
 export const AUTH_RATE_LIMITS = {
   // Failed logins for one login name from one address.
@@ -17,7 +17,8 @@ export const AUTH_RATE_LIMITS = {
   register: { limit: 5, windowMs: ONE_HOUR_MS },
   // Every password-reset request from one address.
   resetRequest: { limit: 5, windowMs: ONE_HOUR_MS },
-  // Current-password guesses on a user's own password or email change, by user id; every attempt counts until a correct one.
+  // Wrong or aborted current-password guesses on a user's own password or
+  // email change, by user id; a correct one clears it.
   currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
 } as const;
 
