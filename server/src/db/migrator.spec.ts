@@ -2,7 +2,8 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sequelize } from 'sequelize';
+import type { QueryInterface, Sequelize } from 'sequelize';
+import type { Umzug } from 'umzug';
 import { createSequelize } from './sequelize.ts';
 import { ensureDatabase } from './ensureDatabase.ts';
 import { parseConfig } from './config.ts';
@@ -13,6 +14,17 @@ import { assertNoPendingMigrations, createMigrator } from './migrator.ts';
 const BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
 
 const skip = await skipWithoutMysql();
+
+describe('assertNoPendingMigrations message', () => {
+  test('joins several pending names with a comma', async () => {
+    const stub = {
+      pending: async () => [{ name: 'a.ts' }, { name: 'b.ts' }],
+    } as unknown as Umzug<QueryInterface>;
+    await assert.rejects(assertNoPendingMigrations(stub), {
+      message: 'Pending migrations: a.ts, b.ts. Run npm run migrate -w server',
+    });
+  });
+});
 
 describe('assertNoPendingMigrations', { skip }, () => {
   let sequelize: Sequelize;
