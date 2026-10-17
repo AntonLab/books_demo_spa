@@ -7,7 +7,10 @@ import {
   type InferCreationAttributes,
   type Sequelize,
 } from 'sequelize';
-import { ILLUSTRATION_CAPTION_MAX_LENGTH } from 'shared';
+import {
+  ILLUSTRATION_CAPTION_MAX_LENGTH,
+  type PublicIllustration,
+} from 'shared';
 import type { Chapter } from './Chapter.ts';
 
 // A picture placed in a Chapter. The bytes live in illustration_images.
@@ -67,4 +70,13 @@ export function initIllustrationModel(
   );
 
   return Illustration;
+}
+
+export function toPublicIllustration(row: Illustration): PublicIllustration {
+  return {
+    id: row.id,
+    position: row.position,
+    caption: row.caption,
+    updatedAt: row.updatedAt,
+  };
 }

@@ -221,6 +221,7 @@ describe('the app', () => {
     seriesRepository: createUnusedRepository('series'),
     bookRepository: createUnusedRepository('book'),
     chapterRepository: createUnusedRepository('chapter'),
+    illustrationRepository: createUnusedRepository('illustration'),
     genreRepository: createUnusedRepository('genre'),
     commentRepository: createUnusedRepository('comment'),
     likeRepository: createUnusedRepository('like'),

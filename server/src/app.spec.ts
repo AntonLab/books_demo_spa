@@ -17,6 +17,8 @@ import { createLogMailDelivery } from './delivery/mailDelivery.ts';
 import { XSRF_HEADER_NAME } from './middleware/csrfProtection.ts';
 import { SESSION_COOKIE_NAME, XSRF_COOKIE } from './sessionCookie.ts';
 import { initModels } from './models/index.ts';
+import { Illustration } from './models/Illustration.ts';
+import { IllustrationImage } from './models/IllustrationImage.ts';
 import { Session } from './models/Session.ts';
 import { User } from './models/User.ts';
 import {
@@ -738,5 +740,136 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     assert.equal(metadata.format, 'webp');
     assert.equal(metadata.width, 600);
     assert.equal(metadata.height, 900);
+  });
+
+  const seedIllustration = async (
+    chapterId: number,
+    position: number,
+    caption: string | null
+  ) => {
+    const row = await Illustration.create({ chapterId, position, caption });
+    const data = await sharp({
+      create: { width: 40, height: 30, channels: 3, background: '#336699' },
+    })
+      .webp()
+      .toBuffer();
+    await IllustrationImage.create({ illustrationId: row.id, data });
+    return row;
+  };
+  const imageOf = (id: number, browser?: Browser) =>
+    fetch(`${base}/api/illustrations/${id}/image`, {
+      headers: browser ? { cookie: browser.cookieHeader() } : {},
+    });
+  const publishedBook = async (author: Visitor, title: string) => {
+    const book = await createBook(author, title);
+    const patched = await author.browser.send('PATCH', `/books/${book.id}`, {
+      status: 'in_progress',
+    });
+    assert.equal(patched.status, 200);
+    return book;
+  };
+
+  test('Illustrations of a Draft chapter are for its Co-authors only, on the list and on a direct image link', async () => {
+    const author = await signUp('illusAuthor', 'author');
+    const stranger = await signUp('illusStranger', 'author');
+    const book = await publishedBook(author, 'Pictured');
+    const draft = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      { bookId: book.id, title: 'Draft', text: 'Hidden.' }
+    );
+    const second = await seedIllustration(draft.body.id, 2, 'Second');
+    const first = await seedIllustration(draft.body.id, 1, null);
+    const list = `/chapters/${draft.body.id}/illustrations`;
+
+    for (const reader of [openBrowser(), stranger.browser]) {
+      assert.equal((await reader.send('GET', list)).status, 404);
+      assert.equal((await imageOf(first.id, reader)).status, 404);
+    }
+    const own = await author.browser.send<{ items: Record<string, unknown>[] }>(
+      'GET',
+      list
+    );
+    assert.equal(own.status, 200);
+    assert.deepEqual(
+      own.body.items.map((item) => item.id),
+      [first.id, second.id]
+    );
+    assert.deepEqual(Object.keys(own.body.items[0] ?? {}).sort(), [
+      'caption',
+      'id',
+      'position',
+      'updatedAt',
+    ]);
+    const image = await imageOf(first.id, author.browser);
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get('content-type'), 'image/webp');
+    assert.equal(
+      image.headers.get('cache-control'),
+      'private, max-age=31536000, immutable'
+    );
+    assert.equal(
+      (await author.browser.send('GET', '/chapters/999999/illustrations'))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(999999)).status, 404);
+  });
+
+  test('Illustrations of a Scheduled chapter stay hidden until its time, and of a chapter in a Draft book always', async () => {
+    const author = await signUp('illusScheduler', 'author');
+    const book = await publishedBook(author, 'Timed');
+    const soon = new Date(Date.now() + 3_600_000).toISOString();
+    const scheduled = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      { bookId: book.id, title: 'Later', text: 'Soon.', publishedAt: soon }
+    );
+    const out = await author.browser.send<PublicChapter>('POST', '/chapters', {
+      bookId: book.id,
+      title: 'Now',
+      text: 'Out.',
+      publishedAt: 'now',
+    });
+    const later = await seedIllustration(scheduled.body.id, 1, null);
+    const now = await seedIllustration(out.body.id, 1, 'Out');
+    const guest = openBrowser();
+
+    assert.equal(
+      (await guest.send('GET', `/chapters/${scheduled.body.id}/illustrations`))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(later.id)).status, 404);
+    assert.equal((await imageOf(later.id, author.browser)).status, 200);
+    const published = await guest.send<{ items: { id: number }[] }>(
+      'GET',
+      `/chapters/${out.body.id}/illustrations`
+    );
+    assert.equal(published.status, 200);
+    assert.deepEqual(
+      published.body.items.map((item) => item.id),
+      [now.id]
+    );
+    assert.equal((await imageOf(now.id)).status, 200);
+
+    const draftBook = await createBook(author, 'Still private');
+    const inDraft = await author.browser.send<PublicChapter>(
+      'POST',
+      '/chapters',
+      {
+        bookId: draftBook.id,
+        title: 'Out but hidden',
+        text: '.',
+        publishedAt: 'now',
+      }
+    );
+    const hidden = await seedIllustration(inDraft.body.id, 1, null);
+    assert.equal(
+      (await guest.send('GET', `/chapters/${inDraft.body.id}/illustrations`))
+        .status,
+      404
+    );
+    assert.equal((await imageOf(hidden.id)).status, 404);
   });
 });

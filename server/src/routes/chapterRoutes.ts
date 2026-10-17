@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createChapterController } from '../controllers/chapterController.ts';
+import { createIllustrationController } from '../controllers/illustrationController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -12,6 +13,9 @@ import type { RouteDeps } from './index.ts';
 
 export function createChapterRoutes(deps: RouteDeps): Router {
   const controller = createChapterController(deps.chapterRepository);
+  const illustrations = createIllustrationController(
+    deps.illustrationRepository
+  );
   const requirePermission = createRequirePermission(deps);
   const router = Router();
 
@@ -29,6 +33,12 @@ export function createChapterRoutes(deps: RouteDeps): Router {
     requirePermission('chapters', 'read'),
     validate({ params: idParamSchema }),
     controller.getById
+  );
+  router.get(
+    '/:id/illustrations',
+    requirePermission('chapters', 'read'),
+    validate({ params: idParamSchema }),
+    illustrations.list
   );
 
   router.post(
