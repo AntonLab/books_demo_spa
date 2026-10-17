@@ -83,6 +83,58 @@ test('TRUST_PROXY refuses a negative, fractional or non-numeric value', () => {
   }
 });
 
+test('TRUST_PROXY may be left unset in development and test, and then trusts none', () => {
+  for (const NODE_ENV of ['development', 'test']) {
+    assert.equal(parseConfig({ ...minimal, NODE_ENV }).trustProxy, 0);
+  }
+});
+
+test('production without TRUST_PROXY is a config error that says why', () => {
+  assert.throws(
+    () =>
+      parseConfig({ ...minimal, NODE_ENV: 'production', MAIL_DELIVERY: 'log' }),
+    /Invalid environment configuration — TRUST_PROXY: production must set TRUST_PROXY explicitly; .*client address/
+  );
+});
+
+test('production accepts TRUST_PROXY=0 and TRUST_PROXY=1 once set explicitly', () => {
+  const production = {
+    ...minimal,
+    NODE_ENV: 'production',
+    MAIL_DELIVERY: 'log',
+  };
+  assert.equal(parseConfig({ ...production, TRUST_PROXY: '0' }).trustProxy, 0);
+  assert.equal(parseConfig({ ...production, TRUST_PROXY: '1' }).trustProxy, 1);
+});
+
+test('production treats a blank TRUST_PROXY as unset, development keeps 0', () => {
+  const production = {
+    ...minimal,
+    NODE_ENV: 'production',
+    MAIL_DELIVERY: 'log',
+  };
+  for (const blank of ['', '  ']) {
+    assert.throws(
+      () => parseConfig({ ...production, TRUST_PROXY: blank }),
+      /TRUST_PROXY: production must set TRUST_PROXY explicitly/
+    );
+  }
+  assert.equal(parseConfig({ ...minimal, TRUST_PROXY: '' }).trustProxy, 0);
+});
+
+test('production still refuses an invalid TRUST_PROXY by name', () => {
+  assert.throws(
+    () =>
+      parseConfig({
+        ...minimal,
+        NODE_ENV: 'production',
+        MAIL_DELIVERY: 'log',
+        TRUST_PROXY: 'yes',
+      }),
+    /TRUST_PROXY/
+  );
+});
+
 const SMTP = {
   MAIL_DELIVERY: 'smtp',
   SMTP_HOST: 'smtp.example.com',
@@ -107,8 +159,12 @@ test('production without MAIL_DELIVERY is a config error that says what log does
 
 test('production accepts MAIL_DELIVERY=log once it is set explicitly', () => {
   assert.deepEqual(
-    parseConfig({ ...minimal, NODE_ENV: 'production', MAIL_DELIVERY: 'log' })
-      .mail,
+    parseConfig({
+      ...minimal,
+      NODE_ENV: 'production',
+      MAIL_DELIVERY: 'log',
+      TRUST_PROXY: '0',
+    }).mail,
     { delivery: 'log' }
   );
 });
