@@ -6,6 +6,11 @@ import { initChapterModel, Chapter } from './Chapter.ts';
 import { initCommentModel, Comment } from './Comment.ts';
 import { initFavoriteModel, Favorite } from './Favorite.ts';
 import { initGenreModel, Genre } from './Genre.ts';
+import { initIllustrationModel, Illustration } from './Illustration.ts';
+import {
+  initIllustrationImageModel,
+  IllustrationImage,
+} from './IllustrationImage.ts';
 import { initLibraryEntryModel, LibraryEntry } from './LibraryEntry.ts';
 import { initLikeModel, Like } from './Like.ts';
 import { initNotificationModel, Notification } from './Notification.ts';
@@ -45,6 +50,8 @@ function initEachModel(sequelize: Sequelize): void {
   initBookCoverModel(sequelize);
   initBookAuthorModel(sequelize);
   initChapterModel(sequelize);
+  initIllustrationModel(sequelize);
+  initIllustrationImageModel(sequelize);
   initCommentModel(sequelize);
   initReportModel(sequelize);
   initLikeModel(sequelize);
@@ -176,6 +183,27 @@ function declareAssociations(): void {
     onUpdate: 'CASCADE',
   });
   Chapter.belongsTo(Book, { as: 'book', foreignKey: 'bookId' });
+
+  // A Chapter's Illustrations and each one's picture (ADR-0007): both cascade,
+  // so deleting a Chapter (or its Book) removes them with no application code.
+  Chapter.hasMany(Illustration, {
+    as: 'illustrations',
+    foreignKey: 'chapterId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  Illustration.belongsTo(Chapter, { as: 'chapter', foreignKey: 'chapterId' });
+
+  Illustration.hasOne(IllustrationImage, {
+    as: 'image',
+    foreignKey: 'illustrationId',
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  });
+  IllustrationImage.belongsTo(Illustration, {
+    as: 'illustration',
+    foreignKey: 'illustrationId',
+  });
 
   User.hasMany(Comment, {
     as: 'comments',
