@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { crc32, deflateSync } from 'node:zlib';
 import sharp from 'sharp';
 import { BadRequestError } from './types/errors.ts';
 import { processAvatarImage, processCoverImage } from './images.ts';
@@ -132,4 +133,54 @@ test('an empty buffer is refused, not left to crash the caller', async () => {
 
   await assert.rejects(processCoverImage(empty), isNotAValidImage);
   await assert.rejects(processAvatarImage(empty), isNotAValidImage);
+});
+
+// A PNG chunk is length, type, data, then CRC32 over type + data.
+const pngChunk = (type: string, data: Buffer): Buffer => {
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(body));
+  return Buffer.concat([length, body, crc]);
+};
+
+// A few dozen bytes that declare width x height RGB 8-bit pixels. The IDAT
+// holds one scanline only, so the file is far smaller than it claims.
+const declaredPng = (width: number, height: number): Buffer => {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 2; // colour type: RGB
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', deflateSync(Buffer.alloc(1 + width * 3))),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+};
+
+test('a PNG declaring 16000x16000 pixels is refused as not a valid image', async () => {
+  const bomb = declaredPng(16000, 16000);
+  assert.ok(bomb.length < 2 * 1024 * 1024);
+
+  await assert.rejects(processCoverImage(bomb), isNotAValidImage);
+  await assert.rejects(processAvatarImage(bomb), isNotAValidImage);
+});
+
+test('a real JPEG over 25 megapixels is refused', async () => {
+  const input = await solid(6000, 5000, '#336699');
+
+  await assert.rejects(processCoverImage(input), isNotAValidImage);
+  await assert.rejects(processAvatarImage(input), isNotAValidImage);
+});
+
+test('a real 20 megapixel JPEG is still accepted', async () => {
+  const input = await solid(5000, 4000, '#336699');
+
+  const cover = await sharp(await processCoverImage(input)).metadata();
+  const avatar = await sharp(await processAvatarImage(input)).metadata();
+  assert.deepEqual([cover.width, cover.height], [600, 900]);
+  assert.deepEqual([avatar.width, avatar.height], [256, 256]);
 });
