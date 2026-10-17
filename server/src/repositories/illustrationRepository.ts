@@ -1,9 +1,11 @@
 import { Op } from 'sequelize';
-import type { PublicIllustration } from 'shared';
+import { ILLUSTRATIONS_PER_CHAPTER_MAX, type PublicIllustration } from 'shared';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Illustration, toPublicIllustration } from '../models/Illustration.ts';
 import { IllustrationImage } from '../models/IllustrationImage.ts';
+import { NotFoundError, StateConflictError } from '../types/errors.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
 import { readableChapterScope, type Viewer } from './visibility.ts';
 
 export interface IllustrationRepository {
@@ -16,6 +18,18 @@ export interface IllustrationRepository {
   ): Promise<{ data: Buffer; updatedAt: Date } | null>;
   // The Co-author ids of the illustration's book; null when it is missing.
   findCoAuthorIds(id: number): Promise<number[] | null>;
+  // The Co-author ids of the chapter's book; null when the chapter is missing.
+  findChapterCoAuthorIds(chapterId: number): Promise<number[] | null>;
+  // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
+  create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
+}
+
+async function coAuthorIdsOfBook(bookId: number): Promise<number[]> {
+  const credits = await BookAuthor.findAll({
+    where: { bookId },
+    attributes: ['userId'],
+  });
+  return credits.map((credit) => credit.userId);
 }
 
 // An Illustration is as readable as its Chapter: the same scope as
@@ -73,11 +87,50 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
       });
       if (!chapter) return null;
 
-      const credits = await BookAuthor.findAll({
-        where: { bookId: chapter.bookId },
-        attributes: ['userId'],
+      return coAuthorIdsOfBook(chapter.bookId);
+    },
+
+    async findChapterCoAuthorIds(chapterId) {
+      const chapter = await Chapter.findByPk(chapterId, {
+        attributes: ['id', 'bookId'],
       });
-      return credits.map((credit) => credit.userId);
+      return chapter ? coAuthorIdsOfBook(chapter.bookId) : null;
+    },
+
+    // The chapter row is locked so two uploads cannot both pass the cap or
+    // share a position.
+    async create(chapterId, data) {
+      return sequelizeOf(Illustration).transaction(async (transaction) => {
+        const chapter = await Chapter.findByPk(chapterId, {
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!chapter) throw new NotFoundError('Chapter', chapterId);
+
+        const where = { chapterId };
+        if (
+          (await Illustration.count({ where, transaction })) >=
+          ILLUSTRATIONS_PER_CHAPTER_MAX
+        ) {
+          throw new StateConflictError(
+            `A chapter holds at most ${ILLUSTRATIONS_PER_CHAPTER_MAX} illustrations`
+          );
+        }
+        const last = await Illustration.max<number | null, Illustration>(
+          'position',
+          { where, transaction }
+        );
+        const row = await Illustration.create(
+          { chapterId, position: (last ?? 0) + 1, caption: null },
+          { transaction }
+        );
+        await IllustrationImage.create(
+          { illustrationId: row.id, data },
+          { transaction }
+        );
+        return toPublicIllustration(row);
+      });
     },
   };
 }

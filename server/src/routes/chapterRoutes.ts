@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
+import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import { createChapterController } from '../controllers/chapterController.ts';
 import { createIllustrationController } from '../controllers/illustrationController.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
@@ -46,6 +47,17 @@ export function createChapterRoutes(deps: RouteDeps): Router {
     requirePermission('chapters', 'create'),
     validate({ body: createChapterSchema }),
     controller.create
+  );
+  // Raw parser last, so a refused request's 2 MiB is never read.
+  router.post(
+    '/:id/illustrations',
+    requirePermission('chapters', 'update'),
+    validate({ params: idParamSchema }),
+    express.raw({
+      type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
+      limit: IMAGE_MAX_BYTES,
+    }),
+    illustrations.upload
   );
   router.patch(
     '/:id',

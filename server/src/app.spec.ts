@@ -872,4 +872,183 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     );
     assert.equal((await imageOf(hidden.id)).status, 404);
   });
+
+  const uploadIllustration = (
+    who: Visitor,
+    chapterId: number,
+    body: Buffer,
+    type = 'image/png'
+  ) =>
+    fetch(`${base}/api/chapters/${chapterId}/illustrations`, {
+      method: 'POST',
+      headers: {
+        'content-type': type,
+        origin: trustedOrigin,
+        cookie: who.browser.cookieHeader(),
+        [XSRF_HEADER_NAME]: who.browser.xsrfToken(),
+      },
+      body,
+    });
+  const picture = (width: number, height: number) =>
+    sharp({
+      create: { width, height, channels: 3, background: '#336699' },
+    })
+      .png()
+      .toBuffer();
+  const chapterIn = async (who: Visitor, title: string) => {
+    const book = await publishedBook(who, title);
+    const chapter = await who.browser.send<PublicChapter>('POST', '/chapters', {
+      bookId: book.id,
+      title: 'One',
+      text: 'Text.',
+      publishedAt: 'now',
+    });
+    return chapter.body;
+  };
+
+  test('a Co-author uploads an Illustration, which is re-encoded to WebP within 1600x1600, and the Chapter stays unedited', async () => {
+    const author = await signUp('illusUploader', 'author');
+    const chapter = await chapterIn(author, 'Uploads');
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+
+    const created = await uploadIllustration(
+      author,
+      chapter.id,
+      await picture(3200, 800)
+    );
+    assert.equal(created.status, 201);
+    const row = (await created.json()) as {
+      id: number;
+      position: number;
+      caption: string | null;
+    };
+    assert.equal(row.position, 1);
+    assert.equal(row.caption, null);
+    const meta = await sharp(
+      Buffer.from(await (await imageOf(row.id)).arrayBuffer())
+    ).metadata();
+    assert.equal(meta.format, 'webp');
+    assert.equal(meta.width, 1600);
+    assert.equal(meta.height, 400);
+    const small = await uploadIllustration(
+      author,
+      chapter.id,
+      await picture(40, 30)
+    );
+    const smallMeta = await sharp(
+      Buffer.from(
+        await (
+          await imageOf(((await small.json()) as { id: number }).id)
+        ).arrayBuffer()
+      )
+    ).metadata();
+    assert.equal(smallMeta.width, 40);
+
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('uploads are refused by size, type, content and the 20 per Chapter cap', async () => {
+    const author = await signUp('illusRefused', 'author');
+    const chapter = await chapterIn(author, 'Refusals');
+    const png = await picture(20, 20);
+
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('%PDF-1.4'),
+          'application/pdf'
+        )
+      ).status,
+      415
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('<svg/>'),
+          'image/svg+xml'
+        )
+      ).status,
+      415
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.from('not an image'),
+          'image/png'
+        )
+      ).status,
+      400
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.alloc(0),
+          'image/png'
+        )
+      ).status,
+      400
+    );
+    assert.equal(
+      (
+        await uploadIllustration(
+          author,
+          chapter.id,
+          Buffer.alloc(2 * 1024 * 1024 + 1),
+          'image/png'
+        )
+      ).status,
+      413
+    );
+    assert.equal((await uploadIllustration(author, 999999, png)).status, 404);
+
+    for (let position = 1; position <= 19; position += 1) {
+      await seedIllustration(chapter.id, position, null);
+    }
+    const race = await Promise.all([
+      uploadIllustration(author, chapter.id, png),
+      uploadIllustration(author, chapter.id, png),
+      uploadIllustration(author, chapter.id, png),
+    ]);
+    assert.deepEqual(race.map((r) => r.status).sort(), [201, 409, 409]);
+    assert.equal(
+      await Illustration.count({ where: { chapterId: chapter.id } }),
+      20
+    );
+  });
+
+  test('only a Co-author uploads: 403 with the message, and nothing is stored', async () => {
+    const author = await signUp('illusOwner', 'author');
+    const other = await signUp('illusOther', 'author');
+    const chapter = await chapterIn(author, 'Guarded');
+
+    const upload = await uploadIllustration(
+      other,
+      chapter.id,
+      await picture(20, 20)
+    );
+    assert.equal(upload.status, 403);
+    assert.match(
+      ((await upload.json()) as { error: string }).error,
+      /co-author/i
+    );
+    assert.equal(
+      await Illustration.count({ where: { chapterId: chapter.id } }),
+      0
+    );
+  });
 });
