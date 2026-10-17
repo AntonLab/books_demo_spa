@@ -121,7 +121,7 @@ its Reading order and optionally grouped into a Series.
 _Avoid_: Title
 
 **Work**:
-A Book or a Series; used where a rule applies to both.
+A Book or a Series, named where a rule covers both.
 
 **Description**:
 The text a Work's Co-authors write to tell readers what it is
