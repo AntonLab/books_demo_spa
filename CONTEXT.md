@@ -116,7 +116,10 @@ _Avoid_: Author photo, profile picture, userpic
 **Book**:
 A work credited to one or more Co-authors, read as a sequence of Chapters in
 its Reading order and optionally grouped into a Series.
-_Avoid_: Title, work
+_Avoid_: Title
+
+**Work**:
+A Book or a Series; used where a rule applies to both.
 
 **Description**:
 The text a Book's or Series' Co-authors write to tell readers what it is
@@ -394,9 +397,10 @@ chapter until its Publication time passes.
 _Avoid_: Updated at (for a Book)
 
 **Search filter**:
-A condition that narrows which Books a search finds, such as its text, an
-author, a Series, a Genre, a Book status, or a range of Release times or Last
-updates. A search's Search filters all apply at once.
+A condition that narrows which Books a search finds, such as its text, a
+Co-author (any Co-author's login or name), a Series, a Genre, a Book status, or
+a range of Release times or Last updates. The query parameter stays `author=`.
+A search's Search filters all apply at once.
 _Avoid_: Sort (for a condition that narrows)
 
 **Sort order**:
