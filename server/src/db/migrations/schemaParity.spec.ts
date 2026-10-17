@@ -27,10 +27,11 @@ async function readSchema(sequelize: Sequelize): Promise<Schema> {
     const [create] = (await sequelize.query(
       `SHOW CREATE TABLE \`${table}\``
     )) as [Record<string, string>[], unknown];
-    ddl[table] = (create[0]?.['Create Table'] ?? '').replace(
-      / AUTO_INCREMENT=\d+/,
-      ''
-    );
+    // CHECK lines are dropped: Sequelize 6 cannot declare them, so sync() emits
+    // none. xorChecks.spec.ts covers the ones the migrations add.
+    ddl[table] = (create[0]?.['Create Table'] ?? '')
+      .replace(/ AUTO_INCREMENT=\d+/, '')
+      .replace(/,\n {2}CONSTRAINT `[^`]+` CHECK .*(?=\n\))/, '');
   }
   return { tables, ddl };
 }

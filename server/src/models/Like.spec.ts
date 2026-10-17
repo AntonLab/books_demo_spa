@@ -71,11 +71,11 @@ test('all three foreign keys cascade — an orphaned like breaks the XOR', () =>
   );
   assert.match(
     createTableSql,
-    /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+    /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE RESTRICT/
   );
   assert.match(
     createTableSql,
-    /FOREIGN KEY \(`commentId`\) REFERENCES `comments` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+    /FOREIGN KEY \(`commentId`\) REFERENCES `comments` \(`id`\) ON DELETE CASCADE ON UPDATE RESTRICT/
   );
 });
 

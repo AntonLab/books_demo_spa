@@ -39,10 +39,10 @@ export class Like extends Model<
 }
 
 // The XOR, restated where Sequelize can enforce it: createLikeSchema covers the
-// API edge, but a caller reaching the model skips zod, and MySQL gets no CHECK
-// (Sequelize 6 cannot declare one in Model.init and there is no migration tool;
-// see .claude/rules/server/sequelize.md). So this validator is the last line,
-// and a write that bypasses the model can still break the invariant.
+// API edge, but a caller reaching the model skips zod. Sequelize 6 cannot
+// declare a CHECK in Model.init, so migration 0003 adds it (see
+// .claude/rules/server/sequelize.md) and this validator gives model writes a
+// readable error before the database refuses them.
 //
 // A named function with an explicit `this`: a method in the options object
 // would leave `this` implicitly any under strict mode.

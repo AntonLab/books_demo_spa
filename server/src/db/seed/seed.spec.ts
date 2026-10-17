@@ -42,7 +42,11 @@ import { RNG_SEED, createRng } from './rng.ts';
 // process, and watch what it does to a schema of their own.
 const TEST_DB_NAME = testDbName('seed');
 
-const APPLIED_MIGRATIONS = ['0001-baseline.ts', '0002-illustrations.ts'];
+const APPLIED_MIGRATIONS = [
+  '0001-baseline.ts',
+  '0002-illustrations.ts',
+  '0003-xor-checks.ts',
+];
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 

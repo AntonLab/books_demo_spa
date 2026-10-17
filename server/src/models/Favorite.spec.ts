@@ -61,11 +61,11 @@ test('all three foreign keys cascade — SET NULL would break the XOR', () => {
   );
   assert.match(
     createTableSql,
-    /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+    /FOREIGN KEY \(`bookId`\) REFERENCES `books` \(`id`\) ON DELETE CASCADE ON UPDATE RESTRICT/
   );
   assert.match(
     createTableSql,
-    /FOREIGN KEY \(`seriesId`\) REFERENCES `series` \(`id`\) ON DELETE CASCADE ON UPDATE CASCADE/
+    /FOREIGN KEY \(`seriesId`\) REFERENCES `series` \(`id`\) ON DELETE CASCADE ON UPDATE RESTRICT/
   );
 });
 

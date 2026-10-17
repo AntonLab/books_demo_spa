@@ -32,7 +32,8 @@ export class Favorite extends Model<
 }
 
 // A named function with an explicit `this`, so strict mode sees no implicit
-// any. MySQL gets no CHECK for this (see .claude/rules/server/sequelize.md).
+// any. Migration 0003 adds the matching CHECK (see
+// .claude/rules/server/sequelize.md); this validator guards model writes.
 function exactlyOneTarget(this: Favorite): void {
   if ((this.bookId == null) === (this.seriesId == null)) {
     throw new Error('Exactly one of bookId or seriesId must be set');

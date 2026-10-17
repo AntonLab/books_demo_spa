@@ -41,7 +41,7 @@ describe('assertNoPendingMigrations', { skip }, () => {
   test('throws and names the unapplied migration', async () => {
     await assert.rejects(assertNoPendingMigrations(createMigrator(sequelize)), {
       message:
-        'Pending migrations: 0001-baseline.ts, 0002-illustrations.ts. Run npm run migrate -w server',
+        'Pending migrations: 0001-baseline.ts, 0002-illustrations.ts, 0003-xor-checks.ts. Run npm run migrate -w server',
     });
   });
 

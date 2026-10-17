@@ -51,4 +51,4 @@ drift apart unnoticed.
   rerun `npm run migrate -w server`. `IF NOT EXISTS` is not used on purpose,
   because it would hide drift.
 - The XOR `CHECK` constraints on `likes` and `favorites`, which Sequelize 6
-  cannot declare, are the first future migration.
+  cannot declare, are migration `0003-xor-checks.ts`.
