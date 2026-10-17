@@ -43,6 +43,15 @@ const noDefaultExports = {
   ],
 };
 
+// no-restricted-syntax also takes one option set per file, so the tests block
+// repeats this selector.
+const noClassComponents = {
+  selector:
+    ':matches(ClassDeclaration, ClassExpression):matches([superClass.name=/^(Pure)?Component$/], [superClass.property.name=/^(Pure)?Component$/])',
+  message:
+    'Write a function component; only ErrorBoundary may be a class (CLAUDE.md).',
+};
+
 // The shared ignores, recommended sets, repo-wide rules and the Prettier tail
 // live in the root eslint.config.base.mjs. Only the React and browser
 // specifics are below.
@@ -87,11 +96,17 @@ export default createConfig(
         'error',
         { name: 'fetch', message: 'Call the API through request().' },
       ],
+      'no-restricted-syntax': ['error', noClassComponents],
     },
   },
   {
     files: ['src/api/client.ts'],
     rules: { 'no-restricted-globals': 'off' },
+  },
+  // React has no hook for getDerivedStateFromError.
+  {
+    files: ['src/components/organisms/ErrorBoundary/ErrorBoundary.tsx'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
   // Tests only: queries/auth.ts writes the session key in production.
   // Another block that sets no-restricted-syntax must repeat this option.
@@ -101,6 +116,7 @@ export default createConfig(
     rules: {
       'no-restricted-syntax': [
         'error',
+        noClassComponents,
         {
           selector:
             "CallExpression[callee.property.name='setQueryData'][arguments.0.object.name='queryKeys'][arguments.0.property.name='session']",

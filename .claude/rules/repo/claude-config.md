@@ -2,7 +2,6 @@
 paths:
   - '.claude/settings.json'
   - '.claude/skills/db-reset/**'
-  - '.mcp.json'
   - '.gitignore'
 ---
 
@@ -42,12 +41,10 @@ paths:
 - **`.claude/agents/`** stays ignored and empty: the pipeline agents come
   from the `swarm` plugin as `swarm:<name>`. Copies left there from before
   the plugin are stale; delete them.
-- **`.mcp.json`** starts Playwright through `node -e` spawning `npx` with
-  `shell: true`: Claude Code spawns without a shell, so a bare `npx` fails on
-  native Windows (it is `npx.cmd`) and `cmd /c npx` fails everywhere else.
-  The command is one string because an args array with `shell: true` trips
-  Node's DEP0190 warning. Stdio is inherited, so the server exits on stdin EOF
-  with no orphan.
+- **No `.mcp.json`.** The `swarm` plugin (1.2.0+) starts the Playwright MCP
+  server that `ui-checker` drives; a project `playwright` server beside it
+  makes the session run two browsers. The plugin's server writes to
+  `.playwright-mcp/`, which stays git-ignored.
 - **Plugins are project dependencies.** `enabledPlugins` and
   `extraKnownMarketplaces` in `settings.json` make Claude Code offer to install
   them once the folder is trusted. The agents preload `caveman`, `tdd`,

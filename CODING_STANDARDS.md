@@ -18,14 +18,7 @@ A breach is Minor unless its rule says it blocks a merge.
 - No direct mutation of React state, a store or a prop: build a new value.
   Blocks a merge.
 
-## Server
+## Lint disables
 
-- No synchronous filesystem API (`readFileSync`, `writeFileSync`, `existsSync`
-  and the like) in a request handler or anything it calls. Startup code may
-  use them. Blocks a merge.
-
-## Components
-
-- Function components only. The one exception is the client's
-  `ErrorBoundary` (React has no hook for `getDerivedStateFromError`); do not
-  add a dependency to dodge it.
+- An `eslint-disable` for the server's sync-call rule is a finding unless the
+  call runs once at startup, never on a request path, and the comment says so.

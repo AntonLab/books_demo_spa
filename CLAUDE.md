@@ -73,6 +73,9 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 - `any` (use `unknown` or a real type); `@ts-ignore` (use `@ts-expect-error`
   with a reason); `enum` (use `as const`). Lint and `erasableSyntaxOnly`
   refuse all three.
+- Class components (lint allows only the client's `ErrorBoundary`, since
+  React has no hook for `getDerivedStateFromError`) and sync calls such as
+  `readFileSync` in server code outside tests (lint refuses them).
 
 Judgement-call rules live in `CODING_STANDARDS.md`. Only the task and final
 reviewers read it; implementers do not, so a rule there costs no context.
