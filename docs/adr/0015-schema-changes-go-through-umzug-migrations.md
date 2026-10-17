@@ -18,7 +18,7 @@ production. In production it only asserts that nothing is pending and refuses to
 start otherwise; production migrates with `npm run migrate -w server` before the
 server starts. The seed migrates too, so it builds the same schema a deployment
 does. Test schemas stay on `sync({ force: true })`, which is fast and isolated
-per suite, except the two seed specs, which build theirs with the migrations. A
+per suite, except the two seed suites, which build theirs with the migrations. A
 parity spec compares a `sync()` schema with a migrated one, so the two cannot
 drift apart unnoticed.
 
@@ -44,6 +44,12 @@ drift apart unnoticed.
 - Umzug takes no lock. Two instances migrating at once could both run the same
   migration, so one instance migrates at a time, which fits the single-instance
   deployment of ADR-0013.
+- The baseline runs about 22 `CREATE TABLE` statements and MySQL DDL is not
+  transactional, so a failure partway leaves some tables and no `SequelizeMeta`
+  row. The next `up()` then fails with "table already exists". Recovery:
+  `/db-reset` in development; in production, drop the partial tables by hand and
+  rerun `npm run migrate -w server`. `IF NOT EXISTS` is not used on purpose,
+  because it would hide drift.
 - An applied migration is never edited; a fix is a new migration.
 - The XOR `CHECK` constraints on `likes` and `favorites`, which Sequelize 6
   cannot declare, are the first future migration.
