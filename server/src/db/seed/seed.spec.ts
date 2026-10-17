@@ -31,6 +31,7 @@ import { User } from '../../models/User.ts';
 import { parseConfig } from '../config.ts';
 import { ensureDatabase } from '../ensureDatabase.ts';
 import { skipWithoutMysql } from '../mysqlProbe.testkit.ts';
+import { createMigrator } from '../migrator.ts';
 import { createSequelize } from '../sequelize.ts';
 import { buildPlan } from './plan.ts';
 import { RNG_SEED, createRng } from './rng.ts';
@@ -100,6 +101,21 @@ function runSeed(
   });
 }
 
+// Dropped first, so a schema a red run left behind, or one sync() built, cannot
+// make the baseline fail.
+async function buildSchema(sequelize: Sequelize): Promise<void> {
+  await sequelize.getQueryInterface().dropAllTables();
+  await createMigrator(sequelize).up();
+}
+
+async function appliedMigrations(sequelize: Sequelize): Promise<string[]> {
+  const rows = await sequelize.query<{ name: string }>(
+    'SELECT name FROM SequelizeMeta',
+    { type: QueryTypes.SELECT }
+  );
+  return rows.map((row) => row.name);
+}
+
 async function countRows(): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
   for (const model of CONTENT_MODELS) {
@@ -147,7 +163,7 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);
-    await sequelize.sync({ force: true });
+    await buildSchema(sequelize);
 
     const user = await User.create({
       login: 'SeedBystander',
@@ -193,6 +209,21 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     assert.doesNotMatch(run.stderr, /\] (WARN|ERROR) /);
     assert.equal(found.users, 1);
     assert.deepEqual(await countRows(), found);
+    assert.deepEqual(await appliedMigrations(sequelize), ['0001-baseline.ts']);
+  });
+
+  // Last in this suite: it drops the bystander's tables.
+  test('builds the schema through the migrations on a fresh database', async () => {
+    await sequelize.getQueryInterface().dropAllTables();
+
+    const run = await runSeed({
+      ...process.env,
+      NODE_ENV: 'test',
+      DB_NAME: TEST_DB_NAME,
+    });
+
+    assert.equal(run.code, 0, run.stderr);
+    assert.deepEqual(await appliedMigrations(sequelize), ['0001-baseline.ts']);
   });
 });
 
@@ -214,7 +245,7 @@ describe('seed.ts --force against real MySQL', { skip }, () => {
     await ensureDatabase(db);
     sequelize = createSequelize(db);
     initModels(sequelize);
-    await sequelize.sync({ force: true });
+    await buildSchema(sequelize);
 
     const run = await runSeed(
       { ...process.env, NODE_ENV: 'test', DB_NAME: TEST_DB_NAME },

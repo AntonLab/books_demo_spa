@@ -19,6 +19,7 @@
 import type { ModelStatic, Model, Transaction } from 'sequelize';
 import { logger, messageOf } from '../../logger.ts';
 import { initModels } from '../../models/index.ts';
+import { createMigrator } from '../migrator.ts';
 import { Book } from '../../models/Book.ts';
 import { BookAuthor } from '../../models/BookAuthor.ts';
 import { Chapter } from '../../models/Chapter.ts';
@@ -698,13 +699,13 @@ async function main(): Promise<void> {
   const config = loadConfig();
   assertSafeTarget(config, force);
 
-  // The same two calls index.ts makes outside production, and idempotent, so a
-  // fresh clone can seed before the server has ever run.
+  // The same ensure-and-migrate steps boot takes outside production, and
+  // idempotent, so a fresh clone can seed before the server has ever run.
   await ensureDatabase(config.db);
   const sequelize = createSequelize(config.db);
   initModels(sequelize);
   await sequelize.authenticate();
-  await sequelize.sync();
+  await createMigrator(sequelize).up();
 
   try {
     if (!force) {
