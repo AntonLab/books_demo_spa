@@ -49,7 +49,9 @@ export function createChapterRoutes(deps: RouteDeps): Router {
     validate({ body: createChapterSchema }),
     controller.create
   );
-  // Raw parser last, so a refused request's 2 MiB is never read.
+  // Raw parser after permission and params, so those failures never read the
+  // body. The Co-author check runs in the controller, after the body is read
+  // (bounded by 2 MiB, as for a Cover upload).
   router.post(
     '/:id/illustrations',
     requirePermission('chapters', 'update'),

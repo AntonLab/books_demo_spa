@@ -51,6 +51,7 @@ paths:
   or Scheduled Chapter's picture is refused by direct link too.
 - `express.raw()` is mounted on the upload only, after `requirePermission` and
   `validate`, with the same 415/400/413 order as a Cover.
-- The image `GET` reuses `sendCover`'s headers; `PublicIllustration.updatedAt` is
-  the client's cache-bust `?v=`.
+- The image `GET` reuses `sendCover`'s headers. Its URL carries no `?v=`: the
+  bytes are never replaced, so the client builds it from the id alone and a
+  caption save keeps the cached picture.
 - At most 20 per Chapter, enforced under the chapter row lock (409).
