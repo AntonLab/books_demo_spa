@@ -22,7 +22,8 @@ paths:
   do `npx tsc`, and `npx jest`/`eslint` or `node --test` with no path; only
   a run naming a path passes (`npm test -w client -- <path>`); `format-edited` runs
   Prettier from the nearest folder holding `.prettierrc.json`; `after-pr`
-  reminds the main session to `/clear` after `gh pr create`. Change them in
+  reminds the main session to offer `/mattpocock-skills:retro`, then `/clear`,
+  after `gh pr create`. Change them in
   `AntonLab/custom-agents-swarm`, not here. ESLint is left to the pre-commit
   hook; typed linting per edit is too slow. A redirect to `$VAR/file` is
   refused, since the guard cannot resolve the variable; write the path
