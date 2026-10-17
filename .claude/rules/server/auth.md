@@ -134,8 +134,9 @@ lookup or argon2. A limited Account is not Blocked.
   before `validate`) cannot leave an unbounded key in memory.
 - Refusal is 429 with `Retry-After` in whole seconds and "Try again in N
   minutes." (singular at 1).
-- Keyed on `req.ip`, so `TRUST_PROXY` matters behind a proxy. Each process keeps
-  its own counts, and a restart forgets them.
+- Keyed on `req.ip`, so `TRUST_PROXY` matters behind a proxy. Production must set
+  it (0 is valid); boot fails otherwise. Each process keeps its own counts, and a
+  restart forgets them.
 - Test harnesses pass `unlimitedAuthRateLimits()`; only
   `authRateLimit.spec.ts` and the rate-limit cases in `authRoutes.spec.ts`
   use the real set.
