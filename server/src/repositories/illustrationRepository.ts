@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { col, fn, Op } from 'sequelize';
 import { ILLUSTRATIONS_PER_CHAPTER_MAX, type PublicIllustration } from 'shared';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
@@ -22,6 +22,19 @@ export interface IllustrationRepository {
   findChapterCoAuthorIds(chapterId: number): Promise<number[] | null>;
   // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
   create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
+  // null when the illustration is missing. Leaves chapters.updatedAt alone.
+  updateCaption(
+    id: number,
+    caption: string | null
+  ): Promise<PublicIllustration | null>;
+  // Takes every id of the chapter once, first first; 409 changing nothing
+  // when they are not exactly the current ones.
+  reorder(
+    chapterId: number,
+    illustrationIds: number[]
+  ): Promise<PublicIllustration[]>;
+  // Whether a row went; its image cascades.
+  remove(id: number): Promise<boolean>;
 }
 
 async function coAuthorIdsOfBook(bookId: number): Promise<number[]> {
@@ -131,6 +144,59 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
         );
         return toPublicIllustration(row);
       });
+    },
+
+    async updateCaption(id, caption) {
+      const row = await Illustration.findByPk(id);
+      if (!row) return null;
+      await row.update({ caption });
+      return toPublicIllustration(row);
+    },
+
+    async reorder(chapterId, illustrationIds) {
+      return sequelizeOf(Illustration).transaction(async (transaction) => {
+        const chapter = await Chapter.findByPk(chapterId, {
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!chapter) throw new NotFoundError('Chapter', chapterId);
+
+        // Locked as well as read, so a delete cannot slip between the
+        // comparison and the write.
+        const current = await Illustration.findAll({
+          where: { chapterId },
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        const currentIds = new Set(current.map((row) => row.id));
+        const sameSet =
+          new Set(illustrationIds).size === illustrationIds.length &&
+          illustrationIds.length === currentIds.size &&
+          illustrationIds.every((id) => currentIds.has(id));
+        if (!sameSet) {
+          throw new StateConflictError(
+            'The illustrations of this chapter changed since you loaded them'
+          );
+        }
+
+        // One statement: FIELD(id, …) is each id's 1-based place in the list.
+        await Illustration.update(
+          { position: fn('FIELD', col('id'), ...illustrationIds) },
+          { where: { chapterId }, transaction, silent: true }
+        );
+        const rows = await Illustration.findAll({
+          where: { chapterId },
+          order: [['position', 'ASC']],
+          transaction,
+        });
+        return rows.map(toPublicIllustration);
+      });
+    },
+
+    async remove(id) {
+      return (await Illustration.destroy({ where: { id } })) > 0;
     },
   };
 }

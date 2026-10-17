@@ -1,11 +1,15 @@
 import type { RequestHandler } from 'express';
 import type { ItemsResponse, PublicIllustration } from 'shared';
-import { validatedParams } from '../middleware/validate.ts';
+import { validatedBody, validatedParams } from '../middleware/validate.ts';
 import type { IllustrationRepository } from '../repositories/illustrationRepository.ts';
 import { viewerOf } from '../repositories/visibility.ts';
 import { processIllustrationImage } from '../images.ts';
 import { NotFoundError, UnsupportedMediaTypeError } from '../types/errors.ts';
-import { assertMayChange } from './coAuthorGuard.ts';
+import type {
+  ReorderIllustrationsInput,
+  UpdateIllustrationInput,
+} from '../types/illustration.ts';
+import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
 import { sendCover } from './coverResponse.ts';
 
 // No try/catch anywhere below: the Express 5 router calls next(err) itself when
@@ -13,6 +17,12 @@ import { sendCover } from './coverResponse.ts';
 export function createIllustrationController(
   repository: IllustrationRepository
 ) {
+  const illustrationTarget = (id: number): CoAuthorTarget => ({
+    resource: 'Illustration',
+    id,
+    coAuthorIds: () => repository.findCoAuthorIds(id),
+  });
+
   return {
     list: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
@@ -38,6 +48,51 @@ export function createIllustrationController(
 
       const processed = await processIllustrationImage(req.body);
       res.status(201).json(await repository.create(id, processed));
+    },
+
+    update: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChange(
+        req,
+        illustrationTarget(id),
+        'You may only change chapters in books you co-author'
+      );
+
+      const { caption } = validatedBody<UpdateIllustrationInput>(req);
+      const row = await repository.updateCaption(id, caption);
+      if (!row) throw new NotFoundError('Illustration', id);
+      res.json(row);
+    },
+
+    reorder: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChange(
+        req,
+        {
+          resource: 'Chapter',
+          id,
+          coAuthorIds: () => repository.findChapterCoAuthorIds(id),
+        },
+        'You may only change chapters in books you co-author'
+      );
+
+      const { illustrationIds } = validatedBody<ReorderIllustrationsInput>(req);
+      const items = await repository.reorder(id, illustrationIds);
+      res.json({ items } satisfies ItemsResponse<PublicIllustration>);
+    },
+
+    remove: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      await assertMayChange(
+        req,
+        illustrationTarget(id),
+        'You may only change chapters in books you co-author'
+      );
+
+      if (!(await repository.remove(id))) {
+        throw new NotFoundError('Illustration', id);
+      }
+      res.status(204).end();
     },
 
     getImage: async (req, res) => {

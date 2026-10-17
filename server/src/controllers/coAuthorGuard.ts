@@ -20,7 +20,7 @@ import {
 
 export interface CoAuthorTarget {
   // What a missing row is reported as.
-  resource: 'Book' | 'Series' | 'Chapter';
+  resource: 'Book' | 'Series' | 'Chapter' | 'Illustration';
   id: number;
   // The Co-authors answering for the row, or null when it does not exist.
   coAuthorIds: () => Promise<number[] | null>;

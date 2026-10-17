@@ -9,6 +9,7 @@ import {
   listChaptersQuerySchema,
   updateChapterSchema,
 } from '../types/chapter.ts';
+import { reorderIllustrationsSchema } from '../types/illustration.ts';
 import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
@@ -58,6 +59,12 @@ export function createChapterRoutes(deps: RouteDeps): Router {
       limit: IMAGE_MAX_BYTES,
     }),
     illustrations.upload
+  );
+  router.put(
+    '/:id/illustration-order',
+    requirePermission('chapters', 'update'),
+    validate({ params: idParamSchema, body: reorderIllustrationsSchema }),
+    illustrations.reorder
   );
   router.patch(
     '/:id',

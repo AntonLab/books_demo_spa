@@ -67,7 +67,7 @@ const skip = await skipWithoutMysql();
 
 const PASSWORD = 'Password123!';
 
-type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 interface SetCookie {
   name: string;
@@ -1048,6 +1048,167 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     );
     assert.equal(
       await Illustration.count({ where: { chapterId: chapter.id } }),
+      0
+    );
+  });
+
+  test('only a Co-author captions, reorders or deletes: 403, and 404 for an unknown id comes first', async () => {
+    const author = await signUp('illusGuard', 'author');
+    const other = await signUp('illusGuardOther', 'author');
+    const chapter = await chapterIn(author, 'Guarded edits');
+    const row = await seedIllustration(chapter.id, 1, 'Mine');
+
+    const patch = await other.browser.send(
+      'PATCH',
+      `/illustrations/${row.id}`,
+      {
+        caption: 'x',
+      }
+    );
+    assert.equal(patch.status, 403);
+    assert.equal(
+      (
+        await other.browser.send(
+          'PUT',
+          `/chapters/${chapter.id}/illustration-order`,
+          { illustrationIds: [row.id] }
+        )
+      ).status,
+      403
+    );
+    assert.equal(
+      (await other.browser.send('DELETE', `/illustrations/${row.id}`)).status,
+      403
+    );
+    assert.equal(
+      (
+        await other.browser.send('PATCH', '/illustrations/999999', {
+          caption: 'x',
+        })
+      ).status,
+      404
+    );
+    assert.equal(
+      (await other.browser.send('DELETE', '/illustrations/999999')).status,
+      404
+    );
+    assert.equal(
+      (
+        await other.browser.send('PUT', '/chapters/999999/illustration-order', {
+          illustrationIds: [1],
+        })
+      ).status,
+      404
+    );
+    assert.equal((await Illustration.findByPk(row.id))?.caption, 'Mine');
+  });
+
+  test('a caption holds 200 characters, blank becomes null, and none of it edits the Chapter', async () => {
+    const author = await signUp('illusCaption', 'author');
+    const chapter = await chapterIn(author, 'Captions');
+    const row = await seedIllustration(chapter.id, 1, null);
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    const patch = (caption: unknown) =>
+      author.browser.send<{ caption: string | null }>(
+        'PATCH',
+        `/illustrations/${row.id}`,
+        { caption }
+      );
+
+    const ok = await patch('c'.repeat(200));
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.caption?.length, 200);
+    assert.equal((await patch('c'.repeat(201))).status, 400);
+    assert.equal((await patch(7)).status, 400);
+    assert.equal((await patch('   ')).body.caption, null);
+    assert.equal((await patch(null)).body.caption, null);
+    assert.equal((await patch('  trimmed  ')).body.caption, 'trimmed');
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('reordering applies a full set, rejects a stale or foreign set, and deleting renumbers nothing it should not', async () => {
+    const author = await signUp('illusOrder', 'author');
+    const chapter = await chapterIn(author, 'Ordering');
+    const elsewhere = await chapterIn(author, 'Elsewhere');
+    const [a, b, c] = [
+      await seedIllustration(chapter.id, 1, 'a'),
+      await seedIllustration(chapter.id, 2, 'b'),
+      await seedIllustration(chapter.id, 3, 'c'),
+    ];
+    const foreign = await seedIllustration(elsewhere.id, 1, 'f');
+    const before = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    const put = (ids: number[]) =>
+      author.browser.send<{ items: { id: number }[] }>(
+        'PUT',
+        `/chapters/${chapter.id}/illustration-order`,
+        { illustrationIds: ids }
+      );
+    const order = async () =>
+      (
+        await author.browser.send<{ items: { id: number }[] }>(
+          'GET',
+          `/chapters/${chapter.id}/illustrations`
+        )
+      ).body.items.map((i) => i.id);
+
+    const moved = await put([c.id, a.id, b.id]);
+    assert.equal(moved.status, 200);
+    assert.deepEqual(
+      moved.body.items.map((i) => i.id),
+      [c.id, a.id, b.id]
+    );
+    assert.deepEqual(await order(), [c.id, a.id, b.id]);
+    for (const bad of [
+      [a.id, b.id],
+      [a.id, b.id, c.id, foreign.id],
+      [a.id, a.id, b.id, c.id],
+      [a.id, b.id, foreign.id],
+    ]) {
+      assert.ok([400, 409].includes((await put(bad)).status));
+    }
+    assert.equal((await put([a.id, b.id, 999999])).status, 409);
+    assert.equal((await put([])).status, 400);
+    assert.deepEqual(await order(), [c.id, a.id, b.id]);
+
+    assert.equal(
+      (await author.browser.send('DELETE', `/illustrations/${a.id}`)).status,
+      204
+    );
+    assert.deepEqual(await order(), [c.id, b.id]);
+    assert.equal((await imageOf(a.id, author.browser)).status, 404);
+    assert.equal(
+      await IllustrationImage.count({ where: { illustrationId: a.id } }),
+      0
+    );
+    const after = await author.browser.send<PublicChapter>(
+      'GET',
+      `/chapters/${chapter.id}`
+    );
+    assert.equal(after.body.updatedAt, before.body.updatedAt);
+  });
+
+  test('deleting a Chapter takes its Illustrations and their bytes with it', async () => {
+    const author = await signUp('illusCascade', 'author');
+    const chapter = await chapterIn(author, 'Cascade');
+    const row = await seedIllustration(chapter.id, 1, null);
+
+    assert.equal(
+      (await author.browser.send('DELETE', `/chapters/${chapter.id}`)).status,
+      204
+    );
+    assert.equal(await Illustration.count({ where: { id: row.id } }), 0);
+    assert.equal(
+      await IllustrationImage.count({ where: { illustrationId: row.id } }),
       0
     );
   });
