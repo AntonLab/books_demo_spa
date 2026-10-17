@@ -30,3 +30,15 @@ export function createMigrator(sequelize: Sequelize): Umzug<QueryInterface> {
     logger: undefined,
   });
 }
+
+export async function assertNoPendingMigrations(
+  migrator: Umzug<QueryInterface>
+): Promise<void> {
+  const pending = await migrator.pending();
+  if (pending.length > 0) {
+    const names = pending.map((migration) => migration.name);
+    throw new Error(
+      `Pending migrations: ${names.join(', ')}. Run npm run migrate -w server`
+    );
+  }
+}
