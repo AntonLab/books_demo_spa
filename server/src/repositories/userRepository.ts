@@ -449,12 +449,18 @@ export function createSequelizeUserRepository(): UserRepository {
     },
 
     async updateRole(id, role) {
-      const user = await User.findByPk(id);
-      if (!user) return null;
+      return sequelizeOf(User).transaction(async (transaction) => {
+        // FOR UPDATE: serializes against a concurrent block or update of the same user.
+        const user = await User.findByPk(id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!user) return null;
 
-      await user.update({ role });
-      const avatarUrls = await loadAvatarUrls([id]);
-      return toPublicUser(user, avatarUrls.get(id) ?? null);
+        await user.update({ role }, { transaction });
+        const avatarUrls = await loadAvatarUrls([id], transaction);
+        return toPublicUser(user, avatarUrls.get(id) ?? null);
+      });
     },
 
     // These two are the only places the password column is read for a

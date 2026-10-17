@@ -67,6 +67,7 @@ refuses to start on a malformed value. The traps:
 
 - `NODE_ENV` also picks the argon2 cost (`test` is deliberately weak).
 - `TRUST_PROXY`: the sign-in limits key on `req.ip`, so set it behind a proxy.
+  Production must set it; see README.
 - `DB_USER` / `DB_PASSWORD` have no default, so the server never starts against
   an unintended database.
 - The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and

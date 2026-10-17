@@ -117,8 +117,9 @@ test('NODE_ENV=production exits non-zero before touching the database, --force o
       ...process.env,
       NODE_ENV: 'production',
       // Set so the config parses: the refusal under test is the seed's own,
-      // not production's missing MAIL_DELIVERY.
+      // not production's missing MAIL_DELIVERY or TRUST_PROXY.
       MAIL_DELIVERY: 'log',
+      TRUST_PROXY: '0',
       DB_USER: 'u',
       DB_PASSWORD: 'p',
       DB_HOST: '127.0.0.1',

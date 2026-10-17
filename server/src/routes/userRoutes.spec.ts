@@ -6,6 +6,7 @@ import {
   createFakeUserRepository,
   type FakeUserRow,
 } from '../repositories/userRepository.fake.testkit.ts';
+import { createAuthRateLimits } from '../middleware/authRateLimit.ts';
 import { hashPassword } from '../password.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { ABOUT_MAX_LENGTH, type PublicUser } from 'shared';
@@ -901,6 +902,128 @@ test('changing your own email needs your current password too', async () => {
     }
   );
 });
+
+const wrong = {
+  email: 'new@example.test',
+  currentPassword: 'not-the-password',
+};
+const right = { email: 'new@example.test', currentPassword: PASSWORD };
+
+async function withLimitedUsers(
+  run: (base: string) => Promise<void>
+): Promise<void> {
+  const limits = createAuthRateLimits();
+  try {
+    await withAuthenticatedApp(
+      {
+        userRepository: createFakeRepository(seedPersonaRows()),
+        authRateLimits: limits,
+      },
+      run
+    );
+  } finally {
+    limits.stop();
+  }
+}
+
+test('the 6th wrong currentPassword is refused with 429 and Retry-After, even with the right one', () =>
+  withLimitedUsers(async (base) => {
+    const as = ROLE_COOKIES.user;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal((await patch(base, USER_IDS.user, wrong, as)).status, 403);
+    }
+
+    const refused = await patch(base, USER_IDS.user, right, as);
+    assert.equal(refused.status, 429);
+    assert.match(refused.headers.get('retry-after') ?? '', /^\d+$/);
+
+    const stored = await json<PublicUser>(
+      await fetch(`${base}/api/users/${USER_IDS.user}`, {
+        headers: { cookie: as },
+      })
+    );
+    assert.equal(stored.email, `persona-${USER_IDS.user}@example.com`);
+  }));
+
+test('a correct currentPassword resets the count', () =>
+  withLimitedUsers(async (base) => {
+    const as = ROLE_COOKIES.user;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      assert.equal((await patch(base, USER_IDS.user, wrong, as)).status, 403);
+    }
+    assert.equal((await patch(base, USER_IDS.user, right, as)).status, 200);
+
+    const other = { ...wrong, email: 'other@example.test' };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal((await patch(base, USER_IDS.user, other, as)).status, 403);
+    }
+    assert.equal((await patch(base, USER_IDS.user, other, as)).status, 429);
+  }));
+
+test('the currentPassword budget is per user', () =>
+  withLimitedUsers(async (base) => {
+    let last = 0;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      last = (await patch(base, USER_IDS.user, wrong, ROLE_COOKIES.user))
+        .status;
+    }
+    assert.equal(last, 429);
+
+    const other = await patch(
+      base,
+      USER_IDS.author,
+      wrong,
+      ROLE_COOKIES.author
+    );
+    assert.equal(other.status, 403);
+  }));
+
+test('a missing currentPassword does not spend the budget', () =>
+  withLimitedUsers(async (base) => {
+    const as = ROLE_COOKIES.user;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const missing = await patch(
+        base,
+        USER_IDS.user,
+        { email: wrong.email },
+        as
+      );
+      assert.equal(missing.status, 400);
+    }
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      assert.equal((await patch(base, USER_IDS.user, wrong, as)).status, 403);
+    }
+  }));
+
+test('changing only your own name never charges the budget', () =>
+  withLimitedUsers(async (base) => {
+    const as = ROLE_COOKIES.user;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const renamed = await patch(
+        base,
+        USER_IDS.user,
+        { firstName: 'Zed' },
+        as
+      );
+      assert.equal(renamed.status, 200);
+    }
+    assert.equal((await patch(base, USER_IDS.user, wrong, as)).status, 403);
+  }));
+
+test("an admin changing another user's password does not touch the budget", () =>
+  withLimitedUsers(async (base) => {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const reset = await patch(
+        base,
+        USER_IDS.user,
+        { password: 'brand-new-pass' },
+        ROLE_COOKIES.admin
+      );
+      assert.equal(reset.status, 200);
+    }
+    const guess = await patch(base, USER_IDS.user, wrong, ROLE_COOKIES.user);
+    assert.equal(guess.status, 403);
+  }));
 
 test("an admin changing a user's password needs no current password", async () => {
   await withAuthenticatedApp(

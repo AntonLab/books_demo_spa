@@ -1,5 +1,7 @@
-import type { Request, RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { processAvatarImage } from '../images.ts';
+import { refusal } from '../middleware/authRateLimit.ts';
+import type { RateLimiter } from '../rateLimit.ts';
 import {
   validatedBody,
   validatedParams,
@@ -27,7 +29,10 @@ const ADMIN_MANAGEABLE_ROLES: readonly UserRole[] = ['user', 'author'];
 
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
-export function createUserController(repository: UserRepository) {
+export function createUserController(
+  repository: UserRepository,
+  currentPasswordLimiter: RateLimiter
+) {
   // The other half of enforcement. requirePermission already refused `none`.
   //
   // Anything but `any` — `own`, or a handler mounted without
@@ -66,7 +71,8 @@ export function createUserController(repository: UserRepository) {
   // request.
   const assertCurrentPassword = async (
     id: number,
-    currentPassword: string | undefined
+    currentPassword: string | undefined,
+    res: Response
   ): Promise<void> => {
     if (currentPassword === undefined) {
       throw new AppError(
@@ -75,10 +81,16 @@ export function createUserController(repository: UserRepository) {
       );
     }
 
+    // Charged on arrival so parallel guesses cannot share a slot, as in
+    // limitFailedLogins.
+    const budget = currentPasswordLimiter.hit(String(id));
+    if (!budget.allowed) throw refusal(res, budget.retryAfterMs);
+
     const hash = await repository.findPasswordHashById(id);
     if (hash === null || !(await verifyPassword(hash, currentPassword))) {
       throw new ForbiddenError('Current password is incorrect');
     }
+    currentPasswordLimiter.reset(String(id));
   };
 
   return {
@@ -119,7 +131,7 @@ export function createUserController(repository: UserRepository) {
         isOwnRow &&
         (changes.password !== undefined || changes.email !== undefined)
       ) {
-        await assertCurrentPassword(id, currentPassword);
+        await assertCurrentPassword(id, currentPassword, res);
       }
 
       const user = await repository.update(id, changes);

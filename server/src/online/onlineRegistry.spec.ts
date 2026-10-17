@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import type { PublicNotification } from 'shared';
 import { recordLogs } from '../logger.testkit.ts';
 import {
+  MAX_STREAMS_PER_ACCOUNT,
   ONLINE_REVALIDATE_INTERVAL_MS,
   createOnlineRegistry,
   notificationEvent,
   type OnlineConnection,
+  type OnlineRegistry,
 } from './onlineRegistry.ts';
 
 const NEW_CHAPTER: PublicNotification = {
@@ -35,6 +37,15 @@ function connection(userId: number, tokenHash: string) {
     },
   };
   return { stream, written, state };
+}
+
+// Adds streams up to the cap for one account, each accepted, and returns them.
+function fillAccount(registry: OnlineRegistry, userId: number) {
+  const open = Array.from({ length: MAX_STREAMS_PER_ACCOUNT }, (_, index) =>
+    connection(userId, `hash-${index}`)
+  );
+  for (const stream of open) assert.equal(registry.add(stream.stream), true);
+  return open;
 }
 
 // The session repository answers from a map the test edits, as sessions end;
@@ -200,4 +211,59 @@ test('start revalidates every 30 s; stop ends the timer and closes every stream'
   t.mock.timers.tick(5 * ONLINE_REVALIDATE_INTERVAL_MS);
   await settle();
   assert.equal(asked.length, 1);
+});
+
+test('the stream over the per-account cap is refused and nothing is closed', () => {
+  const registry = createOnlineRegistry(sessions(new Map()).deps);
+  const open = fillAccount(registry, 2);
+
+  const extra = connection(2, 'hash-extra');
+  assert.equal(registry.add(extra.stream), false);
+  assert.equal(
+    open.some(({ state }) => state.closed),
+    false
+  );
+  assert.equal(extra.state.closed, false);
+
+  // Another account is unaffected, and the refused stream gets no push.
+  assert.equal(registry.add(connection(3, 'hash-other').stream), true);
+  registry.push(2, NEW_CHAPTER);
+  assert.deepEqual(extra.written, []);
+  assert.deepEqual(open[0]!.written, [notificationEvent(NEW_CHAPTER)]);
+});
+
+test('a freed slot lets the next stream in, and re-adding one stream does not use two', () => {
+  const registry = createOnlineRegistry(sessions(new Map()).deps);
+  const open = fillAccount(registry, 2);
+  assert.equal(registry.add(open[0]!.stream), true);
+  assert.equal(registry.add(connection(2, 'hash-extra').stream), false);
+
+  registry.remove(open[0]!.stream);
+  assert.equal(registry.add(connection(2, 'hash-extra').stream), true);
+});
+
+test('a stream dropped by revalidation frees its slot and its account goes offline', async () => {
+  const registry = createOnlineRegistry(sessions(new Map()).deps);
+  const only = connection(2, 'hash-gone');
+  registry.add(only.stream);
+
+  await registry.revalidate();
+
+  assert.equal(only.state.closed, true);
+  assert.equal(registry.isOnline(2), false);
+});
+
+test('stop closes the streams of every account', () => {
+  const registry = createOnlineRegistry(sessions(new Map()).deps);
+  const first = connection(2, 'hash-a');
+  const second = connection(3, 'hash-b');
+  registry.add(first.stream);
+  registry.add(second.stream);
+
+  registry.stop();
+
+  assert.equal(first.state.closed, true);
+  assert.equal(second.state.closed, true);
+  assert.equal(registry.isOnline(2), false);
+  assert.equal(registry.isOnline(3), false);
 });

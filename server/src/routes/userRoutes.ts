@@ -27,7 +27,10 @@ import {
 import type { RouteDeps } from './index.ts';
 
 export function createUserRoutes(deps: RouteDeps): Router {
-  const controller = createUserController(deps.userRepository);
+  const controller = createUserController(
+    deps.userRepository,
+    deps.authRateLimits.currentPassword
+  );
   const requirePermission = createRequirePermission(deps);
   const router = Router();
 

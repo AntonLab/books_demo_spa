@@ -6,7 +6,7 @@ import { TooManyRequestsError } from '../types/errors.ts';
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-// The four sign-in budgets. A limit is not an Account state: nothing is
+// The auth budgets. A limit is not an Account state: nothing is
 // written anywhere, and a limited Account is not Blocked.
 export const AUTH_RATE_LIMITS = {
   // Failed logins for one login name from one address.
@@ -17,6 +17,9 @@ export const AUTH_RATE_LIMITS = {
   register: { limit: 5, windowMs: ONE_HOUR_MS },
   // Every password-reset request from one address.
   resetRequest: { limit: 5, windowMs: ONE_HOUR_MS },
+  // Wrong or aborted current-password guesses on a user's own password or
+  // email change, by user id; a correct one clears it.
+  currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
 } as const;
 
 export interface AuthRateLimits {
@@ -24,6 +27,7 @@ export interface AuthRateLimits {
   readonly loginByIp: RateLimiter;
   readonly register: RateLimiter;
   readonly resetRequest: RateLimiter;
+  readonly currentPassword: RateLimiter;
   // Stops every limiter's sweep; the graceful shutdown calls it.
   stop(): void;
 }
@@ -34,6 +38,7 @@ export function createAuthRateLimits(): AuthRateLimits {
     loginByIp: createRateLimiter(AUTH_RATE_LIMITS.loginByIp),
     register: createRateLimiter(AUTH_RATE_LIMITS.register),
     resetRequest: createRateLimiter(AUTH_RATE_LIMITS.resetRequest),
+    currentPassword: createRateLimiter(AUTH_RATE_LIMITS.currentPassword),
   };
 
   return {
@@ -75,7 +80,10 @@ function loginNameKey(address: string, body: unknown): string {
   return JSON.stringify([address, digest]);
 }
 
-function refusal(res: Response, retryAfterMs: number): TooManyRequestsError {
+export function refusal(
+  res: Response,
+  retryAfterMs: number
+): TooManyRequestsError {
   // Whole seconds, rounded up, so a client that waits exactly this long is
   // not refused again by the same window.
   res.setHeader('Retry-After', String(Math.ceil(retryAfterMs / 1000)));

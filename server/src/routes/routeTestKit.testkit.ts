@@ -49,6 +49,7 @@ export function unlimitedAuthRateLimits(): AuthRateLimits {
     loginByIp: unlimited(),
     register: unlimited(),
     resetRequest: unlimited(),
+    currentPassword: unlimited(),
     stop: () => {},
   };
 }

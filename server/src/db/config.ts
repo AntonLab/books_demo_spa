@@ -22,8 +22,10 @@ const envSchema = z.object({
   // How many reverse-proxy hops in front of the API may name the client in
   // X-Forwarded-For — Express's 'trust proxy'. 0 trusts none, so req.ip is
   // the socket's peer. Only a whole, non-negative count is accepted: a hop
-  // count is the form that cannot silently trust every address.
-  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  // count is the form that cannot silently trust every address. Development
+  // and test may leave it unset, which trusts none; production must set it (see
+  // parseConfig), because the sign-in limits key on req.ip.
+  TRUST_PROXY: z.coerce.number().int().min(0).optional(),
   // How mail leaves the server: `log` writes every message into the server
   // log, `smtp` sends it through the SMTP_* settings below. Development and
   // test may leave it unset, which logs; production must set it (see
@@ -119,12 +121,21 @@ export function parseConfig(source: NodeJS.ProcessEnv): AppConfig {
       'Invalid environment configuration — MAIL_DELIVERY: production must set MAIL_DELIVERY explicitly; `log` writes password-reset links and notification emails to the server log'
     );
   }
+  // The schema coerces a blank value to 0, so the raw source is what says unset.
+  if (
+    env.NODE_ENV === 'production' &&
+    (source.TRUST_PROXY === undefined || source.TRUST_PROXY.trim() === '')
+  ) {
+    throw new Error(
+      'Invalid environment configuration — TRUST_PROXY: production must set TRUST_PROXY explicitly; the sign-in limits key on the client address, so behind a proxy every user shares one address (set the number of proxy hops, or 0 for none)'
+    );
+  }
 
   return {
     env: env.NODE_ENV,
     port: env.PORT,
     appBaseUrl: env.APP_BASE_URL,
-    trustProxy: env.TRUST_PROXY,
+    trustProxy: env.TRUST_PROXY ?? 0,
     mail: mailConfigOf(env),
     db: {
       host: env.DB_HOST,
