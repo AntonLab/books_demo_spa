@@ -197,13 +197,27 @@ async function assertRefused(
   });
 }
 
-test('the budgets are 10 and 50 failed logins per 15 minutes, 5 registrations and 5 reset requests per hour', () => {
+test('the budgets are 10 and 50 failed logins per 15 minutes, 5 registrations and 5 reset requests per hour, and 5 currentPassword guesses per 15 minutes', () => {
   assert.deepEqual(AUTH_RATE_LIMITS, {
     loginByIpAndLogin: { limit: 10, windowMs: FIFTEEN_MINUTES_MS },
     loginByIp: { limit: 50, windowMs: FIFTEEN_MINUTES_MS },
     register: { limit: 5, windowMs: ONE_HOUR_MS },
     resetRequest: { limit: 5, windowMs: ONE_HOUR_MS },
+    currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
   });
+});
+
+test('the currentPassword limiter allows 5 hits per key and refuses the 6th', () => {
+  const limits = createAuthRateLimits();
+  try {
+    for (let i = 0; i < 5; i++) {
+      assert.equal(limits.currentPassword.hit('7').allowed, true);
+    }
+    assert.equal(limits.currentPassword.hit('7').allowed, false);
+    assert.equal(limits.currentPassword.hit('8').allowed, true);
+  } finally {
+    limits.stop();
+  }
 });
 
 test('the 11th failed login for one name from one address is refused before the handler runs', async (t) => {
