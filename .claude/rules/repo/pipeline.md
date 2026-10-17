@@ -36,8 +36,8 @@ per-call values.
   inside the spec, add `accepted without user: <concern> -> <choice>` to the
   follow-ups file, and go on; the user reviews those lines with the other
   follow-ups. Put a concern with no recommendation, or one that changes what
-  the spec asks for, to the user verbatim and wait. In the 2026-10-17 queue
-  five stops all ended in the agent's own recommendation.
+  the spec asks for, to the user verbatim and wait. An audit finding is not a
+  concern: fix it as the audit bullet below says.
 - **The main session edits no source file while a plan runs**, and it fixes
   nothing through `cavecrew-builder` or another ad-hoc agent. Every change
   goes through an `sdd-implementer` brief, so it gets a ledger line and a
@@ -53,8 +53,6 @@ per-call values.
   review already covered the whole diff. The changed-files audit and
   `gate-runner` still run, audit first, so the gates run once. A plan that
   comes back with more than two tasks leaves light mode for the final review.
-  The fixed pipeline cost dominated the 2026-10-17 queue: 115 changed lines
-  per issue cost 6.3M tokens.
 - **One spec, one main session.** After the PR for a spec is opened (or its
   part of a shared branch is finished), have the user run `/clear` before the
   next spec: a long context compacts repeatedly and costs far more. The spec,
@@ -81,7 +79,9 @@ per-call values.
   defects every review passed: a numbered checklist from the spec's
   user-visible behavior, the worktree as working directory. It serves the
   worktree on ports 3100/4100 and never touches the user's server on 3000. Its
-  FAIL items are fixed like final-review findings. Build each checklist item
+  FAIL items are fixed like final-review findings: the fix brief quotes the
+  FAIL line with its measured values, and the implementer's report says why
+  the change moves them. Build each checklist item
   from what the seeded data can reach: roles are `user`, `author`, `admin` and
   `superadmin` (check `USER_ROLES` in `shared/`), so an item that needs another
   role cannot be verified. Fix all FAIL items first, then send one recheck run
