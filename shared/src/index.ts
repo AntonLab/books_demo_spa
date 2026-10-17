@@ -10,6 +10,7 @@ export * from './chapter.ts';
 export * from './comment.ts';
 export * from './favorite.ts';
 export * from './genre.ts';
+export * from './illustration.ts';
 export * from './library.ts';
 export * from './like.ts';
 export * from './notification.ts';

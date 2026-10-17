@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { crc32, deflateSync } from 'node:zlib';
 import sharp from 'sharp';
 import { BadRequestError } from './types/errors.ts';
-import { processAvatarImage, processCoverImage } from './images.ts';
+import {
+  processAvatarImage,
+  processCoverImage,
+  processIllustrationImage,
+} from './images.ts';
 
 const solid = (
   width: number,
@@ -182,4 +186,39 @@ test('a real 20 megapixel JPEG is still accepted', async () => {
   const avatar = await sharp(await processAvatarImage(input)).metadata();
   assert.deepEqual([cover.width, cover.height], [600, 900]);
   assert.deepEqual([avatar.width, avatar.height], [256, 256]);
+});
+
+test('an Illustration keeps its aspect inside 1600x1600, WebP, no crop (wide)', async () => {
+  const output = await processIllustrationImage(
+    await solid(3200, 800, '#336699')
+  );
+  const metadata = await sharp(output).metadata();
+  assert.equal(metadata.format, 'webp');
+  assert.equal(metadata.width, 1600);
+  assert.equal(metadata.height, 400);
+});
+
+test('an Illustration keeps its aspect inside 1600x1600 (tall)', async () => {
+  const metadata = await sharp(
+    await processIllustrationImage(await solid(800, 3200, '#336699'))
+  ).metadata();
+  assert.equal(metadata.width, 400);
+  assert.equal(metadata.height, 1600);
+});
+
+test('an Illustration smaller than the box is not enlarged', async () => {
+  const metadata = await sharp(
+    await processIllustrationImage(await solid(100, 60, '#336699'))
+  ).metadata();
+  assert.equal(metadata.width, 100);
+  assert.equal(metadata.height, 60);
+});
+
+test('an Illustration refuses bytes that are not an image', async () => {
+  await assert.rejects(
+    processIllustrationImage(
+      Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')
+    ),
+    isNotAValidImage
+  );
 });
