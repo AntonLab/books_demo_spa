@@ -216,7 +216,10 @@ describe('GenreManager', () => {
 
     // Drops the row `from` on the middle of the row `onto`. jsdom has no
     // layout, so the target's geometry is stubbed for rc-tree's position maths.
-    const drag = (from: string, onto: string) => {
+    // The `drag-over` class (rc-tree sets it only for a drop inside) proves the
+    // stub yields "drop inside" on the collapsed target, so a change in
+    // rc-tree's position maths fails here, not as a silent no-drop.
+    const drag = (from: string, onto: string, expectInside = true) => {
       const source = rowOf(from);
       const target = rowOf(onto);
       const dataTransfer = { setData: jest.fn(), dropEffect: '' };
@@ -234,6 +237,8 @@ describe('GenreManager', () => {
       fireEvent.dragStart(source, { dataTransfer });
       fireEvent.dragEnter(target, { dataTransfer, clientX: 0, clientY: 50 });
       fireEvent.dragOver(target, { dataTransfer, clientX: 0, clientY: 50 });
+      if (expectInside) expect(target).toHaveClass('drag-over');
+      else expect(target).not.toHaveClass('drag-over');
       fireEvent.drop(target, { dataTransfer, clientX: 0, clientY: 50 });
     };
 
@@ -255,7 +260,7 @@ describe('GenreManager', () => {
     it('sends nothing for a refused drop', async () => {
       await renderLoaded();
 
-      drag('Fantasy', 'Mystery');
+      drag('Fantasy', 'Mystery', false);
 
       expect(mockedGenres.updateGenre).not.toHaveBeenCalled();
     });
@@ -289,7 +294,7 @@ describe('GenreManager', () => {
       await waitFor(() =>
         expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1)
       );
-      drag('Romance', 'Fantasy');
+      drag('Romance', 'Fantasy', false);
 
       expect(mockedGenres.updateGenre).toHaveBeenCalledTimes(1);
 
