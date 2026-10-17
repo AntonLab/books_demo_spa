@@ -18,6 +18,10 @@ import {
 // 404 before 403 (a refusal cannot be used to probe which ids exist) and
 // before a handler spends work on the body.
 
+// The refusal for editing or deleting a Chapter or its Illustrations.
+export const MAY_CHANGE_CHAPTERS =
+  'You may only change chapters in books you co-author';
+
 export interface CoAuthorTarget {
   // What a missing row is reported as.
   resource: 'Book' | 'Series' | 'Chapter' | 'Illustration';

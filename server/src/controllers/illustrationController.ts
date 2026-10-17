@@ -9,10 +9,12 @@ import type {
   ReorderIllustrationsInput,
   UpdateIllustrationInput,
 } from '../types/illustration.ts';
-import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
+import {
+  assertMayChange,
+  type CoAuthorTarget,
+  MAY_CHANGE_CHAPTERS,
+} from './coAuthorGuard.ts';
 import { sendCover } from './coverResponse.ts';
-
-const MAY_CHANGE = 'You may only change chapters in books you co-author';
 
 // No try/catch anywhere below: the Express 5 router calls next(err) itself when
 // a handler's promise rejects.
@@ -41,7 +43,7 @@ export function createIllustrationController(
     // The Co-author check runs before decoding: a refused upload is never decoded.
     upload: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(req, chapterTarget(id), MAY_CHANGE);
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE_CHAPTERS);
       if (!Buffer.isBuffer(req.body)) throw new UnsupportedMediaTypeError();
 
       const processed = await processIllustrationImage(req.body);
@@ -50,7 +52,7 @@ export function createIllustrationController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE);
+      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE_CHAPTERS);
 
       const { caption } = validatedBody<UpdateIllustrationInput>(req);
       const row = await repository.updateCaption(id, caption);
@@ -60,7 +62,7 @@ export function createIllustrationController(
 
     reorder: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(req, chapterTarget(id), MAY_CHANGE);
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE_CHAPTERS);
 
       const { illustrationIds } = validatedBody<ReorderIllustrationsInput>(req);
       const items = await repository.reorder(id, illustrationIds);
@@ -69,7 +71,7 @@ export function createIllustrationController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE);
+      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE_CHAPTERS);
 
       if (!(await repository.remove(id))) {
         throw new NotFoundError('Illustration', id);

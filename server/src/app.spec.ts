@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net';
 import type { Sequelize } from 'sequelize';
 import sharp from 'sharp';
 import { createApp } from './app.ts';
+import { MAY_CHANGE_CHAPTERS } from './controllers/coAuthorGuard.ts';
 import { startAnnouncementPass } from './announcements/announcementPass.ts';
 import { parseConfig } from './db/config.ts';
 import { ensureDatabase } from './db/ensureDatabase.ts';
@@ -516,7 +517,7 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
         `/chapters/${created.body.id}`,
         edit
       ),
-      'You may only change chapters in books you co-author'
+      MAY_CHANGE_CHAPTERS
     );
 
     const edited = await author.browser.send<PublicChapter>(
