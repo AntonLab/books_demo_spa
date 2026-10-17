@@ -12,7 +12,7 @@ export const ILLUSTRATION_BOX = 1600;
 export interface UpdateIllustrationPayload {
   caption: string | null;
 }
-// PUT /api/chapters/:id/illustration-order: every id once, first first.
+// The chapter's whole order; see IllustrationRepository.reorder.
 export interface ReorderIllustrationsPayload {
   illustrationIds: number[];
 }

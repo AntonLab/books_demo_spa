@@ -12,11 +12,18 @@ import type {
 import { assertMayChange, type CoAuthorTarget } from './coAuthorGuard.ts';
 import { sendCover } from './coverResponse.ts';
 
+const MAY_CHANGE = 'You may only change chapters in books you co-author';
+
 // No try/catch anywhere below: the Express 5 router calls next(err) itself when
 // a handler's promise rejects.
 export function createIllustrationController(
   repository: IllustrationRepository
 ) {
+  const chapterTarget = (id: number): CoAuthorTarget => ({
+    resource: 'Chapter',
+    id,
+    coAuthorIds: () => repository.findChapterCoAuthorIds(id),
+  });
   const illustrationTarget = (id: number): CoAuthorTarget => ({
     resource: 'Illustration',
     id,
@@ -31,19 +38,10 @@ export function createIllustrationController(
       res.json({ items } satisfies ItemsResponse<PublicIllustration>);
     },
 
-    // Chapters x update, then the Co-author check, then the body: a refused
-    // upload is never decoded.
+    // The Co-author check runs before decoding: a refused upload is never decoded.
     upload: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        {
-          resource: 'Chapter',
-          id,
-          coAuthorIds: () => repository.findChapterCoAuthorIds(id),
-        },
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE);
       if (!Buffer.isBuffer(req.body)) throw new UnsupportedMediaTypeError();
 
       const processed = await processIllustrationImage(req.body);
@@ -52,11 +50,7 @@ export function createIllustrationController(
 
     update: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        illustrationTarget(id),
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE);
 
       const { caption } = validatedBody<UpdateIllustrationInput>(req);
       const row = await repository.updateCaption(id, caption);
@@ -66,15 +60,7 @@ export function createIllustrationController(
 
     reorder: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        {
-          resource: 'Chapter',
-          id,
-          coAuthorIds: () => repository.findChapterCoAuthorIds(id),
-        },
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, chapterTarget(id), MAY_CHANGE);
 
       const { illustrationIds } = validatedBody<ReorderIllustrationsInput>(req);
       const items = await repository.reorder(id, illustrationIds);
@@ -83,11 +69,7 @@ export function createIllustrationController(
 
     remove: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
-      await assertMayChange(
-        req,
-        illustrationTarget(id),
-        'You may only change chapters in books you co-author'
-      );
+      await assertMayChange(req, illustrationTarget(id), MAY_CHANGE);
 
       if (!(await repository.remove(id))) {
         throw new NotFoundError('Illustration', id);

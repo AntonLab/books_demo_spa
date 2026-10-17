@@ -19,7 +19,7 @@ export interface IllustrationRepository {
   findChapterCoAuthorIds(chapterId: number): Promise<number[] | null>;
   // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
   create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
-  // null when the illustration is missing. Leaves chapters.updatedAt alone.
+  // null when the illustration is missing.
   updateCaption(
     id: number,
     caption: string | null

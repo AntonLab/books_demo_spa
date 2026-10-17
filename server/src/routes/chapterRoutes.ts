@@ -50,8 +50,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
     controller.create
   );
   // Raw parser after permission and params, so those failures never read the
-  // body. The Co-author check runs in the controller, after the body is read
-  // (bounded by 2 MiB, as for a Cover upload).
+  // body.
   router.post(
     '/:id/illustrations',
     requirePermission('chapters', 'update'),

@@ -32,8 +32,7 @@ export const updateIllustrationCaption = (
   });
 };
 
-// The chapter's whole order. The server answers 409 when the ids are not
-// exactly the chapter's illustrations.
+// The chapter's whole order; see IllustrationRepository.reorder.
 export const reorderIllustrations = (
   chapterId: number,
   illustrationIds: number[]

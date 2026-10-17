@@ -17,8 +17,7 @@ export const updateIllustrationSchema = z
   })
   .strict();
 
-// A chapter's whole Illustration order, first first: the whole list, so the
-// repository can tell when it was drawn from a set that has since changed.
+// The chapter's whole order; see IllustrationRepository.reorder.
 export const reorderIllustrationsSchema = z.object({
   illustrationIds: z
     .array(idSchema)
