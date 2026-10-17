@@ -99,6 +99,30 @@ describe('GenreManager', () => {
     expect(screen.getByText('Fantasy')).toBeInTheDocument();
   });
 
+  it("keeps a parent's total and Delete lock when a usage filter hides its Subgenres", async () => {
+    mockedGenres.listGenreCounts.mockResolvedValue({
+      items: [
+        adminGenre(1, 'Fantasy', null, 2, 1),
+        adminGenre(2, 'Urban Fantasy', 1, 3, 0),
+        adminGenre(5, 'Mystery'),
+      ],
+    });
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    await user.click(screen.getByRole('combobox', { name: 'Filter genres' }));
+    await user.click(await screen.findByTitle('Has series'));
+
+    await waitFor(() => expect(screen.queryByText('Mystery')).toBeNull());
+    expect(screen.queryByText('Urban Fantasy')).toBeNull();
+    expect(screen.getByText('5 books, 1 series')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Cannot delete Fantasy: it has subgenres',
+      })
+    ).toBeDisabled();
+  });
+
   it('opens the create form from the toolbar and from a top-level row', async () => {
     const user = userEvent.setup();
     await renderLoaded();
