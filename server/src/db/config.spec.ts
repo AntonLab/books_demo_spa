@@ -93,7 +93,7 @@ const production = { ...minimal, NODE_ENV: 'production', MAIL_DELIVERY: 'log' };
 
 test('production without TRUST_PROXY is a config error that says why', () => {
   assert.throws(
-    () => parseConfig({ ...production }),
+    () => parseConfig(production),
     /Invalid environment configuration — TRUST_PROXY: production must set TRUST_PROXY explicitly; .*client address/
   );
 });
