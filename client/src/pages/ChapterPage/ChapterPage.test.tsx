@@ -5,6 +5,7 @@ import { ChapterPage } from './ChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
+import * as illustrationsApi from '@/api/illustrations';
 import {
   initialDevicePreferences,
   initialReadingPreferences,
@@ -19,9 +20,11 @@ import * as measurePages from './measurePages';
 
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
+jest.mock('@/api/illustrations');
 jest.mock('./measurePages');
 
 const measure = jest.mocked(measurePages);
+const mockedIllustrations = jest.mocked(illustrationsApi);
 
 const mocked = jest.mocked(chaptersApi);
 const mockedBooks = jest.mocked(booksApi);
@@ -94,6 +97,7 @@ const renderWithRoutes = (chapterId: string) =>
 beforeEach(() => {
   jest.resetAllMocks();
   mockedBooks.getBook.mockResolvedValue(book);
+  mockedIllustrations.listIllustrations.mockResolvedValue({ items: [] });
   mocked.listChapters.mockResolvedValue({
     items: [summary(9, 'One'), summary(10, 'Two'), summary(11, 'Three')],
     total: 3,
@@ -671,5 +675,63 @@ describe('ChapterPage pages from a click on the text', () => {
     fireEvent.click(heading, { clientX: 850 });
 
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+});
+
+describe('ChapterPage illustrations', () => {
+  const pictures = {
+    items: [
+      {
+        id: 7,
+        position: 1,
+        caption: 'A map',
+        updatedAt: '2026-10-17T10:00:00.000Z',
+      },
+      {
+        id: 8,
+        position: 2,
+        caption: null,
+        updatedAt: '2026-10-17T10:00:00.000Z',
+      },
+    ],
+  };
+  beforeEach(() =>
+    mockedIllustrations.listIllustrations.mockResolvedValue(pictures)
+  );
+
+  it('scroll: shows them after the chapter text', async () => {
+    renderAt(9);
+    const text = await screen.findByText('It was a dark night.');
+    const caption = await screen.findByText('A map');
+    expect(mockedIllustrations.listIllustrations).toHaveBeenCalledWith(9);
+    expect(
+      text.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('scroll: a chapter without pictures shows none', async () => {
+    mockedIllustrations.listIllustrations.mockResolvedValue({ items: [] });
+    renderAt(9);
+    await screen.findByText('It was a dark night.');
+    expect(screen.queryByRole('region', { name: 'Illustrations' })).toBeNull();
+  });
+
+  it('pages: hidden on page 1 of 3, shown on the last page', async () => {
+    renderPagesAt(10);
+    await screen.findByText('Page 1 of 3');
+    await waitFor(() =>
+      expect(mockedIllustrations.listIllustrations).toHaveBeenCalled()
+    );
+    expect(screen.queryByText('A map')).toBeNull();
+
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
+    expect(await screen.findByText('Page 3 of 3')).toBeInTheDocument();
+    expect(await screen.findByText('A map')).toBeInTheDocument();
+  });
+
+  it('pages: a one-page chapter shows them at once', async () => {
+    measure.countPages.mockReturnValue(1);
+    renderPagesAt(9);
+    expect(await screen.findByText('A map')).toBeInTheDocument();
   });
 });

@@ -22,6 +22,7 @@ import {
 import { ApiError } from '@/api/client';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
+import { ChapterIllustrations } from '@/components/organisms/ChapterIllustrations/ChapterIllustrations';
 import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
 import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
 import { useBook } from '@/queries/books';
@@ -307,6 +308,9 @@ export const ChapterPage: FC = () => {
                   ))}
                 </div>
               </div>
+              {/* Outside the strip, which measurePages.ts measures: they
+                  belong to the chapter's last page only. */}
+              {!hasPage('next') && <ChapterIllustrations chapterId={id} />}
             </div>
           ) : (
             /* Size and spacing are the reader's own numbers, so they go
@@ -326,6 +330,8 @@ export const ChapterPage: FC = () => {
               <Typography.Paragraph className={styles.text}>
                 {chapter.text}
               </Typography.Paragraph>
+
+              <ChapterIllustrations chapterId={id} />
             </div>
           )}
         </Card>
