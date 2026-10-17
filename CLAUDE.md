@@ -138,6 +138,27 @@ CI (`.github/workflows/`) gates every PR into `dev` or `main`; see
 - To find out why a pipeline session went wrong, use
   `superpowers:diagnosing-superpowers` rather than reading transcripts by hand.
 
+### UI checks and focused tests
+
+`swarm:ui-checker` and `swarm:sdd-re-reviewer` read these values here; without
+them `ui-checker` reports `BLOCKED`.
+
+- **UI-check server:** ports 3100 (client, the one the browser opens) and 4100
+  (API). Start from the worktree:
+  `PORT=4100 APP_BASE_URL=http://localhost:3100 npm run dev`; both the client
+  config and the server read these two variables. Ports 3000 and 4000 are the
+  user's own dev server: never stop it.
+- **Database:** MySQL. If the server cannot reach it, report `BLOCKED`; never
+  run `seed` or `/db-reset`.
+- **Seeded logins:** `superadmin`, `admin`, `mhale`, `ipetrov`, `nquinn`,
+  `user1`–`user5`, plus the non-Active `blocked1` and `pending1`. They share
+  the password in `DEMO_PASSWORD` (`server/src/db/seed/seed.ts`). Roles:
+  `USER_ROLES` in `shared/src/role.ts`.
+- **Focused test commands:** client `npm test -w client -- <test path>`;
+  server, from `server/`,
+  `node --env-file-if-exists=.env.local --test <spec path>`
+  (`npm test -w server -- <path>` still runs the whole glob).
+
 ### Shell on Windows
 
 Every session runs Git Bash on Windows, so commands are POSIX:
