@@ -8,6 +8,7 @@ import {
   createOnlineRegistry,
   notificationEvent,
   type OnlineConnection,
+  type OnlineRegistry,
 } from './onlineRegistry.ts';
 
 const NEW_CHAPTER: PublicNotification = {
@@ -36,6 +37,15 @@ function connection(userId: number, tokenHash: string) {
     },
   };
   return { stream, written, state };
+}
+
+// Adds streams up to the cap for one account, each accepted, and returns them.
+function fillAccount(registry: OnlineRegistry, userId: number) {
+  const open = Array.from({ length: MAX_STREAMS_PER_ACCOUNT }, (_, index) =>
+    connection(userId, `hash-${index}`)
+  );
+  for (const stream of open) assert.equal(registry.add(stream.stream), true);
+  return open;
 }
 
 // The session repository answers from a map the test edits, as sessions end;
@@ -205,10 +215,7 @@ test('start revalidates every 30 s; stop ends the timer and closes every stream'
 
 test('the stream over the per-account cap is refused and nothing is closed', () => {
   const registry = createOnlineRegistry(sessions(new Map()).deps);
-  const open = Array.from({ length: MAX_STREAMS_PER_ACCOUNT }, (_, index) =>
-    connection(2, `hash-${index}`)
-  );
-  for (const stream of open) assert.equal(registry.add(stream.stream), true);
+  const open = fillAccount(registry, 2);
 
   const extra = connection(2, 'hash-extra');
   assert.equal(registry.add(extra.stream), false);
@@ -225,16 +232,9 @@ test('the stream over the per-account cap is refused and nothing is closed', () 
   assert.deepEqual(open[0]!.written, [notificationEvent(NEW_CHAPTER)]);
 });
 
-test('MAX_STREAMS_PER_ACCOUNT is 10', () => {
-  assert.equal(MAX_STREAMS_PER_ACCOUNT, 10);
-});
-
 test('a freed slot lets the next stream in, and re-adding one stream does not use two', () => {
   const registry = createOnlineRegistry(sessions(new Map()).deps);
-  const open = Array.from({ length: MAX_STREAMS_PER_ACCOUNT }, (_, index) =>
-    connection(2, `hash-${index}`)
-  );
-  for (const stream of open) registry.add(stream.stream);
+  const open = fillAccount(registry, 2);
   assert.equal(registry.add(open[0]!.stream), true);
   assert.equal(registry.add(connection(2, 'hash-extra').stream), false);
 

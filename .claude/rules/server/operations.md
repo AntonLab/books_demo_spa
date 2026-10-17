@@ -81,9 +81,9 @@ database hiccup costs one pass, not the process.
   close its stream on the spot: the stream closes at the next revalidation,
   within 30 s.
 - An Account holds at most `MAX_STREAMS_PER_ACCOUNT` (10) streams. The stream
-  over it is a 429 and no open stream is closed: closing the oldest would make
-  the browser's reconnect evict the next one forever. The client's `onClosed`
-  retries after 30 s, and the bell's polling covers the gap.
+  over it is a 429 and no open stream is closed (reason: `onlineRegistry.ts`).
+  The client's `onClosed` retries after 30 s, and the bell's polling covers the
+  gap.
 - The shutdown stops the registry before `server.close()`, which would
   otherwise wait on every open stream.
 

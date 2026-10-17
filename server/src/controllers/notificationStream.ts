@@ -10,8 +10,7 @@ import { TooManyStreamsError, UnauthorizedError } from '../types/errors.ts';
 
 // One Server-Sent Events stream per open tab. It carries only what the Online
 // registry writes: the pass's notifications and its 30 s ping. The registry
-// also decides when the session behind it has ended and closes it then, and
-// caps the streams one Account may hold: past it the request is a 429.
+// also decides when the session behind it has ended and closes it then.
 export function createNotificationStreamHandler(
   registry: Pick<OnlineRegistry, 'add' | 'remove'>
 ): RequestHandler {
