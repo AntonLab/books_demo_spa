@@ -27,6 +27,7 @@ import { Comment } from '../../models/Comment.ts';
 import { Report } from '../../models/Report.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../../models/Genre.ts';
+import { Illustration } from '../../models/Illustration.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -84,6 +85,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Like,
   Report,
   Comment,
+  Illustration,
   Chapter,
   BookAuthor,
   Book,

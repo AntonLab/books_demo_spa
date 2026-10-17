@@ -19,6 +19,7 @@ import { Chapter, countWords } from '../../models/Chapter.ts';
 import { Comment } from '../../models/Comment.ts';
 import { Favorite } from '../../models/Favorite.ts';
 import { Genre } from '../../models/Genre.ts';
+import { Illustration } from '../../models/Illustration.ts';
 import { LibraryEntry } from '../../models/LibraryEntry.ts';
 import { Like } from '../../models/Like.ts';
 import { Notification } from '../../models/Notification.ts';
@@ -41,6 +42,8 @@ import { RNG_SEED, createRng } from './rng.ts';
 // process, and watch what it does to a schema of their own.
 const TEST_DB_NAME = `${process.env.TEST_DB_NAME ?? 'books_demo_spa_test'}_seed`;
 
+const APPLIED_MIGRATIONS = ['0001-baseline.ts', '0002-illustrations.ts'];
+
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');
 
 // The tables the seed deletes from under --force. Listed again here
@@ -54,6 +57,7 @@ const CONTENT_MODELS: readonly ModelStatic<Model>[] = [
   Like,
   Report,
   Comment,
+  Illustration,
   Chapter,
   BookAuthor,
   Book,
@@ -209,7 +213,7 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     assert.doesNotMatch(run.stderr, /\] (WARN|ERROR) /);
     assert.equal(found.users, 1);
     assert.deepEqual(await countRows(), found);
-    assert.deepEqual(await appliedMigrations(sequelize), ['0001-baseline.ts']);
+    assert.deepEqual(await appliedMigrations(sequelize), APPLIED_MIGRATIONS);
   });
 
   // Last in this suite: it drops the bystander's tables.
@@ -223,7 +227,7 @@ describe('seed.ts without --force against real MySQL', { skip }, () => {
     });
 
     assert.equal(run.code, 0, run.stderr);
-    assert.deepEqual(await appliedMigrations(sequelize), ['0001-baseline.ts']);
+    assert.deepEqual(await appliedMigrations(sequelize), APPLIED_MIGRATIONS);
   });
 });
 
