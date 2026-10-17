@@ -125,8 +125,7 @@ test('a truncated JPEG is refused', async () => {
   const whole = await solid(400, 400, '#336699');
   const truncated = whole.subarray(0, Math.floor(whole.length / 2));
 
-  await assert.rejects(processCoverImage(truncated), isNotAValidImage);
-  await assert.rejects(processAvatarImage(truncated), isNotAValidImage);
+  await rejectsBoth(truncated);
 });
 
 // sharp(buffer) throws synchronously ("Input Buffer is empty") for a 0-byte
