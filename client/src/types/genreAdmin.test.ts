@@ -77,6 +77,15 @@ describe('dropParentOf', () => {
     expect(dropParentOf(tree, 99, 1, false)).toBeNull();
     expect(dropParentOf(tree, 1, 99, true)).toBeNull();
   });
+  it('refuses a gap drop of a Genre with Subgenres beside a top-level Genre', () => {
+    expect(dropParentOf(tree, 1, 5, true)).toBeNull();
+  });
+  it('demotes a childless Genre dropped in a gap beside a Subgenre', () => {
+    expect(dropParentOf(tree, 5, 2, true)).toEqual({ parentId: 1 });
+  });
+  it('refuses a gap drop of a Subgenre beside itself', () => {
+    expect(dropParentOf(tree, 2, 2, true)).toBeNull();
+  });
 });
 
 describe('totalsOf', () => {
