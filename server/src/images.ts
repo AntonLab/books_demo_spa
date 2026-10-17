@@ -2,11 +2,10 @@ import sharp, { type Sharp } from 'sharp';
 import { BadRequestError } from './types/errors.ts';
 
 // Every sharp call for a Cover or an Avatar lives here, one function each.
-// The input-pixel limit is set here explicitly: sharp's default (about
-// 268 MP) lets a tiny PNG declaring 16000x16000 through, at about 1 GB of RAM
-// to decode, while the largest output is 600x900 and 25 MP still admits a
-// 6000x4000 photo. Multi-page input reads only its first frame (sharp's
-// default, left on).
+// The input-pixel limit is set explicitly. sharp's default (about 268 MP) lets
+// a tiny PNG declaring 16000x16000 through, costing about 1 GB of RAM to
+// decode. The largest output is 600x900, and 25 MP still admits a 6000x4000
+// photo. Multi-page input reads only its first frame (sharp default).
 const MAX_INPUT_PIXELS = 25_000_000;
 const DECODABLE_FORMATS = new Set(['jpeg', 'png', 'webp']);
 

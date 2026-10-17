@@ -17,6 +17,11 @@ const solid = (
 const isNotAValidImage = (error: unknown): boolean =>
   error instanceof BadRequestError && /not a valid image/i.test(error.message);
 
+const rejectsBoth = async (input: Buffer): Promise<void> => {
+  await assert.rejects(processCoverImage(input), isNotAValidImage);
+  await assert.rejects(processAvatarImage(input), isNotAValidImage);
+};
+
 test('a Cover comes back as WebP at exactly 600x900 from a wide input', async () => {
   const input = await solid(1200, 400, '#336699');
 
@@ -129,10 +134,7 @@ test('a truncated JPEG is refused', async () => {
 // that must be the same 400 as any other undecodable input, not an
 // uncaught error that surfaces as a 500.
 test('an empty buffer is refused, not left to crash the caller', async () => {
-  const empty = Buffer.alloc(0);
-
-  await assert.rejects(processCoverImage(empty), isNotAValidImage);
-  await assert.rejects(processAvatarImage(empty), isNotAValidImage);
+  await rejectsBoth(Buffer.alloc(0));
 });
 
 // A PNG chunk is length, type, data, then CRC32 over type + data.
@@ -162,18 +164,16 @@ const declaredPng = (width: number, height: number): Buffer => {
 };
 
 test('a PNG declaring 16000x16000 pixels is refused as not a valid image', async () => {
+  // Guard only: its truncated IDAT fails to decode even without the limit.
+  // The 6000x5000 JPEG test below is what proves the limit.
   const bomb = declaredPng(16000, 16000);
   assert.ok(bomb.length < 2 * 1024 * 1024);
 
-  await assert.rejects(processCoverImage(bomb), isNotAValidImage);
-  await assert.rejects(processAvatarImage(bomb), isNotAValidImage);
+  await rejectsBoth(bomb);
 });
 
 test('a real JPEG over 25 megapixels is refused', async () => {
-  const input = await solid(6000, 5000, '#336699');
-
-  await assert.rejects(processCoverImage(input), isNotAValidImage);
-  await assert.rejects(processAvatarImage(input), isNotAValidImage);
+  await rejectsBoth(await solid(6000, 5000, '#336699'));
 });
 
 test('a real 20 megapixel JPEG is still accepted', async () => {
