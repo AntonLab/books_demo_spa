@@ -1,0 +1,27 @@
+---
+paths:
+  - 'docs/superpowers/queue/**'
+---
+
+# Follow-up fix rounds
+
+A round that applies the follow-ups of a finished plan has no plan, only a
+brief file. It runs the same chain as a plan task: `sdd-implementer`, then
+`sdd-task-reviewer`, then `gate-runner`.
+
+- **Review package without a plan:** pass the brief file where the plan goes,
+  `bash scripts/sdd-step.sh review <brief.md> <BASE> [HEAD]`. It writes the
+  diff under `.superpowers/sdd/<brief-name>/` and prints the path. Do not
+  build the diff by hand.
+- **Concerns land in the follow-ups file.** The brief's rule "do not edit the
+  followups files" protects the lines being fixed. A `DONE_WITH_CONCERNS` still
+  gets its `accepted without user: <concern> -> <choice>` line, or goes to the
+  user, under a `## Round <n>` heading in that file, as `pipeline.md` says. A
+  concern left only in the chat is lost at `/clear`.
+- **Baseline questions** ("does this warning also appear on `origin/dev`?"):
+  `npm run baseline -- <client test path> [text]`. It builds a proper task
+  worktree for the dev side; a bare `git worktree add` shares `shared` with the
+  checkout it came from, so its result proves nothing.
+- **`ui-checker`:** a follow-up round whose diff touches `client/src` is not
+  checked again by default, since the plan's own run covered the behaviour.
+  Ask the user, and run it when the round changed what a page shows or sends.
