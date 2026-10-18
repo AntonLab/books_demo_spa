@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import {
+  useChapter,
   useCreateChapter,
   useDeleteChapter,
   useUpdateChapter,
@@ -34,6 +35,7 @@ const setUp = () => {
 
   return {
     wrapper: Wrapper,
+    invalidate,
     // The book detail carries wordCount, summed over Published chapters, so a
     // create, a save or a delete can each move it. The all-chapters prefix
     // covers the list, so a separate list key must not be sent.
@@ -87,14 +89,32 @@ describe('chapter writes', () => {
     expectChaptersAndBookInvalidated();
   });
 
-  it('deleting a chapter refreshes the list and the book’s figures', async () => {
-    const { wrapper, expectChaptersAndBookInvalidated } = setUp();
-    const { result } = renderHook(() => useDeleteChapter(1, 9), { wrapper });
+  it('deleting a chapter refetches the other chapters and the book, but not the deleted detail', async () => {
+    const { wrapper, invalidate } = setUp();
+    mockedChapters.getChapter.mockImplementation((id) =>
+      Promise.resolve({ ...chapter, id })
+    );
+    const { result } = renderHook(
+      () => ({
+        deleted: useChapter(9),
+        other: useChapter(10),
+        remove: useDeleteChapter(1, 9),
+      }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.other.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.deleted.isSuccess).toBe(true));
+    expect(mockedChapters.getChapter).toHaveBeenCalledTimes(2);
 
-    result.current.mutate(undefined);
+    result.current.remove.mutate(undefined);
 
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(result.current.remove.isSuccess).toBe(true));
     expect(mockedChapters.deleteChapter).toHaveBeenCalledWith(9);
-    expectChaptersAndBookInvalidated();
+    await waitFor(() =>
+      expect(mockedChapters.getChapter).toHaveBeenCalledTimes(3)
+    );
+    expect(mockedChapters.getChapter).toHaveBeenLastCalledWith(10);
+    expect(mockedChapters.getChapter).toHaveBeenCalledTimes(3);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books', 1] });
   });
 });

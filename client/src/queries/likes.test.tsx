@@ -56,14 +56,16 @@ describe('useToggleLike', () => {
   });
 
   it.each([
-    ['create', 409, null],
-    ['delete', 404, 5],
-  ])(
+    ['create', 409, null, 'createLike', 'deleteLike'],
+    ['delete', 404, 5, 'deleteLike', 'createLike'],
+  ] as const)(
     'refreshes the key after a refused %s (%i) too',
-    async (_op, status, existingId) => {
-      const refusal = new ApiError(status, 'already changed');
-      mockedLikes.createLike.mockRejectedValue(refusal);
-      mockedLikes.deleteLike.mockRejectedValue(refusal);
+    async (_op, status, existingId, ran, spared) => {
+      // Only the function that must run rejects, so a call to the other one
+      // would not look like the refusal.
+      mockedLikes[ran].mockRejectedValue(
+        new ApiError(status, 'already changed')
+      );
       const { result, invalidate } = setUp();
 
       act(() => {
@@ -75,6 +77,8 @@ describe('useToggleLike', () => {
           queryKey: queryKeys.comments(7),
         })
       );
+      expect(mockedLikes[ran]).toHaveBeenCalledTimes(1);
+      expect(mockedLikes[spared]).not.toHaveBeenCalled();
     }
   );
 });

@@ -141,6 +141,6 @@ export const useRemoveBookFromSeries = (seriesId: number) =>
 export const useReorderSeriesBooks = (seriesId: number) =>
   useOptimisticReorder<{ items: SeriesBookSummary[] }>(
     queryKeys.seriesBooks(seriesId),
-    [queryKeys.seriesBooks(seriesId), queryKeys.allBooks],
+    [queryKeys.allBooks],
     (bookIds) => reorderSeriesBooks(seriesId, bookIds)
   );

@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createChapter,
   deleteChapter,
@@ -35,10 +40,13 @@ export const useChapter = (id: number) => {
 // Every chapter write invalidates all chapter queries (the book's list and every
 // detail) and the book's detail. A save can change what a list shows (a draft
 // published) and the record itself. The detail's wordCount sums the Published
-// chapters' text.
+// chapters' text. A delete skips the deleted chapter's own detail: its page or
+// modal is still mounted and would refetch into a 404. (removeQueries would not
+// help: a mounted observer rebuilds the removed query and fetches it again.)
 const useChapterMutation = <TVariables, TResult>(
   bookId: number,
-  mutationFn: (variables: TVariables) => Promise<TResult>
+  mutationFn: (variables: TVariables) => Promise<TResult>,
+  deletedId?: number
 ) => {
   const queryClient = useQueryClient();
 
@@ -47,7 +55,13 @@ const useChapterMutation = <TVariables, TResult>(
     // with a second context argument an API function never declared.
     mutationFn: (variables: TVariables) => mutationFn(variables),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.allChapters });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.allChapters,
+        ...(deletedId !== undefined && {
+          predicate: (query) =>
+            hashKey(query.queryKey) !== hashKey(queryKeys.chapter(deletedId)),
+        }),
+      });
       void queryClient.invalidateQueries({ queryKey: queryKeys.book(bookId) });
     },
   });
@@ -64,12 +78,12 @@ export const useUpdateChapter = (bookId: number, id: number) =>
   );
 
 export const useDeleteChapter = (bookId: number, id: number) =>
-  useChapterMutation(bookId, () => deleteChapter(id));
+  useChapterMutation(bookId, () => deleteChapter(id), id);
 
 // Saves the book's Reading order on drop; see useOptimisticReorder.
 export const useReorderChapters = (bookId: number) =>
   useOptimisticReorder<ListResponse<ChapterSummary>>(
     queryKeys.chapters(bookId),
-    [queryKeys.chapters(bookId)],
+    [],
     (chapterIds) => reorderChapters(bookId, chapterIds)
   );

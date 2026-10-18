@@ -4,11 +4,11 @@ import type { QueryKey } from '@tanstack/react-query';
 // Saves a new order on drop, optimistically, for any cached list whose rows
 // carry an id: a book's chapters, a series' books. The list under `listKey` is
 // rewritten in the new order before the request leaves and put back on failure.
-// Each key in `invalidate` is refetched either way; after a 409 that brings in
-// the row someone else added or removed.
+// `listKey` and each key in `alsoInvalidate` are refetched either way; after a
+// 409 that brings in the row someone else added or removed.
 export const useOptimisticReorder = <TList extends { items: { id: number }[] }>(
   listKey: QueryKey,
-  invalidate: QueryKey[],
+  alsoInvalidate: QueryKey[],
   save: (ids: number[]) => Promise<void>
 ) => {
   const queryClient = useQueryClient();
@@ -39,7 +39,7 @@ export const useOptimisticReorder = <TList extends { items: { id: number }[] }>(
       }
     },
     onSettled: () => {
-      for (const queryKey of invalidate) {
+      for (const queryKey of [listKey, ...alsoInvalidate]) {
         void queryClient.invalidateQueries({ queryKey });
       }
     },

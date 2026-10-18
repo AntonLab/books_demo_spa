@@ -97,12 +97,30 @@ describe('useReorderSeriesBooks', () => {
       await waitFor(() =>
         expect(mockedBooks.listBooks).toHaveBeenCalledTimes(2)
       );
+      expect(invalidate).toHaveBeenCalledTimes(2);
       expect(invalidate).toHaveBeenCalledWith({
         queryKey: queryKeys.seriesBooks(3),
       });
       expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
     }
   );
+
+  it('puts the old order back in the cache when the save fails for any reason but a 409', async () => {
+    mockedSeries.reorderSeriesBooks.mockRejectedValue(
+      new ApiError(500, 'Internal Server Error')
+    );
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useReorderSeriesBooks(3)
+    );
+    const rows = [{ id: 1 }, { id: 2 }];
+    queryClient.setQueryData(queryKeys.seriesBooks(3), { items: rows });
+
+    await act(() => result.current.mutateAsync([2, 1]).catch(() => undefined));
+
+    expect(queryClient.getQueryData(queryKeys.seriesBooks(3))).toEqual({
+      items: rows,
+    });
+  });
 });
 
 describe('useFavoritedSeries', () => {
