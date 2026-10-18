@@ -34,7 +34,9 @@ const usage =
   'usage: npm run worktree -- <name> <branch> [start-point]\n' +
   '       npm run worktree -- --remove <name>';
 // An empty name never gets here: the argument dispatch below sends it to usage.
-const validName = (name) => name === basename(name) && !name.startsWith('.');
+// `\` is no separator to POSIX basename, so it is refused by hand.
+const validName = (name) =>
+  name === basename(name) && !name.includes('\\') && !name.startsWith('.');
 const rejectName = (name) => {
   if (validName(name)) return;
   console.error(usage);
