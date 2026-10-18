@@ -204,6 +204,18 @@ test('a request refused by validate spends nothing', () =>
     await spendBudget(base, as);
   }));
 
+test('a 403 from requirePermission spends nothing', () =>
+  withLimitedUploads(async (base, bookId) => {
+    const as = ROLE_COOKIES.user;
+    // A plain user may not update a book, so each cover PUT is refused.
+    for (let i = 0; i < BUDGET + 5; i += 1) {
+      assert.equal((await putCover(base, bookId, as)).status, 403);
+    }
+
+    // The same user's own avatar is permitted, and the budget is untouched.
+    assert.equal((await putAvatar(base, USER_IDS.user, as)).status, 200);
+  }));
+
 test('a guest PUT is 401 and spends nothing', () =>
   withLimitedUploads(async (base, bookId) => {
     assert.equal(
