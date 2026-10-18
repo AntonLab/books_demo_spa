@@ -190,7 +190,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
 
   // Returns the result so a caller can tell a failed page from a loaded one.
   // cancelRefetch: false: a second call would cancel the page in flight and
-  // resend it.
+  // resend it; this one joins the fetch already running, a refetch included.
   const loadMore = async () => {
     const result = await fetchNextPage({ cancelRefetch: false });
     if (result.isError) void message.error('Could not load more comments.');

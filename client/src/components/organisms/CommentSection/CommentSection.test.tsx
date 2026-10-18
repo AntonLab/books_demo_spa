@@ -1279,7 +1279,7 @@ describe('CommentSection paging', () => {
     const server = makeComments(250);
     serve(server);
     serveCreate(server);
-    renderSignedIn();
+    const { store } = renderSignedIn();
     await screen.findByText('Comment 1');
     const served = mockedComments.listComments.getMockImplementation()!;
     mockedComments.listComments.mockImplementation((id, offset) =>
@@ -1295,5 +1295,8 @@ describe('CommentSection paging', () => {
     ).toHaveLength(1);
     expect(callsAt(200)).toBe(0);
     expect(loadMoreButton()).toBeInTheDocument();
+    // The create succeeded, so the composer closes and the draft goes.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(store.getState().unsavedText.entries).toEqual({});
   });
 });
