@@ -23,8 +23,11 @@ const mockFlights: Promise<void>[] = [];
 jest.mock('@/hooks/useSingleFlight', () => {
   const actual = jest.requireActual('@/hooks/useSingleFlight');
   return {
-    useSingleFlight: (fn: (...args: unknown[]) => Promise<void>) => {
-      const flight = actual.useSingleFlight(fn);
+    useSingleFlight: (
+      fn: (...args: unknown[]) => Promise<void>,
+      keyOf?: (...args: unknown[]) => unknown
+    ) => {
+      const flight = actual.useSingleFlight(fn, keyOf);
       return (...args: unknown[]) => {
         const promise: Promise<void> = flight(...args);
         promise.catch(() => {});

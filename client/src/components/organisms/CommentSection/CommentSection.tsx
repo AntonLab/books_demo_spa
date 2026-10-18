@@ -1,4 +1,4 @@
-import { useRef, useState, type FC, type ReactNode } from 'react';
+import { useState, type FC, type ReactNode } from 'react';
 import { Alert, App, Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
@@ -85,7 +85,6 @@ export const CommentSection: FC<CommentSectionProps> = ({
     }
   );
   const sendReport = useSingleFlight((run: () => Promise<void>) => run());
-  const acting = useRef(new Set<number>());
   const { message } = App.useApp();
 
   const [composing, setComposing] = useState<Composing | null>(null);
@@ -93,6 +92,38 @@ export const CommentSection: FC<CommentSectionProps> = ({
   // Per-id state: `mutation.variables` keeps only the latest call, so a second
   // request would re-enable the first Comment early.
   const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set());
+
+  // Keyed by id, so one Comment's request never blocks another's. Remove is a
+  // delete too: the server makes a Removed comment when another Account calls
+  // it.
+  const actOn = useSingleFlight(
+    async (
+      mutation: typeof remove,
+      id: number,
+      failure: string,
+      onDone?: () => void
+    ) => {
+      setBusyIds((ids) => new Set(ids).add(id));
+      try {
+        try {
+          await mutation.mutateAsync(id);
+        } catch (error: unknown) {
+          void message.error(
+            error instanceof ApiError ? error.message : failure
+          );
+          return;
+        }
+        onDone?.();
+      } finally {
+        setBusyIds((ids) => {
+          const next = new Set(ids);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    (_mutation, id) => id
+  );
 
   // The Book page's tab label names the region, so no heading here. Every
   // branch renders the row, so the section keeps its height while the thread
@@ -251,33 +282,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
     setComposing(next);
   };
 
-  // A ref, not isPending: TanStack notifies it on a later tick, so a double
-  // click would send two requests. mutateAsync as in submit() above. Remove is
-  // a delete too: the server makes a Removed comment when another Account
-  // calls it.
+  // A keyed single flight, not isPending: TanStack notifies it on a later tick,
+  // so a double click would send two requests. mutateAsync as in submit()
+  // above.
   const act = (
     mutation: typeof remove,
     id: number,
     failure: string,
     onDone?: () => void
-  ) => {
-    if (acting.current.has(id)) return;
-    acting.current.add(id);
-    setBusyIds((ids) => new Set(ids).add(id));
-    void mutation
-      .mutateAsync(id)
-      .then(onDone, (error: unknown) => {
-        void message.error(error instanceof ApiError ? error.message : failure);
-      })
-      .finally(() => {
-        acting.current.delete(id);
-        setBusyIds((ids) => {
-          const next = new Set(ids);
-          next.delete(id);
-          return next;
-        });
-      });
-  };
+  ) => void actOn(mutation, id, failure, onDone);
 
   const deleteComment = (id: number) =>
     act(remove, id, 'Could not delete the comment.', () =>
