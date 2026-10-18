@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import sharp from 'sharp';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import {
   createFakeUserRepository,
@@ -11,6 +10,7 @@ import { hashPassword } from '../password.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import { ABOUT_MAX_LENGTH, type PublicUser } from 'shared';
 import {
+  aWebpImage,
   AUTH_COOKIE,
   json,
   ROLE_COOKIES,
@@ -1111,11 +1111,6 @@ test('currentPassword never reaches the stored row', async () => {
 });
 
 // --- An Account Avatar, uploaded, replaced, removed and served. ---
-
-const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
-  sharp({ create: { width, height, channels: 3, background: '#663399' } })
-    .webp()
-    .toBuffer();
 
 test('PUT /api/users/:id/avatar answers 401 with no session', async () => {
   await withApp(

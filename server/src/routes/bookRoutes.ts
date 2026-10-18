@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
 import { createChapterController } from '../controllers/chapterController.ts';
+import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
@@ -88,6 +89,7 @@ export function createBookRoutes(deps: RouteDeps): Router {
     '/:id/cover',
     requirePermission('books', 'update'),
     validate({ params: idParamSchema }),
+    limitEveryRequestByUser(deps.authRateLimits.upload),
     express.raw({
       type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
       limit: IMAGE_MAX_BYTES,

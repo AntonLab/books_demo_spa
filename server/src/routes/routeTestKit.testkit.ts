@@ -1,6 +1,7 @@
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import express, { type RequestHandler } from 'express';
+import sharp from 'sharp';
 import { createApp, type AppDeps } from '../app.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import { XSRF_HEADER_NAME } from '../middleware/csrfProtection.ts';
@@ -51,6 +52,7 @@ export function unlimitedAuthRateLimits(): AuthRateLimits {
     register: unlimited(),
     resetRequest: unlimited(),
     currentPassword: unlimited(),
+    upload: unlimited(),
     stop: () => {},
   };
 }
@@ -124,6 +126,28 @@ export async function withApp(
 // tests narrow it, mirroring validatedBody/Query/Params in validate.ts.
 export async function json<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
+}
+
+// A valid WebP, for the image upload PUTs.
+export const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
+  sharp({ create: { width, height, channels: 3, background: '#336699' } })
+    .webp()
+    .toBuffer();
+
+// An image PUT; no cookie sends it as a guest.
+export async function put(
+  url: string,
+  cookie: string | undefined,
+  body: Buffer
+): Promise<Response> {
+  return fetch(url, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'image/webp',
+      ...(cookie ? { cookie } : {}),
+    },
+    body,
+  });
 }
 
 export const TEST_USER: PublicUser = {

@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import sharp from 'sharp';
 import type { Actor } from '../repositories/notificationRepository.ts';
 import type { SeriesRepository } from '../repositories/seriesRepository.ts';
 import { createFakeSeriesRepository } from '../repositories/seriesRepository.fake.testkit.ts';
@@ -12,6 +11,7 @@ import type {
   Wire,
 } from 'shared';
 import {
+  aWebpImage,
   json,
   ROLE_COOKIES,
   USER_IDS,
@@ -825,11 +825,6 @@ test('series credit changes and deletes are made as the signed-in caller', async
 });
 
 // --- A Series Cover, uploaded, replaced, removed and served. ---
-
-const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
-  sharp({ create: { width, height, channels: 3, background: '#336699' } })
-    .webp()
-    .toBuffer();
 
 const putCover = (
   base: string,

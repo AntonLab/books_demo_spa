@@ -27,6 +27,14 @@ import type { UserRole } from 'shared';
 // other admins, every superadmin — is a superadmin's call. See CONTEXT.md.
 const ADMIN_MANAGEABLE_ROLES: readonly UserRole[] = ['user', 'author'];
 
+// The non-`any` half of assertMayTouch, also mounted ahead of the upload
+// limiter so a refused PUT spends no budget. No database read.
+export function assertOwnRow(req: Request, id: number): void {
+  if (req.permissionScope !== 'any' && req.user?.id !== id) {
+    throw new ForbiddenError('You may only change your own account');
+  }
+}
+
 // No try/catch anywhere below: the Express 5 router inspects the returned
 // promise and calls next(err) itself when it rejects.
 export function createUserController(
@@ -43,12 +51,8 @@ export function createUserController(
   // rank: 404 before 403, as everywhere else. Only a superadmin reaches
   // admin and superadmin accounts other than their own.
   const assertMayTouch = async (req: Request, id: number): Promise<void> => {
-    if (req.permissionScope !== 'any') {
-      if (req.user?.id !== id) {
-        throw new ForbiddenError('You may only change your own account');
-      }
-      return;
-    }
+    assertOwnRow(req, id);
+    if (req.permissionScope !== 'any') return;
 
     const target = await repository.findById(id);
     if (!target) throw new NotFoundError('User', id);

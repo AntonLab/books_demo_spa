@@ -75,6 +75,29 @@ export function commentRepositoryContract(
     );
   });
 
+  test('contract: a reply whose parent is on another book blames the parent and adds no row', async () => {
+    const { repository, anAccount, aBook } = await setUp();
+    const actorId = await anAccount();
+    const bookId = await aBook();
+    const otherBookId = await aBook();
+    const parent = await repository.create(
+      { bookId: otherBookId, parentId: null, text: 'Elsewhere' },
+      actorId
+    );
+
+    await assert.rejects(
+      repository.create(
+        { bookId, parentId: parent.id, text: 'Orphan' },
+        actorId
+      ),
+      new NotFoundError('Comment', parent.id)
+    );
+
+    const page = await repository.list({ limit: 20, offset: 0, bookId }, null);
+    assert.equal(page.total, 0);
+    assert.deepEqual(page.items, []);
+  });
+
   test('contract: every lookup and write on a missing comment answers null or false', async () => {
     const { repository } = await setUp();
 
