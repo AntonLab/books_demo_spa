@@ -13,7 +13,12 @@ import { Report } from '../models/Report.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { Session } from '../models/Session.ts';
-import { toAuthorSummary, toPublicUser, User } from '../models/User.ts';
+import {
+  toAuthorSummary,
+  toAuthUser,
+  toPublicUser,
+  User,
+} from '../models/User.ts';
 import { UserAvatar } from '../models/UserAvatar.ts';
 import { containsPattern } from './likePattern.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
@@ -27,6 +32,7 @@ import type {
   UserStatus,
 } from 'shared';
 import type {
+  AuthUserRecord,
   CreateUserInput,
   ListAuthorsQuery,
   ListUsersQuery,
@@ -45,6 +51,9 @@ export interface UserRepository {
   // as AuthorSummary, so the picker that searches them never sees an email.
   listAuthors(query: ListAuthorsQuery): Promise<AuthorSummary[]>;
   findById(id: number): Promise<PublicUser | null>;
+  // The auth path's read: the user row only, no avatar query, and the internal
+  // lastSeenAt the stamp throttle compares.
+  findForAuth(id: number): Promise<AuthUserRecord | null>;
   update(id: number, input: UserChanges): Promise<PublicUser | null>;
   remove(id: number): Promise<boolean>;
   // The one door role changes travel through — see userRoleRoutes.ts. Its own
@@ -68,9 +77,10 @@ export interface UserRepository {
   setAvatar(id: number, data: Buffer): Promise<boolean>;
   removeAvatar(id: number): Promise<void>;
   getAvatarData(id: number): Promise<{ data: Buffer; updatedAt: Date } | null>;
-  // A throttled stamp, never an edit: it writes lastSeenAt only when the
-  // stored value is null or older than LAST_ONLINE_WINDOW_MS, and leaves
-  // updatedAt alone. A missing id is a silent no-op.
+  // A throttled stamp, never an edit: callers pre-check staleness in
+  // resolveSessionUser, so the WHERE (lastSeenAt null or older than
+  // LAST_ONLINE_WINDOW_MS) only guards races. Leaves updatedAt alone. A
+  // missing id is a silent no-op.
   touchLastSeen(id: number, now: Date): Promise<void>;
 }
 
@@ -267,6 +277,11 @@ export function createSequelizeUserRepository(): UserRepository {
       if (!user) return null;
       const avatarUrls = await loadAvatarUrls([id]);
       return toPublicUser(user, avatarUrls.get(id) ?? null);
+    },
+
+    async findForAuth(id) {
+      const user = await User.findByPk(id);
+      return user ? toAuthUser(user) : null;
     },
 
     // One transaction, so a block or a password change and the sessions it

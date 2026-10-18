@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddToReadingList } from './AddToReadingList';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { ApiError } from '@/api/client';
 import * as readingListsApi from '@/api/readingLists';
 import type { WorkTarget } from '@/api/readingLists';
@@ -159,5 +160,25 @@ describe('AddToReadingList', () => {
     expect(await screen.findByText('Title is too long')).toBeInTheDocument();
     expect(screen.getByLabelText('New list title')).toHaveValue('Warm days');
     expect(mocked.addReadingListItem).not.toHaveBeenCalled();
+  });
+
+  it('returns focus to the button when the modal closes', async () => {
+    mocked.listMyReadingLists.mockResolvedValue({ items: [] });
+    const user = userEvent.setup();
+    renderWithProviders(<AddToReadingList target={{ bookId: 7 }} />);
+    const opener = screen.getByRole('button', { name: 'Add to reading list' });
+    await expectFocusReturnsToOpener(opener, {
+      open: () => user.keyboard('{Enter}'),
+      close: async () =>
+        user.click(
+          within(
+            await screen.findByRole('dialog', { name: 'Add to reading list' })
+          ).getByRole('button', { name: 'Close' })
+        ),
+      gone: () =>
+        expect(
+          screen.queryByRole('dialog', { name: 'Add to reading list' })
+        ).toBeNull(),
+    });
   });
 });

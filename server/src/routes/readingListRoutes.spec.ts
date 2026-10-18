@@ -10,6 +10,7 @@ import type {
   ReadingListItem,
   Wire,
 } from 'shared';
+import { READING_LIST_MAX_PER_ACCOUNT } from 'shared';
 import {
   aPublicBook,
   aPublicSeries,
@@ -346,6 +347,75 @@ test('a Guest lists the public lists holding a Book; a Draft or missing Book is 
           0
         );
       }
+    }
+  );
+});
+
+test('create refuses the 51st list of one account with 400; another account is not blocked', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      for (let i = 0; i < READING_LIST_MAX_PER_ACCOUNT - 1; i += 1) {
+        await createList(base, user, { title: `List ${i}` });
+      }
+      await createList(base, user, { title: 'The 50th' });
+      const refused = await call(base, user, 'POST', '', { title: 'The 51st' });
+      assert.equal(refused.status, 400);
+      const body = await json<{ error: string }>(refused);
+      assert.equal(
+        body.error,
+        `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`
+      );
+      await createList(base, ROLE_COOKIES.author, { title: 'Elsewhere' });
+    }
+  );
+});
+
+test('copy refuses with 400 when the copier already holds 50 lists', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      const { id } = await createList(base, ROLE_COOKIES.author);
+      for (let i = 0; i < READING_LIST_MAX_PER_ACCOUNT; i += 1) {
+        await createList(base, user, { title: `List ${i}` });
+      }
+      const refused = await call(base, user, 'POST', `/${id}/copy`);
+      assert.equal(refused.status, 400);
+    }
+  );
+});
+
+test('at 50 lists, deleting one lets the next create succeed', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      const first = await createList(base, user, { title: 'List 0' });
+      for (let i = 1; i < READING_LIST_MAX_PER_ACCOUNT; i += 1) {
+        await createList(base, user, { title: `List ${i}` });
+      }
+      assert.equal(
+        (await call(base, user, 'POST', '', { title: 'Over' })).status,
+        400
+      );
+      assert.equal(
+        (await call(base, user, 'DELETE', `/${first.id}`)).status,
+        204
+      );
+      await createList(base, user, { title: 'After delete' });
+    }
+  );
+});
+
+test('the 50th list is accepted by create and by copy (boundary)', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      const { id } = await createList(base, ROLE_COOKIES.author);
+      for (let i = 0; i < READING_LIST_MAX_PER_ACCOUNT - 1; i += 1) {
+        await createList(base, user, { title: `List ${i}` });
+      }
+      const copy = await call(base, user, 'POST', `/${id}/copy`);
+      assert.equal(copy.status, 201);
     }
   );
 });

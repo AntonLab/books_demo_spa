@@ -1,4 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
+import type { QueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigationType } from 'react-router';
 import {
   profileTabOf,
@@ -8,13 +9,15 @@ import {
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { seededClient, sessionOf } from '@/test/session';
 import { genreItem } from '@/test/genres';
+import { publicBook, publicSeries } from '@/test/works';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries, PublicUser } from '@/types/api';
-import type { PublicBook } from '@/types/book';
+import { listParamsOf, parseBookSearch } from '@/types/bookSearch';
+import { parseSeriesSearch, seriesListParamsOf } from '@/types/seriesSearch';
+import type { PublicUser } from '@/types/api';
 import type { ProfileScope } from '@/types/profileScope';
 
 jest.mock('@/api/auth');
@@ -27,24 +30,49 @@ const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 
 const row = {
-  id: 1,
-  title: 'Book 1',
+  ...publicBook({ id: 1, title: 'Book 1' }),
   favoriteId: 41,
-} as unknown as PublicBook & { favoriteId: number };
+};
 const user = { id: 3, role: 'user' } as PublicUser;
-const setup = (
-  scope: ProfileScope,
-  route: string,
-  who: PublicUser | null = user
-) =>
-  renderHookWithProviders(
-    () => ({
-      state: useProfileBooks(scope, 3),
-      location: useLocation(),
-      navType: useNavigationType(),
-    }),
-    { route, queryClient: seededClient(who) }
-  );
+const setupOf =
+  <T,>(useList: (scope: ProfileScope, userId: number) => T) =>
+  (
+    scope: ProfileScope,
+    route: string,
+    who: PublicUser | null = user,
+    seed?: (client: QueryClient) => void
+  ) => {
+    const queryClient = seededClient(who);
+    seed?.(queryClient);
+    return renderHookWithProviders(
+      () => ({
+        state: useList(scope, 3),
+        location: useLocation(),
+        navType: useNavigationType(),
+      }),
+      { route, queryClient }
+    );
+  };
+const setup = setupOf(useProfileBooks);
+const setupSeries = setupOf(useProfileSeries);
+const expectBlockedGenreList = async (
+  result: {
+    current: {
+      state: { list: unknown };
+      location: { search: string };
+    };
+  },
+  search: string
+) => {
+  await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+  expect(result.current.state.list).toMatchObject({
+    items: [],
+    total: 0,
+    isPending: false,
+    error: null,
+  });
+  expect(result.current.location.search).toBe(search);
+};
 const rowsOf = ({ current }: ReturnType<typeof setup>['result']) =>
   current.state.list.items;
 
@@ -137,6 +165,30 @@ describe('useProfileBooks', () => {
       filtered: true,
     });
   });
+
+  it.each(['mine', 'favorites'] as const)(
+    'Books %s: a genre that is no id hides cached rows, asks nothing and does not clamp the page',
+    async (scope) => {
+      const search = parseBookSearch(new URLSearchParams('page=9'));
+      const base = listParamsOf(search, undefined);
+      const key =
+        scope === 'mine'
+          ? queryKeys.books({ ...base, userId: 3 })
+          : queryKeys.books({ ...base, favoritedBy: 'me' });
+      const { result } = setup(scope, '/p?genre=abc&page=9', user, (client) =>
+        client.setQueryData(key, {
+          items: [row],
+          total: 1,
+          current: 9,
+          pageSize: 20,
+        })
+      );
+
+      await expectBlockedGenreList(result, '?genre=abc&page=9');
+      expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+      expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+    }
+  );
 
   it('asks for an unknown genre id as it is, with the form field empty; a known one fills it', async () => {
     const unknown = setup('mine', '/p?genre=99');
@@ -291,24 +343,10 @@ describe('page clamp', () => {
 });
 
 const seriesRow = {
-  id: 5,
-  title: 'Series 5',
+  ...publicSeries({ id: 5, title: 'Series 5' }),
   favoriteId: 61,
-} as unknown as PublicSeries & { favoriteId: number };
+};
 const seriesBody = { items: [seriesRow], total: 1, limit: 20, offset: 0 };
-const setupSeries = (
-  scope: ProfileScope,
-  route: string,
-  who: PublicUser | null = user
-) =>
-  renderHookWithProviders(
-    () => ({
-      state: useProfileSeries(scope, 3),
-      location: useLocation(),
-      navType: useNavigationType(),
-    }),
-    { route, queryClient: seededClient(who) }
-  );
 
 describe('useProfileSeries', () => {
   beforeEach(() => {
@@ -359,6 +397,36 @@ describe('useProfileSeries', () => {
       filtered: true,
     });
   });
+
+  it.each(['mine', 'favorites'] as const)(
+    'Series %s: a genre that is no id hides cached rows, asks nothing and does not clamp the page',
+    async (scope) => {
+      const base = seriesListParamsOf(
+        parseSeriesSearch(new URLSearchParams('page=9')),
+        undefined
+      );
+      const key =
+        scope === 'mine'
+          ? queryKeys.series({ ...base, userId: 3 })
+          : queryKeys.series({ ...base, favoritedBy: 'me' });
+      const { result } = setupSeries(
+        scope,
+        '/p?tab=series&genre=abc&page=9',
+        user,
+        (client) =>
+          client.setQueryData(key, {
+            items: [seriesRow],
+            total: 1,
+            limit: 20,
+            offset: 160,
+          })
+      );
+
+      await expectBlockedGenreList(result, '?tab=series&genre=abc&page=9');
+      expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+      expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+    }
+  );
 
   it('Search keeps the tab and size and resets the page, Reset keeps only the tab', () => {
     const { result } = setupSeries('mine', '/p?tab=series&page=3&pageSize=50');

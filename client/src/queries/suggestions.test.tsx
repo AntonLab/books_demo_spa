@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { useSuggestions } from './suggestions';
 import { createTestQueryClient } from '../test/queryClient';
+import { publicBook, publicSeries } from '../test/works';
 import * as booksApi from '../api/books';
 import * as seriesApi from '../api/series';
 import type { PublicSeries } from '../types/api';
@@ -31,10 +32,10 @@ const bookOf = (
   id: number,
   title: string,
   authors: PublicBook['authors'] = []
-): PublicBook => ({ id, title, authors }) as Partial<PublicBook> as PublicBook;
+): PublicBook => publicBook({ id, title, authors });
 
 const seriesOf = (id: number, title: string): PublicSeries =>
-  ({ id, title }) as PublicSeries;
+  publicSeries({ id, title });
 
 const pageOf = (items: PublicBook[]) => ({
   items,

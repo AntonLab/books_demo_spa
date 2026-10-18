@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SeriesCoverManager } from './SeriesCoverManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicSeries } from '@/test/works';
 import * as seriesApi from '@/api/series';
 import type { SeriesDetail } from '@/types/api';
 
@@ -10,16 +11,11 @@ jest.mock('@/api/series');
 const mockedSeries = jest.mocked(seriesApi);
 
 const series: SeriesDetail = {
-  id: 12,
-  coverUrl: null,
-  bookCount: 0,
-  authors: [],
-  title: 'The Scale Cycle',
-  description: 'Dragons, in four parts.',
-  tags: [],
-  genre: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
+  ...publicSeries({
+    id: 12,
+    title: 'The Scale Cycle',
+    description: 'Dragons, in four parts.',
+  }),
   favoriteCount: 0,
   viewerFavoriteId: null,
 };

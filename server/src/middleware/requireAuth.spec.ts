@@ -6,6 +6,7 @@ import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
 import { createRequireAuth } from './requireAuth.ts';
 import { errorHandler } from './errorHandler.ts';
+import { toAuthRecord } from '../repositories/userRepository.fake.testkit.ts';
 import { hashToken } from '../tokens.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
@@ -45,6 +46,14 @@ function deps(
       return overrides.userFound === false
         ? null
         : { ...USER, status: overrides.status ?? USER.status };
+    },
+    async findForAuth(_id: number) {
+      return overrides.userFound === false
+        ? null
+        : toAuthRecord({
+            ...USER,
+            status: overrides.status ?? USER.status,
+          });
     },
     async touchLastSeen() {},
   } as unknown as UserRepository;

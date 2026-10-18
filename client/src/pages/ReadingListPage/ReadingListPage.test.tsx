@@ -7,8 +7,8 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
 import * as readingListsApi from '@/api/readingLists';
 import { ApiError } from '@/api/client';
-import type { PublicBook } from '@/types/book';
-import type { PublicUser, PublicSeries } from '@/types/api';
+import { publicBook, publicSeries } from '@/test/works';
+import type { PublicUser } from '@/types/api';
 import type { ReadingListDetail } from '@/types/readingList';
 
 jest.mock('@/api/readingLists');
@@ -29,33 +29,20 @@ const coAuthor = {
   avatarUrl: null,
 };
 
-const book: PublicBook = {
-  id: 1,
+const book = publicBook({
   authors: [coAuthor],
-  seriesId: null,
-  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
-  tags: [],
   status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
-const series: PublicSeries = {
+const series = publicSeries({
   id: 12,
-  coverUrl: null,
   bookCount: 2,
   authors: [coAuthor],
   title: 'The Ashgrove Chronicles',
   description: 'Letters found in a manor.',
-  tags: [],
-  genre: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 const detail: ReadingListDetail = {
   id: 4,

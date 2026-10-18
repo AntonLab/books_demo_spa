@@ -5,8 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as readingListsApi from '@/api/readingLists';
-import type { PublicSeries } from '@/types/api';
-import type { PublicBook } from '@/types/book';
+import { publicBook, publicSeries } from '@/test/works';
 import type { ReadingListEditItem } from '@/types/readingList';
 
 jest.mock('@/api/readingLists');
@@ -25,37 +24,25 @@ const ann = {
 const bookItem = (id: number, title: string): ReadingListEditItem => ({
   id,
   kind: 'book',
-  book: {
+  book: publicBook({
     id: 1,
     title,
     status: 'complete',
     authors: [ann],
     description: 'D.',
-    tags: [],
-    genre: null,
-    coverUrl: null,
-    seriesId: null,
-    series: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  } as PublicBook,
+  }),
 });
 
 const seriesItem = (id: number, title: string): ReadingListEditItem => ({
   id,
   kind: 'series',
-  series: {
+  series: publicSeries({
     id: 12,
     title,
-    coverUrl: null,
     bookCount: 1,
     authors: [ann],
     description: 'D.',
-    tags: [],
-    genre: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  } as PublicSeries,
+  }),
 });
 
 const hidden = (id: number): ReadingListEditItem => ({

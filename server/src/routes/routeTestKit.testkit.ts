@@ -5,6 +5,7 @@ import { createApp, type AppDeps } from '../app.ts';
 import type { AuthRateLimits } from '../middleware/authRateLimit.ts';
 import { XSRF_HEADER_NAME } from '../middleware/csrfProtection.ts';
 import type { RateLimiter } from '../rateLimit.ts';
+import { toAuthRecord } from '../repositories/userRepository.fake.testkit.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
 import { SESSION_COOKIE_NAME, XSRF_COOKIE } from '../sessionCookie.ts';
@@ -241,6 +242,10 @@ function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
       async findById(id: number) {
         return USERS_BY_ID.get(id) ?? null;
       },
+      async findForAuth(id: number) {
+        const user = USERS_BY_ID.get(id);
+        return user ? toAuthRecord(user) : null;
+      },
       async touchLastSeen() {},
     } as unknown as UserRepository,
   };
@@ -275,6 +280,12 @@ export async function withAuthenticatedApp(
                 (await overrideUsers.findById(id)) ??
                 USERS_BY_ID.get(id) ??
                 null
+              );
+            },
+            async findForAuth(id: number) {
+              return (
+                (await overrideUsers.findForAuth(id)) ??
+                stubs.userRepository.findForAuth(id)
               );
             },
           }

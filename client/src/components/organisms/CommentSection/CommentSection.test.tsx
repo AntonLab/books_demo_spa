@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { CommentSection } from './CommentSection';
 import { ApiError } from '@/api/client';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { seedSession } from '@/test/session';
@@ -915,6 +916,21 @@ describe('CommentSection Unsaved text', () => {
     );
     await addComment();
     expect(screen.getByRole('textbox')).toHaveValue('Later');
+  });
+
+  it('returns focus to Add comment when the composer closes', async () => {
+    const user = userEvent.setup();
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    const opener = screen.getByRole('button', { name: 'Add comment' });
+    await expectFocusReturnsToOpener(opener, {
+      open: () => user.keyboard('{Enter}'),
+      close: async () => {
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      },
+      gone: () => expect(screen.queryByRole('dialog')).toBeNull(),
+    });
   });
 
   it('closes a reply whose comment becomes a Tombstone and offers its text', async () => {

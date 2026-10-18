@@ -4,7 +4,7 @@ import { SeriesCreateModal } from './SeriesCreateModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries } from '@/types/api';
+import { publicSeries } from '@/test/works';
 
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
@@ -12,10 +12,8 @@ jest.mock('@/api/series');
 const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
-const created: PublicSeries = {
+const created = publicSeries({
   id: 9,
-  coverUrl: null,
-  bookCount: 0,
   authors: [
     {
       id: 3,
@@ -28,11 +26,7 @@ const created: PublicSeries = {
   ],
   title: 'The Scale Cycle',
   description: 'Dragons, in four parts.',
-  tags: [],
-  genre: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 const renderModal = ({ onClose }: { onClose: () => void }) =>
   renderWithProviders(<SeriesCreateModal onClose={onClose} />);

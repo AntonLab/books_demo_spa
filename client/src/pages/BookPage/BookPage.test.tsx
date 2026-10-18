@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicBook } from '@/test/works';
 import { ApiError } from '@/api/client';
 import { formatDate } from '@/format/date';
 import * as booksApi from '@/api/books';
@@ -46,35 +47,33 @@ const mockedLibrary = jest.mocked(libraryApi);
 const mockedSeries = jest.mocked(seriesApi);
 
 const book: BookDetail = {
-  id: 1,
-  authors: [
-    {
-      id: 3,
-      login: 'Author',
-      firstName: 'Ann',
-      lastName: 'Author',
-      status: 'active',
-      avatarUrl: null,
-    },
-    {
-      id: 4,
-      login: 'Cowriter',
-      firstName: 'Cora',
-      lastName: 'Writer',
-      status: 'active',
-      avatarUrl: null,
-    },
-  ],
-  seriesId: 2,
-  title: 'A Tale of Dragons',
-  description: 'Long ago, in a kingdom of scales.',
-  tags: ['epic'],
-  status: 'in_progress',
-  genre: publicGenre(4, 'Gothic'),
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-  series: { id: 2, title: 'The Scale Cycle', position: 1 },
+  ...publicBook({
+    authors: [
+      {
+        id: 3,
+        login: 'Author',
+        firstName: 'Ann',
+        lastName: 'Author',
+        status: 'active',
+        avatarUrl: null,
+      },
+      {
+        id: 4,
+        login: 'Cowriter',
+        firstName: 'Cora',
+        lastName: 'Writer',
+        status: 'active',
+        avatarUrl: null,
+      },
+    ],
+    seriesId: 2,
+    title: 'A Tale of Dragons',
+    description: 'Long ago, in a kingdom of scales.',
+    tags: ['epic'],
+    status: 'in_progress',
+    genre: publicGenre(4, 'Gothic'),
+    series: { id: 2, title: 'The Scale Cycle', position: 1 },
+  }),
   likeCount: 4,
   commentCount: 0,
   wordCount: 0,

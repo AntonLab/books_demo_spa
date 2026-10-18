@@ -3,10 +3,12 @@ import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorChapter } from '@/test/editFixtures';
 import { seedSession } from '@/test/session';
+import { publicBook } from '@/test/works';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
@@ -35,18 +37,12 @@ const ann = {
 };
 
 const bookDetail: BookDetail = {
-  id: 1,
-  authors: [ann],
-  seriesId: null,
-  series: null,
-  title: 'A Tale of Dragons',
-  description: 'Long ago, in a kingdom of scales.',
-  tags: [],
-  status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
+  ...publicBook({
+    authors: [ann],
+    title: 'A Tale of Dragons',
+    description: 'Long ago, in a kingdom of scales.',
+    status: 'in_progress',
+  }),
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,
@@ -295,6 +291,23 @@ describe('BookEditDetailsModal Chapter editor', () => {
     expect(await dialogTitled('Edit book')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Edit One' })).toBeVisible();
+  });
+
+  it('returns focus to the chapter button when the Chapter modal closes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const opener = await toChapters();
+    await expectFocusReturnsToOpener(opener, {
+      open: () => user.keyboard('{Enter}'),
+      close: async () =>
+        user.click(
+          within(await dialogTitled('Edit chapter')).getByRole('button', {
+            name: 'Close',
+          })
+        ),
+      gone: () => expect(screen.queryByText('Edit chapter')).toBeNull(),
+    });
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
   });
 
   it('opens a new chapter from Add chapter', async () => {

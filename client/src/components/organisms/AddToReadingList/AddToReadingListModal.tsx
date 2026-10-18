@@ -17,7 +17,9 @@ import {
   useMyReadingLists,
   useToggleListItem,
 } from '@/queries/readingLists';
+import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 import type { WorkTarget } from '@/api/readingLists';
+import styles from './AddToReadingListModal.module.css';
 
 interface AddToReadingListModalProps {
   target: WorkTarget;
@@ -29,6 +31,7 @@ export const AddToReadingListModal: FC<AddToReadingListModalProps> = ({
   target,
   onClose,
 }) => {
+  useRestoreFocus();
   const lists = useMyReadingLists(target, true);
   const toggle = useToggleListItem(target);
   const create = useCreateReadingList();
@@ -64,7 +67,7 @@ export const AddToReadingListModal: FC<AddToReadingListModalProps> = ({
           You have no reading lists yet. Create one below.
         </Typography.Paragraph>
       )}
-      <Flex vertical gap="small">
+      <Flex vertical gap="small" className={styles.lists}>
         {lists.data?.items.map((list) => (
           <Checkbox
             key={list.id}

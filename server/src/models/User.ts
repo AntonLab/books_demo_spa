@@ -7,6 +7,7 @@ import {
   type Sequelize,
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
+import type { AuthUserRecord } from '../types/user.ts';
 import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
 import {
   EMAIL_MAX_LENGTH,
@@ -139,6 +140,13 @@ export function toPublicUser(user: User, avatarUrl: string | null): PublicUser {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+// Narrowed shape for the auth path: no avatar, no hash, plus the internal
+// lastSeenAt that toPublicUser omits.
+export function toAuthUser(user: User): AuthUserRecord {
+  const { avatarUrl: _avatarUrl, ...base } = toPublicUser(user, null);
+  return { ...base, lastSeenAt: user.lastSeenAt ?? null };
 }
 
 // The shape public endpoints embed when they name an author. Deliberately not

@@ -2,12 +2,10 @@ import { screen } from '@testing-library/react';
 import { SeriesCard } from './SeriesCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
-import type { PublicSeries } from '@/types/api';
+import { publicSeries } from '@/test/works';
 
-const series: PublicSeries = {
+const series = publicSeries({
   id: 12,
-  coverUrl: null,
-  bookCount: 0,
   authors: [
     {
       id: 3,
@@ -30,9 +28,7 @@ const series: PublicSeries = {
   description: 'Letters found in a manor that should have stayed shut.',
   tags: ['gothic', 'mystery'],
   genre: publicGenre(4, 'Gothic'),
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 describe('SeriesCard', () => {
   it('heads the card with the series title', () => {

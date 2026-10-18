@@ -6,12 +6,12 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicBook, publicSeries } from '@/test/works';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import * as favoritesApi from '@/api/favorites';
 import { ApiError } from '@/api/client';
-import type { PublicBook } from '@/types/book';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/authors');
@@ -36,34 +36,26 @@ const coAuthor = {
 };
 
 const series: SeriesDetail = {
-  id: 12,
-  coverUrl: null,
-  bookCount: 2,
-  authors: [coAuthor],
-  title: 'The Ashgrove Chronicles',
-  description: 'Letters found in a manor that should have stayed shut.',
-  tags: ['gothic'],
-  genre: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
+  ...publicSeries({
+    id: 12,
+    bookCount: 2,
+    authors: [coAuthor],
+    title: 'The Ashgrove Chronicles',
+    description: 'Letters found in a manor that should have stayed shut.',
+    tags: ['gothic'],
+  }),
   favoriteCount: 0,
   viewerFavoriteId: null,
 };
 
-const book: PublicBook = {
-  id: 1,
+const book = publicBook({
   authors: [coAuthor],
   seriesId: 12,
   series: { id: 12, title: 'The Ashgrove Chronicles', position: 1 },
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
-  tags: [],
   status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 const account = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   ...coAuthor,

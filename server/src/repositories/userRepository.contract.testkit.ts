@@ -84,6 +84,7 @@ export function userRepositoryContract(
     const { repository } = await setUp();
 
     assert.equal(await repository.findById(MISSING_ID), null);
+    assert.equal(await repository.findForAuth(MISSING_ID), null);
     assert.equal(
       await repository.update(MISSING_ID, { firstName: 'Nobody' }),
       null
@@ -97,6 +98,34 @@ export function userRepositoryContract(
       null
     );
     assert.equal(await repository.findByEmail('nobody@example.com'), null);
+  });
+
+  test('contract: findForAuth carries the lean auth fields, no avatar and no hash', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create(
+      { ...input('Lean'), status: 'active' },
+      'author'
+    );
+
+    const found = await repository.findForAuth(created.id);
+
+    assert.equal(found?.id, created.id);
+    assert.equal(found?.login, 'Lean');
+    assert.equal(found?.role, 'author');
+    assert.equal(found?.status, 'active');
+    assert.equal(found?.lastSeenAt, null);
+    assert.equal('avatarUrl' in (found ?? {}), false);
+    assert.equal('password' in (found ?? {}), false);
+  });
+
+  test('contract: findForAuth reports the stamp touchLastSeen wrote', async () => {
+    const { repository } = await setUp();
+    const created = await repository.create(input('Stamped'));
+    await repository.touchLastSeen(created.id, new Date());
+
+    const found = await repository.findForAuth(created.id);
+
+    assert.ok(found?.lastSeenAt instanceof Date);
   });
 
   test('contract: an update applies the fields given, and a new password never comes back', async () => {

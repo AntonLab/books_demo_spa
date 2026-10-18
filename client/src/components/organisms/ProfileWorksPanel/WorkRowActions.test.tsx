@@ -9,8 +9,8 @@ import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries, PublicUser } from '@/types/api';
-import type { PublicBook } from '@/types/book';
+import { publicBook, publicSeries } from '@/test/works';
+import type { AuthorSummary, PublicUser } from '@/types/api';
 import type { ProfileScope } from '@/types/profileScope';
 
 jest.mock('@/api/books');
@@ -21,27 +21,29 @@ const mockedBooks = jest.mocked(booksApi);
 const mockedFavorites = jest.mocked(favoritesApi);
 const mockedSeries = jest.mocked(seriesApi);
 
-const credit = {
+const credit: AuthorSummary = {
   id: 3,
   login: 'u3',
   firstName: 'U',
   lastName: '3',
+  status: 'active',
   avatarUrl: null,
 };
 const viewer = (id: number, role: PublicUser['role']) =>
-  ({ ...credit, id, role, status: 'active' }) as PublicUser;
-const work = { authors: [credit], description: 'D.', tags: [], genre: null };
-const book = {
-  ...work,
+  ({ ...credit, id, role }) as PublicUser;
+const book = publicBook({
   id: 7,
   title: 'Out Now',
   status: 'complete',
-} as unknown as PublicBook;
-const series = {
-  ...work,
+  description: 'D.',
+  authors: [credit],
+});
+const series = publicSeries({
   id: 12,
   title: 'The Scale Cycle',
-} as unknown as PublicSeries;
+  description: 'D.',
+  authors: [credit],
+});
 
 const renderAs = (who: PublicUser, ui: ReactElement) => {
   const queryClient = createTestQueryClient();

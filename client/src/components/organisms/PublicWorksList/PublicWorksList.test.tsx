@@ -5,8 +5,7 @@ import { PublicWorksList } from './PublicWorksList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
-import type { PublicSeries } from '@/types/api';
-import type { PublicBook } from '@/types/book';
+import { publicBook, publicSeries } from '@/test/works';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
@@ -22,33 +21,21 @@ const ann = {
   avatarUrl: null,
 };
 const book = (id: number, title: string) =>
-  ({
+  publicBook({
     id,
     title,
     status: 'complete',
     authors: [ann],
     description: 'D.',
-    tags: [],
-    genre: null,
-    coverUrl: null,
-    seriesId: null,
-    series: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  }) as PublicBook;
+  });
 const series = (id: number, title: string) =>
-  ({
+  publicSeries({
     id,
     title,
-    coverUrl: null,
     bookCount: 1,
     authors: [ann],
     description: 'D.',
-    tags: [],
-    genre: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  }) as PublicSeries;
+  });
 
 const Probe = () => <div data-testid="search">{useLocation().search}</div>;
 

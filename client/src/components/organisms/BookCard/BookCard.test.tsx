@@ -3,10 +3,9 @@ import { BookCard } from './BookCard';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { publicGenre } from '@/test/genres';
 import { formatDate } from '@/format/date';
-import type { PublicBook } from '@/types/book';
+import { publicBook } from '@/test/works';
 
-const book: PublicBook = {
-  id: 1,
+const book = publicBook({
   authors: [
     {
       id: 3,
@@ -25,17 +24,12 @@ const book: PublicBook = {
       avatarUrl: null,
     },
   ],
-  seriesId: null,
-  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons and the people who ride them',
   tags: ['epic', 'fantasy'],
   status: 'in_progress',
   genre: publicGenre(4, 'Gothic'),
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 describe('BookCard', () => {
   it('links the title to the book page', () => {

@@ -5,6 +5,7 @@ import { ProfileWorksPanel } from './ProfileWorksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicBook, publicSeries } from '@/test/works';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
@@ -36,34 +37,19 @@ const author = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 } as PublicUser;
-const dates = {
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
-const book = {
+const book = publicBook({
   id: 2,
   title: 'Out Now',
   status: 'complete',
   authors: [ann],
   description: 'D.',
-  tags: [],
-  genre: null,
-  coverUrl: null,
-  seriesId: null,
-  series: null,
-  ...dates,
-} as PublicBook;
-const series = {
+});
+const series = publicSeries({
   id: 12,
   title: 'The Scale Cycle',
-  coverUrl: null,
-  bookCount: 0,
   authors: [ann],
   description: 'Dragons.',
-  tags: [],
-  genre: null,
-  ...dates,
-} as PublicSeries;
+});
 const bookDetail = {
   ...book,
   series: null,

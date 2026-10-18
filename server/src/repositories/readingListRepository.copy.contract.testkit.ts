@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
+import { READING_LIST_MAX_PER_ACCOUNT } from 'shared';
+import { BadRequestError, NotFoundError } from '../types/errors.ts';
 import {
   as,
   MISSING_ID,
@@ -144,5 +145,25 @@ export function readingListCopyContract(
       ),
       ['Theirs']
     );
+  });
+
+  test('contract: the 51st list is refused for create and copy, and another account is not blocked', async () => {
+    const world = await setUp();
+    const ownerId = await world.anAccount();
+    const otherId = await world.anAccount();
+    const input = { title: 'Cold nights', description: '', tags: [] };
+    const source = await world.repository.create(input, as(otherId));
+    for (let i = 0; i < READING_LIST_MAX_PER_ACCOUNT; i += 1) {
+      await world.repository.create(input, as(ownerId));
+    }
+    await assert.rejects(
+      world.repository.create(input, as(ownerId)),
+      BadRequestError
+    );
+    await assert.rejects(
+      world.repository.copy(source.id, as(ownerId)),
+      BadRequestError
+    );
+    await world.repository.create(input, as(otherId));
   });
 }

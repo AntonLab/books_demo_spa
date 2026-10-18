@@ -8,6 +8,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { GenreManager } from './GenreManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { adminGenre, publicGenre } from '@/test/genres';
 import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
@@ -48,6 +49,35 @@ describe('GenreManager', () => {
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
+
+  it.each([
+    ['', {}],
+    [' under StrictMode', { reactStrictMode: true }],
+  ])(
+    'returns focus to the Edit button when the edit form is cancelled%s',
+    async (_label, options) => {
+      const user = userEvent.setup();
+      renderWithProviders(<GenreManager />, {
+        route: '/admin/genres',
+        ...options,
+      });
+      await screen.findByText('Mystery');
+
+      await expectFocusReturnsToOpener(
+        screen.getByRole('button', { name: 'Edit Mystery' }),
+        {
+          open: () => user.keyboard('{Enter}'),
+          close: async () =>
+            user.click(
+              within(await screen.findByRole('dialog')).getByRole('button', {
+                name: 'Cancel',
+              })
+            ),
+          gone: () => expect(screen.queryByRole('dialog')).toBeNull(),
+        }
+      );
+    }
+  );
 
   it('shows each Genre with its counts, a parent with totals', async () => {
     const user = userEvent.setup();

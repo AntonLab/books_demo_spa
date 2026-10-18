@@ -1,9 +1,6 @@
 /**
  * Creates a task worktree under .claude/worktrees/ ready for agents, or
- * removes one once its branch has merged:
- *
- *   npm run worktree -- <name> <branch> [start-point]
- *   npm run worktree -- --remove <name>
+ * removes one once its branch has merged. Usage: see `usage` below.
  *
  * The start point defaults to a freshly fetched `origin/dev`, so a new branch
  * never starts stale. The script copies every git-ignored `.env.local` from
@@ -24,7 +21,7 @@ import {
   readdirSync,
   rmSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { removeDir } from './remove-dir.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -33,8 +30,21 @@ const git = (...args) =>
 const gitOutput = (cwd, ...args) =>
   execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 const worktreePath = (name) => join(root, '.claude', 'worktrees', name);
+const usage =
+  'usage: npm run worktree -- <name> <branch> [start-point]\n' +
+  '       npm run worktree -- --remove <name>';
+// An empty name never gets here: the argument dispatch below sends it to usage.
+// `\` is no separator to POSIX basename, so it is refused by hand.
+const validName = (name) =>
+  name === basename(name) && !name.includes('\\') && !name.startsWith('.');
+const rejectName = (name) => {
+  if (validName(name)) return;
+  console.error(usage);
+  process.exit(2);
+};
 
 const remove = (name) => {
+  rejectName(name);
   const target = worktreePath(name);
   if (!existsSync(target)) {
     console.error(`worktree: ${target} does not exist`);
@@ -44,6 +54,10 @@ const remove = (name) => {
   const registered = gitOutput(root, 'worktree', 'list', '--porcelain')
     .split('\n')
     .some((line) => resolve(line.slice('worktree '.length)) === target);
+  // Present but unregistered: leftover of an earlier `--remove` (`git
+  // worktree remove` succeeded, npm workspace junctions kept the
+  // directory). `name` is validated, so the target is a direct child of
+  // .claude/worktrees/.
   if (registered) {
     if (gitOutput(target, 'status', '--porcelain') !== '') {
       console.error(`worktree: ${name} has uncommitted changes; left in place`);
@@ -100,6 +114,7 @@ const remove = (name) => {
 };
 
 const create = (name, branch, startPoint = 'origin/dev') => {
+  rejectName(name);
   const target = worktreePath(name);
   if (existsSync(target)) {
     console.error(`worktree: ${target} already exists`);
@@ -142,9 +157,6 @@ if (args[0] === '--remove' && args[1]) {
 } else if (args[0] && args[1] && !args[0].startsWith('-')) {
   create(...args);
 } else {
-  console.error(
-    'usage: npm run worktree -- <name> <branch> [start-point]\n' +
-      '       npm run worktree -- --remove <name>'
-  );
+  console.error(usage);
   process.exit(2);
 }

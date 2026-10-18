@@ -5,6 +5,7 @@ import type { ReadingStatus } from 'shared';
 import { LibraryPanel } from './LibraryPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { seededClient } from '@/test/session';
+import { publicBook } from '@/test/works';
 import * as libraryApi from '@/api/library';
 import { ApiError } from '@/api/client';
 import type { PublicUser } from '@/types/api';
@@ -13,34 +14,29 @@ import type { LibraryBook } from '@/types/library';
 jest.mock('@/api/library');
 const mockedLibrary = jest.mocked(libraryApi);
 
-const book = (id: number, title: string) => ({
-  id,
-  title,
-  status: 'complete',
-  authors: [
-    {
-      id: 3,
-      login: 'ann',
-      firstName: 'Ann',
-      lastName: 'Author',
-      avatarUrl: null,
-    },
-  ],
-  description: 'D.',
-  tags: [],
-  genre: null,
-  coverUrl: null,
-  seriesId: null,
-  series: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-});
 const entry = (
   id: number,
   title: string,
   readingStatus: ReadingStatus
-): LibraryBook =>
-  ({ ...book(id, title), readingStatus }) as unknown as LibraryBook;
+): LibraryBook => ({
+  ...publicBook({
+    id,
+    title,
+    status: 'complete',
+    authors: [
+      {
+        id: 3,
+        login: 'ann',
+        firstName: 'Ann',
+        lastName: 'Author',
+        status: 'active',
+        avatarUrl: null,
+      },
+    ],
+    description: 'D.',
+  }),
+  readingStatus,
+});
 const page = (
   items: LibraryBook[],
   total = items.length,

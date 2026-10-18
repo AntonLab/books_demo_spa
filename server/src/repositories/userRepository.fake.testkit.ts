@@ -1,7 +1,7 @@
 import { hashPassword } from '../password.ts';
 import { ConflictError } from '../types/errors.ts';
 import { LAST_ONLINE_WINDOW_MS, type PublicUser } from 'shared';
-import type { ListAuthorsQuery } from '../types/user.ts';
+import type { AuthUserRecord, ListAuthorsQuery } from '../types/user.ts';
 import type { UserListResult, UserRepository } from './userRepository.ts';
 
 // A row as the fake stores it: the public user plus the one thing PublicUser
@@ -10,6 +10,12 @@ export type FakeUserRow = PublicUser & {
   password: string;
   lastSeenAt?: Date | null;
 };
+
+// What findForAuth answers for a persona that has never been seen online.
+export const toAuthRecord = (user: PublicUser): AuthUserRecord => ({
+  ...user,
+  lastSeenAt: null,
+});
 
 export interface FakeUserRepositoryOptions {
   // Accounts already there, with their hashes.
@@ -126,6 +132,13 @@ export function createFakeUserRepository(
     async findById(id) {
       const row = rows.get(id);
       return row ? publicView(row) : null;
+    },
+
+    async findForAuth(id) {
+      const row = rows.get(id);
+      if (!row) return null;
+      const { password: _password, avatarUrl: _avatarUrl, ...user } = row;
+      return { ...user, lastSeenAt: row.lastSeenAt ?? null };
     },
 
     async update(id, input) {

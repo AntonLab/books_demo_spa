@@ -483,6 +483,49 @@ test('GET /me returns the signed-in user', async () => {
   });
 });
 
+test('GET /me carries the avatarUrl of an Account with a picture', async () => {
+  const { deps, users } = authDeps();
+  await withApp(deps, async (base) => {
+    const registered = await post(base, 'register', registration);
+    const token = sessionCookie(registered);
+    const { id } = await json<PublicUser>(registered);
+    await users.setAvatar(id, Buffer.from('png-bytes'));
+
+    const me = await json<SessionUser>(
+      await fetch(`${base}/api/auth/me`, {
+        headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+      })
+    );
+
+    assert.match(
+      me.avatarUrl ?? '',
+      new RegExp(`^/api/users/${id}/avatar\\?v=`)
+    );
+  });
+});
+
+test('GET /me is 401 when the Account vanished after the session resolved', async () => {
+  const { deps, users } = authDeps();
+  let vanish = false;
+  // The session middleware reads through findForAuth and must still find the
+  // Account; only the handler's own findById comes back empty.
+  const vanishing: UserRepository = {
+    ...users,
+    async findById(id) {
+      if (vanish) return null;
+      return users.findById(id);
+    },
+  };
+  await withApp({ ...deps, userRepository: vanishing }, async (base) => {
+    const token = sessionCookie(await post(base, 'register', registration));
+    vanish = true;
+    const response = await fetch(`${base}/api/auth/me`, {
+      headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+    });
+    assert.equal(response.status, 401);
+  });
+});
+
 test('register, login and /me all carry the Account permissions', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {

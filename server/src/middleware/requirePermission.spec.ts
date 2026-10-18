@@ -6,6 +6,7 @@ import { loadMatrix } from '../permissions/permissionStore.ts';
 import { buildMatrixRows } from '../permissions/matrix.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
+import { toAuthRecord } from '../repositories/userRepository.fake.testkit.ts';
 import { hashToken } from '../tokens.ts';
 import { ForbiddenError, UnauthorizedError } from '../types/errors.ts';
 import type { PublicUser, UserRole } from 'shared';
@@ -43,6 +44,9 @@ function deps(role: UserRole, status: PublicUser['status'] = 'active') {
     userRepository: {
       async findById(id: number) {
         return id === user.id ? user : null;
+      },
+      async findForAuth(id: number) {
+        return id === user.id ? toAuthRecord(user) : null;
       },
       async touchLastSeen() {},
     } as unknown as UserRepository,

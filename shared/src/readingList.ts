@@ -6,6 +6,10 @@ import type { UserStatus } from './user.ts';
 export const READING_LIST_TITLE_MAX_LENGTH = 200;
 // Reading list (CONTEXT.md): the most items one list holds.
 export const READING_LIST_MAX_ITEMS = 100;
+// Reading list (CONTEXT.md): the most lists one Account holds.
+export const READING_LIST_MAX_PER_ACCOUNT = 50;
+export const readingListFullMessage = (): string =>
+  `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`;
 
 // Reading list (CONTEXT.md): the Account that owns a list.
 interface ReadingListOwner {

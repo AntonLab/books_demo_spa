@@ -25,7 +25,9 @@ paths:
 - Login always opens a new session row, which rules out session fixation.
 - `resolveSessionUser` (`middleware/sessionUser.ts`) reports nobody for a
   missing cookie, unknown token, expired session, deleted or Blocked
-  Account: a guarded route answers 401, a public one serves a Guest.
+  Account: a guarded route answers 401, a public one serves a Guest. The
+  lookup is `findForAuth` (no avatar query), and the `lastSeenAt` stamp is
+  skipped while the stored value is fresh (within `LAST_ONLINE_WINDOW_MS`).
 
 ## Login
 

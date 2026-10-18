@@ -95,6 +95,9 @@ export const pagingOf = (
   };
 };
 
+export const trimmed = (value: string | null | undefined): string | undefined =>
+  value?.trim() || undefined;
+
 // Anything the page cannot use — an unknown status or sort, an impossible
 // day, a page below 2, an id without its text — reads as empty. `?series=` is
 // not read at all.
@@ -105,7 +108,7 @@ export const parseBookSearch = (params: URLSearchParams): BookSearch => {
     pageSize: DEFAULT_PAGE_SIZE,
   };
   for (const key of TEXT_KEYS) {
-    const value = params.get(key)?.trim();
+    const value = trimmed(params.get(key));
     if (value) search[key] = value;
   }
   for (const key of ID_KEY_LIST) {
@@ -114,7 +117,7 @@ export const parseBookSearch = (params: URLSearchParams): BookSearch => {
       search[key] = id;
     }
   }
-  const genre = params.get('genre')?.trim();
+  const genre = trimmed(params.get('genre'));
   if (genre) search.genre = genre;
   const status = params.get('status');
   if (isOneOf(SEARCHABLE_BOOK_STATUSES, status)) search.status = status;

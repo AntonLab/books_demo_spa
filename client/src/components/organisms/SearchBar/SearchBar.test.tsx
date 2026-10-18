@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes, useLocation } from 'react-router';
 import { SearchBar } from './SearchBar';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicBook, publicSeries } from '@/test/works';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
 import type { PublicBook } from '@/types/book';
-import type { PublicSeries } from '@/types/api';
 
 jest.mock('@/api/books');
 jest.mock('@/api/series');
@@ -141,10 +141,11 @@ describe('SearchBar suggestions', () => {
     login: 'annlee',
     firstName: 'Ann',
     lastName: 'Dragonfly',
+    status: 'active' as const,
     avatarUrl: null,
   };
   const bookOf = (id: number, title: string, authors = [ann]): PublicBook =>
-    ({ id, title, authors }) as Partial<PublicBook> as PublicBook;
+    publicBook({ id, title, authors });
   const pageOf = (items: PublicBook[]) => ({
     items,
     total: items.length,
@@ -161,7 +162,7 @@ describe('SearchBar suggestions', () => {
         : pageOf([bookOf(9, 'Other', [ann])])
     );
     mockedSeries.listSeries.mockResolvedValue({
-      items: [{ id: 2, title: 'Dragon Saga' } as PublicSeries],
+      items: [publicSeries({ id: 2, title: 'Dragon Saga' })],
       total: 1,
       limit: 8,
       offset: 0,

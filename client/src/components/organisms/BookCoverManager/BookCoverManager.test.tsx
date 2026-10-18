@@ -3,26 +3,16 @@ import userEvent from '@testing-library/user-event';
 import { BookCoverManager } from './BookCoverManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
-import type { PublicBook } from '@/types/book';
+import { publicBook } from '@/test/works';
 
 jest.mock('@/api/books');
 
 const mockedBooks = jest.mocked(booksApi);
 
-const book: PublicBook = {
-  id: 1,
-  authors: [],
-  seriesId: null,
-  series: null,
+const book = publicBook({
   title: 'A Tale of Dragons',
   description: 'Long ago.',
-  tags: [],
-  status: 'draft',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 // antd's Upload hides its real input; the page tests reach for it the same way.
 const fileInput = () =>
