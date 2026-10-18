@@ -49,6 +49,38 @@ describe('GenreManager', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('returns focus to the Edit button when the edit form is cancelled', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+    const edit = screen.getByRole('button', { name: 'Edit Mystery' });
+
+    act(() => edit.focus());
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(edit).toHaveFocus();
+  });
+
+  it('returns focus to the Edit button under StrictMode', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<GenreManager />, {
+      route: '/admin/genres',
+      reactStrictMode: true,
+    });
+    await screen.findByText('Mystery');
+    const edit = screen.getByRole('button', { name: 'Edit Mystery' });
+
+    act(() => edit.focus());
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(edit).toHaveFocus();
+  });
+
   it('shows each Genre with its counts, a parent with totals', async () => {
     const user = userEvent.setup();
     await renderLoaded();

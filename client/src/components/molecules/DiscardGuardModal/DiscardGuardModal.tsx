@@ -2,6 +2,7 @@ import { Modal } from 'antd';
 import type { FormInstance, ModalProps } from 'antd';
 import { useRef } from 'react';
 import type { FC } from 'react';
+import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 
 interface DiscardGuardModalProps extends Omit<ModalProps, 'open' | 'onCancel'> {
   // Optional because isFieldsTouched on a form no <Form> has mounted logs an
@@ -16,6 +17,7 @@ export const DiscardGuardModal: FC<DiscardGuardModalProps> = ({
   onClose,
   ...rest
 }) => {
+  useRestoreFocus();
   const [modal, contextHolder] = Modal.useModal();
 
   // Escape or the close icon pressed again while the confirm is open would
