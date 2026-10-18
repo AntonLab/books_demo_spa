@@ -32,10 +32,10 @@ export const useChapter = (id: number) => {
   });
 };
 
-// Every chapter write invalidates every chapter query (allChapters covers the
-// book's list and every detail) and the book's detail: a save can change what a
-// list shows (a draft published) as well as the record itself, and the
-// detail's wordCount sums the Published chapters' text.
+// Every chapter write invalidates all chapter queries (the book's list and every
+// detail) and the book's detail. A save can change what a list shows (a draft
+// published) and the record itself. The detail's wordCount sums the Published
+// chapters' text.
 const useChapterMutation = <TVariables, TResult>(
   bookId: number,
   mutationFn: (variables: TVariables) => Promise<TResult>

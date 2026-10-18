@@ -35,8 +35,9 @@ const setUp = () => {
   return {
     wrapper: Wrapper,
     // The book detail carries wordCount, summed over Published chapters, so a
-    // create, a save or a delete can each move it.
-    expectListAndBookInvalidated: () => {
+    // create, a save or a delete can each move it. The all-chapters prefix
+    // covers the list, so a separate list key must not be sent.
+    expectChaptersAndBookInvalidated: () => {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chapters'] });
       expect(invalidate).not.toHaveBeenCalledWith({
         queryKey: ['chapters', { bookId: 1 }],
@@ -55,7 +56,7 @@ beforeEach(() => {
 
 describe('chapter writes', () => {
   it('publishing a new chapter refreshes the list and the book’s figures', async () => {
-    const { wrapper, expectListAndBookInvalidated } = setUp();
+    const { wrapper, expectChaptersAndBookInvalidated } = setUp();
     const { result } = renderHook(() => useCreateChapter(1), { wrapper });
 
     result.current.mutate({
@@ -66,11 +67,11 @@ describe('chapter writes', () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expectListAndBookInvalidated();
+    expectChaptersAndBookInvalidated();
   });
 
   it('saving a chapter refreshes the list and the book’s figures', async () => {
-    const { wrapper, expectListAndBookInvalidated } = setUp();
+    const { wrapper, expectChaptersAndBookInvalidated } = setUp();
     const { result } = renderHook(() => useUpdateChapter(1, 9), { wrapper });
 
     result.current.mutate({
@@ -83,17 +84,17 @@ describe('chapter writes', () => {
       text: 'It was a dark and stormy night.',
       expectedUpdatedAt: '2026-09-03T00:00:00.000Z',
     });
-    expectListAndBookInvalidated();
+    expectChaptersAndBookInvalidated();
   });
 
   it('deleting a chapter refreshes the list and the book’s figures', async () => {
-    const { wrapper, expectListAndBookInvalidated } = setUp();
+    const { wrapper, expectChaptersAndBookInvalidated } = setUp();
     const { result } = renderHook(() => useDeleteChapter(1, 9), { wrapper });
 
     result.current.mutate(undefined);
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mockedChapters.deleteChapter).toHaveBeenCalledWith(9);
-    expectListAndBookInvalidated();
+    expectChaptersAndBookInvalidated();
   });
 });
