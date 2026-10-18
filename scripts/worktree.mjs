@@ -2,8 +2,7 @@
  * Creates a task worktree under .claude/worktrees/ ready for agents, or
  * removes one once its branch has merged:
  *
- *   npm run worktree -- <name> <branch> [start-point]
- *   npm run worktree -- --remove <name>
+ * Usage: see `usage` below.
  *
  * The start point defaults to a freshly fetched `origin/dev`, so a new branch
  * never starts stale. The script copies every git-ignored `.env.local` from
@@ -55,10 +54,10 @@ const remove = (name) => {
   const registered = gitOutput(root, 'worktree', 'list', '--porcelain')
     .split('\n')
     .some((line) => resolve(line.slice('worktree '.length)) === target);
-  // Unregistered but present is the leftover of an earlier `--remove` (`git
-  // worktree remove` succeeded, npm workspace junctions kept the directory).
-  // `name` is validated, so the target is a direct child of
-  // .claude/worktrees/ and removing it is intended.
+  // Present but unregistered: leftover of an earlier `--remove` (`git
+  // worktree remove` succeeded, npm workspace junctions kept the
+  // directory). `name` is validated, so the target is a direct child of
+  // .claude/worktrees/.
   if (registered) {
     if (gitOutput(target, 'status', '--porcelain') !== '') {
       console.error(`worktree: ${name} has uncommitted changes; left in place`);
