@@ -1,5 +1,8 @@
 import express, { Router, type Request } from 'express';
-import { createUserController } from '../controllers/userController.ts';
+import {
+  assertOwnRow,
+  createUserController,
+} from '../controllers/userController.ts';
 import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import {
@@ -120,10 +123,15 @@ export function createUserRoutes(deps: RouteDeps): Router {
 
   // The raw body parser is mounted on this PUT alone, never app-wide,
   // and after requirePermission so a refused request's 2 MiB is never read.
+  // A foreign id is refused before the limiter, so it spends no budget.
   router.put(
     '/:id/avatar',
     requirePermission('users', 'update'),
     validate({ params: idParamSchema }),
+    (req, _res, next) => {
+      assertOwnRow(req, validatedParams<{ id: number }>(req).id);
+      next();
+    },
     limitEveryRequestByUser(deps.authRateLimits.upload),
     express.raw({
       type: [...ACCEPTED_IMAGE_CONTENT_TYPES],

@@ -183,20 +183,21 @@ test('a request refused by validate spends nothing', () =>
     await spendBudget(base, as);
   }));
 
-// A plain user may not update a book or a series. No avatar case: every
-// signed-in role holds users.update (own at least), so requirePermission never
-// refuses the avatar PUT; a "not yours" 403 comes from the controller, after
-// the limiter.
+// A plain user may not update a book or a series, nor another account's
+// avatar (users.update is `own` for them: the route refuses a foreign id
+// before the limiter, without a database read).
 const forbiddenPuts: Record<
   string,
   (base: string, bookId: number, cookie: string) => Promise<Response>
 > = {
   'book cover': (base, bookId, cookie) => putCover(base, bookId, cookie),
   'series cover': (base, _bookId, cookie) => putSeriesCover(base, 1, cookie),
+  "another account's avatar": (base, _bookId, cookie) =>
+    putAvatar(base, USER_IDS.author, cookie),
 };
 
 for (const [route, forbiddenPut] of Object.entries(forbiddenPuts)) {
-  test(`a 403 from requirePermission on the ${route} spends nothing`, () =>
+  test(`a 403 on the ${route} PUT spends nothing`, () =>
     withLimitedUploads(async (base, bookId) => {
       const as = ROLE_COOKIES.user;
       for (let i = 0; i < BUDGET + 5; i += 1) {
