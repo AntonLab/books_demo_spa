@@ -102,6 +102,22 @@ const withEntries = (
   entries: Record<string, { text: string; savedAt: string }>
 ): Partial<RootState> => ({ unsavedText: { accountId: 3, entries } });
 
+// Roots with ids 1..count, text `Comment <id>`.
+const makeComments = (count: number): CommentWithAuthor[] =>
+  Array.from({ length: count }, (_, i) => ({
+    ...root,
+    id: i + 1,
+    text: `Comment ${i + 1}`,
+  }));
+// Serves `server` like the API: 100 per page, true total.
+const serve = (server: CommentWithAuthor[]) =>
+  mockedComments.listComments.mockImplementation(async (_bookId, offset) => ({
+    items: server.slice(offset, offset + 100),
+    total: server.length,
+    limit: 100,
+    offset,
+  }));
+
 beforeEach(() => {
   jest.resetAllMocks();
   mockedComments.listComments.mockResolvedValue({
@@ -1082,5 +1098,113 @@ describe('CommentSection Unsaved text', () => {
     await waitFor(() =>
       expect(store.getState().unsavedText.entries).toEqual({})
     );
+  });
+});
+
+describe('CommentSection paging', () => {
+  it('loads and appends the next page on Load more comments', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    expect(screen.queryByText('Comment 101')).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Load more comments' })
+    );
+
+    expect(await screen.findByText('Comment 150')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenLastCalledWith(1, 100);
+    expect(screen.getByText('Comment 1')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Load more comments' })
+    ).toBeNull();
+  });
+
+  it('shows no button when every comment is loaded', async () => {
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('A fine book');
+
+    expect(
+      screen.queryByRole('button', { name: 'Load more comments' })
+    ).toBeNull();
+  });
+
+  it('sends one request for a double click on Load more comments', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    mockedComments.listComments.mockReturnValue(new Promise(() => {}));
+
+    const button = screen.getByRole('button', { name: 'Load more comments' });
+    await userEvent.dblClick(button);
+
+    expect(
+      mockedComments.listComments.mock.calls.filter(
+        ([, offset]) => offset === 100
+      )
+    ).toHaveLength(1);
+  });
+
+  it('keeps the thread and the button after a failed page, with a toast', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    mockedComments.listComments.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Load more comments' })
+    );
+
+    expect(
+      await screen.findByText('Could not load more comments.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Comment 1')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load the comments.')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Load more comments' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers no orphan notice for a target on an unloaded page until every page is loaded', async () => {
+    serve(makeComments(150));
+    renderSignedIn(
+      withEntries({ 'book:1:reply:900': { text: 'Draft', savedAt } })
+    );
+    await screen.findByText('Comment 1');
+
+    expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Load more comments' })
+    );
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Draft');
+  });
+
+  it('drops the button after an empty page below the total, without another request', async () => {
+    // The server overstates the total: page two comes back empty.
+    mockedComments.listComments.mockImplementation(async (_bookId, offset) => ({
+      items: offset === 0 ? makeComments(100) : [],
+      total: 250,
+      limit: 100,
+      offset,
+    }));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Load more comments' })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Load more comments' })
+      ).toBeNull()
+    );
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
   });
 });

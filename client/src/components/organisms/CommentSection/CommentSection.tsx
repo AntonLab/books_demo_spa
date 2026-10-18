@@ -49,7 +49,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
   closed = false,
 }) => {
   const { data: session } = useSession();
-  const { data, isPending, isError } = useComments(bookId);
+  const {
+    data,
+    isPending,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+  } = useComments(bookId);
 
   const create = useCreateComment(bookId);
   const update = useUpdateComment(bookId);
@@ -85,7 +93,8 @@ export const CommentSection: FC<CommentSectionProps> = ({
     </Flex>
   );
 
-  if (isError) {
+  // A failed next page keeps the data: the thread stays, the toast tells.
+  if (isError && !isFetchNextPageError) {
     return (
       <section>
         {header()}
@@ -129,11 +138,13 @@ export const CommentSection: FC<CommentSectionProps> = ({
   );
 
   const find = (id: number) => all.find((item) => item.id === id);
-  // A target missing from the list, or a Tombstone, is gone: its composer
-  // cannot reopen, so its text is offered as a notice below instead.
+  // A Tombstone is gone, and so is a target missing once every page is loaded:
+  // its composer cannot reopen, so its text is offered as a notice below
+  // instead. While a page is unloaded the target may sit on it, so it is not
+  // gone yet.
   const isGone = (id: number): boolean => {
     const target = find(id);
-    return target === undefined || target.tombstone !== null;
+    return target === undefined ? !hasNextPage : target.tombstone !== null;
   };
 
   // A reply or edit whose target went while it was open closes rather than
@@ -166,6 +177,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
         );
       })
     : [];
+
+  // Returns the result so a caller can tell a failed page from a loaded one.
+  // cancelRefetch: false, or a second call cancels the page in flight and
+  // sends it again.
+  const loadMore = async () => {
+    const result = await fetchNextPage({ cancelRefetch: false });
+    if (result.isError) void message.error('Could not load more comments.');
+    return result;
+  };
 
   const submit = () => {
     const text = draft.trim();
@@ -314,6 +334,14 @@ export const CommentSection: FC<CommentSectionProps> = ({
           </div>
         </div>
       ))}
+
+      {hasNextPage && (
+        <Flex justify="center" className={styles.more}>
+          <Button loading={isFetchingNextPage} onClick={() => void loadMore()}>
+            Load more comments
+          </Button>
+        </Flex>
+      )}
 
       {orphans.map(([key, entry]) => (
         <UnsavedTextNotice
