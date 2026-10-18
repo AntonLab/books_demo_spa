@@ -260,6 +260,30 @@ test('limitEveryRequestByUser keys by req.user.id, counts every request and refu
   }
 });
 
+test('limitEveryRequestByUser passes a request without req.user on untouched and counts nothing', () => {
+  const limits = createAuthRateLimits();
+  try {
+    const handler = limitEveryRequestByUser(limits.upload);
+    const run = (user?: { id: number }) => {
+      const calls: unknown[][] = [];
+      handler(
+        { user } as never,
+        { setHeader: () => {} } as never,
+        (...args: unknown[]) => calls.push(args)
+      );
+      return calls;
+    };
+    // More than the budget, so a counted guest would exhaust it.
+    for (let i = 0; i < 25; i++) assert.deepEqual(run(), [[]]);
+    // A user still has the full budget, and only that user is tracked.
+    for (let i = 0; i < 20; i++) assert.deepEqual(run({ id: 7 }), [[]]);
+    assert.ok(run({ id: 7 })[0]?.[0] instanceof TooManyRequestsError);
+    assert.equal(limits.upload.size(), 1);
+  } finally {
+    limits.stop();
+  }
+});
+
 test('the 11th failed login for one name from one address is refused before the handler runs', async (t) => {
   await withLimitedApp(t, async (client) => {
     await failTimes(client, 'bob', 10);
