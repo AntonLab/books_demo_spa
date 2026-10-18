@@ -37,7 +37,8 @@ const setUp = () => {
     // The book detail carries wordCount, summed over Published chapters, so a
     // create, a save or a delete can each move it.
     expectListAndBookInvalidated: () => {
-      expect(invalidate).toHaveBeenCalledWith({
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chapters'] });
+      expect(invalidate).not.toHaveBeenCalledWith({
         queryKey: ['chapters', { bookId: 1 }],
       });
       expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books', 1] });
