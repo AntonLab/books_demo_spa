@@ -279,13 +279,15 @@ function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
 }
 
 // Locks the account row so two writes at once cannot both pass the count, then
-// refuses a full account. Returns the owner for the caller's response.
+// refuses a full account. Returns the owner for the caller's response; a caller
+// that discards it passes ['id'].
 async function lockedOwnerWithRoom(
   accountId: number,
-  transaction: Transaction
+  transaction: Transaction,
+  attributes = ['id', 'firstName', 'lastName', 'status']
 ) {
   const owner = await User.findByPk(accountId, {
-    attributes: ['id', 'firstName', 'lastName', 'status'],
+    attributes,
     transaction,
     lock: transaction.LOCK.UPDATE,
   });
@@ -518,7 +520,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
           const shown = (await placedItems(id, transaction)).filter(
             (item) => item.book ?? item.series
           );
-          await lockedOwnerWithRoom(account.id, transaction);
+          await lockedOwnerWithRoom(account.id, transaction, ['id']);
           const copy = await ReadingList.create(
             {
               userId: account.id,

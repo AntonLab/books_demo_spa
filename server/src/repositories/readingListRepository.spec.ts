@@ -3,7 +3,7 @@ process.env.NODE_ENV ??= 'test';
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { UniqueConstraintError, type Sequelize } from 'sequelize';
-import { READING_LIST_MAX_ITEMS } from 'shared';
+import { READING_LIST_MAX_ITEMS, READING_LIST_MAX_PER_ACCOUNT } from 'shared';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { testDbConfig } from '../db/testDb.testkit.ts';
@@ -228,6 +228,26 @@ describe('readingListRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       ReadingListItem.create({ listId, bookId, position: 2 }),
       UniqueConstraintError
+    );
+  });
+
+  test('two creates racing for the last list: the account ends with 50, not 51', async () => {
+    const world = await setUp();
+    const ownerId = await world.anAccount();
+    for (let i = 0; i < READING_LIST_MAX_PER_ACCOUNT - 1; i += 1) {
+      await world.repository.create(NEW_LIST, as(ownerId));
+    }
+    const results = await Promise.allSettled([
+      world.repository.create(NEW_LIST, as(ownerId)),
+      world.repository.create(NEW_LIST, as(ownerId)),
+    ]);
+    assert.deepEqual(results.map((r) => r.status).sort(), [
+      'fulfilled',
+      'rejected',
+    ]);
+    assert.equal(
+      await ReadingList.count({ where: { userId: ownerId } }),
+      READING_LIST_MAX_PER_ACCOUNT
     );
   });
 

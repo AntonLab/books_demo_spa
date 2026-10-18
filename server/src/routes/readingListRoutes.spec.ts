@@ -385,6 +385,27 @@ test('copy refuses with 400 when the copier already holds 50 lists', async () =>
   );
 });
 
+test('at 50 lists, deleting one lets the next create succeed', async () => {
+  await withAuthenticatedApp(
+    { readingListRepository: fakeRepository() },
+    async (base) => {
+      const first = await createList(base, user, { title: 'List 0' });
+      for (let i = 1; i < READING_LIST_MAX_PER_ACCOUNT; i += 1) {
+        await createList(base, user, { title: `List ${i}` });
+      }
+      assert.equal(
+        (await call(base, user, 'POST', '', { title: 'Over' })).status,
+        400
+      );
+      assert.equal(
+        (await call(base, user, 'DELETE', `/${first.id}`)).status,
+        204
+      );
+      await createList(base, user, { title: 'After delete' });
+    }
+  );
+});
+
 test('the 50th list is accepted by create and by copy (boundary)', async () => {
   await withAuthenticatedApp(
     { readingListRepository: fakeRepository() },
