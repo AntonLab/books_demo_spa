@@ -183,17 +183,30 @@ test('a request refused by validate spends nothing', () =>
     await spendBudget(base, as);
   }));
 
-test('a 403 from requirePermission spends nothing', () =>
-  withLimitedUploads(async (base, bookId) => {
-    const as = ROLE_COOKIES.user;
-    // A plain user may not update a book, so each cover PUT is refused.
-    for (let i = 0; i < BUDGET + 5; i += 1) {
-      assert.equal((await putCover(base, bookId, as)).status, 403);
-    }
+// A plain user may not update a book or a series. No avatar case: every
+// signed-in role holds users.update (own at least), so requirePermission never
+// refuses the avatar PUT; a "not yours" 403 comes from the controller, after
+// the limiter.
+const forbiddenPuts: Record<
+  string,
+  (base: string, bookId: number, cookie: string) => Promise<Response>
+> = {
+  'book cover': (base, bookId, cookie) => putCover(base, bookId, cookie),
+  'series cover': (base, _bookId, cookie) => putSeriesCover(base, 1, cookie),
+};
 
-    // The same user's own avatar is permitted, and the budget is untouched.
-    assert.equal((await putAvatar(base, USER_IDS.user, as)).status, 200);
-  }));
+for (const [route, forbiddenPut] of Object.entries(forbiddenPuts)) {
+  test(`a 403 from requirePermission on the ${route} spends nothing`, () =>
+    withLimitedUploads(async (base, bookId) => {
+      const as = ROLE_COOKIES.user;
+      for (let i = 0; i < BUDGET + 5; i += 1) {
+        assert.equal((await forbiddenPut(base, bookId, as)).status, 403);
+      }
+
+      // The same user's own avatar is permitted, and the budget is untouched.
+      assert.equal((await putAvatar(base, USER_IDS.user, as)).status, 200);
+    }));
+}
 
 test('a guest PUT is 401 and spends nothing', () =>
   withLimitedUploads(async (base, bookId) => {
