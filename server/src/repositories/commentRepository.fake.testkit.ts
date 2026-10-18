@@ -44,10 +44,14 @@ export function createFakeCommentRepository(
 
   return {
     async create(input, actorId) {
-      // Stand in for the parent lookup and the foreign keys, which the real
-      // repository reports as these same NotFoundErrors.
-      if (input.parentId !== null && !rows.has(input.parentId)) {
-        throw new NotFoundError('Comment', input.parentId);
+      // Stand in for the parent lookup (missing or on another book) and the
+      // foreign keys, which the real repository reports as these same
+      // NotFoundErrors.
+      if (input.parentId !== null) {
+        const parent = rows.get(input.parentId);
+        if (!parent || parent.bookId !== input.bookId) {
+          throw new NotFoundError('Comment', input.parentId);
+        }
       }
       if (!books.has(input.bookId)) {
         throw new NotFoundError('Book', input.bookId);

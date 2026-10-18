@@ -109,12 +109,15 @@ export function createSequelizeCommentRepository(): CommentRepository {
       // foreign key only knows the parent exists, not that it is a tombstone.
       // A parent tombstoned between this check and the insert leaves the
       // reply under a fresh tombstone — the same outcome as replying a moment
-      // earlier, so the window is harmless.
+      // earlier, so the window is harmless. A parent in another book is as
+      // good as missing, so the caller learns nothing about it.
       if (input.parentId !== null) {
         const parent = await Comment.findByPk(input.parentId, {
-          attributes: ['id', 'tombstone'],
+          attributes: ['id', 'bookId', 'tombstone'],
         });
-        if (!parent) throw new NotFoundError('Comment', input.parentId);
+        if (!parent || parent.bookId !== input.bookId) {
+          throw new NotFoundError('Comment', input.parentId);
+        }
         if (parent.tombstone !== null) {
           throw new ForbiddenError('You cannot reply to a deleted comment');
         }
