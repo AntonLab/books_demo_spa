@@ -43,7 +43,8 @@ per-call values.
   goes through an `sdd-implementer` brief, so it gets a ledger line and a
   review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
-  task gets an `sdd-task-reviewer`: a task review costs about 0.08M tokens,
+  task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
+  review costs about 0.08M tokens,
   and skipping it let defects through. Do not run
   `superpowers:executing-plans` inline: the Opus session pays about as much as
   all the implementers together and compacts more often.
@@ -60,9 +61,8 @@ per-call values.
   hook prints this reminder after `gh pr create`.
 - **One PR per spec** (or per two or three small related specs, or per
   `/swarm:queue` run of up to 5 issues with one commit group per issue): a
-  giant PR is unreviewable. A PR into `dev` does not run its closing keywords,
-  so after the merge, close each issue it fixes with
-  `gh issue close <n> --comment "Fixed in #<pr>"`.
+  giant PR is unreviewable. `dev` is the default branch, so a `Fixes #<n>`
+  line in the PR body closes that issue on merge.
 - **`dev` and `main` change only through a PR**, a main→dev sync included,
   though the ruleset lets an admin through; `guard-shell` refuses a direct
   push. A blocked push or `gh pr create`: stop and ask the user.
@@ -85,7 +85,9 @@ per-call values.
   from what the seeded data can reach: roles are `user`, `author`, `admin` and
   `superadmin` (check `USER_ROLES` in `shared/`), so an item that needs another
   role cannot be verified. Fix all FAIL items first, then send one recheck run
-  with only those items; one recheck per fix multiplies the cost.
+  with only those items; one recheck per fix multiplies the cost. Save each
+  run's returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md`
+  under a `## <sha>` heading; `/swarm:ship` builds the test plan from it.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`, since
