@@ -371,8 +371,8 @@ A named list of Published Books and Series an Account puts together, with a
 Description and Tags. Anyone may read one; only an Account may make one. A Book
 or Series that stops being Published stays on it but is not shown or counted
 until it is Published again. An Account holds at most 50 Reading lists and a
-list at most 100 items, hidden ones counted. Copying someone's Reading list makes an
-independent list of one's own, with no tie back to the original.
+list at most 100 items, hidden ones counted. Copying someone's Reading list
+makes an independent list of one's own, with no tie back to the original.
 _Avoid_: Collection (that is not a Series either), selection, shelf
 
 **Recently viewed**:

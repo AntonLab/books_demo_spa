@@ -4,6 +4,7 @@ import {
   ForeignKeyConstraintError,
   Op,
   UniqueConstraintError,
+  type InferAttributes,
   type Transaction,
 } from 'sequelize';
 import { sequelizeOf } from './sequelizeOf.ts';
@@ -284,7 +285,12 @@ function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
 async function lockedOwnerWithRoom(
   accountId: number,
   transaction: Transaction,
-  attributes = ['id', 'firstName', 'lastName', 'status']
+  attributes: (keyof InferAttributes<User>)[] = [
+    'id',
+    'firstName',
+    'lastName',
+    'status',
+  ]
 ) {
   const owner = await User.findByPk(accountId, {
     attributes,
