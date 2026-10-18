@@ -264,6 +264,46 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('redeem does not deadlock with a replaceForUser holding the user lock, and loses to it', async () => {
+    const userId = await makeUser('LockOrderOwner');
+    await repository.create(
+      userId,
+      hashToken('lock-old'),
+      new Date(Date.now() + hour)
+    );
+
+    // First half of replaceForUser: hold the user row lock.
+    const held = await sequelize.transaction();
+    await User.findByPk(userId, {
+      transaction: held,
+      lock: held.LOCK.UPDATE,
+    });
+
+    const redeeming = repository.redeem(
+      hashToken('lock-old'),
+      'newpassword123'
+    );
+    // Let redeem reach its wait on the user lock (old code: its token lock).
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Second half: stamp the tokens used, then commit.
+    const committed = (async () => {
+      await PasswordResetToken.update(
+        { usedAt: new Date() },
+        { where: { userId, usedAt: null }, transaction: held }
+      );
+      await held.commit();
+    })();
+
+    const [commit, redeem] = await Promise.allSettled([committed, redeeming]);
+    assert.equal(commit.status, 'fulfilled', 'held transaction committed');
+    assert.deepEqual(redeem, { status: 'fulfilled', value: false });
+
+    const user = await User.unscoped().findByPk(userId);
+    assert.ok(user);
+    assert.equal(await verifyPassword(user.password, 'hunter2hunter2'), true);
+  });
+
   test('deleteExpiredBefore removes tokens expired past the retention, used or not, and keeps younger ones', async () => {
     const userId = await makeUser('PurgeResetOwner');
     // A moment long past, so no other test's rows are old enough to count.

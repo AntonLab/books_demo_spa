@@ -30,6 +30,7 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
     },
 
     async replaceForUser(userId, tokenHash, expiresAt) {
+      // Locks the user row, then the token rows; redeem takes the same order.
       await sequelizeOf(PasswordResetToken).transaction(async (t) => {
         // Serialises requests per Account across processes: the second waits
         // for the first commit.
@@ -57,26 +58,39 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
       // One transaction across three tables: a partial apply would leave a
       // redeemed token beside a live pre-reset session, which is the exact
       // state this flow exists to prevent.
+      // Locks the user row, then the token rows; replaceForUser takes the same
+      // order, or the two could deadlock.
       return sequelizeOf(PasswordResetToken).transaction(async (t) => {
-        const token = await PasswordResetToken.findOne({
-          where: {
-            tokenHash,
-            usedAt: null,
-            expiresAt: { [Op.gt]: new Date() },
-          },
+        const live = {
+          tokenHash,
+          usedAt: null,
+          expiresAt: { [Op.gt]: new Date() },
+        };
+        // Unlocked: only to learn whose row to lock first.
+        const found = await PasswordResetToken.findOne({
+          where: live,
           transaction: t,
-          // SELECT ... FOR UPDATE. Without it two concurrent redemptions of
-          // the same token could both read it as unused.
-          lock: t.LOCK.UPDATE,
         });
-        if (!token) return false;
+        if (!found) return false;
 
         // unscoped so the instance carries the password column, letting the
         // beforeSave hook see a real change and hash the new value.
-        const user = await User.unscoped().findByPk(token.userId, {
+        const user = await User.unscoped().findByPk(found.userId, {
           transaction: t,
+          lock: t.LOCK.UPDATE,
         });
         if (!user) return false;
+
+        // Read again under lock: the first read's REPEATABLE READ snapshot
+        // would still show a token a replaceForUser stamped used meanwhile.
+        // SELECT ... FOR UPDATE also stops two concurrent redemptions of the
+        // same token both reading it as unused.
+        const token = await PasswordResetToken.findOne({
+          where: live,
+          transaction: t,
+          lock: t.LOCK.UPDATE,
+        });
+        if (!token) return false;
 
         user.password = newPassword;
         await user.save({ transaction: t });
