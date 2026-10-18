@@ -60,6 +60,11 @@ audits (`repo-auditor` uses it with the `fallow` skill).
 `shared/src/wire.typetest.ts` pins `Wire<T>` with type-level assertions that
 `typecheck` checks.
 
+Root `overrides` pins `uuid` to `11.1.1` for GHSA-w5hq-g745-h8pq, because
+`sequelize` 6 pulls an older `uuid` (8.x). Drop the override once `sequelize`
+ships `uuid` >= 11.1.1. `sprintf-js` (via `umzug`) and `braces` (via
+`webpack-dev-server`) have no patched release, so they carry no override.
+
 ## Pre-commit hook (`.githooks/pre-commit`)
 
 - Runs ESLint `--fix` per package, from inside it (flat config does not
