@@ -106,6 +106,19 @@ describe('ChapterEditorModal', () => {
     expect(store.getState().unsavedText.entries).toEqual({});
   });
 
+  it('sends one create for a double click on Publish', async () => {
+    mockedChapters.createChapter.mockReturnValue(new Promise(() => {}));
+    renderModal(null, editorAccount(), typed('book:1:chapterNew'));
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Chapter One');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Publish' }));
+
+    await waitFor(() =>
+      expect(mockedChapters.createChapter).toHaveBeenCalledTimes(1)
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('turns away an account that may not add chapters', async () => {
     renderModal(null, editorAccount({ id: 50, role: 'admin' }));
     expect(

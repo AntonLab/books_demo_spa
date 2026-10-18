@@ -3,6 +3,7 @@ import type { FC } from 'react';
 import { Alert, Skeleton } from 'antd';
 import { ChapterForm } from '@/components/organisms/ChapterForm/ChapterForm';
 import type { ChapterFormValues } from '@/components/organisms/ChapterForm/ChapterForm';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useCreateChapter } from '@/queries/chapters';
@@ -35,6 +36,21 @@ export const NewChapterBody: FC<NewChapterBodyProps> = ({
       mountedRef.current = false;
     };
   }, []);
+  const submit = useSingleFlight(
+    ({ title, text, publishedAt }: ChapterFormValues) =>
+      // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
+      // the component unmounts first: the promise still settles.
+      create
+        .mutateAsync({ bookId, title, text, publishedAt: publishedAt ?? null })
+        .then(
+          () => {
+            unsaved.discard();
+            if (mountedRef.current) onClose();
+          },
+          // The rejection already shows through create.error.
+          () => {}
+        )
+  );
 
   if (isError) {
     return <Alert type="error" title="Could not load this book." />;
@@ -53,19 +69,8 @@ export const NewChapterBody: FC<NewChapterBodyProps> = ({
     );
   }
 
-  const handleSubmit = ({ title, text, publishedAt }: ChapterFormValues) => {
-    // mutateAsync, not mutate's per-call onSuccess, which TanStack skips if
-    // the component unmounts first: the promise still settles.
-    void create
-      .mutateAsync({ bookId, title, text, publishedAt: publishedAt ?? null })
-      .then(
-        () => {
-          unsaved.discard();
-          if (mountedRef.current) onClose();
-        },
-        // The rejection already shows through create.error.
-        () => {}
-      );
+  const handleSubmit = (values: ChapterFormValues) => {
+    void submit(values);
   };
 
   return (
