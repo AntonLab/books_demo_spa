@@ -89,11 +89,9 @@ async function main(): Promise<void> {
       notificationRepository,
     });
     stoppables.push(expiryPurge);
-    const authRateLimits = createAuthRateLimits();
-    stoppables.push(authRateLimits);
     const onlineRegistry = createOnlineRegistry({ sessionRepository });
     onlineRegistry.start();
-    stoppables.splice(stoppables.indexOf(authRateLimits), 0, onlineRegistry);
+    stoppables.push(onlineRegistry);
     // Credit Notifications are written inside repository transactions, which
     // know nothing of the registry; this is where the two meet.
     setNotificationPublisher((userId, notification) =>
@@ -110,6 +108,8 @@ async function main(): Promise<void> {
     // The pass before the registry, so no pass pushes to a stream the
     // registry has just closed.
     stoppables.splice(stoppables.indexOf(onlineRegistry), 0, announcementPass);
+    const authRateLimits = createAuthRateLimits();
+    stoppables.push(authRateLimits);
 
     const app = createApp({
       ...repositories,
@@ -122,9 +122,8 @@ async function main(): Promise<void> {
     });
     // Express 5 hands this callback the bind error (EADDRINUSE); Express 4 never
     // did, so code written for it logs "listening" for a server that never
-    // started. Binding fails asynchronously, so `shutdown` is long since
-    // created when the callback runs; it closes the pool and the process
-    // exits 1.
+    // started. The bind failure takes the shutdown path: the pool closes and
+    // the process exits 1.
     shutdownDeps.server = app.listen(config.port, (error) => {
       if (error) {
         logger.error('Could not start the HTTP server', error.message);

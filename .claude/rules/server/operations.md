@@ -36,10 +36,9 @@ as its first middleware, so errors, 404s and parse failures carry it too.
 
 A failed bind logs `Could not start the HTTP server`, never "listening";
 `index.ts` sets `exitCode = 1` and runs the graceful shutdown so the pool
-closes. A startup failure after `authenticate()` takes the same
-graceful-shutdown path (log, `exitCode = 1`, `shutdown('startup failed')`), so
-the pool closes and the process exits; signals are registered right after
-`createSequelize` for the same reason.
+closes. A startup failure after `authenticate()` takes the same path: log,
+`exitCode = 1`, `shutdown('startup failed')`. Signals are registered right
+after `createSequelize` so the pool closes either way.
 
 ## Expiry purge (`expiryPurge.ts`)
 
