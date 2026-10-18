@@ -4,6 +4,7 @@ import { ReadingListEditModal } from './ReadingListEditModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicBook } from '@/test/works';
 import * as readingListsApi from '@/api/readingLists';
 import type { PublicUser } from '@/types/api';
 import type {
@@ -40,12 +41,11 @@ const list: ReadingListDetail = {
   updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-const bookItem = (id: number, title: string): ReadingListEditItem =>
-  ({
-    id,
-    kind: 'book',
-    book: { id: 1, title, status: 'complete', authors: [], tags: [] },
-  }) as unknown as ReadingListEditItem;
+const bookItem = (id: number, title: string): ReadingListEditItem => ({
+  id,
+  kind: 'book',
+  book: publicBook({ id: 1, title, status: 'complete' }),
+});
 
 const onClose = jest.fn();
 const onGone = jest.fn();

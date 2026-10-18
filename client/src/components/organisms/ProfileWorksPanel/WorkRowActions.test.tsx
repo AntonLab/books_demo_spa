@@ -30,7 +30,7 @@ const credit: AuthorSummary = {
   avatarUrl: null,
 };
 const viewer = (id: number, role: PublicUser['role']) =>
-  ({ ...credit, id, role, status: 'active' }) as PublicUser;
+  ({ ...credit, id, role }) as PublicUser;
 const book = publicBook({
   id: 7,
   title: 'Out Now',

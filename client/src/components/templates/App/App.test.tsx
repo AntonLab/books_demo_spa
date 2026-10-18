@@ -5,6 +5,7 @@ import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { App, AppShell } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { sessionOf } from '@/test/session';
+import { publicBook, publicSeries } from '@/test/works';
 import * as authApi from '@/api/auth';
 import * as accountsApi from '@/api/accounts';
 import * as booksApi from '@/api/books';
@@ -116,27 +117,21 @@ beforeEach(() => {
     pageSize: 20,
   });
   mockedBooks.getBook.mockResolvedValue({
-    id: 1,
-    authors: [
-      {
-        id: 3,
-        login: 'Author',
-        firstName: 'Ann',
-        lastName: 'Author',
-        status: 'active',
-        avatarUrl: null,
-      },
-    ],
-    seriesId: null,
-    title: 'A Tale of Dragons',
-    description: 'Long ago, in a kingdom of scales.',
-    tags: [],
-    status: 'in_progress',
-    genre: null,
-    coverUrl: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-    series: null,
+    ...publicBook({
+      authors: [
+        {
+          id: 3,
+          login: 'Author',
+          firstName: 'Ann',
+          lastName: 'Author',
+          status: 'active',
+          avatarUrl: null,
+        },
+      ],
+      title: 'A Tale of Dragons',
+      description: 'Long ago, in a kingdom of scales.',
+      status: 'in_progress',
+    }),
     likeCount: 0,
     commentCount: 0,
     wordCount: 0,
@@ -150,25 +145,21 @@ beforeEach(() => {
   mockedComments.listComments.mockResolvedValue(emptyEnvelope);
   mockedGenres.listGenres.mockResolvedValue({ items: [] });
   mockedSeries.getSeries.mockResolvedValue({
-    id: 12,
-    coverUrl: null,
-    bookCount: 0,
-    authors: [
-      {
-        id: 3,
-        login: 'Author',
-        firstName: 'Ann',
-        lastName: 'Author',
-        status: 'active',
-        avatarUrl: null,
-      },
-    ],
-    title: 'The Scale Cycle',
-    description: 'Dragons.',
-    tags: [],
-    genre: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...publicSeries({
+      id: 12,
+      authors: [
+        {
+          id: 3,
+          login: 'Author',
+          firstName: 'Ann',
+          lastName: 'Author',
+          status: 'active',
+          avatarUrl: null,
+        },
+      ],
+      title: 'The Scale Cycle',
+      description: 'Dragons.',
+    }),
     favoriteCount: 0,
     viewerFavoriteId: null,
   });

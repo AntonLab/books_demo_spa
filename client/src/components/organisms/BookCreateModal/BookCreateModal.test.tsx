@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
+import { publicBook } from '@/test/works';
 import type { PublicBook } from '@/types/book';
 
 jest.mock('@/api/books');
@@ -19,29 +20,23 @@ const book = (
   id: number,
   title: string,
   status: PublicBook['status']
-): PublicBook => ({
-  id,
-  authors: [
-    {
-      id: 3,
-      login: 'ann',
-      firstName: 'Ann',
-      lastName: 'Author',
-      status: 'active',
-      avatarUrl: null,
-    },
-  ],
-  seriesId: null,
-  series: null,
-  title,
-  description: `${title}, described`,
-  tags: [],
-  status,
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-});
+): PublicBook =>
+  publicBook({
+    id,
+    authors: [
+      {
+        id: 3,
+        login: 'ann',
+        firstName: 'Ann',
+        lastName: 'Author',
+        status: 'active',
+        avatarUrl: null,
+      },
+    ],
+    title,
+    description: `${title}, described`,
+    status,
+  });
 
 const renderModal = ({ onClose }: { onClose: () => void }) =>
   renderWithProviders(<BookCreateModal authorId={3} onClose={onClose} />);

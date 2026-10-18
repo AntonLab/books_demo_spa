@@ -13,14 +13,14 @@ import {
 } from './books';
 import { createTestQueryClient } from '../test/queryClient';
 import * as booksApi from '../api/books';
+import { publicBook } from '../test/works';
 import type { PublicBook } from '../types/book';
 
 jest.mock('../api/books');
 
 const mockedBooks = jest.mocked(booksApi);
 
-const book: PublicBook = {
-  id: 1,
+const book = publicBook({
   authors: [
     {
       id: 3,
@@ -31,17 +31,11 @@ const book: PublicBook = {
       avatarUrl: null,
     },
   ],
-  seriesId: null,
-  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 const wrapper = (client = createTestQueryClient()) => {
   const Wrapper = ({ children }: { children: ReactNode }) => (

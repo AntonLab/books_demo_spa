@@ -7,7 +7,7 @@ import {
   useSeriesList,
   useUploadSeriesCover,
 } from './series';
-import type { PublicSeries } from '../types/api';
+import { publicSeries } from '../test/works';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import * as seriesApi from '../api/series';
 
@@ -72,7 +72,7 @@ describe('useFavoritedSeries', () => {
 
 describe('useUploadSeriesCover / useDeleteSeriesCover', () => {
   it('upload calls the API and invalidates the series and books caches', async () => {
-    mockedSeries.uploadSeriesCover.mockResolvedValue({} as PublicSeries);
+    mockedSeries.uploadSeriesCover.mockResolvedValue(publicSeries());
     const { result, queryClient } = renderHookWithProviders(() =>
       useUploadSeriesCover(12)
     );

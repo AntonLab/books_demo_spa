@@ -7,6 +7,7 @@ import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
@@ -45,22 +46,10 @@ const book = (
   title: string,
   status: PublicBook['status'],
   favoriteId?: number
-) =>
-  ({
-    id,
-    title,
-    status,
-    authors: [ann],
-    description: 'D.',
-    tags: [],
-    genre: null,
-    coverUrl: null,
-    seriesId: null,
-    series: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-    ...(favoriteId ? { favoriteId } : {}),
-  }) as PublicBook;
+): PublicBook => ({
+  ...publicBook({ id, title, status, authors: [ann], description: 'D.' }),
+  ...(favoriteId ? { favoriteId } : {}),
+});
 const page = (items: PublicBook[], total = items.length) => ({
   items,
   total,
@@ -199,18 +188,13 @@ describe('ProfileBooksList in Favorites', () => {
 });
 
 describe('ProfileSeriesList', () => {
-  const series = {
+  const series = publicSeries({
     id: 12,
     title: 'The Scale Cycle',
-    coverUrl: null,
     bookCount: 1,
     authors: [ann],
     description: 'Dragons.',
-    tags: [],
-    genre: null,
-    createdAt: '2026-09-01T00:00:00.000Z',
-    updatedAt: '2026-09-01T00:00:00.000Z',
-  } as PublicSeries;
+  });
   const seriesPage = (items: PublicSeries[]) => ({
     items,
     total: items.length,

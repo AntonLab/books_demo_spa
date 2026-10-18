@@ -5,6 +5,7 @@ import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
+import { publicBook } from '@/test/works';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import type { PublicBook } from '@/types/book';
@@ -20,8 +21,7 @@ jest.mock('@/api/genres');
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 
-const book: PublicBook = {
-  id: 1,
+const book = publicBook({
   authors: [
     {
       id: 3,
@@ -32,17 +32,12 @@ const book: PublicBook = {
       avatarUrl: null,
     },
   ],
-  seriesId: null,
-  series: null,
   title: 'A Tale of Dragons',
   description: 'A tale of dragons',
   tags: ['epic'],
   status: 'in_progress',
   genre: publicGenre(4, 'Gothic'),
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-};
+});
 
 // Serves whatever page is asked for, as the server does short of the end, so
 // the page never follows a `current` it did not ask for.

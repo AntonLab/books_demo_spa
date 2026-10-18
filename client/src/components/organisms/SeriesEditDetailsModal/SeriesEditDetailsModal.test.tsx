@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { publicSeries } from '@/test/works';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import type { PublicUser, SeriesDetail } from '@/types/api';
@@ -26,16 +27,13 @@ const ann = {
 };
 
 const series: SeriesDetail = {
-  id: 12,
-  coverUrl: null,
-  bookCount: 0,
-  authors: [ann],
-  title: 'The Scale Cycle',
-  description: 'Dragons, in four parts.',
-  tags: ['epic'],
-  genre: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
+  ...publicSeries({
+    id: 12,
+    authors: [ann],
+    title: 'The Scale Cycle',
+    description: 'Dragons, in four parts.',
+    tags: ['epic'],
+  }),
   favoriteCount: 0,
   viewerFavoriteId: null,
 };

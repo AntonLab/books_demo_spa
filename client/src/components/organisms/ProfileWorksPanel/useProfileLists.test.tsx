@@ -9,6 +9,7 @@ import {
 import { renderHookWithProviders } from '@/test/renderWithProviders';
 import { seededClient, sessionOf } from '@/test/session';
 import { genreItem } from '@/test/genres';
+import { publicBook, publicSeries } from '@/test/works';
 import { queryKeys } from '@/queries/keys';
 import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
@@ -16,8 +17,7 @@ import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import { listParamsOf, parseBookSearch } from '@/types/bookSearch';
 import { parseSeriesSearch, seriesListParamsOf } from '@/types/seriesSearch';
-import type { PublicSeries, PublicUser } from '@/types/api';
-import type { PublicBook } from '@/types/book';
+import type { PublicUser } from '@/types/api';
 import type { ProfileScope } from '@/types/profileScope';
 
 jest.mock('@/api/auth');
@@ -30,34 +30,31 @@ const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 
 const row = {
-  id: 1,
-  title: 'Book 1',
+  ...publicBook({ id: 1, title: 'Book 1' }),
   favoriteId: 41,
-} as unknown as PublicBook & { favoriteId: number };
-const user = { id: 3, role: 'user' } as PublicUser;
-const setupWith = <T,>(
-  useList: () => T,
-  route: string,
-  who: PublicUser | null,
-  seed?: (client: QueryClient) => void
-) => {
-  const queryClient = seededClient(who);
-  seed?.(queryClient);
-  return renderHookWithProviders(
-    () => ({
-      state: useList(),
-      location: useLocation(),
-      navType: useNavigationType(),
-    }),
-    { route, queryClient }
-  );
 };
-const setup = (
-  scope: ProfileScope,
-  route: string,
-  who: PublicUser | null = user,
-  seed?: (client: QueryClient) => void
-) => setupWith(() => useProfileBooks(scope, 3), route, who, seed);
+const user = { id: 3, role: 'user' } as PublicUser;
+const setupOf =
+  <T,>(useList: (scope: ProfileScope, userId: number) => T) =>
+  (
+    scope: ProfileScope,
+    route: string,
+    who: PublicUser | null = user,
+    seed?: (client: QueryClient) => void
+  ) => {
+    const queryClient = seededClient(who);
+    seed?.(queryClient);
+    return renderHookWithProviders(
+      () => ({
+        state: useList(scope, 3),
+        location: useLocation(),
+        navType: useNavigationType(),
+      }),
+      { route, queryClient }
+    );
+  };
+const setup = setupOf(useProfileBooks);
+const setupSeries = setupOf(useProfileSeries);
 const expectBlockedGenreList = async (
   result: {
     current: {
@@ -346,17 +343,10 @@ describe('page clamp', () => {
 });
 
 const seriesRow = {
-  id: 5,
-  title: 'Series 5',
+  ...publicSeries({ id: 5, title: 'Series 5' }),
   favoriteId: 61,
-} as unknown as PublicSeries & { favoriteId: number };
+};
 const seriesBody = { items: [seriesRow], total: 1, limit: 20, offset: 0 };
-const setupSeries = (
-  scope: ProfileScope,
-  route: string,
-  who: PublicUser | null = user,
-  seed?: (client: QueryClient) => void
-) => setupWith(() => useProfileSeries(scope, 3), route, who, seed);
 
 describe('useProfileSeries', () => {
   beforeEach(() => {

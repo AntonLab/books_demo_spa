@@ -6,6 +6,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as illustrationsApi from '@/api/illustrations';
+import { publicBook } from '@/test/works';
 import {
   initialDevicePreferences,
   initialReadingPreferences,
@@ -30,27 +31,21 @@ const mocked = jest.mocked(chaptersApi);
 const mockedBooks = jest.mocked(booksApi);
 
 const book: BookDetail = {
-  id: 1,
-  authors: [
-    {
-      id: 3,
-      login: 'ann',
-      firstName: 'Ann',
-      lastName: 'Author',
-      status: 'active',
-      avatarUrl: null,
-    },
-  ],
-  seriesId: null,
-  title: 'A Tale of Dragons',
-  description: 'Long ago.',
-  tags: [],
-  status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-  series: null,
+  ...publicBook({
+    authors: [
+      {
+        id: 3,
+        login: 'ann',
+        firstName: 'Ann',
+        lastName: 'Author',
+        status: 'active',
+        avatarUrl: null,
+      },
+    ],
+    title: 'A Tale of Dragons',
+    description: 'Long ago.',
+    status: 'in_progress',
+  }),
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,

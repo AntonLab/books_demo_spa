@@ -8,6 +8,7 @@ import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorChapter } from '@/test/editFixtures';
 import { seedSession } from '@/test/session';
+import { publicBook } from '@/test/works';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as genresApi from '@/api/genres';
@@ -36,18 +37,12 @@ const ann = {
 };
 
 const bookDetail: BookDetail = {
-  id: 1,
-  authors: [ann],
-  seriesId: null,
-  series: null,
-  title: 'A Tale of Dragons',
-  description: 'Long ago, in a kingdom of scales.',
-  tags: [],
-  status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
+  ...publicBook({
+    authors: [ann],
+    title: 'A Tale of Dragons',
+    description: 'Long ago, in a kingdom of scales.',
+    status: 'in_progress',
+  }),
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,
