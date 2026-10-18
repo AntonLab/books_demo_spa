@@ -455,7 +455,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
 
       // The series id is part of the WHERE, so a book filed elsewhere matches
       // nothing and is reported missing rather than silently unlinked.
-      // Silent: a series-side write is not an edit of the book.
+      // silent: keeps updatedAt; a series-side write is not an edit of the book.
       const [unlinked] = await Book.update(
         { seriesId: null, seriesPosition: null },
         { where: { id: bookId, seriesId }, silent: true }
