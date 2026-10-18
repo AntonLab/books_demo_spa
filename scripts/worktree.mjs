@@ -1,8 +1,6 @@
 /**
  * Creates a task worktree under .claude/worktrees/ ready for agents, or
- * removes one once its branch has merged:
- *
- * Usage: see `usage` below.
+ * removes one once its branch has merged. Usage: see `usage` below.
  *
  * The start point defaults to a freshly fetched `origin/dev`, so a new branch
  * never starts stale. The script copies every git-ignored `.env.local` from
@@ -35,8 +33,8 @@ const worktreePath = (name) => join(root, '.claude', 'worktrees', name);
 const usage =
   'usage: npm run worktree -- <name> <branch> [start-point]\n' +
   '       npm run worktree -- --remove <name>';
-const validName = (name) =>
-  name !== '' && name === basename(name) && !name.startsWith('.');
+// An empty name never gets here: the argument dispatch below sends it to usage.
+const validName = (name) => name === basename(name) && !name.startsWith('.');
 const rejectName = (name) => {
   if (validName(name)) return;
   console.error(usage);
