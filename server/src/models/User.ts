@@ -7,6 +7,7 @@ import {
   type Sequelize,
 } from 'sequelize';
 import { hashPassword } from '../password.ts';
+import type { AuthUserRecord } from '../types/user.ts';
 import type { AuthorSummary, PublicUser, UserStatus, UserRole } from 'shared';
 import {
   EMAIL_MAX_LENGTH,
@@ -138,6 +139,25 @@ export function toPublicUser(user: User, avatarUrl: string | null): PublicUser {
     showLastSeen: user.showLastSeen,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
+  };
+}
+
+// Second guard again, for the auth path: no avatar, no hash, and the internal
+// lastSeenAt that toPublicUser leaves out.
+export function toAuthUser(user: User): AuthUserRecord {
+  return {
+    id: user.id,
+    login: user.login,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    status: user.status,
+    role: user.role,
+    about: user.about ?? '',
+    showLastSeen: user.showLastSeen,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    lastSeenAt: user.lastSeenAt ?? null,
   };
 }
 

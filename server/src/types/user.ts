@@ -1,3 +1,4 @@
+import type { PublicUser } from 'shared';
 import {
   ABOUT_MAX_LENGTH,
   AUTHOR_SEARCH_MAX_LENGTH,
@@ -68,6 +69,11 @@ export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 export type ListAuthorsQuery = z.infer<typeof listAuthorsQuerySchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
+
+// The session lookup's user: PublicUser without the avatar, which the auth path
+// never reads. The record adds the internal lastSeenAt the stamp throttle needs.
+export type AuthUser = Omit<PublicUser, 'avatarUrl'>;
+export type AuthUserRecord = AuthUser & { lastSeenAt: Date | null };
 
 // What the repository applies: the body minus the proof that gated it.
 export type UserChanges = Omit<UpdateUserInput, 'currentPassword'>;

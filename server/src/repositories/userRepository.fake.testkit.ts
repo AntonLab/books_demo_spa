@@ -128,6 +128,13 @@ export function createFakeUserRepository(
       return row ? publicView(row) : null;
     },
 
+    async findForAuth(id) {
+      const row = rows.get(id);
+      if (!row) return null;
+      const { password: _password, avatarUrl: _avatarUrl, ...user } = row;
+      return { ...user, lastSeenAt: row.lastSeenAt ?? null };
+    },
+
     async update(id, input) {
       const current = rows.get(id);
       if (!current) return null;
