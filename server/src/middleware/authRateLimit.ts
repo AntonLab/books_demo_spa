@@ -6,7 +6,7 @@ import { TooManyRequestsError } from '../types/errors.ts';
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
-// The auth budgets. A limit is not an Account state: nothing is
+// The rate-limit budgets. A limit is not an Account state: nothing is
 // written anywhere, and a limited Account is not Blocked.
 export const AUTH_RATE_LIMITS = {
   // Failed logins for one login name from one address.
@@ -20,6 +20,9 @@ export const AUTH_RATE_LIMITS = {
   // Wrong or aborted current-password guesses on a user's own password or
   // email change, by user id; a correct one clears it.
   currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
+  // Every upload PUT by one user id, all three routes sharing it, because a
+  // decode is what it protects.
+  upload: { limit: 20, windowMs: FIFTEEN_MINUTES_MS },
 } as const;
 
 export interface AuthRateLimits {
@@ -28,6 +31,7 @@ export interface AuthRateLimits {
   readonly register: RateLimiter;
   readonly resetRequest: RateLimiter;
   readonly currentPassword: RateLimiter;
+  readonly upload: RateLimiter;
   // Stops every limiter's sweep; the graceful shutdown calls it.
   stop(): void;
 }
@@ -39,6 +43,7 @@ export function createAuthRateLimits(): AuthRateLimits {
     register: createRateLimiter(AUTH_RATE_LIMITS.register),
     resetRequest: createRateLimiter(AUTH_RATE_LIMITS.resetRequest),
     currentPassword: createRateLimiter(AUTH_RATE_LIMITS.currentPassword),
+    upload: createRateLimiter(AUTH_RATE_LIMITS.upload),
   };
 
   return {
@@ -95,6 +100,25 @@ export function refusal(
 export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
   return (req, res, next) => {
     const { allowed, retryAfterMs } = limiter.hit(addressOf(req));
+    if (!allowed) {
+      next(refusal(res, retryAfterMs));
+      return;
+    }
+    next();
+  };
+}
+
+// The upload PUTs: every request counts, by user id, after requirePermission
+// and before the body is read, so malformed spam spends the budget too. No
+// release: nothing is given back. A request without a user is left to the
+// routes' own refusal.
+export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
+  return (req, res, next) => {
+    if (!req.user) {
+      next();
+      return;
+    }
+    const { allowed, retryAfterMs } = limiter.hit(String(req.user.id));
     if (!allowed) {
       next(refusal(res, retryAfterMs));
       return;

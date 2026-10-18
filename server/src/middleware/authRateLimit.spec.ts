@@ -7,9 +7,11 @@ import {
   AUTH_RATE_LIMITS,
   createAuthRateLimits,
   limitEveryRequest,
+  limitEveryRequestByUser,
   limitFailedLogins,
 } from './authRateLimit.ts';
 import { errorHandler } from './errorHandler.ts';
+import { TooManyRequestsError } from '../types/errors.ts';
 
 const CLIENT = '203.0.113.10';
 const OTHER_CLIENT = '203.0.113.20';
@@ -197,13 +199,14 @@ async function assertRefused(
   });
 }
 
-test('the budgets are 10 and 50 failed logins per 15 minutes, 5 registrations and 5 reset requests per hour, and 5 currentPassword guesses per 15 minutes', () => {
+test('the budgets are 10 and 50 failed logins per 15 minutes, 5 registrations and 5 reset requests per hour, 5 currentPassword guesses per 15 minutes, and 20 uploads per 15 minutes', () => {
   assert.deepEqual(AUTH_RATE_LIMITS, {
     loginByIpAndLogin: { limit: 10, windowMs: FIFTEEN_MINUTES_MS },
     loginByIp: { limit: 50, windowMs: FIFTEEN_MINUTES_MS },
     register: { limit: 5, windowMs: ONE_HOUR_MS },
     resetRequest: { limit: 5, windowMs: ONE_HOUR_MS },
     currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
+    upload: { limit: 20, windowMs: FIFTEEN_MINUTES_MS },
   });
 });
 
@@ -215,6 +218,43 @@ test('the currentPassword limiter allows 5 hits per key and refuses the 6th', ()
     }
     assert.equal(limits.currentPassword.hit('7').allowed, false);
     assert.equal(limits.currentPassword.hit('8').allowed, true);
+  } finally {
+    limits.stop();
+  }
+});
+
+test('the upload limiter allows 20 hits per key and refuses the 21st', () => {
+  const limits = createAuthRateLimits();
+  try {
+    for (let i = 0; i < 20; i++) {
+      assert.equal(limits.upload.hit('7').allowed, true);
+    }
+    assert.equal(limits.upload.hit('7').allowed, false);
+    assert.equal(limits.upload.hit('8').allowed, true);
+  } finally {
+    limits.stop();
+  }
+});
+
+test('limitEveryRequestByUser keys by req.user.id, counts every request and refuses with Retry-After', () => {
+  const limits = createAuthRateLimits();
+  try {
+    const handler = limitEveryRequestByUser(limits.upload);
+    const run = (id: number) => {
+      const headers: Record<string, string> = {};
+      let passed: unknown = 'unset';
+      handler(
+        { user: { id } } as never,
+        { setHeader: (k: string, v: string) => (headers[k] = v) } as never,
+        (err?: unknown) => (passed = err)
+      );
+      return { passed, headers };
+    };
+    for (let i = 0; i < 20; i++) assert.equal(run(7).passed, undefined);
+    const refused = run(7);
+    assert.ok(refused.passed instanceof TooManyRequestsError);
+    assert.match(refused.headers['Retry-After'] ?? '', /^\d+$/);
+    assert.equal(run(8).passed, undefined);
   } finally {
     limits.stop();
   }
