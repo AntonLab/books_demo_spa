@@ -20,6 +20,8 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { ApiError } from '@/api/client';
+import { BOOK_GONE } from '@/constants/goneMessages';
+import { isId } from '@/types/id';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { ChapterIllustrations } from '@/components/organisms/ChapterIllustrations/ChapterIllustrations';
@@ -109,10 +111,7 @@ const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
   );
 };
 
-const BOOK_GONE = 'This book no longer exists.';
 const CHAPTER_GONE = 'This chapter no longer exists.';
-
-const isId = (n: number) => Number.isInteger(n) && n > 0;
 
 const ChapterGone: FC<{ book: number }> = ({ book }) => (
   <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />

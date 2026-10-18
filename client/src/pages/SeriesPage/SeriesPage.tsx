@@ -24,6 +24,7 @@ import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
+import { isId } from '@/types/id';
 import styles from './SeriesPage.module.css';
 
 const SERIES_GONE = 'This series no longer exists.';
@@ -31,7 +32,7 @@ const SERIES_GONE = 'This series no longer exists.';
 export const SeriesPage: FC = () => {
   const seriesId = Number(useParams().id);
   // Not an id the server could answer for, so it is not asked.
-  return Number.isInteger(seriesId) && seriesId > 0 ? (
+  return isId(seriesId) ? (
     <SeriesView seriesId={seriesId} />
   ) : (
     <GoneRedirect message={SERIES_GONE} />

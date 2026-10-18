@@ -17,6 +17,7 @@ import {
   useReadingList,
 } from '@/queries/readingLists';
 import { readingListCapabilities } from '@/types/capabilities';
+import { isId } from '@/types/id';
 import spacing from '@/theme/spacing.module.css';
 import styles from './ReadingListPage.module.css';
 
@@ -25,7 +26,7 @@ const LIST_GONE = 'This reading list no longer exists.';
 export const ReadingListPage: FC = () => {
   const listId = Number(useParams().id);
   // Not an id the server could answer for, so it is not asked.
-  return Number.isInteger(listId) && listId > 0 ? (
+  return isId(listId) ? (
     <ReadingListView listId={listId} />
   ) : (
     <GoneRedirect message={LIST_GONE} />
