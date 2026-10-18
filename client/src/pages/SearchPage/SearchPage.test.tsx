@@ -1,5 +1,5 @@
 import { initialReadingPreferences } from '@/store/devicePreferencesSlice';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
@@ -239,7 +239,7 @@ describe('SearchPage Sort order', () => {
     renderPage('/search');
     await screen.findByRole('link', { name: 'A Tale of Dragons' });
     const popular = screen.getByRole('radio', { name: 'Popular' });
-    popular.focus();
+    act(() => popular.focus());
 
     // Not `userEvent.keyboard`: it walks radios without a `name` as one
     // group and moves the check itself, a second change no browser makes.
