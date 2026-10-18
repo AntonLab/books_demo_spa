@@ -8,7 +8,7 @@ import type { QueryKey } from '@tanstack/react-query';
 // 409, is what brings in the row someone else added or removed.
 export const useOptimisticReorder = <TList extends { items: { id: number }[] }>(
   listKey: QueryKey,
-  invalidate: QueryKey,
+  invalidate: QueryKey[],
   save: (ids: number[]) => Promise<void>
 ) => {
   const queryClient = useQueryClient();
@@ -39,7 +39,9 @@ export const useOptimisticReorder = <TList extends { items: { id: number }[] }>(
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: invalidate });
+      for (const queryKey of invalidate) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
     },
   });
 };

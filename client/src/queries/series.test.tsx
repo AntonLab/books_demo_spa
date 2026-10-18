@@ -1,18 +1,24 @@
-import { waitFor } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
 import { ApiError } from '../api/client';
+import { useBooksInSeries } from './books';
 import {
   useDeleteSeries,
   useDeleteSeriesCover,
   useFavoritedSeries,
+  useReorderSeriesBooks,
   useSeriesList,
   useUploadSeriesCover,
 } from './series';
+import { queryKeys } from './keys';
 import { publicSeries } from '../test/works';
 import { renderHookWithProviders } from '../test/renderWithProviders';
+import * as booksApi from '../api/books';
 import * as seriesApi from '../api/series';
 
 jest.mock('../api/series');
+jest.mock('../api/books');
 const mockedSeries = jest.mocked(seriesApi);
+const mockedBooks = jest.mocked(booksApi);
 
 const body = { items: [], total: 0, limit: 20, offset: 0 };
 
@@ -51,6 +57,52 @@ describe('useDeleteSeries', () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['series'] });
   });
+});
+
+describe('useReorderSeriesBooks', () => {
+  const grid = { items: [], total: 0, current: 1, pageSize: 100 };
+
+  it.each([
+    [
+      'saves',
+      () => mockedSeries.reorderSeriesBooks.mockResolvedValue(undefined),
+    ],
+    [
+      'is refused with a 409',
+      () =>
+        mockedSeries.reorderSeriesBooks.mockRejectedValue(
+          new ApiError(
+            409,
+            'The books of this series changed since you loaded them'
+          )
+        ),
+    ],
+  ])(
+    'refetches the Series page grid and the series books after a reorder that %s',
+    async (_label, arrange) => {
+      arrange();
+      mockedBooks.listBooks.mockResolvedValue(grid);
+      const { result, queryClient } = renderHookWithProviders(() => ({
+        grid: useBooksInSeries(3),
+        reorder: useReorderSeriesBooks(3),
+      }));
+      await waitFor(() => expect(result.current.grid.isSuccess).toBe(true));
+      expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+      await act(() =>
+        result.current.reorder.mutateAsync([2, 1]).catch(() => undefined)
+      );
+
+      await waitFor(() =>
+        expect(mockedBooks.listBooks).toHaveBeenCalledTimes(2)
+      );
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.seriesBooks(3),
+      });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
+    }
+  );
 });
 
 describe('useFavoritedSeries', () => {

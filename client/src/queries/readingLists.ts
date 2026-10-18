@@ -161,7 +161,7 @@ export const useToggleListItem = (target: WorkTarget) =>
 export const useReorderReadingListItems = (id: number) =>
   useOptimisticReorder<{ items: ReadingListEditItem[] }>(
     queryKeys.readingListItems(id),
-    queryKeys.allReadingLists,
+    [queryKeys.allReadingLists],
     (itemIds) => reorderReadingListItems(id, itemIds)
   );
 

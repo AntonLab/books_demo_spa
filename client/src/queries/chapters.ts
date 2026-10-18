@@ -73,6 +73,6 @@ export const useDeleteChapter = (bookId: number, id: number) =>
 export const useReorderChapters = (bookId: number) =>
   useOptimisticReorder<ListResponse<ChapterSummary>>(
     queryKeys.chapters(bookId),
-    queryKeys.allChapters,
+    [queryKeys.chapters(bookId)],
     (chapterIds) => reorderChapters(bookId, chapterIds)
   );
