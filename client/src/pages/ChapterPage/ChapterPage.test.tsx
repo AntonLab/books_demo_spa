@@ -76,7 +76,7 @@ const Probe: FC = () => {
   return <p>{`${pathname}|${useNavigationType()}`}</p>;
 };
 
-const renderWithRoutes = (chapterId: string) =>
+const renderWithRoutes = (chapterId: string, bookId = '1') =>
   renderWithProviders(
     <Routes>
       <Route
@@ -86,7 +86,7 @@ const renderWithRoutes = (chapterId: string) =>
       <Route path="/books/:id" element={<BookPage />} />
       <Route path="/" element={<Probe />} />
     </Routes>,
-    { route: `/books/1/chapters/${chapterId}` }
+    { route: `/books/${bookId}/chapters/${chapterId}` }
   );
 
 beforeEach(() => {
@@ -293,13 +293,32 @@ describe('ChapterPage', () => {
     ).toHaveLength(1);
   });
 
-  it('treats a chapter id that is not a number like a missing chapter', async () => {
-    mocked.getChapter.mockRejectedValue(new ApiError(404, 'gone'));
-    renderWithRoutes('abc');
-    expect(
-      await screen.findAllByText('This chapter no longer exists.')
-    ).toHaveLength(1);
-  });
+  it.each(['0', '-1', 'abc'])(
+    'goes Home with the book message for book id %s and requests nothing',
+    async (bookId) => {
+      renderWithRoutes('9', bookId);
+
+      expect(await screen.findByText('/|REPLACE')).toBeInTheDocument();
+      expect(
+        await screen.findAllByText('This book no longer exists.')
+      ).toHaveLength(1);
+      expect(mocked.getChapter).not.toHaveBeenCalled();
+      expect(mocked.listChapters).not.toHaveBeenCalled();
+      expect(mockedBooks.getBook).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['x', '0', '-3', '1.5'])(
+    'goes to the Book page with the chapter message for chapter id %s and requests no chapter',
+    async (chapterId) => {
+      renderWithRoutes(chapterId);
+
+      expect(
+        await screen.findAllByText('This chapter no longer exists.')
+      ).toHaveLength(1);
+      expect(mocked.getChapter).not.toHaveBeenCalled();
+    }
+  );
 
   it('keeps the Alert on a server error', async () => {
     mocked.getChapter.mockRejectedValue(new ApiError(500, 'boom'));

@@ -109,11 +109,26 @@ const ChapterArrow: FC<ChapterArrowProps> = ({ direction, target, size }) => {
   );
 };
 
+const BOOK_GONE = 'This book no longer exists.';
+const CHAPTER_GONE = 'This chapter no longer exists.';
+
+const isId = (n: number) => Number.isInteger(n) && n > 0;
+
+// Split from the view so a bad id never mounts its queries: they would ask
+// the server for an id it cannot answer for.
 export const ChapterPage: FC = () => {
-  const { token } = theme.useToken();
   const { bookId, chapterId } = useParams();
   const book = Number(bookId);
   const id = Number(chapterId);
+  if (!isId(book)) return <GoneRedirect message={BOOK_GONE} />;
+  if (!isId(id)) {
+    return <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />;
+  }
+  return <ChapterView book={book} id={id} />;
+};
+
+const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
+  const { token } = theme.useToken();
   const reading = useAppSelector((state) => state.devicePreferences.reading);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -214,10 +229,7 @@ export const ChapterPage: FC = () => {
 
   if (isError) {
     return error instanceof ApiError && error.status === 404 ? (
-      <GoneRedirect
-        message="This chapter no longer exists."
-        to={`/books/${book}`}
-      />
+      <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />
     ) : (
       <Alert type="error" title="Could not load this chapter." />
     );
