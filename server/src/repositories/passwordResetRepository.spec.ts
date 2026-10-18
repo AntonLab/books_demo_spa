@@ -283,7 +283,7 @@ describe('passwordResetRepository against real MySQL', { skip }, () => {
       hashToken('lock-old'),
       'newpassword123'
     );
-    // Let redeem reach its wait on the user lock (old code: its token lock).
+    // Give redeem time to block on the user lock.
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Second half: stamp the tokens used, then commit.
