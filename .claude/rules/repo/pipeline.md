@@ -43,7 +43,8 @@ per-call values.
   goes through an `sdd-implementer` brief, so it gets a ledger line and a
   review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
-  task gets an `sdd-task-reviewer`: a task review costs about 0.08M tokens,
+  task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
+  review costs about 0.08M tokens,
   and skipping it let defects through. Do not run
   `superpowers:executing-plans` inline: the Opus session pays about as much as
   all the implementers together and compacts more often.
@@ -84,7 +85,9 @@ per-call values.
   from what the seeded data can reach: roles are `user`, `author`, `admin` and
   `superadmin` (check `USER_ROLES` in `shared/`), so an item that needs another
   role cannot be verified. Fix all FAIL items first, then send one recheck run
-  with only those items; one recheck per fix multiplies the cost.
+  with only those items; one recheck per fix multiplies the cost. Save each
+  run's returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md`
+  under a `## <sha>` heading; `/swarm:ship` builds the test plan from it.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`, since
