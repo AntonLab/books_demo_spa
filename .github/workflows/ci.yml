@@ -35,6 +35,9 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run test:scripts
+      # Critical only: sprintf-js (moderate) has no fix upstream, so a lower level
+      # would keep CI red.
+      - run: npm audit --omit=dev --audit-level=critical
 
   typecheck:
     runs-on: ubuntu-latest

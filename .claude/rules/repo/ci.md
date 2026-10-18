@@ -11,7 +11,8 @@ merges into. Both run the same automation.
 
 - `workflows/ci.yml` — on every PR into and push to `dev` or `main`, plus
   `workflow_dispatch`: five parallel jobs on `ubuntu-latest` with Node from
-  `.nvmrc` — `lint` (`lint`, `format:check` and `test:scripts`), `typecheck`, `test-client`,
+  `.nvmrc` — `lint` (`lint`, `format:check`, `test:scripts` and `npm audit --omit=dev
+--audit-level=critical`, a step, not a job, so the ruleset stays as is), `typecheck`, `test-client`,
   `test-server`, `build`. `test-server` runs against a `mysql:8.4` service;
   a broken database fails the MySQL suites, as it does locally without
   `SKIP_MYSQL=1`, so the job cannot go green with none of them run.
