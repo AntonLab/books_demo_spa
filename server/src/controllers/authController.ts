@@ -164,10 +164,13 @@ export function createAuthController(deps: AuthControllerDeps) {
       res.status(204).end();
     },
 
-    me: (req, res) => {
+    me: async (req, res) => {
       // requireAuth guarantees this; the check narrows the optional type.
       if (!req.user) throw new UnauthorizedError();
-      res.json(toSession(req.user));
+      // req.user is the lean session lookup; /me answers the full user.
+      const user = await deps.userRepository.findById(req.user.id);
+      if (!user) throw new UnauthorizedError();
+      res.json(toSession(user));
     },
 
     requestReset: async (req, res) => {
