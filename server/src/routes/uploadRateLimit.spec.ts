@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import sharp from 'sharp';
 import { createFakeBookRepository } from '../repositories/bookRepository.fake.testkit.ts';
 import {
   createFakeUserRepository,
@@ -8,7 +7,9 @@ import {
 } from '../repositories/userRepository.fake.testkit.ts';
 import { createAuthRateLimits } from '../middleware/authRateLimit.ts';
 import {
+  aWebpImage,
   json,
+  put,
   ROLE_COOKIES,
   USER_IDS,
   withAuthenticatedApp,
@@ -37,13 +38,6 @@ const userRow = (id: number, role: 'user' | 'author'): FakeUserRow => {
     updatedAt: now,
   };
 };
-
-const aWebpImage = (): Promise<Buffer> =>
-  sharp({
-    create: { width: 100, height: 100, channels: 3, background: '#663399' },
-  })
-    .webp()
-    .toBuffer();
 
 async function withLimitedUploads(
   run: (base: string, bookId: number) => Promise<void>
@@ -88,21 +82,6 @@ async function withLimitedUploads(
   } finally {
     limits.stop();
   }
-}
-
-async function put(
-  url: string,
-  cookie: string | undefined,
-  body: Buffer
-): Promise<Response> {
-  return fetch(url, {
-    method: 'PUT',
-    headers: {
-      'content-type': 'image/webp',
-      ...(cookie ? { cookie } : {}),
-    },
-    body,
-  });
 }
 
 const putAvatar = async (

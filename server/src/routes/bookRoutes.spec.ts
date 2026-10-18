@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import sharp from 'sharp';
 import { StateConflictError } from '../types/errors.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import {
@@ -17,6 +16,7 @@ import type {
   AuthorSummary,
 } from 'shared';
 import {
+  aWebpImage,
   AUTH_COOKIE,
   json,
   ROLE_COOKIES,
@@ -1430,11 +1430,6 @@ test('credit changes and deletes are made as the signed-in caller, whom their no
 });
 
 // --- A Book Cover, uploaded, replaced, removed and served. ---
-
-const aWebpImage = (width = 100, height = 100): Promise<Buffer> =>
-  sharp({ create: { width, height, channels: 3, background: '#336699' } })
-    .webp()
-    .toBuffer();
 
 test('PUT /api/books/:id/cover answers 401 with no session', async () => {
   await withApp({}, async (base) => {
