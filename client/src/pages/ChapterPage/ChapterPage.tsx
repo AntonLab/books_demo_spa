@@ -114,6 +114,10 @@ const CHAPTER_GONE = 'This chapter no longer exists.';
 
 const isId = (n: number) => Number.isInteger(n) && n > 0;
 
+const ChapterGone: FC<{ book: number }> = ({ book }) => (
+  <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />
+);
+
 // Split from the view so a bad id never mounts its queries: they would ask
 // the server for an id it cannot answer for.
 export const ChapterPage: FC = () => {
@@ -121,9 +125,7 @@ export const ChapterPage: FC = () => {
   const book = Number(bookId);
   const id = Number(chapterId);
   if (!isId(book)) return <GoneRedirect message={BOOK_GONE} />;
-  if (!isId(id)) {
-    return <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />;
-  }
+  if (!isId(id)) return <ChapterGone book={book} />;
   return <ChapterView book={book} id={id} />;
 };
 
@@ -229,7 +231,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
 
   if (isError) {
     return error instanceof ApiError && error.status === 404 ? (
-      <GoneRedirect message={CHAPTER_GONE} to={`/books/${book}`} />
+      <ChapterGone book={book} />
     ) : (
       <Alert type="error" title="Could not load this chapter." />
     );

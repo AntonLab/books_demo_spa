@@ -1,10 +1,10 @@
 type Listener = (event: Event) => void;
 
 // jsdom implements no EventSource. This fake records every stream a test
-// opens and lets the test drive it: `emit` delivers a server event, `emitRaw` delivers
-// its data unparsed (a malformed frame), `fail`
-// reports an error the way the browser does (CONNECTING while it retries by
-// itself, CLOSED once it has given up).
+// opens and lets the test drive it: `emit` delivers a server event,
+// `emitRaw` delivers a string unparsed (a malformed frame), `fail` reports
+// an error the way the browser does (CONNECTING while it retries by itself,
+// CLOSED once it has given up).
 export class FakeEventSource {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;

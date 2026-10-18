@@ -20,7 +20,7 @@ export const openNotificationStream = ({
     withCredentials: true,
   });
   source.addEventListener(NOTIFICATION_STREAM_EVENT, (event) => {
-    // A frame the server never sends is dropped; a throw from the handler stays visible.
+    // Drop a malformed frame. A throw from onNotification is not caught.
     let parsed: unknown;
     try {
       parsed = JSON.parse(String(event.data));

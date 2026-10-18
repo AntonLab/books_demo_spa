@@ -16,8 +16,8 @@ export const AdminPage: FC = () => {
   const navigate = useNavigate();
   const { data: session, isPending, isError } = useSession();
   const title = <Typography.Title level={2}>Admin panel</Typography.Title>;
-  // A failed fetch stays 'pending' so the error Alert shows instead of a
-  // redirect. A 401 is not a failure: the query turns it into a `null` success.
+  // isError maps to 'pending' so the guard never redirects. A 401 is not an
+  // error: the query returns a `null` success.
   const allowed = usePageGuard(
     isPending || isError
       ? 'pending'
