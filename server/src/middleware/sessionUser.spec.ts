@@ -1,8 +1,13 @@
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Request } from 'express';
-import { LAST_ONLINE_WINDOW_MS } from 'shared';
+import {
+  LAST_ONLINE_WINDOW_MS,
+  type PublicUser,
+  type UserStatus,
+} from 'shared';
 import { resolveSessionUser } from './sessionUser.ts';
+import { toAuthRecord } from '../repositories/userRepository.fake.testkit.ts';
 import { hashToken } from '../tokens.ts';
 import { SESSION_COOKIE_NAME } from '../sessionCookie.ts';
 import type { SessionRepository } from '../repositories/sessionRepository.ts';
@@ -10,10 +15,26 @@ import type { UserRepository } from '../repositories/userRepository.ts';
 
 const NOW = new Date('2026-01-01T12:00:00Z');
 
+const USER: PublicUser = {
+  id: 7,
+  login: 'Bob',
+  email: 'bob@example.com',
+  firstName: 'Bob',
+  lastName: 'Bobsson',
+  status: 'active',
+  role: 'user',
+  avatarUrl: null,
+  about: '',
+  showLastSeen: true,
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
 function world(
   t: TestContext,
-  user: { status: string; lastSeenAt: Date | null } | null
+  seen: { status: UserStatus; lastSeenAt: Date | null } | null
 ) {
+  const user = seen && { ...toAuthRecord(USER), ...seen };
   t.mock.timers.reset();
   t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const touched: number[] = [];

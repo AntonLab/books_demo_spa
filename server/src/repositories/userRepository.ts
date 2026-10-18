@@ -77,9 +77,10 @@ export interface UserRepository {
   setAvatar(id: number, data: Buffer): Promise<boolean>;
   removeAvatar(id: number): Promise<void>;
   getAvatarData(id: number): Promise<{ data: Buffer; updatedAt: Date } | null>;
-  // A throttled stamp, never an edit: it writes lastSeenAt only when the
-  // stored value is null or older than LAST_ONLINE_WINDOW_MS, and leaves
-  // updatedAt alone. A missing id is a silent no-op.
+  // A throttled stamp, never an edit: callers pre-check staleness in
+  // resolveSessionUser, so the WHERE (lastSeenAt null or older than
+  // LAST_ONLINE_WINDOW_MS) only guards races. Leaves updatedAt alone. A
+  // missing id is a silent no-op.
   touchLastSeen(id: number, now: Date): Promise<void>;
 }
 

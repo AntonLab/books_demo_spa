@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import { initUserModel, toPublicUser, User } from './User.ts';
+import { initUserModel, toAuthUser, toPublicUser, User } from './User.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
 // reached through a narrow structural cast rather than `any`.
@@ -132,6 +132,25 @@ test('toPublicUser reads a missing About as empty, carries showLastSeen and omit
     toPublicUser(User.build({ ...fields, about: 'Hi' }), null).about,
     'Hi'
   );
+});
+
+test('toAuthUser omits avatarUrl and password and carries lastSeenAt', () => {
+  const lastSeenAt = new Date('2026-01-01T12:00:00Z');
+  const record = toAuthUser(
+    User.build({
+      id: 1,
+      login: 'Someone',
+      email: 'someone@example.com',
+      password: 'hashed',
+      firstName: 'Some',
+      lastName: 'One',
+      lastSeenAt,
+    })
+  );
+
+  assert.equal('avatarUrl' in record, false);
+  assert.equal('password' in record, false);
+  assert.equal(record.lastSeenAt, lastSeenAt);
 });
 
 test('toPublicUser carries an explicit role', () => {
