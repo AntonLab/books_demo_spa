@@ -505,6 +505,14 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       },
       [ownerId]
     );
+    // Book.update ignores an explicit updatedAt, and a Date replacement skews
+    // by the session time zone, so backdate a year in SQL.
+    await sequelize.query(
+      'UPDATE books SET updatedAt = updatedAt - INTERVAL 1 YEAR WHERE id = ?',
+      { replacements: [filed.id] }
+    );
+    const past = (await Book.findByPk(filed.id))?.updatedAt;
+    assert.ok(past && past.getTime() < Date.now() - 300 * 24 * 3600 * 1000);
 
     assert.equal(await repository.removeBook(created.id, filed.id), true);
 
@@ -512,6 +520,8 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(reloaded?.seriesId, null);
     // Out of the series, out of its order: filing it again appends it afresh.
     assert.equal(reloaded?.seriesPosition, null);
+    // A series-side write is not an edit of the book.
+    assert.equal(reloaded?.updatedAt.getTime(), past.getTime());
   });
 
   test('removing a book that is not in the series is a 404 on the book', async () => {
