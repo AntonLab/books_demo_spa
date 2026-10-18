@@ -1,4 +1,10 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AddToReadingList } from './AddToReadingList';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -142,6 +148,24 @@ describe('AddToReadingList', () => {
         bookId: 7,
       })
     );
+  });
+
+  it('creates one list when Enter and the button arrive together', async () => {
+    mocked.listMyReadingLists.mockResolvedValue({ items: [] });
+    mocked.createReadingList.mockReturnValue(new Promise(() => {}));
+    await openFor({ bookId: 7 });
+    await screen.findByText('You have no reading lists yet. Create one below.');
+    const input = screen.getByLabelText('New list title');
+    await userEvent.type(input, 'Warm days');
+    const button = screen.getByRole('button', { name: 'Create and add' });
+
+    // One act, so no render disables the button between the two events.
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', keyCode: 13 });
+      fireEvent.click(button);
+    });
+
+    expect(mocked.createReadingList).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the typed title and shows the message when the create fails', async () => {

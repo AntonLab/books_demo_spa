@@ -18,6 +18,7 @@ import {
   useToggleListItem,
 } from '@/queries/readingLists';
 import { useRestoreFocus } from '@/hooks/useRestoreFocus';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import type { WorkTarget } from '@/api/readingLists';
 import styles from './AddToReadingListModal.module.css';
 
@@ -39,7 +40,7 @@ export const AddToReadingListModal: FC<AddToReadingListModalProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const error = create.error ?? toggle.error;
 
-  const createAndAdd = async () => {
+  const createAndAdd = useSingleFlight(async () => {
     setIsCreating(true);
     try {
       const created = await create.mutateAsync({
@@ -54,7 +55,7 @@ export const AddToReadingListModal: FC<AddToReadingListModalProps> = ({
     } finally {
       setIsCreating(false);
     }
-  };
+  });
 
   return (
     <Modal open title="Add to reading list" footer={null} onCancel={onClose}>
