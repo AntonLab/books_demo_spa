@@ -142,23 +142,11 @@ export function toPublicUser(user: User, avatarUrl: string | null): PublicUser {
   };
 }
 
-// Second guard again, for the auth path: no avatar, no hash, and the internal
-// lastSeenAt that toPublicUser leaves out.
+// Narrowed shape for the auth path: no avatar, no hash, plus the internal
+// lastSeenAt that toPublicUser omits.
 export function toAuthUser(user: User): AuthUserRecord {
-  return {
-    id: user.id,
-    login: user.login,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    status: user.status,
-    role: user.role,
-    about: user.about ?? '',
-    showLastSeen: user.showLastSeen,
-    createdAt: user.createdAt,
-    updatedAt: user.updatedAt,
-    lastSeenAt: user.lastSeenAt ?? null,
-  };
+  const { avatarUrl: _avatarUrl, ...base } = toPublicUser(user, null);
+  return { ...base, lastSeenAt: user.lastSeenAt ?? null };
 }
 
 // The shape public endpoints embed when they name an author. Deliberately not

@@ -56,50 +56,36 @@ test('the auth path reads findForAuth and never findById', async (t) => {
   assert.deepEqual(lookups, ['findForAuth']);
 });
 
-test('a null lastSeenAt is stamped once', async (t) => {
-  const { deps, touched, request } = world(t, {
-    status: 'active',
-    lastSeenAt: null,
-  });
-  await resolveSessionUser(deps, request('good'));
-  assert.deepEqual(touched, [7]);
-});
+const stampCases: [string, Date | null, number[]][] = [
+  ['a null lastSeenAt is stamped once', null, [7]],
+  [
+    'a stale lastSeenAt (window + 1 ms old) is stamped',
+    ago(LAST_ONLINE_WINDOW_MS + 1),
+    [7],
+  ],
+  [
+    'a lastSeenAt exactly the window old is not stamped',
+    ago(LAST_ONLINE_WINDOW_MS),
+    [],
+  ],
+  ['a fresh lastSeenAt is not stamped', ago(1000), []],
+  [
+    'a lastSeenAt in the future is not stamped',
+    new Date(NOW.getTime() + 60_000),
+    [],
+  ],
+];
 
-test('a stale lastSeenAt (window + 1 ms old) is stamped', async (t) => {
-  const { deps, touched, request } = world(t, {
-    status: 'active',
-    lastSeenAt: ago(LAST_ONLINE_WINDOW_MS + 1),
+for (const [name, lastSeenAt, expected] of stampCases) {
+  test(name, async (t) => {
+    const { deps, touched, request } = world(t, {
+      status: 'active',
+      lastSeenAt,
+    });
+    await resolveSessionUser(deps, request('good'));
+    assert.deepEqual(touched, expected);
   });
-  await resolveSessionUser(deps, request('good'));
-  assert.deepEqual(touched, [7]);
-});
-
-test('a lastSeenAt exactly the window old is not stamped', async (t) => {
-  const { deps, touched, request } = world(t, {
-    status: 'active',
-    lastSeenAt: ago(LAST_ONLINE_WINDOW_MS),
-  });
-  await resolveSessionUser(deps, request('good'));
-  assert.deepEqual(touched, []);
-});
-
-test('a fresh lastSeenAt is not stamped', async (t) => {
-  const { deps, touched, request } = world(t, {
-    status: 'active',
-    lastSeenAt: ago(1000),
-  });
-  await resolveSessionUser(deps, request('good'));
-  assert.deepEqual(touched, []);
-});
-
-test('a lastSeenAt in the future is not stamped', async (t) => {
-  const { deps, touched, request } = world(t, {
-    status: 'active',
-    lastSeenAt: new Date(NOW.getTime() + 60_000),
-  });
-  await resolveSessionUser(deps, request('good'));
-  assert.deepEqual(touched, []);
-});
+}
 
 test('the resolved user carries no lastSeenAt', async (t) => {
   const { deps, request } = world(t, { status: 'active', lastSeenAt: null });
