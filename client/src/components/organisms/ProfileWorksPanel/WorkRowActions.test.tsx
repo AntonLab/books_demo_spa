@@ -142,6 +142,38 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
   });
 });
 
+it('does not let one row block another row from removing its favorite', async () => {
+  mockedFavorites.deleteFavorite.mockReturnValue(new Promise(() => {}));
+  renderAs(
+    author,
+    <>
+      <BookRowActions
+        scope="favorites"
+        book={{ ...book, favoriteId: 41 }}
+        onEdit={jest.fn()}
+      />
+      <SeriesRowActions
+        scope="favorites"
+        series={{ ...series, favoriteId: 42 }}
+        onEdit={jest.fn()}
+      />
+    </>
+  );
+
+  await userEvent.click(
+    screen.getByRole('button', { name: `Remove ${book.title} from favorites` })
+  );
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: `Remove ${series.title} from favorites`,
+    })
+  );
+
+  expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2);
+  expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41);
+  expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(42);
+});
+
 describe.each(kinds)('$noun row actions in Favorites', (kind) => {
   const removeLabel = `Remove ${kind.title} from favorites`;
 
@@ -155,6 +187,31 @@ describe.each(kinds)('$noun row actions in Favorites', (kind) => {
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41)
     );
     expect(screen.queryByRole('button', { name: /^(Edit|Delete)/ })).toBeNull();
+  });
+
+  it('sends one removal for a double click', async () => {
+    mockedFavorites.deleteFavorite.mockReturnValue(new Promise(() => {}));
+    renderAs(author, kind.ui('favorites', jest.fn(), 41));
+
+    await userEvent.dblClick(screen.getByRole('button', { name: removeLabel }));
+
+    expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(1);
+    expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41);
+  });
+
+  it('toasts once and allows a retry when the removal fails', async () => {
+    mockedFavorites.deleteFavorite
+      .mockRejectedValueOnce(new ApiError(404, 'Favorite not found'))
+      .mockResolvedValueOnce(undefined);
+    renderAs(author, kind.ui('favorites', jest.fn(), 43));
+
+    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+    expect(await screen.findByText('Favorite not found')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+
+    await waitFor(() =>
+      expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2)
+    );
   });
 
   it('toasts when the removal fails', async () => {
