@@ -102,7 +102,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
     );
   }
 
-  const all = data?.items ?? [];
+  const all = data?.pages.flatMap((page) => page.items) ?? [];
 
   // A closed thread offers no action at all: every one of them either writes
   // through the composer or reacts, and neither is open on a draft.

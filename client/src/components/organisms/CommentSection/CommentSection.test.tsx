@@ -979,19 +979,24 @@ describe('CommentSection Unsaved text', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Too late');
     act(() => {
       queryClient.setQueryData(queryKeys.comments(1), {
-        items: [
+        pages: [
           {
-            ...root,
-            text: '',
-            tombstone: 'deleted',
-            userId: null,
-            author: null,
+            items: [
+              {
+                ...root,
+                text: '',
+                tombstone: 'deleted',
+                userId: null,
+                author: null,
+              },
+              reply,
+            ],
+            total: 2,
+            limit: 100,
+            offset: 0,
           },
-          reply,
         ],
-        total: 2,
-        limit: 100,
-        offset: 0,
+        pageParams: [0],
       });
     });
 
@@ -999,6 +1004,20 @@ describe('CommentSection Unsaved text', () => {
     expect(screen.getByRole('textbox', { name: 'Unsaved text' })).toHaveValue(
       'Too late'
     );
+  });
+
+  it('shows no button and does not loop for an empty page below the total', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [],
+      total: 5,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(1);
   });
 
   it('offers the text of a reply whose comment became a Tombstone', async () => {

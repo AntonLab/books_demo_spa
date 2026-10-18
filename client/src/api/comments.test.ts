@@ -16,18 +16,30 @@ const mockFetch = (response: Response): jest.Mock => {
 const envelope = { items: [], total: 0, limit: 100, offset: 0 };
 
 describe('listComments', () => {
-  it('requests the comments for one book at the page size', async () => {
+  it('requests the comments for one book at the page size, from the start', async () => {
     const fetchMock = mockFetch(jsonResponse(envelope));
 
-    await listComments(7);
+    await listComments(7, 0);
 
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/comments?bookId=7&limit=100');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/comments?bookId=7&limit=100&offset=0'
+    );
+  });
+
+  it('sends the offset of a later page', async () => {
+    const fetchMock = mockFetch(jsonResponse(envelope));
+
+    await listComments(7, 100);
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/comments?bookId=7&limit=100&offset=100'
+    );
   });
 
   it('sends the session cookie', async () => {
     const fetchMock = mockFetch(jsonResponse(envelope));
 
-    await listComments(7);
+    await listComments(7, 0);
 
     // Without credentials the browser withholds the httpOnly `sid` cookie, and
     // viewerLikeId would come back null for a signed-in reader.
