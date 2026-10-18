@@ -520,7 +520,6 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     assert.equal(reloaded?.seriesId, null);
     // Out of the series, out of its order: filing it again appends it afresh.
     assert.equal(reloaded?.seriesPosition, null);
-    // A series-side write is not an edit of the book.
     assert.equal(reloaded?.updatedAt.getTime(), past.getTime());
   });
 
