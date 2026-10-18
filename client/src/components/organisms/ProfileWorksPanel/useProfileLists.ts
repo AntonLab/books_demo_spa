@@ -58,7 +58,14 @@ export interface ProfileFilters {
 
 // The request never waits for the genre list: `genreId` comes from the URL
 // alone, so a genre the list lacks (a Draft-only one) still filters.
-const useGenreFilter = (raw: string | undefined) => {
+const useGenreFilter = (
+  raw: string | undefined
+): {
+  genres: GenreListItem[];
+  genre: GenreListItem | undefined;
+  genreId: number | undefined;
+  blocked: boolean;
+} => {
   const genres = useGenres().data?.items ?? [];
   const genreId = genreIdOf(raw);
   return {
@@ -141,8 +148,9 @@ export const useProfileBooks = (
     moveTo
   );
 
+  const filters = filterCount(search);
   return {
-    filterCount: filterCount(search),
+    filterCount: filters,
     genres,
     sort: search.sort,
     form: {
@@ -165,7 +173,7 @@ export const useProfileBooks = (
       pageSize: search.pageSize,
       isPending: (!blocked && query.isPending) || overshooting,
       error: blocked ? null : query.error,
-      filtered: filterCount(search) > 0,
+      filtered: filters > 0,
       goToPage: (page, pageSize) =>
         setSearchParams(toSearchParams({ ...search, page, pageSize })),
     },
@@ -213,8 +221,9 @@ export const useProfileSeries = (
     moveTo
   );
 
+  const filters = seriesFilterCount(search);
   return {
-    filterCount: seriesFilterCount(search),
+    filterCount: filters,
     genres,
     form: {
       key: `${searchParams.toString()}|${genre?.id ?? ''}`,
@@ -238,7 +247,7 @@ export const useProfileSeries = (
       pageSize: search.pageSize,
       isPending: (!blocked && query.isPending) || overshooting,
       error: blocked ? null : query.error,
-      filtered: seriesFilterCount(search) > 0,
+      filtered: filters > 0,
       goToPage: (page, pageSize) =>
         setSearchParams(toSeriesSearchParams({ ...search, page, pageSize })),
     },
