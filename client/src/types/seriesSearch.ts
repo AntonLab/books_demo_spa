@@ -1,6 +1,6 @@
 import type { ListSeriesParams } from '../api/series';
 import { DEFAULT_PAGE_SIZE } from '../constants/pagination';
-import { pagingOf, type BookSearchFormValues } from './bookSearch';
+import { pagingOf, trimmed, type BookSearchFormValues } from './bookSearch';
 
 // The Series tab's state as its URL holds it. `genre` is kept raw, like
 // BookSearch.genre.
@@ -11,9 +11,6 @@ interface SeriesSearch {
   page: number;
   pageSize: number;
 }
-
-const trimmed = (value: string | null | undefined): string | undefined =>
-  value?.trim() || undefined;
 
 export const parseSeriesSearch = (params: URLSearchParams): SeriesSearch => {
   const search: SeriesSearch = pagingOf(params);
