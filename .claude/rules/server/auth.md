@@ -107,9 +107,10 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 
 ## Rate limiting (`middleware/authRateLimit.ts`)
 
-Sign-in, registration, password and upload budgets. In memory, fixed window,
-mounted before `validate` so a refusal costs no parse, lookup or argon2. A
-limited Account is not Blocked.
+Sign-in, registration, password and upload budgets. In memory, fixed window.
+Login, register and reset mount before `validate` so a refusal costs no parse,
+lookup or argon2. Upload PUTs mount after `requirePermission` and `validate`,
+before `express.raw`. A limited Account is not Blocked.
 
 | Route                                       | Key        | Limit         | Counts                                                               |
 | ------------------------------------------- | ---------- | ------------- | -------------------------------------------------------------------- |
@@ -144,5 +145,5 @@ limited Account is not Blocked.
   it (0 is valid); boot fails otherwise. Each process keeps its own counts, and a
   restart forgets them.
 - Test harnesses pass `unlimitedAuthRateLimits()`; only
-  `authRateLimit.spec.ts` and the rate-limit cases in `authRoutes.spec.ts`
-  use the real set.
+  `authRateLimit.spec.ts`, `uploadRateLimit.spec.ts` and the rate-limit cases
+  in `authRoutes.spec.ts` use the real set.

@@ -97,9 +97,12 @@ export function refusal(
 
 // Register and the reset request: every request counts, before validate, so
 // malformed spam spends the budget too.
-export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
+export function limitEveryRequest(
+  limiter: RateLimiter,
+  keyOf: (req: Request) => string = addressOf
+): RequestHandler {
   return (req, res, next) => {
-    const { allowed, retryAfterMs } = limiter.hit(addressOf(req));
+    const { allowed, retryAfterMs } = limiter.hit(keyOf(req));
     if (!allowed) {
       next(refusal(res, retryAfterMs));
       return;
@@ -108,22 +111,17 @@ export function limitEveryRequest(limiter: RateLimiter): RequestHandler {
   };
 }
 
-// The upload PUTs: every request counts, by user id, after requirePermission
-// and before the body is read, so malformed spam spends the budget too. No
-// release: nothing is given back. A request without a user is left to the
-// routes' own refusal.
+// Upload PUTs: every request counts, by user id, after requirePermission and
+// before the body is read. A request without a user is left to the routes' own
+// refusal.
 export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
+  const count = limitEveryRequest(limiter, (req) => String(req.user?.id));
   return (req, res, next) => {
     if (!req.user) {
       next();
       return;
     }
-    const { allowed, retryAfterMs } = limiter.hit(String(req.user.id));
-    if (!allowed) {
-      next(refusal(res, retryAfterMs));
-      return;
-    }
-    next();
+    count(req, res, next);
   };
 }
 

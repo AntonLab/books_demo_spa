@@ -84,7 +84,7 @@ export function createBookRoutes(deps: RouteDeps): Router {
 
   // The raw body parser is mounted on this PUT alone, never
   // app-wide, and after requirePermission so a refused request's 2 MiB is
-  // never read. The upload budget counts before the body is read.
+  // never read.
   router.put(
     '/:id/cover',
     requirePermission('books', 'update'),
