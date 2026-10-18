@@ -179,18 +179,18 @@ export const CommentSection: FC<CommentSectionProps> = ({
     : [];
 
   // Returns the result so a caller can tell a failed page from a loaded one.
-  // cancelRefetch: false, or a second call cancels the page in flight and
-  // sends it again.
+  // cancelRefetch: false: a second call would cancel the page in flight and
+  // resend it.
   const loadMore = async () => {
     const result = await fetchNextPage({ cancelRefetch: false });
     if (result.isError) void message.error('Could not load more comments.');
     return result;
   };
 
-  // After a create the new comment sits on the last page, so every page before
-  // it is fetched. The first call is not gated on hasNextPage: that value is
-  // stale until the refetch the create awaited lands. Never rejects: loadMore
-  // toasts a failure and returns it.
+  // After a create the new comment sits on the last page, so fetch every page
+  // before it. The first call skips the hasNextPage gate: it is stale until the
+  // refetch the create awaited lands. Never rejects: loadMore toasts a failure
+  // and returns it.
   const loadRest = async () => {
     let result = await loadMore();
     while (result.hasNextPage && !result.isError) result = await loadMore();

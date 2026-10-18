@@ -1102,31 +1102,40 @@ describe('CommentSection Unsaved text', () => {
 });
 
 describe('CommentSection paging', () => {
+  const loadMoreButton = () =>
+    screen.getByRole('button', { name: 'Load more comments' });
+  const queryLoadMore = () =>
+    screen.queryByRole('button', { name: 'Load more comments' });
+  const callsAt = (offset: number) =>
+    mockedComments.listComments.mock.calls.filter(([, at]) => at === offset)
+      .length;
+  const serveCreate = (server: CommentWithAuthor[]) =>
+    mockedComments.createComment.mockImplementation(async () => {
+      const id = server.length + 1;
+      const created = { ...root, id, text: `Comment ${id}` };
+      server.push(created);
+      return created;
+    });
+
   it('loads and appends the next page on Load more comments', async () => {
     serve(makeComments(150));
     renderWithProviders(<CommentSection bookId={1} />);
     await screen.findByText('Comment 1');
     expect(screen.queryByText('Comment 101')).toBeNull();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Load more comments' })
-    );
+    await userEvent.click(loadMoreButton());
 
     expect(await screen.findByText('Comment 150')).toBeInTheDocument();
     expect(mockedComments.listComments).toHaveBeenLastCalledWith(1, 100);
     expect(screen.getByText('Comment 1')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Load more comments' })
-    ).toBeNull();
+    expect(queryLoadMore()).toBeNull();
   });
 
   it('shows no button when every comment is loaded', async () => {
     renderWithProviders(<CommentSection bookId={1} />);
     await screen.findByText('A fine book');
 
-    expect(
-      screen.queryByRole('button', { name: 'Load more comments' })
-    ).toBeNull();
+    expect(queryLoadMore()).toBeNull();
   });
 
   it('sends one request for a double click on Load more comments', async () => {
@@ -1135,14 +1144,9 @@ describe('CommentSection paging', () => {
     await screen.findByText('Comment 1');
     mockedComments.listComments.mockReturnValue(new Promise(() => {}));
 
-    const button = screen.getByRole('button', { name: 'Load more comments' });
-    await userEvent.dblClick(button);
+    await userEvent.dblClick(loadMoreButton());
 
-    expect(
-      mockedComments.listComments.mock.calls.filter(
-        ([, offset]) => offset === 100
-      )
-    ).toHaveLength(1);
+    expect(callsAt(100)).toBe(1);
   });
 
   it('keeps the thread and the button after a failed page, with a toast', async () => {
@@ -1153,18 +1157,14 @@ describe('CommentSection paging', () => {
       new TypeError('Failed to fetch')
     );
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Load more comments' })
-    );
+    await userEvent.click(loadMoreButton());
 
     expect(
       await screen.findByText('Could not load more comments.')
     ).toBeInTheDocument();
     expect(screen.getByText('Comment 1')).toBeInTheDocument();
     expect(screen.queryByText('Could not load the comments.')).toBeNull();
-    expect(
-      screen.getByRole('button', { name: 'Load more comments' })
-    ).toBeInTheDocument();
+    expect(loadMoreButton()).toBeInTheDocument();
   });
 
   it('offers no orphan notice for a target on an unloaded page until every page is loaded', async () => {
@@ -1176,9 +1176,7 @@ describe('CommentSection paging', () => {
 
     expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Load more comments' })
-    );
+    await userEvent.click(loadMoreButton());
 
     expect(
       await screen.findByRole('textbox', { name: 'Unsaved text' })
@@ -1196,15 +1194,9 @@ describe('CommentSection paging', () => {
     renderWithProviders(<CommentSection bookId={1} />);
     await screen.findByText('Comment 1');
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Load more comments' })
-    );
+    await userEvent.click(loadMoreButton());
 
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: 'Load more comments' })
-      ).toBeNull()
-    );
+    await waitFor(() => expect(queryLoadMore()).toBeNull());
     expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
   });
 
@@ -1217,11 +1209,7 @@ describe('CommentSection paging', () => {
   it('fetches every remaining page after a create so the new comment shows', async () => {
     const server = makeComments(250);
     serve(server);
-    mockedComments.createComment.mockImplementation(async () => {
-      const created = { ...root, id: 251, text: 'Comment 251' };
-      server.push(created);
-      return created;
-    });
+    serveCreate(server);
     renderSignedIn();
     await screen.findByText('Comment 1');
 
@@ -1235,11 +1223,7 @@ describe('CommentSection paging', () => {
   it('shows the new comment when exactly one full page was loaded', async () => {
     const server = makeComments(100);
     serve(server);
-    mockedComments.createComment.mockImplementation(async () => {
-      const created = { ...root, id: 101, text: 'Comment 101' };
-      server.push(created);
-      return created;
-    });
+    serveCreate(server);
     renderSignedIn();
     await screen.findByText('Comment 1');
 
@@ -1251,10 +1235,7 @@ describe('CommentSection paging', () => {
   it('stops draining after a failed page, toasts once and keeps the button', async () => {
     const server = makeComments(250);
     serve(server);
-    mockedComments.createComment.mockImplementation(async () => {
-      server.push({ ...root, id: 251, text: 'Comment 251' });
-      return server[250]!;
-    });
+    serveCreate(server);
     renderSignedIn();
     await screen.findByText('Comment 1');
     const served = mockedComments.listComments.getMockImplementation()!;
@@ -1269,13 +1250,7 @@ describe('CommentSection paging', () => {
     expect(
       await screen.findAllByText('Could not load more comments.')
     ).toHaveLength(1);
-    expect(
-      mockedComments.listComments.mock.calls.filter(
-        ([, offset]) => offset === 200
-      )
-    ).toHaveLength(0);
-    expect(
-      screen.getByRole('button', { name: 'Load more comments' })
-    ).toBeInTheDocument();
+    expect(callsAt(200)).toBe(0);
+    expect(loadMoreButton()).toBeInTheDocument();
   });
 });
