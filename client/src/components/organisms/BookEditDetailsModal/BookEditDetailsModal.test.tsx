@@ -1,8 +1,9 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorChapter } from '@/test/editFixtures';
@@ -301,13 +302,17 @@ describe('BookEditDetailsModal Chapter editor', () => {
     const user = userEvent.setup();
     renderModal();
     const opener = await toChapters();
-    act(() => opener.focus());
-    await user.keyboard('{Enter}');
-    const chapter = await dialogTitled('Edit chapter');
-    await user.click(within(chapter).getByRole('button', { name: 'Close' }));
-    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    await expectFocusReturnsToOpener(opener, {
+      open: () => user.keyboard('{Enter}'),
+      close: async () =>
+        user.click(
+          within(await dialogTitled('Edit chapter')).getByRole('button', {
+            name: 'Close',
+          })
+        ),
+      gone: () => expect(screen.queryByText('Edit chapter')).toBeNull(),
+    });
     expect(await dialogTitled('Edit book')).toBeInTheDocument();
-    expect(opener).toHaveFocus();
   });
 
   it('opens a new chapter from Add chapter', async () => {

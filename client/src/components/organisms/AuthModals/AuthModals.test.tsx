@@ -57,16 +57,19 @@ describe('AuthModals', () => {
       const errorSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      renderWithProviders(
-        <AuthModals modal={null} onOpen={onOpen} onClose={onClose} />,
-        { route: '/reset-password?token=abc' }
-      );
+      try {
+        renderWithProviders(
+          <AuthModals modal={null} onOpen={onOpen} onClose={onClose} />,
+          { route: '/reset-password?token=abc' }
+        );
 
-      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-      expect(errorSpy).not.toHaveBeenCalled();
-      errorSpy.mockRestore();
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
 
     it('opens nothing without a token', () => {

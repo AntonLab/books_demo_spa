@@ -8,6 +8,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import { GenreManager } from './GenreManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { adminGenre, publicGenre } from '@/test/genres';
 import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
@@ -49,37 +50,34 @@ describe('GenreManager', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('returns focus to the Edit button when the edit form is cancelled', async () => {
-    const user = userEvent.setup();
-    await renderLoaded();
-    const edit = screen.getByRole('button', { name: 'Edit Mystery' });
+  it.each([
+    ['', {}],
+    [' under StrictMode', { reactStrictMode: true }],
+  ])(
+    'returns focus to the Edit button when the edit form is cancelled%s',
+    async (_label, options) => {
+      const user = userEvent.setup();
+      renderWithProviders(<GenreManager />, {
+        route: '/admin/genres',
+        ...options,
+      });
+      await screen.findByText('Mystery');
 
-    act(() => edit.focus());
-    await user.keyboard('{Enter}');
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(edit).toHaveFocus();
-  });
-
-  it('returns focus to the Edit button under StrictMode', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<GenreManager />, {
-      route: '/admin/genres',
-      reactStrictMode: true,
-    });
-    await screen.findByText('Mystery');
-    const edit = screen.getByRole('button', { name: 'Edit Mystery' });
-
-    act(() => edit.focus());
-    await user.keyboard('{Enter}');
-    const dialog = await screen.findByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(edit).toHaveFocus();
-  });
+      await expectFocusReturnsToOpener(
+        screen.getByRole('button', { name: 'Edit Mystery' }),
+        {
+          open: () => user.keyboard('{Enter}'),
+          close: async () =>
+            user.click(
+              within(await screen.findByRole('dialog')).getByRole('button', {
+                name: 'Cancel',
+              })
+            ),
+          gone: () => expect(screen.queryByRole('dialog')).toBeNull(),
+        }
+      );
+    }
+  );
 
   it('shows each Genre with its counts, a parent with totals', async () => {
     const user = userEvent.setup();

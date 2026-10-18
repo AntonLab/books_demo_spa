@@ -20,8 +20,7 @@ interface Props extends AuthModalProps {
   modal: AuthModalName | null;
 }
 
-interface ChainProps extends AuthModalProps {
-  modal: AuthModalName | null;
+interface ChainProps extends Props {
   resetToken: string | null;
 }
 
@@ -47,8 +46,7 @@ const AuthChain: FC<ChainProps> = ({ modal, resetToken, onOpen, onClose }) => {
 };
 
 // Renders only the active modal. Mounting one at a time keeps each form fresh
-// on open and sidesteps antd's close/destroy props entirely. `AuthChain` owns
-// the focus restore so a switch does not make a vanishing link the opener.
+// on open and sidesteps antd's close/destroy props entirely.
 export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();

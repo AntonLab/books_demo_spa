@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { CommentSection } from './CommentSection';
 import { ApiError } from '@/api/client';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { createTestQueryClient } from '@/test/queryClient';
 import { queryKeys } from '@/queries/keys';
 import { seedSession } from '@/test/session';
@@ -922,12 +923,14 @@ describe('CommentSection Unsaved text', () => {
     renderSignedIn();
     await screen.findByText('A fine book');
     const opener = screen.getByRole('button', { name: 'Add comment' });
-    act(() => opener.focus());
-    await user.keyboard('{Enter}');
-    await screen.findByRole('dialog');
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(opener).toHaveFocus();
+    await expectFocusReturnsToOpener(opener, {
+      open: () => user.keyboard('{Enter}'),
+      close: async () => {
+        await screen.findByRole('dialog');
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      },
+      gone: () => expect(screen.queryByRole('dialog')).toBeNull(),
+    });
   });
 
   it('closes a reply whose comment becomes a Tombstone and offers its text', async () => {

@@ -13,6 +13,7 @@ import { useSession } from '@/queries/auth';
 import { NOTIFICATION_STREAM_EVENT } from 'shared';
 import { AppHeader } from './AppHeader';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { expectFocusReturnsToOpener } from '@/test/focusRestore';
 import { genreItem } from '@/test/genres';
 import { searchPath } from '@/types/bookSearch';
 import { createTestQueryClient } from '@/test/queryClient';
@@ -177,20 +178,21 @@ describe('AppHeader when logged out', () => {
     await renderHeader(<AppHeader />, withSession(null));
     const opener = screen.getByRole('menuitem', { name: 'Log in' });
 
-    act(() => opener.focus());
-    await userEvent.click(opener);
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Create an account' })
-    );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Create an account',
+    await expectFocusReturnsToOpener(opener, {
+      open: () => userEvent.click(opener),
+      close: async () => {
+        await userEvent.click(
+          await screen.findByRole('button', { name: 'Create an account' })
+        );
+        const dialog = await screen.findByRole('dialog', {
+          name: 'Create an account',
+        });
+        await userEvent.click(
+          within(dialog).getByRole('button', { name: 'Close' })
+        );
+      },
+      gone: () => expect(screen.queryByRole('dialog')).toBeNull(),
     });
-    await userEvent.click(
-      within(dialog).getByRole('button', { name: 'Close' })
-    );
-
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(opener).toHaveFocus();
   });
 });
 
@@ -843,12 +845,17 @@ describe('AppHeader returning a Guest after Log in', () => {
 
   it('closes a Log in dialog opened by the page guard without error', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    await renderJumped();
-    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    try {
+      await renderJumped();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Close' })
+      );
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(errorSpy).not.toHaveBeenCalled();
-    errorSpy.mockRestore();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   const signInAndExpectPath = async (
