@@ -31,10 +31,18 @@ case "$step" in
     bash "$scripts/review-package" "$plan" "$3" "${4:-HEAD}"
     ;;
   next)
+    dir=$(bash "$scripts/sdd-workspace" "$plan")
     if [ $# -ge 4 ]; then
-      printf '%s\n' "$4" >> "$(bash "$scripts/sdd-workspace" "$plan")/progress.md"
+      printf '%s\n' "$4" >> "$dir/progress.md"
     fi
-    bash "$scripts/task-brief" "$plan" "$3"
+    # task-brief exits 3 past the last task but leaves an empty brief behind.
+    status=0
+    bash "$scripts/task-brief" "$plan" "$3" || status=$?
+    if [ "$status" -eq 3 ]; then
+      rm -f "$dir/task-$3-brief.md"
+      echo "no task $3 in $plan: plan complete" >&2
+    fi
+    exit "$status"
     ;;
   *) usage ;;
 esac

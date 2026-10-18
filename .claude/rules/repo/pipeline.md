@@ -60,9 +60,8 @@ per-call values.
   hook prints this reminder after `gh pr create`.
 - **One PR per spec** (or per two or three small related specs, or per
   `/swarm:queue` run of up to 5 issues with one commit group per issue): a
-  giant PR is unreviewable. A PR into `dev` does not run its closing keywords,
-  so after the merge, close each issue it fixes with
-  `gh issue close <n> --comment "Fixed in #<pr>"`.
+  giant PR is unreviewable. `dev` is the default branch, so a `Fixes #<n>`
+  line in the PR body closes that issue on merge.
 - **`dev` and `main` change only through a PR**, a main→dev sync included,
   though the ruleset lets an admin through; `guard-shell` refuses a direct
   push. A blocked push or `gh pr create`: stop and ask the user.
