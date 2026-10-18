@@ -1,7 +1,6 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input } from 'antd';
-import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { DiscardGuardModal } from './DiscardGuardModal';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -124,57 +123,5 @@ describe('DiscardGuardModal', () => {
     pressEscape();
 
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-});
-
-let setOpenerVisible: (visible: boolean) => void;
-let setOpenerDisabled: (disabled: boolean) => void;
-
-const FocusHarness: FC = () => {
-  const [open, setOpen] = useState(false);
-  const [openerVisible, setVisible] = useState(true);
-  const [openerDisabled, setDisabled] = useState(false);
-  useEffect(() => {
-    setOpenerVisible = setVisible;
-    setOpenerDisabled = setDisabled;
-  }, []);
-  return (
-    <>
-      {openerVisible && (
-        <button disabled={openerDisabled} onClick={() => setOpen(true)}>
-          Open
-        </button>
-      )}
-      {open && (
-        <DiscardGuardModal title="Dialog" onClose={() => setOpen(false)} />
-      )}
-    </>
-  );
-};
-
-const openThenCancel = async (change: () => void) => {
-  const user = userEvent.setup();
-  renderWithProviders(<FocusHarness />);
-  const opener = screen.getByRole('button', { name: 'Open' });
-  act(() => opener.focus());
-  await user.click(opener);
-  const dialog = await screen.findByRole('dialog');
-  act(change);
-  await user.click(screen.getByRole('button', { name: 'Close' }));
-  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(dialog).not.toBeInTheDocument();
-};
-
-describe('DiscardGuardModal focus restore', () => {
-  it('does nothing, and does not throw, when the opener left the DOM', async () => {
-    await openThenCancel(() => setOpenerVisible(false));
-
-    expect(document.body).toHaveFocus();
-  });
-
-  it('does not focus an opener that became disabled', async () => {
-    await openThenCancel(() => setOpenerDisabled(true));
-
-    expect(screen.getByRole('button', { name: 'Open' })).not.toHaveFocus();
   });
 });

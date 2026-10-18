@@ -1,11 +1,8 @@
 import { act, waitFor } from '@testing-library/react';
 
 interface FocusRestoreSteps {
-  // Activates the opener, which is already focused.
   open: () => Promise<unknown>;
-  // Finds the open dialog and closes it.
   close: () => Promise<unknown>;
-  // Asserts the dialog is gone; retried until it holds.
   gone: () => void;
 }
 

@@ -1,26 +1,22 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
-// Returns focus to the element that had it when the calling component first
-// rendered, once the component unmounts. A modal mounted only while open skips
-// antd's own restore, which runs when `open` flips to false.
-//
-// The opener is read during the first render, not in an effect: child effects
-// (antd moving focus into the dialog) run before a parent's, so an effect
-// would capture the dialog itself.
+// Returns focus to the element focused when the component first rendered, once
+// it unmounts. A modal mounted only while open skips antd's own restore.
+// The opener is read during render: child effects (antd focusing the dialog)
+// run before a parent's, so an effect would capture the dialog itself.
 export const useRestoreFocus = (): void => {
-  const opener = useRef<Element | null | undefined>(undefined);
-  opener.current ??= document.activeElement;
+  const [opener] = useState(() => document.activeElement);
 
-  useEffect(() => {
-    const el = opener.current;
-    return () => {
+  useEffect(
+    () => () => {
       if (
-        el instanceof HTMLElement &&
-        el.isConnected &&
-        !('disabled' in el && el.disabled)
+        opener instanceof HTMLElement &&
+        opener.isConnected &&
+        !('disabled' in opener && opener.disabled)
       ) {
-        el.focus();
+        opener.focus();
       }
-    };
-  }, []);
+    },
+    [opener]
+  );
 };
