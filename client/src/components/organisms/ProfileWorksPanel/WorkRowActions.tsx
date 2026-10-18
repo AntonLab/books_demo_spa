@@ -7,6 +7,7 @@ import {
   DELETE_BOOK_CONFIRM,
   DELETE_SERIES_CONFIRM,
 } from '@/constants/deleteWork';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { useDeleteBook } from '@/queries/books';
 import { useSession } from '@/queries/auth';
 import { useRemoveFavorite } from '@/queries/favorites';
@@ -46,6 +47,13 @@ const RowButtons: FC<RowButtonsProps> = ({
   const removeFavorite = useRemoveFavorite();
   const [confirming, setConfirming] = useState(false);
   const toastError = (error: Error) => void message.error(error.message);
+  const guardedRemove = useSingleFlight(async (id: number) => {
+    try {
+      await removeFavorite.mutateAsync(id);
+    } catch (error) {
+      if (error instanceof Error) toastError(error);
+    }
+  });
 
   let buttons: ReactNode = null;
   if (scope === 'favorites') {
@@ -56,9 +64,7 @@ const RowButtons: FC<RowButtonsProps> = ({
           type="text"
           icon={<StarFilled />}
           label={`Remove ${title} from favorites`}
-          onClick={() =>
-            removeFavorite.mutate(favoriteId, { onError: toastError })
-          }
+          onClick={() => void guardedRemove(favoriteId)}
         />
       );
     }

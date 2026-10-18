@@ -17,6 +17,27 @@ jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/reports');
 
+// Keeps each send's promise: the component fires it and forgets it, so a test
+// reaches an error that surfaces from it only through here.
+const mockFlights: Promise<void>[] = [];
+jest.mock('@/hooks/useSingleFlight', () => {
+  const actual = jest.requireActual('@/hooks/useSingleFlight');
+  return {
+    useSingleFlight: (
+      fn: (...args: unknown[]) => Promise<void>,
+      keyOf?: (...args: unknown[]) => unknown
+    ) => {
+      const flight = actual.useSingleFlight(fn, keyOf);
+      return (...args: unknown[]) => {
+        const promise: Promise<void> = flight(...args);
+        promise.catch(() => {});
+        mockFlights.push(promise);
+        return promise;
+      };
+    },
+  };
+});
+
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedReports = jest.mocked(reportsApi);
@@ -102,8 +123,25 @@ const withEntries = (
   entries: Record<string, { text: string; savedAt: string }>
 ): Partial<RootState> => ({ unsavedText: { accountId: 3, entries } });
 
+// Roots with ids 1..count, text `Comment <id>`.
+const makeComments = (count: number): CommentWithAuthor[] =>
+  Array.from({ length: count }, (_, i) => ({
+    ...root,
+    id: i + 1,
+    text: `Comment ${i + 1}`,
+  }));
+// Serves `server` like the API: 100 per page, true total.
+const serve = (server: CommentWithAuthor[]) =>
+  mockedComments.listComments.mockImplementation(async (_bookId, offset) => ({
+    items: server.slice(offset, offset + 100),
+    total: server.length,
+    limit: 100,
+    offset,
+  }));
+
 beforeEach(() => {
   jest.resetAllMocks();
+  mockFlights.length = 0;
   mockedComments.listComments.mockResolvedValue({
     items: [root, reply],
     total: 2,
@@ -346,6 +384,44 @@ describe('CommentSection', () => {
       parentId: null,
       text: 'New',
     });
+  });
+
+  it('sends one create for a double click on Post', async () => {
+    mockedComments.createComment.mockReturnValue(new Promise(() => {}));
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Post' }));
+    expect(mockedComments.createComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends one patch for a double click on Save of an edit', async () => {
+    mockedComments.updateComment.mockReturnValue(new Promise(() => {}));
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.type(screen.getByRole('textbox'), 'Edited');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Save' }));
+    expect(mockedComments.updateComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends again after a failed create, keeping the typed text', async () => {
+    mockedComments.createComment
+      .mockRejectedValueOnce(new ApiError(500, 'Boom'))
+      .mockResolvedValueOnce({ ...root, id: 7 });
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await screen.findByText('Could not post the comment.');
+    expect(screen.getByRole('textbox')).toHaveValue('New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalledTimes(2)
+    );
   });
 
   it('offers no Post for blank text', async () => {
@@ -902,6 +978,30 @@ describe('CommentSection Unsaved text', () => {
     expect(store.getState().unsavedText.entries).toEqual({});
   });
 
+  it('does not swallow an error thrown after a successful post', async () => {
+    mockedComments.createComment.mockResolvedValue({ ...root, id: 7 });
+    const { store } = renderSignedIn();
+    const realDispatch = store.dispatch;
+    // Only the clean-up that follows a successful post throws.
+    jest.spyOn(store, 'dispatch').mockImplementation((action) => {
+      if (
+        typeof action === 'object' &&
+        'type' in action &&
+        action.type === 'unsavedText/remove'
+      ) {
+        throw new Error('after-success boom');
+      }
+      return realDispatch(action);
+    });
+    await screen.findByText('A fine book');
+
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    await expect(mockFlights[0]).rejects.toThrow('after-success boom');
+  });
+
   it('keeps the text when the modal is cancelled', async () => {
     const { store } = renderSignedIn();
     await screen.findByText('A fine book');
@@ -941,19 +1041,24 @@ describe('CommentSection Unsaved text', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Too late');
     act(() => {
       queryClient.setQueryData(queryKeys.comments(1), {
-        items: [
+        pages: [
           {
-            ...root,
-            text: '',
-            tombstone: 'deleted',
-            userId: null,
-            author: null,
+            items: [
+              {
+                ...root,
+                text: '',
+                tombstone: 'deleted',
+                userId: null,
+                author: null,
+              },
+              reply,
+            ],
+            total: 2,
+            limit: 100,
+            offset: 0,
           },
-          reply,
         ],
-        total: 2,
-        limit: 100,
-        offset: 0,
+        pageParams: [0],
       });
     });
 
@@ -961,6 +1066,20 @@ describe('CommentSection Unsaved text', () => {
     expect(screen.getByRole('textbox', { name: 'Unsaved text' })).toHaveValue(
       'Too late'
     );
+  });
+
+  it('shows no button and does not loop for an empty page below the total', async () => {
+    mockedComments.listComments.mockResolvedValue({
+      items: [],
+      total: 5,
+      limit: 100,
+      offset: 0,
+    });
+
+    renderWithProviders(<CommentSection bookId={1} />);
+
+    expect(await screen.findByText('No comments yet.')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(1);
   });
 
   it('offers the text of a reply whose comment became a Tombstone', async () => {
@@ -1025,5 +1144,162 @@ describe('CommentSection Unsaved text', () => {
     await waitFor(() =>
       expect(store.getState().unsavedText.entries).toEqual({})
     );
+  });
+});
+
+describe('CommentSection paging', () => {
+  const loadMoreButton = () =>
+    screen.getByRole('button', { name: 'Load more comments' });
+  const queryLoadMore = () =>
+    screen.queryByRole('button', { name: 'Load more comments' });
+  const callsAt = (offset: number) =>
+    mockedComments.listComments.mock.calls.filter(([, at]) => at === offset)
+      .length;
+  const serveCreate = (server: CommentWithAuthor[]) =>
+    mockedComments.createComment.mockImplementation(async () => {
+      const id = server.length + 1;
+      const created = { ...root, id, text: `Comment ${id}` };
+      server.push(created);
+      return created;
+    });
+
+  it('loads and appends the next page on Load more comments', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    expect(screen.queryByText('Comment 101')).toBeNull();
+
+    await userEvent.click(loadMoreButton());
+
+    expect(await screen.findByText('Comment 150')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenLastCalledWith(1, 100);
+    expect(screen.getByText('Comment 1')).toBeInTheDocument();
+    expect(queryLoadMore()).toBeNull();
+  });
+
+  it('shows no button when every comment is loaded', async () => {
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('A fine book');
+
+    expect(queryLoadMore()).toBeNull();
+  });
+
+  it('sends one request for a double click on Load more comments', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    mockedComments.listComments.mockReturnValue(new Promise(() => {}));
+
+    await userEvent.dblClick(loadMoreButton());
+
+    expect(callsAt(100)).toBe(1);
+  });
+
+  it('keeps the thread and the button after a failed page, with a toast', async () => {
+    serve(makeComments(150));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+    mockedComments.listComments.mockRejectedValue(
+      new TypeError('Failed to fetch')
+    );
+
+    await userEvent.click(loadMoreButton());
+
+    expect(
+      await screen.findByText('Could not load more comments.')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Comment 1')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load the comments.')).toBeNull();
+    expect(loadMoreButton()).toBeInTheDocument();
+  });
+
+  it('offers no orphan notice for a target on an unloaded page until every page is loaded', async () => {
+    serve(makeComments(150));
+    renderSignedIn(
+      withEntries({ 'book:1:reply:900': { text: 'Draft', savedAt } })
+    );
+    await screen.findByText('Comment 1');
+
+    expect(screen.queryByRole('textbox', { name: 'Unsaved text' })).toBeNull();
+
+    await userEvent.click(loadMoreButton());
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Unsaved text' })
+    ).toHaveValue('Draft');
+  });
+
+  it('drops the button after an empty page below the total, without another request', async () => {
+    // The server overstates the total: page two comes back empty.
+    mockedComments.listComments.mockImplementation(async (_bookId, offset) => ({
+      items: offset === 0 ? makeComments(100) : [],
+      total: 250,
+      limit: 100,
+      offset,
+    }));
+    renderWithProviders(<CommentSection bookId={1} />);
+    await screen.findByText('Comment 1');
+
+    await userEvent.click(loadMoreButton());
+
+    await waitFor(() => expect(queryLoadMore()).toBeNull());
+    expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
+  });
+
+  const post = async (text: string) => {
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), text);
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+  };
+
+  it('fetches every remaining page after a create so the new comment shows', async () => {
+    const server = makeComments(250);
+    serve(server);
+    serveCreate(server);
+    renderSignedIn();
+    await screen.findByText('Comment 1');
+
+    await post('New');
+
+    expect(await screen.findByText('Comment 251')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 100);
+    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 200);
+  });
+
+  it('shows the new comment when exactly one full page was loaded', async () => {
+    const server = makeComments(100);
+    serve(server);
+    serveCreate(server);
+    renderSignedIn();
+    await screen.findByText('Comment 1');
+
+    await post('New');
+
+    expect(await screen.findByText('Comment 101')).toBeInTheDocument();
+  });
+
+  it('stops draining after a failed page, toasts once and keeps the button', async () => {
+    const server = makeComments(250);
+    serve(server);
+    serveCreate(server);
+    const { store } = renderSignedIn();
+    await screen.findByText('Comment 1');
+    const served = mockedComments.listComments.getMockImplementation()!;
+    mockedComments.listComments.mockImplementation((id, offset) =>
+      offset === 100
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : served(id, offset)
+    );
+
+    await post('New');
+
+    expect(
+      await screen.findAllByText('Could not load more comments.')
+    ).toHaveLength(1);
+    expect(callsAt(200)).toBe(0);
+    expect(loadMoreButton()).toBeInTheDocument();
+    // The create succeeded, so the composer closes and the draft goes.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(store.getState().unsavedText.entries).toEqual({});
   });
 });

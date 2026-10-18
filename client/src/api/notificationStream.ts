@@ -20,7 +20,14 @@ export const openNotificationStream = ({
     withCredentials: true,
   });
   source.addEventListener(NOTIFICATION_STREAM_EVENT, (event) => {
-    onNotification(JSON.parse(String(event.data)) as PublicNotification);
+    // Drop a malformed frame. A throw from onNotification is not caught.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(String(event.data));
+    } catch {
+      return;
+    }
+    onNotification(parsed as PublicNotification);
   });
   // An error while CONNECTING is the browser's own retry after a dropped
   // connection; only CLOSED needs the caller.

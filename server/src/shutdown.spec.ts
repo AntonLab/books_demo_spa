@@ -100,6 +100,19 @@ test('stops every interval, closes the server, then the pool, and exits 0', asyn
   ]);
 });
 
+test('stopping is false until the first call, then true', async (t) => {
+  const h = harness(t);
+  const shutdown = createShutdown(h.deps);
+  assert.equal(shutdown.stopping, false);
+
+  const done = shutdown('SIGTERM');
+  assert.equal(shutdown.stopping, true);
+
+  h.finishClose();
+  await done;
+  assert.equal(shutdown.stopping, true);
+});
+
 test('a second call joins the shutdown already under way', async (t) => {
   const h = harness(t);
   const shutdown = createShutdown(h.deps);
@@ -144,6 +157,46 @@ test('a pool that fails to close is logged and exits 1', async (t) => {
   await done;
   assert.deepEqual(h.exits, [1]);
   assert.ok(h.logs.includes('error Shutdown failed'));
+});
+
+test('a shutdown with no server stops the stoppables, closes the pool and exits 0', async (t) => {
+  const h = harness(t);
+  const { server: _server, ...deps } = h.deps;
+
+  await createShutdown(deps)('startup failed');
+
+  assert.deepEqual(h.calls, ['purge.stop', 'limits.stop', 'sequelize.close']);
+  assert.deepEqual(h.exits, []);
+  assert.deepEqual(h.logs, [
+    'info Shutting down (startup failed)',
+    'info Shutdown complete',
+  ]);
+});
+
+test('a server handed over after creation is the one closed', async (t) => {
+  const h = harness(t);
+  const { server, ...deps } = h.deps;
+  const shutdownDeps: ShutdownDeps = deps;
+  const shutdown = createShutdown(shutdownDeps);
+  shutdownDeps.server = server;
+
+  const done = shutdown('SIGTERM');
+  h.finishClose();
+  await done;
+
+  assert.ok(h.calls.includes('server.close'));
+  assert.ok(h.calls.includes('server.closeIdleConnections'));
+});
+
+test('the deadline with no server still exits 1', (t) => {
+  const h = harness(t, () => new Promise<void>(() => {}));
+  const { server: _server, ...deps } = h.deps;
+
+  void createShutdown(deps)('startup failed');
+  t.mock.timers.tick(SHUTDOWN_TIMEOUT_MS);
+
+  assert.deepEqual(h.exits, [1]);
+  assert.ok(!h.calls.includes('server.closeAllConnections'));
 });
 
 test('SIGTERM and SIGINT each start the shutdown, and each is heard once', () => {

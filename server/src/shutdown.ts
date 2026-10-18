@@ -16,14 +16,20 @@ interface Stoppable {
 }
 
 export interface ShutdownDeps {
-  server: ShutdownServer;
+  // Absent when startup failed before listen; read at shutdown time, so it
+  // may be assigned after the shutdown is created.
+  server?: ShutdownServer;
   sequelize: { close(): Promise<void> };
   stoppables: readonly Stoppable[];
   // process.exit, for the forced and the failed paths only.
   exit: (code: number) => void;
 }
 
-export type Shutdown = (reason: string) => Promise<void>;
+// `stopping` is true once a shutdown has started, so a boot still in progress
+// can see it and stop starting things on a closed pool.
+export type Shutdown = ((reason: string) => Promise<void>) & {
+  readonly stopping: boolean;
+};
 
 export function createShutdown(deps: ShutdownDeps): Shutdown {
   let running: Promise<void> | undefined;
@@ -34,7 +40,7 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
     // unref()ed: the deadline must never be what keeps the process alive
     // once everything else has closed.
     setTimeout(() => {
-      deps.server.closeAllConnections();
+      deps.server?.closeAllConnections();
       logger.error(
         `Shutdown did not finish within ${SHUTDOWN_TIMEOUT_MS} ms; forcing exit`
       );
@@ -49,11 +55,14 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
       // close() waits for the requests in flight. Its error only means the
       // server was not listening — a listen that failed — so there is
       // nothing left for it to close, and the error is not one.
-      const closed = new Promise<void>((resolve) => {
-        deps.server.close(() => resolve());
-      });
-      deps.server.closeIdleConnections();
-      await closed;
+      const { server } = deps;
+      if (server) {
+        const closed = new Promise<void>((resolve) => {
+          server.close(() => resolve());
+        });
+        server.closeIdleConnections();
+        await closed;
+      }
 
       await deps.sequelize.close();
       // process.exitCode is left alone: a clean shutdown ends with 0 (or with
@@ -69,17 +78,22 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
   // under way instead of starting another. A repeat of the same signal never
   // gets here — process.once has removed that listener, so Node's default
   // action takes it and ends the process at once.
-  return (reason) => {
-    running ??= run(reason);
-    return running;
-  };
+  return Object.defineProperty(
+    (reason: string) => {
+      running ??= run(reason);
+      return running;
+    },
+    // satisfies: the cast below cannot see a typo in the property name.
+    'stopping' satisfies keyof Shutdown,
+    { get: () => running !== undefined }
+  ) as Shutdown;
 }
 
 // process.once, so each signal is heard once; the shutdown itself makes the
 // pair idempotent. `node --watch` restarts with SIGTERM, so every dev restart
 // takes this path too.
 export function registerShutdownSignals(
-  shutdown: Shutdown,
+  shutdown: (reason: string) => Promise<void>,
   target: Pick<NodeJS.EventEmitter, 'once'> = process
 ): void {
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {

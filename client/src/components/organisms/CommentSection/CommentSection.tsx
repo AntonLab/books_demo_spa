@@ -1,4 +1,4 @@
-import { useRef, useState, type FC, type ReactNode } from 'react';
+import { useState, type FC, type ReactNode } from 'react';
 import { Alert, App, Button, Empty, Flex, Skeleton, Typography } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Comment } from '@/components/molecules/Comment/Comment';
@@ -17,6 +17,7 @@ import {
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { useReportComment } from '@/queries/reports';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { useAppDispatch } from '@/store/hooks';
 import {
   entriesOfBook,
@@ -48,7 +49,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
   closed = false,
 }) => {
   const { data: session } = useSession();
-  const { data, isPending, isError } = useComments(bookId);
+  const {
+    data,
+    isPending,
+    isError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isFetchNextPageError,
+  } = useComments(bookId);
 
   const create = useCreateComment(bookId);
   const update = useUpdateComment(bookId);
@@ -60,8 +69,22 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const entries = useOwnUnsavedEntries();
 
   const report = useReportComment(bookId);
-  const sending = useRef(false);
-  const acting = useRef(new Set<number>());
+  // The rejection already shows through the mutation's error state; only it
+  // is swallowed, so an error in `after` surfaces.
+  const send = useSingleFlight(
+    async (
+      mutate: () => Promise<unknown>,
+      after: () => Promise<void> | void
+    ) => {
+      try {
+        await mutate();
+      } catch {
+        return;
+      }
+      await after();
+    }
+  );
+  const sendReport = useSingleFlight((run: () => Promise<void>) => run());
   const { message } = App.useApp();
 
   const [composing, setComposing] = useState<Composing | null>(null);
@@ -69,6 +92,38 @@ export const CommentSection: FC<CommentSectionProps> = ({
   // Per-id state: `mutation.variables` keeps only the latest call, so a second
   // request would re-enable the first Comment early.
   const [busyIds, setBusyIds] = useState<ReadonlySet<number>>(new Set());
+
+  // Keyed by id, so one Comment's request never blocks another's. Remove is a
+  // delete too: the server makes a Removed comment when another Account calls
+  // it.
+  const actOn = useSingleFlight(
+    async (
+      mutation: typeof remove,
+      id: number,
+      failure: string,
+      onDone?: () => void
+    ) => {
+      setBusyIds((ids) => new Set(ids).add(id));
+      try {
+        try {
+          await mutation.mutateAsync(id);
+        } catch (error: unknown) {
+          void message.error(
+            error instanceof ApiError ? error.message : failure
+          );
+          return;
+        }
+        onDone?.();
+      } finally {
+        setBusyIds((ids) => {
+          const next = new Set(ids);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    (_mutation, id) => id
+  );
 
   // The Book page's tab label names the region, so no heading here. Every
   // branch renders the row, so the section keeps its height while the thread
@@ -79,7 +134,8 @@ export const CommentSection: FC<CommentSectionProps> = ({
     </Flex>
   );
 
-  if (isError) {
+  // A failed next page keeps the data: the thread stays, the toast tells.
+  if (isError && !isFetchNextPageError) {
     return (
       <section>
         {header()}
@@ -96,7 +152,7 @@ export const CommentSection: FC<CommentSectionProps> = ({
     );
   }
 
-  const all = data?.items ?? [];
+  const all = data?.pages.flatMap((page) => page.items) ?? [];
 
   // A closed thread offers no action at all: every one of them either writes
   // through the composer or reacts, and neither is open on a draft.
@@ -123,11 +179,13 @@ export const CommentSection: FC<CommentSectionProps> = ({
   );
 
   const find = (id: number) => all.find((item) => item.id === id);
-  // A target missing from the list, or a Tombstone, is gone: its composer
-  // cannot reopen, so its text is offered as a notice below instead.
+  // A Tombstone is gone, and so is a target missing once every page is loaded:
+  // its composer cannot reopen, so its text is offered as a notice below
+  // instead. While a page is unloaded the target may sit on it, so it is not
+  // gone yet.
   const isGone = (id: number): boolean => {
     const target = find(id);
-    return target === undefined || target.tombstone !== null;
+    return target === undefined ? !hasNextPage : target.tombstone !== null;
   };
 
   // A reply or edit whose target went while it was open closes rather than
@@ -161,6 +219,24 @@ export const CommentSection: FC<CommentSectionProps> = ({
       })
     : [];
 
+  // Returns the result so a caller can tell a failed page from a loaded one.
+  // cancelRefetch: false: a second call would cancel the page in flight and
+  // resend it; this one joins the fetch already running, a refetch included.
+  const loadMore = async () => {
+    const result = await fetchNextPage({ cancelRefetch: false });
+    if (result.isError) void message.error('Could not load more comments.');
+    return result;
+  };
+
+  // After a create the new comment sits on the last page, so fetch every page
+  // before it. The first call skips the hasNextPage gate: it is stale until the
+  // refetch the create awaited lands. Never rejects: loadMore toasts a failure
+  // and returns it.
+  const loadRest = async () => {
+    let result = await loadMore();
+    while (result.hasNextPage && !result.isError) result = await loadMore();
+  };
+
   const submit = () => {
     const text = draft.trim();
     if (text.length === 0) return;
@@ -174,24 +250,28 @@ export const CommentSection: FC<CommentSectionProps> = ({
       dispatch(unsavedText.remove(key));
       setComposing(null);
     };
-    // The modal already shows the failure from the mutation's state.
-    const onRejected = () => {};
 
     if (editTarget !== undefined) {
-      void update
-        .mutateAsync({ id: editTarget.id, text })
-        .then(onFulfilled, onRejected);
+      void send(
+        () => update.mutateAsync({ id: editTarget.id, text }),
+        onFulfilled
+      );
     } else {
-      void create
-        .mutateAsync({
-          bookId,
-          // The thread stays two levels: a reply to a reply joins its root.
-          parentId: replyTarget
-            ? (replyTarget.parentId ?? replyTarget.id)
-            : null,
-          text,
-        })
-        .then(onFulfilled, onRejected);
+      void send(
+        () =>
+          create.mutateAsync({
+            bookId,
+            // The thread stays two levels: a reply to a reply joins its root.
+            parentId: replyTarget
+              ? (replyTarget.parentId ?? replyTarget.id)
+              : null,
+            text,
+          }),
+        async () => {
+          await loadRest();
+          onFulfilled();
+        }
+      );
     }
   };
 
@@ -202,33 +282,15 @@ export const CommentSection: FC<CommentSectionProps> = ({
     setComposing(next);
   };
 
-  // A ref, not isPending: TanStack notifies it on a later tick, so a double
-  // click would send two requests. mutateAsync as in submit() above. Remove is
-  // a delete too: the server makes a Removed comment when another Account
-  // calls it.
+  // A keyed single flight, not isPending: TanStack notifies it on a later tick,
+  // so a double click would send two requests. mutateAsync as in submit()
+  // above.
   const act = (
     mutation: typeof remove,
     id: number,
     failure: string,
     onDone?: () => void
-  ) => {
-    if (acting.current.has(id)) return;
-    acting.current.add(id);
-    setBusyIds((ids) => new Set(ids).add(id));
-    void mutation
-      .mutateAsync(id)
-      .then(onDone, (error: unknown) => {
-        void message.error(error instanceof ApiError ? error.message : failure);
-      })
-      .finally(() => {
-        acting.current.delete(id);
-        setBusyIds((ids) => {
-          const next = new Set(ids);
-          next.delete(id);
-          return next;
-        });
-      });
-  };
+  ) => void actOn(mutation, id, failure, onDone);
 
   const deleteComment = (id: number) =>
     act(remove, id, 'Could not delete the comment.', () =>
@@ -309,6 +371,14 @@ export const CommentSection: FC<CommentSectionProps> = ({
         </div>
       ))}
 
+      {hasNextPage && (
+        <Flex justify="center" className={styles.more}>
+          <Button loading={isFetchingNextPage} onClick={() => void loadMore()}>
+            Load more comments
+          </Button>
+        </Flex>
+      )}
+
       {orphans.map(([key, entry]) => (
         <UnsavedTextNotice
           key={key}
@@ -375,21 +445,13 @@ export const CommentSection: FC<CommentSectionProps> = ({
       {canAct && reporting !== null && (
         <ReportCommentModal
           onSubmit={(payload) => {
-            // A ref, not report.isPending: a double click lands both clicks
-            // before the pending state renders.
-            if (sending.current) return;
-            // The modal shows the failure from the mutation's own state; the
-            // empty handler only keeps the rejection from going unhandled.
-            sending.current = true;
-            void report
-              .mutateAsync({ commentId: reporting, payload })
-              .then(
+            void sendReport(() =>
+              report.mutateAsync({ commentId: reporting, payload }).then(
                 () => setReporting(null),
+                // The rejection already shows through report.error.
                 () => {}
               )
-              .finally(() => {
-                sending.current = false;
-              });
+            );
           }}
           onCancel={() => setReporting(null)}
           pending={report.isPending}

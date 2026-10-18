@@ -29,6 +29,8 @@ as its first middleware, so errors, 404s and parse failures carry it too.
   is a hard kill: `once` removed the listener, so Node's default is back.
 - A 10 s deadline (`SHUTDOWN_TIMEOUT_MS`, `unref()`ed) drops open connections
   and exits 1, as does a pool that fails to close.
+- `shutdown.stopping` turns true on the first call; `index.ts` checks it after
+  the last startup await, before anything starts, and ends boot if it is set.
 - `npm run dev` restarts with `SIGTERM`, so every dev restart takes this path.
   `shutdown.spec.ts` uses fakes, not real signals.
 
@@ -36,7 +38,9 @@ as its first middleware, so errors, 404s and parse failures carry it too.
 
 A failed bind logs `Could not start the HTTP server`, never "listening";
 `index.ts` sets `exitCode = 1` and runs the graceful shutdown so the pool
-closes.
+closes. A startup failure after `authenticate()` takes the same path: log,
+`exitCode = 1`, `shutdown('startup failed')`. Signals are registered right
+after `createSequelize` so the pool closes either way.
 
 ## Expiry purge (`expiryPurge.ts`)
 

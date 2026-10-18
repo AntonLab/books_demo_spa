@@ -8,6 +8,8 @@ import {
 import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
+import { BOOK_GONE } from '@/constants/goneMessages';
+import { isId } from '@/types/id';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
@@ -41,13 +43,11 @@ import { useOwnUnsavedEntries } from '@/store/useUnsavedText';
 import spacing from '@/theme/spacing.module.css';
 import styles from './BookPage.module.css';
 
-const BOOK_GONE = 'This book no longer exists.';
-
 export const BookPage: FC = () => {
   const bookId = Number(useParams().id);
   // Not an id the server could answer for (an old /books/new bookmark), so it
   // is not asked.
-  return Number.isInteger(bookId) && bookId > 0 ? (
+  return isId(bookId) ? (
     <BookView bookId={bookId} />
   ) : (
     <GoneRedirect message={BOOK_GONE} />

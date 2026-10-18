@@ -24,6 +24,9 @@ export const useToggleLike = (invalidates: QueryKey) => {
       }
       await deleteLike(variables.existingId);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: invalidates }),
+    // onSettled, not onSuccess: a 409 (liked from another tab) or a 404
+    // (already unliked) means the count and the viewer's like id on screen
+    // are stale, and only the refetch puts them right.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: invalidates }),
   });
 };

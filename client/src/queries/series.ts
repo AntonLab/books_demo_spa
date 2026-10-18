@@ -136,10 +136,11 @@ export const useDeleteSeriesCover = (id: number) =>
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));
 
-// Saves the Series order on drop; see useOptimisticReorder.
+// Saves the Series order on drop; see useOptimisticReorder. allBooks refreshes
+// useBooksInSeries, which feeds the Series page grid.
 export const useReorderSeriesBooks = (seriesId: number) =>
   useOptimisticReorder<{ items: SeriesBookSummary[] }>(
     queryKeys.seriesBooks(seriesId),
-    queryKeys.seriesBooks(seriesId),
+    [queryKeys.allBooks],
     (bookIds) => reorderSeriesBooks(seriesId, bookIds)
   );

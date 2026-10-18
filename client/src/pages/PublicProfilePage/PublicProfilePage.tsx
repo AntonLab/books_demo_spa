@@ -9,6 +9,7 @@ import { PublicWorksList } from '@/components/organisms/PublicWorksList/PublicWo
 import { PublicProfileTab } from '@/components/organisms/PublicProfileTab/PublicProfileTab';
 import { lastOnlineLabel } from '@/format/lastOnline';
 import { usePublicProfile } from '@/queries/accounts';
+import { isId } from '@/types/id';
 import styles from './PublicProfilePage.module.css';
 
 const PAGE_GONE = 'Page not found.';
@@ -16,7 +17,7 @@ const PAGE_GONE = 'Page not found.';
 export const PublicProfilePage: FC = () => {
   const id = Number(useParams().id);
   // Not an id the server could answer for, so it is not asked.
-  return Number.isInteger(id) && id > 0 ? (
+  return isId(id) ? (
     // Keyed so every state resets when the id changes.
     <PublicProfileView key={id} id={id} />
   ) : (

@@ -1,4 +1,8 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   createComment,
   deleteComment,
@@ -10,9 +14,15 @@ import type { CreateCommentPayload } from 'shared';
 import { queryKeys } from './keys';
 
 export const useComments = (bookId: number) => {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.comments(bookId),
-    queryFn: () => listComments(bookId),
+    queryFn: ({ pageParam }) => listComments(bookId, pageParam),
+    initialPageParam: 0,
+    // An empty page ends paging, or a total the server overstates would loop.
+    getNextPageParam: (last) => {
+      const next = last.offset + last.items.length;
+      return last.items.length > 0 && next < last.total ? next : undefined;
+    },
   });
 };
 

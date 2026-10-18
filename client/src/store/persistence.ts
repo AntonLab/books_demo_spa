@@ -16,6 +16,7 @@ import type {
   ReadingPreferences,
 } from './devicePreferencesSlice';
 import { BOOK_IDS_MAX } from 'shared';
+import { isId } from '@/types/id';
 import { recentlyViewed } from './recentlyViewedSlice';
 import type { RecentlyViewedState } from './recentlyViewedSlice';
 import { isBlank, unsavedText } from './unsavedTextSlice';
@@ -167,8 +168,7 @@ const toRecentlyViewed = (value: unknown): RecentlyViewedState | undefined => {
     return undefined;
   }
   const clean = ids.filter(
-    (id, index): id is number =>
-      Number.isInteger(id) && id > 0 && ids.indexOf(id) === index
+    (id, index): id is number => isId(id) && ids.indexOf(id) === index
   );
   return { accountId, ids: clean.slice(0, BOOK_IDS_MAX) };
 };

@@ -106,6 +106,35 @@ describe('ChapterEditorModal', () => {
     expect(store.getState().unsavedText.entries).toEqual({});
   });
 
+  it('sends one create for a double click on Publish', async () => {
+    mockedChapters.createChapter.mockReturnValue(new Promise(() => {}));
+    renderModal(null, editorAccount(), typed('book:1:chapterNew'));
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Chapter One');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Publish' }));
+
+    await waitFor(() =>
+      expect(mockedChapters.createChapter).toHaveBeenCalledTimes(1)
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('sends again after a failed create and closes once it succeeds', async () => {
+    mockedChapters.createChapter
+      .mockRejectedValueOnce(new ApiError(500, 'Boom'))
+      .mockResolvedValueOnce(editorChapter);
+    renderModal(null, editorAccount(), typed('book:1:chapterNew'));
+
+    expect(await screen.findByLabelText('Title')).toHaveValue('Chapter One');
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await screen.findByText('Boom');
+    expect(onClose).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockedChapters.createChapter).toHaveBeenCalledTimes(2);
+  });
+
   it('turns away an account that may not add chapters', async () => {
     renderModal(null, editorAccount({ id: 50, role: 'admin' }));
     expect(

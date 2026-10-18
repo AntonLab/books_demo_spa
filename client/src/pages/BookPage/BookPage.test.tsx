@@ -504,7 +504,7 @@ describe('BookPage', () => {
       screen.getByRole('tab', { name: 'Comments (0)' })
     ).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
-    expect(mockedComments.listComments).toHaveBeenCalledWith(1);
+    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 0);
   });
 });
 

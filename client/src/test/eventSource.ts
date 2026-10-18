@@ -1,9 +1,10 @@
 type Listener = (event: Event) => void;
 
 // jsdom implements no EventSource. This fake records every stream a test
-// opens and lets the test drive it: `emit` delivers a server event, `fail`
-// reports an error the way the browser does (CONNECTING while it retries by
-// itself, CLOSED once it has given up).
+// opens and lets the test drive it: `emit` delivers a server event,
+// `emitRaw` delivers a string unparsed (a malformed frame), `fail` reports
+// an error the way the browser does (CONNECTING while it retries by itself,
+// CLOSED once it has given up).
 export class FakeEventSource {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
@@ -50,9 +51,13 @@ export class FakeEventSource {
   // A closed stream receives nothing, as in the browser, so a test can prove
   // that an event sent after close reaches no one.
   emit(type: string, data: unknown): void {
+    this.emitRaw(type, JSON.stringify(data));
+  }
+
+  emitRaw(type: string, data: string): void {
     if (this.readyState === FakeEventSource.CLOSED) return;
     this.readyState = FakeEventSource.OPEN;
-    this.dispatch(type, new MessageEvent(type, { data: JSON.stringify(data) }));
+    this.dispatch(type, new MessageEvent(type, { data }));
   }
 
   fail(readyState: 0 | 2): void {

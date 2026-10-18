@@ -43,6 +43,32 @@ describe('openNotificationStream', () => {
     expect(onNotification).not.toHaveBeenCalled();
   });
 
+  it('drops a malformed frame and still hands over the next one', () => {
+    const { source, onNotification } = open();
+
+    expect(() =>
+      source.emitRaw(NOTIFICATION_STREAM_EVENT, '{not json')
+    ).not.toThrow();
+    expect(() => source.emitRaw(NOTIFICATION_STREAM_EVENT, '')).not.toThrow();
+    expect(onNotification).not.toHaveBeenCalled();
+
+    source.emit(NOTIFICATION_STREAM_EVENT, newChapter);
+
+    expect(onNotification).toHaveBeenCalledTimes(1);
+    expect(onNotification).toHaveBeenCalledWith(newChapter);
+  });
+
+  it('does not catch an error thrown by onNotification', () => {
+    const { source, onNotification } = open();
+    onNotification.mockImplementation(() => {
+      throw new Error('handler failed');
+    });
+
+    expect(() => source.emit(NOTIFICATION_STREAM_EVENT, newChapter)).toThrow(
+      'handler failed'
+    );
+  });
+
   it('reports a stream the browser gave up on, and not one it is retrying', () => {
     const { source, onClosed } = open();
 

@@ -57,6 +57,6 @@ export const useDeleteIllustration = (chapterId: number) =>
 export const useReorderIllustrations = (chapterId: number) =>
   useOptimisticReorder<ItemsResponse<PublicIllustration>>(
     queryKeys.illustrations(chapterId),
-    queryKeys.illustrations(chapterId),
+    [],
     (ids) => reorderIllustrations(chapterId, ids).then(() => undefined)
   );

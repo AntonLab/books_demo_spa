@@ -5,10 +5,11 @@ import type { CommentWithAuthor, PublicComment } from '../types/api';
 const COMMENTS_PAGE_SIZE = 100;
 
 export const listComments = (
-  bookId: number
+  bookId: number,
+  offset: number
 ): Promise<ListResponse<CommentWithAuthor>> => {
   return request<ListResponse<CommentWithAuthor>>(
-    `/comments?bookId=${bookId}&limit=${COMMENTS_PAGE_SIZE}`
+    `/comments?bookId=${bookId}&limit=${COMMENTS_PAGE_SIZE}&offset=${offset}`
   );
 };
 

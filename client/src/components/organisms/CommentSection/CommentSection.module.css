@@ -2,6 +2,10 @@
   margin-bottom: var(--ant-margin);
 }
 
+.more {
+  margin-top: var(--ant-margin);
+}
+
 .replies {
   margin-left: var(--ant-margin-xl);
 }
