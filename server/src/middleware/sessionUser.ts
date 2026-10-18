@@ -16,8 +16,8 @@ export interface RequireAuthDeps {
 // session, deleted user, blocked account — because each of its two callers
 // (requireAuth, requirePermission) draws its own conclusion
 // from that answer and none of them needs to know which of the five
-// happened. Its one side effect: it stamps the resolved user's lastSeenAt when
-// the stored value is stale (the repository's WHERE still guards races).
+// happened. Its one side effect: it stamps lastSeenAt when stale (the
+// repository's WHERE guards races).
 export async function resolveSessionUser(
   deps: RequireAuthDeps,
   req: Request

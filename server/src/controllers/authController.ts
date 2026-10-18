@@ -167,7 +167,7 @@ export function createAuthController(deps: AuthControllerDeps) {
     me: async (req, res) => {
       // requireAuth guarantees this; the check narrows the optional type.
       if (!req.user) throw new UnauthorizedError();
-      // req.user is the lean session lookup; /me answers the full user.
+      // req.user is the lean AuthUser; /me needs avatarUrl.
       const user = await deps.userRepository.findById(req.user.id);
       if (!user) throw new UnauthorizedError();
       res.json(toSession(user));
