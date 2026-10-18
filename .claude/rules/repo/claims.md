@@ -21,6 +21,13 @@ the gates", "every result arrives twice".
   duplicate count, a failing test for "fails if") and write the output into the
   brief's item. An item whose command contradicts the claim is rewritten or
   dropped before dispatch.
+- **A brief item that names an API or a method** ("use `removeQueries`", "use
+  `refetchPage`", "move X onto hook Y") gets a command that shows it works
+  here: `git grep` in the installed package (`node_modules/<pkg>/src`), `ctx7`
+  for the installed major, or the hook's source. In the queue-b follow-ups
+  three such items could not run as written (`removeQueries` refetched a
+  mounted observer; TanStack Query 5.104.1 has no `refetchPage`; the hook had
+  one flag).
 - **Before `gh issue create` from a retro, audit or summary:** check each factual
   line against the primary source: the transcript (`npm run tokens -- <id>`
   tallies one session; `Grep` the `.jsonl` for the event), the skill text, the
