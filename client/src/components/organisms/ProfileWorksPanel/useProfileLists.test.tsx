@@ -35,22 +35,46 @@ const row = {
   favoriteId: 41,
 } as unknown as PublicBook & { favoriteId: number };
 const user = { id: 3, role: 'user' } as PublicUser;
-const setup = (
-  scope: ProfileScope,
+const setupWith = <T,>(
+  useList: () => T,
   route: string,
-  who: PublicUser | null = user,
+  who: PublicUser | null,
   seed?: (client: QueryClient) => void
 ) => {
   const queryClient = seededClient(who);
   seed?.(queryClient);
   return renderHookWithProviders(
     () => ({
-      state: useProfileBooks(scope, 3),
+      state: useList(),
       location: useLocation(),
       navType: useNavigationType(),
     }),
     { route, queryClient }
   );
+};
+const setup = (
+  scope: ProfileScope,
+  route: string,
+  who: PublicUser | null = user,
+  seed?: (client: QueryClient) => void
+) => setupWith(() => useProfileBooks(scope, 3), route, who, seed);
+const expectBlockedGenreList = async (
+  result: {
+    current: {
+      state: { list: unknown };
+      location: { search: string };
+    };
+  },
+  search: string
+) => {
+  await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+  expect(result.current.state.list).toMatchObject({
+    items: [],
+    total: 0,
+    isPending: false,
+    error: null,
+  });
+  expect(result.current.location.search).toBe(search);
 };
 const rowsOf = ({ current }: ReturnType<typeof setup>['result']) =>
   current.state.list.items;
@@ -163,14 +187,7 @@ describe('useProfileBooks', () => {
         })
       );
 
-      await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
-      expect(result.current.state.list).toMatchObject({
-        items: [],
-        total: 0,
-        isPending: false,
-        error: null,
-      });
-      expect(result.current.location.search).toBe('?genre=abc&page=9');
+      await expectBlockedGenreList(result, '?genre=abc&page=9');
       expect(mockedBooks.listBooks).not.toHaveBeenCalled();
       expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
     }
@@ -339,18 +356,7 @@ const setupSeries = (
   route: string,
   who: PublicUser | null = user,
   seed?: (client: QueryClient) => void
-) => {
-  const queryClient = seededClient(who);
-  seed?.(queryClient);
-  return renderHookWithProviders(
-    () => ({
-      state: useProfileSeries(scope, 3),
-      location: useLocation(),
-      navType: useNavigationType(),
-    }),
-    { route, queryClient }
-  );
-};
+) => setupWith(() => useProfileSeries(scope, 3), route, who, seed);
 
 describe('useProfileSeries', () => {
   beforeEach(() => {
@@ -426,16 +432,7 @@ describe('useProfileSeries', () => {
           })
       );
 
-      await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
-      expect(result.current.state.list).toMatchObject({
-        items: [],
-        total: 0,
-        isPending: false,
-        error: null,
-      });
-      expect(result.current.location.search).toBe(
-        '?tab=series&genre=abc&page=9'
-      );
+      await expectBlockedGenreList(result, '?tab=series&genre=abc&page=9');
       expect(mockedSeries.listSeries).not.toHaveBeenCalled();
       expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
     }
