@@ -1,4 +1,5 @@
 import { act, waitFor } from '@testing-library/react';
+import type { QueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigationType } from 'react-router';
 import {
   profileTabOf,
@@ -13,6 +14,8 @@ import * as authApi from '@/api/auth';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
+import { listParamsOf, parseBookSearch } from '@/types/bookSearch';
+import { parseSeriesSearch, seriesListParamsOf } from '@/types/seriesSearch';
 import type { PublicSeries, PublicUser } from '@/types/api';
 import type { PublicBook } from '@/types/book';
 import type { ProfileScope } from '@/types/profileScope';
@@ -35,16 +38,20 @@ const user = { id: 3, role: 'user' } as PublicUser;
 const setup = (
   scope: ProfileScope,
   route: string,
-  who: PublicUser | null = user
-) =>
-  renderHookWithProviders(
+  who: PublicUser | null = user,
+  seed?: (client: QueryClient) => void
+) => {
+  const queryClient = seededClient(who);
+  seed?.(queryClient);
+  return renderHookWithProviders(
     () => ({
       state: useProfileBooks(scope, 3),
       location: useLocation(),
       navType: useNavigationType(),
     }),
-    { route, queryClient: seededClient(who) }
+    { route, queryClient }
   );
+};
 const rowsOf = ({ current }: ReturnType<typeof setup>['result']) =>
   current.state.list.items;
 
@@ -137,6 +144,37 @@ describe('useProfileBooks', () => {
       filtered: true,
     });
   });
+
+  it.each(['mine', 'favorites'] as const)(
+    'Books %s: a genre that is no id hides cached rows, asks nothing and does not clamp the page',
+    async (scope) => {
+      const search = parseBookSearch(new URLSearchParams('page=9'));
+      const base = listParamsOf(search, undefined);
+      const key =
+        scope === 'mine'
+          ? queryKeys.books({ ...base, userId: 3 })
+          : queryKeys.books({ ...base, favoritedBy: 'me' });
+      const { result } = setup(scope, '/p?genre=abc&page=9', user, (client) =>
+        client.setQueryData(key, {
+          items: [row],
+          total: 1,
+          current: 9,
+          pageSize: 20,
+        })
+      );
+
+      await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+      expect(result.current.state.list).toMatchObject({
+        items: [],
+        total: 0,
+        isPending: false,
+        error: null,
+      });
+      expect(result.current.location.search).toBe('?genre=abc&page=9');
+      expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+      expect(mockedBooks.listFavoritedBooks).not.toHaveBeenCalled();
+    }
+  );
 
   it('asks for an unknown genre id as it is, with the form field empty; a known one fills it', async () => {
     const unknown = setup('mine', '/p?genre=99');
@@ -299,16 +337,20 @@ const seriesBody = { items: [seriesRow], total: 1, limit: 20, offset: 0 };
 const setupSeries = (
   scope: ProfileScope,
   route: string,
-  who: PublicUser | null = user
-) =>
-  renderHookWithProviders(
+  who: PublicUser | null = user,
+  seed?: (client: QueryClient) => void
+) => {
+  const queryClient = seededClient(who);
+  seed?.(queryClient);
+  return renderHookWithProviders(
     () => ({
       state: useProfileSeries(scope, 3),
       location: useLocation(),
       navType: useNavigationType(),
     }),
-    { route, queryClient: seededClient(who) }
+    { route, queryClient }
   );
+};
 
 describe('useProfileSeries', () => {
   beforeEach(() => {
@@ -359,6 +401,45 @@ describe('useProfileSeries', () => {
       filtered: true,
     });
   });
+
+  it.each(['mine', 'favorites'] as const)(
+    'Series %s: a genre that is no id hides cached rows, asks nothing and does not clamp the page',
+    async (scope) => {
+      const base = seriesListParamsOf(
+        parseSeriesSearch(new URLSearchParams('page=9')),
+        undefined
+      );
+      const key =
+        scope === 'mine'
+          ? queryKeys.series({ ...base, userId: 3 })
+          : queryKeys.series({ ...base, favoritedBy: 'me' });
+      const { result } = setupSeries(
+        scope,
+        '/p?tab=series&genre=abc&page=9',
+        user,
+        (client) =>
+          client.setQueryData(key, {
+            items: [seriesRow],
+            total: 1,
+            limit: 20,
+            offset: 160,
+          })
+      );
+
+      await waitFor(() => expect(mockedGenres.listGenres).toHaveBeenCalled());
+      expect(result.current.state.list).toMatchObject({
+        items: [],
+        total: 0,
+        isPending: false,
+        error: null,
+      });
+      expect(result.current.location.search).toBe(
+        '?tab=series&genre=abc&page=9'
+      );
+      expect(mockedSeries.listSeries).not.toHaveBeenCalled();
+      expect(mockedSeries.listFavoritedSeries).not.toHaveBeenCalled();
+    }
+  );
 
   it('Search keeps the tab and size and resets the page, Reset keeps only the tab', () => {
     const { result } = setupSeries('mine', '/p?tab=series&page=3&pageSize=50');
