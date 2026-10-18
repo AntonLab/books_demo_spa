@@ -1,5 +1,6 @@
 import {
   READING_LIST_MAX_ITEMS,
+  READING_LIST_MAX_PER_ACCOUNT,
   type PublicBook,
   type PublicReadingList,
   type PublicSeries,
@@ -121,6 +122,14 @@ export function createFakeReadingListRepository(
     async create(input, account) {
       if (!accounts.has(account.id)) {
         throw new NotFoundError('User', account.id);
+      }
+      const held = [...lists.values()].filter(
+        (row) => row.userId === account.id
+      ).length;
+      if (held >= READING_LIST_MAX_PER_ACCOUNT) {
+        throw new BadRequestError(
+          `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`
+        );
       }
       const time = now();
       const list: ListRow = {

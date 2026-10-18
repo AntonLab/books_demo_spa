@@ -9,6 +9,7 @@ import {
 import { sequelizeOf } from './sequelizeOf.ts';
 import {
   READING_LIST_MAX_ITEMS,
+  READING_LIST_MAX_PER_ACCOUNT,
   type MyReadingList,
   type PublicReadingList,
   type ReadingListDetail,
@@ -276,15 +277,41 @@ function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
   throw error;
 }
 
+// Locks the account row so two writes at once cannot both pass the count, then
+// refuses a full account. Returns the owner for the caller's response.
+async function lockedOwnerWithRoom(
+  accountId: number,
+  transaction: Transaction
+) {
+  const owner = await User.findByPk(accountId, {
+    attributes: ['id', 'firstName', 'lastName', 'status'],
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!owner) throw new NotFoundError('User', accountId);
+  const held = await ReadingList.count({
+    where: { userId: accountId },
+    transaction,
+  });
+  if (held >= READING_LIST_MAX_PER_ACCOUNT) {
+    throw new BadRequestError(
+      `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`
+    );
+  }
+  return owner;
+}
+
 export function createSequelizeReadingListRepository(): ReadingListRepository {
   const repository: ReadingListRepository = {
     async create(input, account) {
-      const owner = await User.findByPk(account.id, {
-        attributes: ['firstName', 'lastName', 'status'],
+      return sequelizeOf(ReadingList).transaction(async (transaction) => {
+        const owner = await lockedOwnerWithRoom(account.id, transaction);
+        const list = await ReadingList.create(
+          { ...input, userId: account.id },
+          { transaction }
+        );
+        return toPublicReadingList(list, owner, 0);
       });
-      if (!owner) throw new NotFoundError('User', account.id);
-      const list = await ReadingList.create({ ...input, userId: account.id });
-      return toPublicReadingList(list, owner, 0);
     },
 
     async findById(id) {
@@ -492,11 +519,7 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
           const shown = (await placedItems(id, transaction)).filter(
             (item) => item.book ?? item.series
           );
-          const owner = await User.findByPk(account.id, {
-            attributes: ['id'],
-            transaction,
-          });
-          if (!owner) throw new NotFoundError('User', account.id);
+          await lockedOwnerWithRoom(account.id, transaction);
           const copy = await ReadingList.create(
             {
               userId: account.id,
