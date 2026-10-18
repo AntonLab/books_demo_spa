@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { PASSWORD_RESET_PATH } from 'shared';
+import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 import { LoginModal } from '@/components/organisms/LoginModal/LoginModal';
 import { RegisterModal } from '@/components/organisms/RegisterModal/RegisterModal';
 import { ResetConfirmModal } from '@/components/organisms/ResetConfirmModal/ResetConfirmModal';
@@ -19,17 +20,16 @@ interface Props extends AuthModalProps {
   modal: AuthModalName | null;
 }
 
-// Renders only the active modal. Mounting one at a time keeps each form fresh
-// on open and sidesteps antd's close/destroy props entirely.
-export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
-  const { pathname } = useLocation();
-  const [searchParams] = useSearchParams();
+interface ChainProps extends AuthModalProps {
+  modal: AuthModalName | null;
+  resetToken: string | null;
+}
 
-  // The emailed link is <APP_BASE_URL><PASSWORD_RESET_PATH>?token=... — built
-  // by `resetUrl()` in server/src/delivery/passwordResetMail.ts. The query key
-  // must not drift. Leaving the path closes the modal.
-  const resetToken =
-    pathname === PASSWORD_RESET_PATH ? searchParams.get('token') : null;
+// Stays mounted while the modals switch, so it alone holds the opener the
+// first modal found and gives focus back to it when the chain closes.
+const AuthChain: FC<ChainProps> = ({ modal, resetToken, onOpen, onClose }) => {
+  useRestoreFocus();
+
   if (resetToken) {
     return <ResetConfirmModal token={resetToken} />;
   }
@@ -44,4 +44,30 @@ export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
     case null:
       return null;
   }
+};
+
+// Renders only the active modal. Mounting one at a time keeps each form fresh
+// on open and sidesteps antd's close/destroy props entirely. `AuthChain` owns
+// the focus restore so a switch does not make a vanishing link the opener.
+export const AuthModals: FC<Props> = ({ modal, onOpen, onClose }) => {
+  const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+
+  // The emailed link is <APP_BASE_URL><PASSWORD_RESET_PATH>?token=... — built
+  // by `resetUrl()` in server/src/delivery/passwordResetMail.ts. The query key
+  // must not drift. Leaving the path closes the modal.
+  const resetToken =
+    pathname === PASSWORD_RESET_PATH ? searchParams.get('token') : null;
+  if (modal === null && !resetToken) {
+    return null;
+  }
+
+  return (
+    <AuthChain
+      modal={modal}
+      resetToken={resetToken}
+      onOpen={onOpen}
+      onClose={onClose}
+    />
+  );
 };

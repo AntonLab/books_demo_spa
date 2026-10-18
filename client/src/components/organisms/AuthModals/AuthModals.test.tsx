@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AuthModals } from './AuthModals';
 import { renderWithProviders } from '@/test/renderWithProviders';
 
@@ -50,6 +51,22 @@ describe('AuthModals', () => {
       expect(
         screen.getByRole('dialog', { name: 'Choose a new password' })
       ).toBeInTheDocument();
+    });
+
+    it('closes the reset-confirm modal opened by the URL without error', async () => {
+      const errorSpy = jest
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      renderWithProviders(
+        <AuthModals modal={null} onOpen={onOpen} onClose={onClose} />,
+        { route: '/reset-password?token=abc' }
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(errorSpy).not.toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
 
     it('opens nothing without a token', () => {

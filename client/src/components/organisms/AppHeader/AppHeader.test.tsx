@@ -172,6 +172,26 @@ describe('AppHeader when logged out', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
   });
+
+  it('returns focus to the Log in item after login -> register -> close', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+    const opener = screen.getByRole('menuitem', { name: 'Log in' });
+
+    act(() => opener.focus());
+    await userEvent.click(opener);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create an account' })
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Create an account',
+    });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Close' })
+    );
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+  });
 });
 
 describe('AppHeader when logged in', () => {
@@ -819,6 +839,16 @@ describe('AppHeader returning a Guest after Log in', () => {
     expect(
       await screen.findByRole('dialog', { name: 'Log in' })
     ).toBeInTheDocument();
+  });
+
+  it('closes a Log in dialog opened by the page guard without error', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await renderJumped();
+    await userEvent.click(await screen.findByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   const signInAndExpectPath = async (
