@@ -1,6 +1,7 @@
 import express, { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
 import { createChapterController } from '../controllers/chapterController.ts';
+import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
@@ -83,11 +84,12 @@ export function createBookRoutes(deps: RouteDeps): Router {
 
   // The raw body parser is mounted on this PUT alone, never
   // app-wide, and after requirePermission so a refused request's 2 MiB is
-  // never read.
+  // never read. The upload budget counts before the body is read.
   router.put(
     '/:id/cover',
     requirePermission('books', 'update'),
     validate({ params: idParamSchema }),
+    limitEveryRequestByUser(deps.authRateLimits.upload),
     express.raw({
       type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
       limit: IMAGE_MAX_BYTES,

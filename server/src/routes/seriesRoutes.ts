@@ -2,6 +2,7 @@ import express, { Router } from 'express';
 import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import { createBookController } from '../controllers/bookController.ts';
 import { createSeriesController } from '../controllers/seriesController.ts';
+import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
@@ -83,11 +84,13 @@ export function createSeriesRoutes(deps: RouteDeps): Router {
   );
 
   // The raw body parser is mounted on this PUT alone, after requirePermission
-  // so a refused request's 2 MiB is never read.
+  // so a refused request's 2 MiB is never read. The upload budget counts before
+  // the body is read.
   router.put(
     '/:id/cover',
     requirePermission('series', 'update'),
     validate({ params: idParamSchema }),
+    limitEveryRequestByUser(deps.authRateLimits.upload),
     express.raw({
       type: [...ACCEPTED_IMAGE_CONTENT_TYPES],
       limit: IMAGE_MAX_BYTES,
