@@ -83,7 +83,8 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
       running ??= run(reason);
       return running;
     },
-    'stopping',
+    // satisfies: the cast below cannot see a typo in the property name.
+    'stopping' satisfies keyof Shutdown,
     { get: () => running !== undefined }
   ) as Shutdown;
 }

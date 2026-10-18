@@ -76,8 +76,8 @@ async function main(): Promise<void> {
     // never provisioned, and failing loudly at boot beats discovering it later.
     await syncPermissions();
 
-    // A signal during the awaits above already closed the pool and stopped
-    // nothing of what starts below, so boot ends here.
+    // A signal during the awaits above already closed the pool; nothing below
+    // has started, so boot ends here.
     if (shutdown.stopping) return;
 
     const repositories = createSequelizeRepositories();
