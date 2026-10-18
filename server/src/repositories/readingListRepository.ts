@@ -10,6 +10,7 @@ import { sequelizeOf } from './sequelizeOf.ts';
 import {
   READING_LIST_MAX_ITEMS,
   READING_LIST_MAX_PER_ACCOUNT,
+  readingListFullMessage,
   type MyReadingList,
   type PublicReadingList,
   type ReadingListDetail,
@@ -294,9 +295,7 @@ async function lockedOwnerWithRoom(
     transaction,
   });
   if (held >= READING_LIST_MAX_PER_ACCOUNT) {
-    throw new BadRequestError(
-      `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`
-    );
+    throw new BadRequestError(readingListFullMessage());
   }
   return owner;
 }

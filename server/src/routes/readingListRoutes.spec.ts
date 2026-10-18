@@ -362,7 +362,10 @@ test('create refuses the 51st list of one account with 400; another account is n
       const refused = await call(base, user, 'POST', '', { title: 'The 51st' });
       assert.equal(refused.status, 400);
       const body = await json<{ error: string }>(refused);
-      assert.equal(body.error, 'An account holds at most 50 reading lists');
+      assert.equal(
+        body.error,
+        `An account holds at most ${READING_LIST_MAX_PER_ACCOUNT} reading lists`
+      );
       await createList(base, ROLE_COOKIES.author, { title: 'Elsewhere' });
     }
   );
