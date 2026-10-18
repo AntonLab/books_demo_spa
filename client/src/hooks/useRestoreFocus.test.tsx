@@ -13,6 +13,8 @@ const focusedButton = () => {
 };
 
 describe('useRestoreFocus', () => {
+  afterEach(() => document.body.replaceChildren());
+
   it('focuses the opener on unmount', () => {
     const opener = focusedButton();
     const focus = jest.spyOn(opener, 'focus');
@@ -21,7 +23,6 @@ describe('useRestoreFocus', () => {
     unmount();
 
     expect(focus).toHaveBeenCalledTimes(1);
-    opener.remove();
   });
 
   it('does not focus an opener that left the DOM', () => {
@@ -44,7 +45,6 @@ describe('useRestoreFocus', () => {
     unmount();
 
     expect(focus).not.toHaveBeenCalled();
-    opener.remove();
   });
 
   it('keeps focus inside the dialog after open under StrictMode', async () => {
@@ -63,7 +63,6 @@ describe('useRestoreFocus', () => {
 
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(opener).not.toHaveFocus());
-    expect(dialog).toContainElement(document.activeElement as HTMLElement);
-    opener.remove();
+    expect(dialog.contains(document.activeElement)).toBe(true);
   });
 });
