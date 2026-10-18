@@ -48,6 +48,7 @@ describe('useRestoreFocus', () => {
   });
 
   it('keeps focus inside the dialog after open under StrictMode', async () => {
+    // A real dialog: only its autofocus can lose to a re-run opener focus.
     const Page: FC = () => (
       <DiscardGuardModal title="Dialog" onClose={jest.fn()}>
         <input aria-label="Name" />

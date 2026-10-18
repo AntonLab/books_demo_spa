@@ -36,6 +36,7 @@ const rejected = [
   ['--remove', 'a/b'],
   ['--remove', 'a\\b'],
   ['--remove', '.foo'],
+  // Rejected by the argument dispatch (usage, exit 2) before validName runs.
   ['--remove', ''],
   ['x/y', 'main'],
   ['..', 'main'],
