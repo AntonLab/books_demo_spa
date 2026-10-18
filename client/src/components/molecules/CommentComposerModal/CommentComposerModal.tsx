@@ -1,6 +1,7 @@
 import { useRef, type FC } from 'react';
 import { Alert, Input, Modal, type GetRef } from 'antd';
 import { Comment } from '@/components/molecules/Comment/Comment';
+import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 import type { CommentWithAuthor } from '@/types/api';
 import spacing from '@/theme/spacing.module.css';
 import styles from './CommentComposerModal.module.css';
@@ -38,6 +39,7 @@ export const CommentComposerModal: FC<CommentComposerModalProps> = ({
   error,
   replyTo,
 }) => {
+  useRestoreFocus();
   const field = useRef<GetRef<typeof Input.TextArea>>(null);
 
   return (

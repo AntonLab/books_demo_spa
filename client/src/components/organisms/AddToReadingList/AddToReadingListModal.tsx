@@ -17,6 +17,7 @@ import {
   useMyReadingLists,
   useToggleListItem,
 } from '@/queries/readingLists';
+import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 import type { WorkTarget } from '@/api/readingLists';
 
 interface AddToReadingListModalProps {
@@ -29,6 +30,7 @@ export const AddToReadingListModal: FC<AddToReadingListModalProps> = ({
   target,
   onClose,
 }) => {
+  useRestoreFocus();
   const lists = useMyReadingLists(target, true);
   const toggle = useToggleListItem(target);
   const create = useCreateReadingList();

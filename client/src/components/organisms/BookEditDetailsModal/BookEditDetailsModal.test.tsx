@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { BookEditDetailsModal } from './BookEditDetailsModal';
@@ -295,6 +295,19 @@ describe('BookEditDetailsModal Chapter editor', () => {
     expect(await dialogTitled('Edit book')).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Edit One' })).toBeVisible();
+  });
+
+  it('returns focus to the chapter button when the Chapter modal closes', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    const opener = await toChapters();
+    act(() => opener.focus());
+    await user.keyboard('{Enter}');
+    const chapter = await dialogTitled('Edit chapter');
+    await user.click(within(chapter).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByText('Edit chapter')).toBeNull());
+    expect(await dialogTitled('Edit book')).toBeInTheDocument();
+    expect(opener).toHaveFocus();
   });
 
   it('opens a new chapter from Add chapter', async () => {

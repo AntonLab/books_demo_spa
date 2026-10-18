@@ -917,6 +917,19 @@ describe('CommentSection Unsaved text', () => {
     expect(screen.getByRole('textbox')).toHaveValue('Later');
   });
 
+  it('returns focus to Add comment when the composer closes', async () => {
+    const user = userEvent.setup();
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    const opener = screen.getByRole('button', { name: 'Add comment' });
+    act(() => opener.focus());
+    await user.keyboard('{Enter}');
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(opener).toHaveFocus();
+  });
+
   it('closes a reply whose comment becomes a Tombstone and offers its text', async () => {
     const { queryClient } = renderSignedIn();
     await screen.findByText('A fine book');
