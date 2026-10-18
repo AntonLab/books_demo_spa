@@ -3,6 +3,7 @@ import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { ChapterContents } from './ChapterContents';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { publicBook } from '@/test/works';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 
@@ -16,27 +17,21 @@ const summary = (id: number, title: string): ChapterSummary => ({
 });
 
 const book: BookDetail = {
-  id: 1,
-  authors: [
-    {
-      id: 5,
-      login: 'ada',
-      firstName: 'Ada',
-      lastName: 'Byron',
-      status: 'active',
-      avatarUrl: null,
-    },
-  ],
-  seriesId: null,
-  title: 'The Long Night',
-  description: 'A book.',
-  tags: [],
-  status: 'in_progress',
-  genre: null,
-  coverUrl: null,
-  createdAt: '2026-09-01T00:00:00.000Z',
-  updatedAt: '2026-09-01T00:00:00.000Z',
-  series: null,
+  ...publicBook({
+    authors: [
+      {
+        id: 5,
+        login: 'ada',
+        firstName: 'Ada',
+        lastName: 'Byron',
+        status: 'active',
+        avatarUrl: null,
+      },
+    ],
+    title: 'The Long Night',
+    description: 'A book.',
+    status: 'in_progress',
+  }),
   likeCount: 0,
   commentCount: 0,
   wordCount: 0,
