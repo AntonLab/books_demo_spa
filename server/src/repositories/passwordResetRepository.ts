@@ -30,7 +30,7 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
     },
 
     async replaceForUser(userId, tokenHash, expiresAt) {
-      // Lock order: user row, then token rows. redeem must match.
+      // Lock order: user row, then token rows (see redeem).
       await sequelizeOf(PasswordResetToken).transaction(async (t) => {
         // Serialises requests per Account across processes: the second waits
         // for the first commit.
@@ -58,8 +58,8 @@ export function createSequelizePasswordResetRepository(): PasswordResetRepositor
       // One transaction across three tables: a partial apply would leave a
       // redeemed token beside a live pre-reset session, which is the exact
       // state this flow exists to prevent.
-      // Lock order: user row, then token rows, same as replaceForUser.
-      // Else the two deadlock.
+      // Lock order: user row, then token rows, as in replaceForUser. The
+      // reverse order deadlocks.
       return sequelizeOf(PasswordResetToken).transaction(async (t) => {
         const live = {
           tokenHash,
