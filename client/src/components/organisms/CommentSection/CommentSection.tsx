@@ -17,6 +17,7 @@ import {
 import { queryKeys } from '@/queries/keys';
 import { useToggleLike } from '@/queries/likes';
 import { useReportComment } from '@/queries/reports';
+import { useSingleFlight } from '@/hooks/useSingleFlight';
 import { useAppDispatch } from '@/store/hooks';
 import {
   entriesOfBook,
@@ -60,6 +61,11 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const entries = useOwnUnsavedEntries();
 
   const report = useReportComment(bookId);
+  // The modal already shows a failed send from the mutation's state, so the
+  // rejection is swallowed here.
+  const send = useSingleFlight(async (run: () => Promise<unknown>) => {
+    await run().catch(() => {});
+  });
   const sending = useRef(false);
   const acting = useRef(new Set<number>());
   const { message } = App.useApp();
@@ -174,24 +180,24 @@ export const CommentSection: FC<CommentSectionProps> = ({
       dispatch(unsavedText.remove(key));
       setComposing(null);
     };
-    // The modal already shows the failure from the mutation's state.
-    const onRejected = () => {};
 
     if (editTarget !== undefined) {
-      void update
-        .mutateAsync({ id: editTarget.id, text })
-        .then(onFulfilled, onRejected);
+      void send(() =>
+        update.mutateAsync({ id: editTarget.id, text }).then(onFulfilled)
+      );
     } else {
-      void create
-        .mutateAsync({
-          bookId,
-          // The thread stays two levels: a reply to a reply joins its root.
-          parentId: replyTarget
-            ? (replyTarget.parentId ?? replyTarget.id)
-            : null,
-          text,
-        })
-        .then(onFulfilled, onRejected);
+      void send(() =>
+        create
+          .mutateAsync({
+            bookId,
+            // The thread stays two levels: a reply to a reply joins its root.
+            parentId: replyTarget
+              ? (replyTarget.parentId ?? replyTarget.id)
+              : null,
+            text,
+          })
+          .then(onFulfilled)
+      );
     }
   };
 

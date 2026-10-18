@@ -348,6 +348,44 @@ describe('CommentSection', () => {
     });
   });
 
+  it('sends one create for a double click on Post', async () => {
+    mockedComments.createComment.mockReturnValue(new Promise(() => {}));
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Post' }));
+    expect(mockedComments.createComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends one patch for a double click on Save of an edit', async () => {
+    mockedComments.updateComment.mockReturnValue(new Promise(() => {}));
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.clear(screen.getByRole('textbox'));
+    await userEvent.type(screen.getByRole('textbox'), 'Edited');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Save' }));
+    expect(mockedComments.updateComment).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends again after a failed create, keeping the typed text', async () => {
+    mockedComments.createComment
+      .mockRejectedValueOnce(new ApiError(500, 'Boom'))
+      .mockResolvedValueOnce({ ...root, id: 7 });
+    renderSignedIn();
+    await screen.findByText('A fine book');
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await screen.findByText('Could not post the comment.');
+    expect(screen.getByRole('textbox')).toHaveValue('New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalledTimes(2)
+    );
+  });
+
   it('offers no Post for blank text', async () => {
     renderSignedIn();
     await screen.findByText('A fine book');
