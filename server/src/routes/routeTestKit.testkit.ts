@@ -241,6 +241,10 @@ function authStubs(): Pick<AppDeps, 'sessionRepository' | 'userRepository'> {
       async findById(id: number) {
         return USERS_BY_ID.get(id) ?? null;
       },
+      async findForAuth(id: number) {
+        const user = USERS_BY_ID.get(id);
+        return user ? { ...user, lastSeenAt: null } : null;
+      },
       async touchLastSeen() {},
     } as unknown as UserRepository,
   };
@@ -275,6 +279,12 @@ export async function withAuthenticatedApp(
                 (await overrideUsers.findById(id)) ??
                 USERS_BY_ID.get(id) ??
                 null
+              );
+            },
+            async findForAuth(id: number) {
+              return (
+                (await overrideUsers.findForAuth(id)) ??
+                stubs.userRepository.findForAuth(id)
               );
             },
           }

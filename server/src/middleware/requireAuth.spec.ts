@@ -46,6 +46,15 @@ function deps(
         ? null
         : { ...USER, status: overrides.status ?? USER.status };
     },
+    async findForAuth(_id: number) {
+      return overrides.userFound === false
+        ? null
+        : {
+            ...USER,
+            status: overrides.status ?? USER.status,
+            lastSeenAt: null,
+          };
+    },
     async touchLastSeen() {},
   } as unknown as UserRepository;
 

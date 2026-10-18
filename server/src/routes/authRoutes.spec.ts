@@ -508,12 +508,12 @@ test('GET /me is 401 when the Account vanished after the session resolved', asyn
   const { deps, users } = authDeps();
   let vanish = false;
   let lookups = 0;
-  // The session middleware reads the Account first and must still find it;
-  // only the read after it (the handler's own) comes back empty.
+  // The session middleware reads through findForAuth and must still find the
+  // Account; only the handler's own findById comes back empty.
   const vanishing: UserRepository = {
     ...users,
     async findById(id) {
-      if (vanish && (lookups += 1) > 1) return null;
+      if (vanish && (lookups += 1) > 0) return null;
       return users.findById(id);
     },
   };
