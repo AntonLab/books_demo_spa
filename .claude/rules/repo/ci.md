@@ -13,8 +13,9 @@ merges into. Both run the same automation.
   `workflow_dispatch`: five parallel jobs on `ubuntu-latest` with Node from
   `.nvmrc` — `lint` (`lint`, `format:check`, `test:scripts` and
   `npm audit --omit=dev --audit-level=critical`), `typecheck`, `test-client`,
-  `test-server`, `build`. The audit is a step, not a job, so the ruleset stays
-  as is. `test-server` runs against a `mysql:8.4` service;
+  `test-server`, `build`. A new check that needs no service or separate runner
+  is a step in `lint`, as the audit is, so the ruleset stays as is; a new job
+  needs its own ruleset entry. `test-server` runs against a `mysql:8.4` service;
   a broken database fails the MySQL suites, as it does locally without
   `SKIP_MYSQL=1`, so the job cannot go green with none of them run.
 - `workflows/codeql.yml` — `security-extended` over `javascript-typescript`

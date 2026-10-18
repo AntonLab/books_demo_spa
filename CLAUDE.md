@@ -179,4 +179,5 @@ with `EPERM ... uv_spawn 'rg'`, fall back to `git grep`.
 Plan pipeline: **Read `.claude/rules/repo/pipeline.md` before running it**; it
 does not load itself. Save the spec before dispatching `plan-writer`. Run one
 spec per main session (`/clear` after its PR). Pass `model` on every dispatch,
-opus only when the user asks.
+opus only when the user asks. Before a brief or an issue states a fact, run its
+command: `.claude/rules/repo/claims.md`.
