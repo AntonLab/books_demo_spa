@@ -110,7 +110,8 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 Sign-in, registration, password and upload budgets. In memory, fixed window.
 Login, register and reset mount before `validate` so a refusal costs no parse,
 lookup or argon2. Upload PUTs mount after `requirePermission` and `validate`,
-before `express.raw`. A limited Account is not Blocked.
+before `express.raw`, so a refused body is never read. A request with no user
+passes the limiter; the route refuses it. A limited Account is not Blocked.
 
 | Route                                       | Key        | Limit         | Counts                                                               |
 | ------------------------------------------- | ---------- | ------------- | -------------------------------------------------------------------- |

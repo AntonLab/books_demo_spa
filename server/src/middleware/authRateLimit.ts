@@ -111,9 +111,8 @@ export function limitEveryRequest(
   };
 }
 
-// Upload PUTs: every request counts, by user id, after requirePermission and
-// before the body is read. A request without a user is left to the routes' own
-// refusal.
+// Upload PUTs: every request counts, by user id. No user: pass on, the route
+// refuses it. Mount order: see rules/server/auth.md.
 export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
   const count = limitEveryRequest(limiter, (req) => String(req.user?.id));
   return (req, res, next) => {
