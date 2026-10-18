@@ -20,8 +20,8 @@ export const AUTH_RATE_LIMITS = {
   // Wrong or aborted current-password guesses on a user's own password or
   // email change, by user id; a correct one clears it.
   currentPassword: { limit: 5, windowMs: FIFTEEN_MINUTES_MS },
-  // Every upload PUT by one user id, all three routes sharing it, because a
-  // decode is what it protects.
+  // Upload PUTs (avatar, book cover, series cover) share one budget per user
+  // id. It guards the image decode.
   upload: { limit: 20, windowMs: FIFTEEN_MINUTES_MS },
 } as const;
 
