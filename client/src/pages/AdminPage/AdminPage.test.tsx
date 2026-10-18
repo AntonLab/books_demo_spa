@@ -6,6 +6,8 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { adminGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import * as authApi from '@/api/auth';
+import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
 import type { PublicUser } from '@/types/api';
 
@@ -14,6 +16,7 @@ jest.mock('@/api/genres');
 jest.mock('@/api/reports');
 
 const mockedGenres = jest.mocked(genresApi);
+const mockedAuth = jest.mocked(authApi);
 
 const admin: PublicUser = {
   id: 1,
@@ -118,5 +121,32 @@ describe('AdminPage', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'Reports' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/admin/reports');
     await waitFor(() => expect(screen.queryByText('Mystery')).toBeNull());
+  });
+});
+
+describe('AdminPage when the session fails to load', () => {
+  it('shows an error and does not redirect', async () => {
+    // Not a 401: that one is the ordinary signed-out case, which the query
+    // turns into a `null` success (see queries/auth.ts).
+    mockedAuth.me.mockRejectedValue(new ApiError(500, 'Server error'));
+
+    renderWithProviders(
+      <>
+        <AdminPage />
+        <LocationProbe />
+      </>,
+      { route: '/admin/reports' }
+    );
+
+    expect(
+      await screen.findByText('Could not load the admin panel.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Admin panel' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      /^\/admin\/reports$/
+    );
   });
 });

@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Tabs, Typography } from 'antd';
+import { Alert, Tabs, Typography } from 'antd';
 import { useLocation, useNavigate } from 'react-router';
 import { isModeratorRole } from 'shared';
 import { PageSpinner } from '@/components/molecules/PageSpinner/PageSpinner';
@@ -14,9 +14,12 @@ import { useSession } from '@/queries/auth';
 export const AdminPage: FC = () => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending, isError } = useSession();
+  const title = <Typography.Title level={2}>Admin panel</Typography.Title>;
+  // A failed fetch stays 'pending' so the error Alert shows instead of a
+  // redirect. A 401 is not a failure: the query turns it into a `null` success.
   const allowed = usePageGuard(
-    isPending
+    isPending || isError
       ? 'pending'
       : !session
         ? 'guest'
@@ -24,11 +27,20 @@ export const AdminPage: FC = () => {
           ? 'allowed'
           : 'denied'
   );
+  if (isPending) return <PageSpinner />;
+  if (isError) {
+    return (
+      <>
+        {title}
+        <Alert type="error" title="Could not load the admin panel." />
+      </>
+    );
+  }
   if (!allowed) return <PageSpinner />;
 
   return (
     <>
-      <Typography.Title level={2}>Admin panel</Typography.Title>
+      {title}
       {/* The tabs are paths so the menu and a reload land on a tab, and a
           hidden panel must not keep its queries alive. */}
       <Tabs
