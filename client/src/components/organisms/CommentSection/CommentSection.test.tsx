@@ -1207,4 +1207,75 @@ describe('CommentSection paging', () => {
     );
     expect(mockedComments.listComments).toHaveBeenCalledTimes(2);
   });
+
+  const post = async (text: string) => {
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), text);
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+  };
+
+  it('fetches every remaining page after a create so the new comment shows', async () => {
+    const server = makeComments(250);
+    serve(server);
+    mockedComments.createComment.mockImplementation(async () => {
+      const created = { ...root, id: 251, text: 'Comment 251' };
+      server.push(created);
+      return created;
+    });
+    renderSignedIn();
+    await screen.findByText('Comment 1');
+
+    await post('New');
+
+    expect(await screen.findByText('Comment 251')).toBeInTheDocument();
+    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 100);
+    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 200);
+  });
+
+  it('shows the new comment when exactly one full page was loaded', async () => {
+    const server = makeComments(100);
+    serve(server);
+    mockedComments.createComment.mockImplementation(async () => {
+      const created = { ...root, id: 101, text: 'Comment 101' };
+      server.push(created);
+      return created;
+    });
+    renderSignedIn();
+    await screen.findByText('Comment 1');
+
+    await post('New');
+
+    expect(await screen.findByText('Comment 101')).toBeInTheDocument();
+  });
+
+  it('stops draining after a failed page, toasts once and keeps the button', async () => {
+    const server = makeComments(250);
+    serve(server);
+    mockedComments.createComment.mockImplementation(async () => {
+      server.push({ ...root, id: 251, text: 'Comment 251' });
+      return server[250]!;
+    });
+    renderSignedIn();
+    await screen.findByText('Comment 1');
+    const served = mockedComments.listComments.getMockImplementation()!;
+    mockedComments.listComments.mockImplementation((id, offset) =>
+      offset === 100
+        ? Promise.reject(new TypeError('Failed to fetch'))
+        : served(id, offset)
+    );
+
+    await post('New');
+
+    expect(
+      await screen.findAllByText('Could not load more comments.')
+    ).toHaveLength(1);
+    expect(
+      mockedComments.listComments.mock.calls.filter(
+        ([, offset]) => offset === 200
+      )
+    ).toHaveLength(0);
+    expect(
+      screen.getByRole('button', { name: 'Load more comments' })
+    ).toBeInTheDocument();
+  });
 });
