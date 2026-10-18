@@ -183,6 +183,29 @@ test('a failed email is logged with its account and the other recipients are sti
   ]);
 });
 
+test('a push that throws is logged with its account and the next recipient is still pushed to', async (t) => {
+  const { deps, lines, pushed } = fakes(t, {
+    recipients: [news(5, 'a@example.com'), news(6, 'b@example.com')],
+    online: [5, 6],
+  });
+  const push = deps.onlineRegistry.push;
+  deps.onlineRegistry.push = (userId, notification) => {
+    if (userId === 5) throw new Error('stream write failed');
+    push(userId, notification);
+  };
+
+  await assert.doesNotReject(runAnnouncementPass(deps, NOW));
+
+  assert.deepEqual(pushed, [{ userId: 6, id: 60 }]);
+  assert.deepEqual(lines, [
+    {
+      level: 'error',
+      message: 'Announcement delivery failed',
+      meta: { userId: 5, error: 'stream write failed' },
+    },
+  ]);
+});
+
 test('a failed claim is logged and the pass resolves', async (t) => {
   const { deps, lines, steps } = fakes(t, {
     announce: async () => {

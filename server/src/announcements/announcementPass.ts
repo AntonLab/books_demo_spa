@@ -66,7 +66,14 @@ export async function runAnnouncementPass(
   // Account look Online and cost it the email.
   await deps.onlineRegistry.revalidate();
   for (const recipient of news) {
-    await tell(deps, recipient);
+    try {
+      await tell(deps, recipient);
+    } catch (error) {
+      logger.error('Announcement delivery failed', {
+        userId: recipient.userId,
+        error: messageOf(error),
+      });
+    }
   }
 }
 
