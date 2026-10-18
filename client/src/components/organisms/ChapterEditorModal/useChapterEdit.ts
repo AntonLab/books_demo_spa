@@ -145,7 +145,7 @@ export const useChapterEdit = (
             );
             onSaved?.();
           },
-          // The rejection already shows through `saveError` or `conflict`.
+          // The rejection already shows through saveError or conflict.
           () => {}
         );
     },

@@ -17,6 +17,24 @@ jest.mock('@/api/comments');
 jest.mock('@/api/likes');
 jest.mock('@/api/reports');
 
+// Keeps each send's promise: the component fires it and forgets it, so a test
+// reaches an error that surfaces from it only through here.
+const mockFlights: Promise<void>[] = [];
+jest.mock('@/hooks/useSingleFlight', () => {
+  const actual = jest.requireActual('@/hooks/useSingleFlight');
+  return {
+    useSingleFlight: (fn: (...args: unknown[]) => Promise<void>) => {
+      const flight = actual.useSingleFlight(fn);
+      return (...args: unknown[]) => {
+        const promise: Promise<void> = flight(...args);
+        promise.catch(() => {});
+        mockFlights.push(promise);
+        return promise;
+      };
+    },
+  };
+});
+
 const mockedComments = jest.mocked(commentsApi);
 const mockedLikes = jest.mocked(likesApi);
 const mockedReports = jest.mocked(reportsApi);
@@ -120,6 +138,7 @@ const serve = (server: CommentWithAuthor[]) =>
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockFlights.length = 0;
   mockedComments.listComments.mockResolvedValue({
     items: [root, reply],
     total: 2,
@@ -954,6 +973,30 @@ describe('CommentSection Unsaved text', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(store.getState().unsavedText.entries).toEqual({});
+  });
+
+  it('does not swallow an error thrown after a successful post', async () => {
+    mockedComments.createComment.mockResolvedValue({ ...root, id: 7 });
+    const { store } = renderSignedIn();
+    const realDispatch = store.dispatch;
+    // Only the clean-up that follows a successful post throws.
+    jest.spyOn(store, 'dispatch').mockImplementation((action) => {
+      if (
+        typeof action === 'object' &&
+        'type' in action &&
+        action.type === 'unsavedText/remove'
+      ) {
+        throw new Error('after-success boom');
+      }
+      return realDispatch(action);
+    });
+    await screen.findByText('A fine book');
+
+    await addComment();
+    await userEvent.type(screen.getByRole('textbox'), 'New');
+    await userEvent.click(screen.getByRole('button', { name: 'Post' }));
+
+    await expect(mockFlights[0]).rejects.toThrow('after-success boom');
   });
 
   it('keeps the text when the modal is cancelled', async () => {

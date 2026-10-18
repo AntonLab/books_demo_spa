@@ -69,12 +69,22 @@ export const CommentSection: FC<CommentSectionProps> = ({
   const entries = useOwnUnsavedEntries();
 
   const report = useReportComment(bookId);
-  // The modal already shows a failed send from the mutation's state, so the
-  // rejection is swallowed here.
-  const send = useSingleFlight(async (run: () => Promise<unknown>) => {
-    await run().catch(() => {});
-  });
-  const sending = useRef(false);
+  // The rejection already shows through the mutation's error state; only it
+  // is swallowed, so an error in `after` surfaces.
+  const send = useSingleFlight(
+    async (
+      mutate: () => Promise<unknown>,
+      after: () => Promise<void> | void
+    ) => {
+      try {
+        await mutate();
+      } catch {
+        return;
+      }
+      await after();
+    }
+  );
+  const sendReport = useSingleFlight((run: () => Promise<void>) => run());
   const acting = useRef(new Set<number>());
   const { message } = App.useApp();
 
@@ -211,22 +221,25 @@ export const CommentSection: FC<CommentSectionProps> = ({
     };
 
     if (editTarget !== undefined) {
-      void send(() =>
-        update.mutateAsync({ id: editTarget.id, text }).then(onFulfilled)
+      void send(
+        () => update.mutateAsync({ id: editTarget.id, text }),
+        onFulfilled
       );
     } else {
-      void send(() =>
-        create
-          .mutateAsync({
+      void send(
+        () =>
+          create.mutateAsync({
             bookId,
             // The thread stays two levels: a reply to a reply joins its root.
             parentId: replyTarget
               ? (replyTarget.parentId ?? replyTarget.id)
               : null,
             text,
-          })
-          .then(loadRest)
-          .then(onFulfilled)
+          }),
+        async () => {
+          await loadRest();
+          onFulfilled();
+        }
       );
     }
   };
@@ -419,21 +432,13 @@ export const CommentSection: FC<CommentSectionProps> = ({
       {canAct && reporting !== null && (
         <ReportCommentModal
           onSubmit={(payload) => {
-            // A ref, not report.isPending: a double click lands both clicks
-            // before the pending state renders.
-            if (sending.current) return;
-            // The modal shows the failure from the mutation's own state; the
-            // empty handler only keeps the rejection from going unhandled.
-            sending.current = true;
-            void report
-              .mutateAsync({ commentId: reporting, payload })
-              .then(
+            void sendReport(() =>
+              report.mutateAsync({ commentId: reporting, payload }).then(
                 () => setReporting(null),
+                // The rejection already shows through report.error.
                 () => {}
               )
-              .finally(() => {
-                sending.current = false;
-              });
+            );
           }}
           onCancel={() => setReporting(null)}
           pending={report.isPending}
