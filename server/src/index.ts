@@ -76,6 +76,10 @@ async function main(): Promise<void> {
     // never provisioned, and failing loudly at boot beats discovering it later.
     await syncPermissions();
 
+    // A signal during the awaits above already closed the pool and stopped
+    // nothing of what starts below, so boot ends here.
+    if (shutdown.stopping) return;
+
     const repositories = createSequelizeRepositories();
     const {
       sessionRepository,
@@ -105,8 +109,9 @@ async function main(): Promise<void> {
       mailDelivery,
       appBaseUrl: config.appBaseUrl,
     });
-    // The pass before the registry, so no pass pushes to a stream the
-    // registry has just closed.
+    // Final stop order: expiry purge, announcement pass, online registry, rate
+    // limits. The pass stops before the registry, so no pass pushes to a stream
+    // the registry has just closed.
     stoppables.splice(stoppables.indexOf(onlineRegistry), 0, announcementPass);
     const authRateLimits = createAuthRateLimits();
     stoppables.push(authRateLimits);
@@ -134,13 +139,14 @@ async function main(): Promise<void> {
       logger.info(`server listening on http://127.0.0.1:${config.port}`);
     });
   } catch (error) {
-    logger.error('Fatal error during startup', messageOf(error));
-    process.exitCode = 1;
+    reportFatal(error);
     await shutdown('startup failed');
   }
 }
 
-await main().catch((error: unknown) => {
+function reportFatal(error: unknown): void {
   logger.error('Fatal error during startup', messageOf(error));
   process.exitCode = 1;
-});
+}
+
+await main().catch(reportFatal);

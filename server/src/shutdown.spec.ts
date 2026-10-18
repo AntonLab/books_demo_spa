@@ -100,6 +100,19 @@ test('stops every interval, closes the server, then the pool, and exits 0', asyn
   ]);
 });
 
+test('stopping is false until the first call, then true', async (t) => {
+  const h = harness(t);
+  const shutdown = createShutdown(h.deps);
+  assert.equal(shutdown.stopping, false);
+
+  const done = shutdown('SIGTERM');
+  assert.equal(shutdown.stopping, true);
+
+  h.finishClose();
+  await done;
+  assert.equal(shutdown.stopping, true);
+});
+
 test('a second call joins the shutdown already under way', async (t) => {
   const h = harness(t);
   const shutdown = createShutdown(h.deps);

@@ -25,7 +25,11 @@ export interface ShutdownDeps {
   exit: (code: number) => void;
 }
 
-export type Shutdown = (reason: string) => Promise<void>;
+// `stopping` is true once a shutdown has started, so a boot still in progress
+// can see it and stop starting things on a closed pool.
+export type Shutdown = ((reason: string) => Promise<void>) & {
+  readonly stopping: boolean;
+};
 
 export function createShutdown(deps: ShutdownDeps): Shutdown {
   let running: Promise<void> | undefined;
@@ -74,17 +78,21 @@ export function createShutdown(deps: ShutdownDeps): Shutdown {
   // under way instead of starting another. A repeat of the same signal never
   // gets here — process.once has removed that listener, so Node's default
   // action takes it and ends the process at once.
-  return (reason) => {
-    running ??= run(reason);
-    return running;
-  };
+  return Object.defineProperty(
+    (reason: string) => {
+      running ??= run(reason);
+      return running;
+    },
+    'stopping',
+    { get: () => running !== undefined }
+  ) as Shutdown;
 }
 
 // process.once, so each signal is heard once; the shutdown itself makes the
 // pair idempotent. `node --watch` restarts with SIGTERM, so every dev restart
 // takes this path too.
 export function registerShutdownSignals(
-  shutdown: Shutdown,
+  shutdown: (reason: string) => Promise<void>,
   target: Pick<NodeJS.EventEmitter, 'once'> = process
 ): void {
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
