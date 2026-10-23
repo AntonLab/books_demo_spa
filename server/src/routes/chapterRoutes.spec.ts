@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CHAPTER_JSON_LIMIT_BYTES } from '../app.ts';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
@@ -261,7 +262,7 @@ test('POST and PATCH answer 413 for a body over the 5 MiB chapter limit', async 
     { chapterRepository: createFakeRepository() },
     async (base) => {
       const created = await json<PublicChapter>(await post(base, valid));
-      const text = 'x'.repeat(5 * 1024 * 1024 + 1);
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES + 1);
 
       assert.equal((await post(base, { ...valid, text })).status, 413);
       assert.equal((await patch(base, created.id, { text })).status, 413);

@@ -16,9 +16,9 @@ const noSniff: RequestHandler = (_req, res, next) => {
   next();
 };
 
-// A chapter text is up to CHAPTER_TEXT_MAX_LENGTH (1,000,000) characters, up to
-// 4 bytes each, plus the JSON envelope.
-const CHAPTER_JSON_LIMIT_BYTES = 5 * 1024 * 1024;
+// A chapter text is up to CHAPTER_TEXT_MAX_LENGTH characters, up to 4 bytes
+// each, plus the JSON envelope.
+export const CHAPTER_JSON_LIMIT_BYTES = 5 * 1024 * 1024;
 
 const notFound: RequestHandler = (req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
