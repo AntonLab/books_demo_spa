@@ -756,16 +756,21 @@ export function createSequelizeBookRepository(): BookRepository {
       });
     },
 
+    // Under a lock on the book row, which addCoAuthor and removeCoAuthor
+    // (coAuthors.ts) rely on.
     async addCoAuthor(bookId, userId, actor) {
-      const book = await Book.findByPk(bookId);
-      if (!book) return null;
+      return sequelizeOf(Book).transaction(async (transaction) => {
+        const book = await Book.findByPk(bookId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!book) return null;
 
-      await addCoAuthor(credits, sequelizeOf(Book), book, userId, actor);
-      return publicBook(book);
+        await addCoAuthor(credits, book, userId, actor, transaction);
+        return publicBook(book, transaction);
+      });
     },
 
-    // Under a lock on the book row, which removeCoAuthor (coAuthors.ts)
-    // relies on.
     async removeCoAuthor(bookId, userId, actor) {
       return sequelizeOf(Book).transaction(async (transaction) => {
         const book = await Book.findByPk(bookId, {

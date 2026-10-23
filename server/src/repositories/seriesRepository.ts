@@ -441,12 +441,19 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       });
     },
 
+    // Under a lock on the series row, which addCoAuthor and removeCoAuthor
+    // (coAuthors.ts) rely on.
     async addCoAuthor(seriesId, userId, actor) {
-      const series = await Series.findByPk(seriesId);
-      if (!series) return null;
+      return sequelizeOf(Series).transaction(async (transaction) => {
+        const series = await Series.findByPk(seriesId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!series) return null;
 
-      await addCoAuthor(credits, sequelizeOf(Series), series, userId, actor);
-      return publicSeriesRow(series);
+        await addCoAuthor(credits, series, userId, actor, transaction);
+        return publicSeriesRow(series, transaction);
+      });
     },
 
     async removeBook(seriesId, bookId) {
