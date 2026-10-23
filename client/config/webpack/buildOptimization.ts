@@ -18,8 +18,9 @@ export const buildOptimization = (): Configuration['optimization'] => ({
         // 'initial', not 'all': 'all' pulls every lazy page's libraries (antd
         // pickers, dnd-kit) into the first load.
         chunks: 'initial',
-        // Splits `vendors` into several vendors-<hash> chunks; antd and dnd-kit
-        // get no chunk of their own.
+        // Splits `vendors` into about twenty vendors-<hash> chunks (the count
+        // moves with maxSize and the lockfile); antd and dnd-kit get no chunk
+        // of their own.
         maxSize: 250_000,
       },
     },
