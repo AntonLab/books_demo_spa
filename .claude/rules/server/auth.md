@@ -1,6 +1,12 @@
 ---
 paths:
-  - 'server/src/middleware/**'
+  - 'server/src/middleware/csrfProtection*'
+  - 'server/src/middleware/errorHandler*'
+  - 'server/src/middleware/requireAuth*'
+  - 'server/src/middleware/requireModerator*'
+  - 'server/src/middleware/requirePermission*'
+  - 'server/src/middleware/sessionUser*'
+  - 'server/src/middleware/validate*'
   - 'server/src/controllers/authController.ts'
   - 'server/src/routes/authRoutes.ts'
   - 'server/src/repositories/sessionRepository.ts'
