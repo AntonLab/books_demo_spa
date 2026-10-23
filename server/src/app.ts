@@ -1,14 +1,11 @@
 import cookieParser from 'cookie-parser';
-import express, {
-  type Express,
-  type Request,
-  type RequestHandler,
-} from 'express';
+import express, { type Express, type RequestHandler } from 'express';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
 } from './middleware/csrfProtection.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
+import { isChapterTextWrite } from './routes/chapterRoutes.ts';
 import { createApiRouter, type RouteDeps } from './routes/index.ts';
 
 // Stops a browser second-guessing a response's Content-Type: sniffing a JSON
@@ -19,12 +16,6 @@ const noSniff: RequestHandler = (_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   next();
 };
-
-// The two chapter writes that carry text parse their own body in
-// chapterRoutes.ts, after requirePermission, with a larger limit.
-const isChapterTextWrite = (req: Request): boolean =>
-  (req.method === 'POST' && /^\/api\/chapters\/?$/.test(req.path)) ||
-  (req.method === 'PATCH' && /^\/api\/chapters\/[^/]+\/?$/.test(req.path));
 
 const notFound: RequestHandler = (req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });

@@ -299,6 +299,42 @@ test('POST and PATCH without a session answer 401 for a body over the 5 MiB limi
   );
 });
 
+test('a differently cased path is treated like /api/chapters: 401 without a session, not 413', async () => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
+    const response = await fetch(`${base}/API/Chapters`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...valid,
+        text: 'x'.repeat(200 * 1024),
+      }),
+    });
+
+    assert.equal(response.status, 401);
+  });
+});
+
+test('another chapter route keeps the 100 KB global body limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/chapters/1/illustration-order`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            cookie: ROLE_COOKIES.author,
+          },
+          body: JSON.stringify({ padding: 'x'.repeat(102_400) }),
+        }
+      );
+
+      assert.equal(response.status, 413);
+    }
+  );
+});
+
 test('PATCH rejects an empty body with 400', async () => {
   await withAuthenticatedApp(
     { chapterRepository: createFakeRepository() },
