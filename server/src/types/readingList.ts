@@ -6,6 +6,7 @@ import {
 import { z } from 'zod';
 import { pageShape } from './pagination.ts';
 import { idSchema } from './params.ts';
+import { exactlyOneSet } from './target.ts';
 import { workTagListSchema } from './work.ts';
 
 const titleSchema = z.string().trim().min(1).max(READING_LIST_TITLE_MAX_LENGTH);
@@ -37,7 +38,7 @@ const targetIdSchema = idSchema.nullable().default(null);
 
 export const addReadingListItemSchema = z
   .object({ bookId: targetIdSchema, seriesId: targetIdSchema })
-  .refine((value) => (value.bookId === null) !== (value.seriesId === null), {
+  .refine((value) => exactlyOneSet(value.bookId, value.seriesId), {
     message: 'Exactly one of bookId or seriesId must be set',
     path: ['bookId'],
   });

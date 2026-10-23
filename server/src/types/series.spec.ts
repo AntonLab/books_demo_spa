@@ -176,6 +176,13 @@ test('listSeriesQuerySchema takes published=true and refuses any other value', (
   }
 });
 
+test('listSeriesQuerySchema takes a q of 1 to 200 characters', () => {
+  const parse = (q: string) => listSeriesQuerySchema.safeParse({ q }).success;
+  assert.equal(parse('a'.repeat(200)), true);
+  assert.equal(parse('a'.repeat(201)), false);
+  assert.equal(parse(''), false);
+});
+
 test('listSeriesQuerySchema takes genreId as a filter', () => {
   assert.equal(listSeriesQuerySchema.parse({ genreId: '4' }).genreId, 4);
   assert.equal(listSeriesQuerySchema.parse({}).genreId, undefined);

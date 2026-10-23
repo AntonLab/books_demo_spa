@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
+import { exactlyOneSet } from './target.ts';
 
 // Nullable *and* defaulted to null, so an omitted key and an explicit null
 // reach the refine below as the same value — otherwise the XOR check would
@@ -8,17 +9,6 @@ import { idSchema } from './params.ts';
 // both short-circuit before the coercion runs, so neither null nor undefined
 // is coerced to 0 or NaN on the way through.
 const targetIdSchema = idSchema.nullable().default(null);
-
-// Exactly one target, never both and never neither. Enforced again as a
-// model-level validate in models/Like.ts, because a caller reaching Sequelize
-// directly never passes through this schema; migration 0003 adds the CHECK
-// behind it (see .claude/rules/server/sequelize.md).
-function exactlyOneTarget(value: {
-  bookId: number | null;
-  commentId: number | null;
-}): boolean {
-  return (value.bookId === null) !== (value.commentId === null);
-}
 
 // No userId. The liker comes from req.user.id, never from the body —
 // otherwise the self-like ban is defeated by naming someone else, and the
@@ -32,7 +22,7 @@ export const createLikeSchema = z
     // is not the schema's business.
     isLike: z.boolean(),
   })
-  .refine(exactlyOneTarget, {
+  .refine((value) => exactlyOneSet(value.bookId, value.commentId), {
     message: 'Exactly one of bookId or commentId must be set',
     path: ['bookId'],
   });
