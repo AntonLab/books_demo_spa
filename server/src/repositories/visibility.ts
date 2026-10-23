@@ -101,22 +101,26 @@ function bookIncludeWhere(where: WhereOptions): IncludeOptions {
   return { model: Book, as: 'book', attributes: [], required: true, where };
 }
 
-// The same rule turned inside out: the ids of the Draft books a viewer may not
-// read. For the reads that cannot join a single `book` — a like points at a
-// book or at a comment on one — excluding the few hidden drafts is simpler
-// than enumerating every readable book.
-export async function hiddenBookIds(viewer: Viewer): Promise<number[]> {
-  if (isModerator(viewer)) return [];
+// The same rule turned inside out: the Draft books a viewer may not read, as a
+// subquery on `books`, or null for a Moderator (nothing is hidden). For the
+// reads that cannot join a single `book` — a like points at a book or at a
+// comment on one — excluding the hidden drafts is simpler than enumerating
+// every readable book.
+//
+// A subquery rather than an id list, because the drafts grow with the
+// catalogue. The only values interpolated are the viewer's credited book ids,
+// integers read from the database through creditedBookIds.
+export async function hiddenBooksSubquery(
+  viewer: Viewer
+): Promise<ReturnType<typeof literal> | null> {
+  if (isModerator(viewer)) return null;
 
   const credited = await creditedBookIds(viewer);
-  const drafts = await Book.findAll({
-    where: {
-      status: 'draft',
-      ...(credited.length > 0 ? { id: { [Op.notIn]: credited } } : {}),
-    },
-    attributes: ['id'],
-  });
-  return drafts.map((book) => book.id);
+  const notCredited =
+    credited.length > 0 ? ` AND \`id\` NOT IN (${credited.join(',')})` : '';
+  return literal(
+    `(SELECT \`id\` FROM \`books\` WHERE \`status\` = 'draft'${notCredited})`
+  );
 }
 
 // Every series holding at least one Published book, for any viewer. A series

@@ -1,5 +1,6 @@
 import {
   ForeignKeyConstraintError,
+  literal,
   Op,
   UniqueConstraintError,
 } from 'sequelize';
@@ -21,7 +22,7 @@ import type {
 } from '../types/like.ts';
 import {
   assertDraftRefusal,
-  hiddenBookIds,
+  hiddenBooksSubquery,
   type Account,
   type Viewer,
 } from './visibility.ts';
@@ -147,28 +148,23 @@ function asConflict(error: unknown): never {
 // comments under one. NULL-safe on both columns: every like leaves one of them
 // empty, and `NOT IN` alone would drop those rows too.
 async function visibleLikeWhere(viewer: Viewer): Promise<WhereOptions> {
-  const hiddenBooks = await hiddenBookIds(viewer);
-  if (hiddenBooks.length === 0) return {};
+  const hiddenBooks = await hiddenBooksSubquery(viewer);
+  if (hiddenBooks === null) return {};
 
-  const hiddenComments = (
-    await Comment.findAll({
-      where: { bookId: hiddenBooks },
-      attributes: ['id'],
-    })
-  ).map((comment) => comment.id);
-
-  const clauses: WhereOptions[] = [
-    { [Op.or]: [{ bookId: null }, { bookId: { [Op.notIn]: hiddenBooks } }] },
-  ];
-  if (hiddenComments.length > 0) {
-    clauses.push({
-      [Op.or]: [
-        { commentId: null },
-        { commentId: { [Op.notIn]: hiddenComments } },
-      ],
-    });
-  }
-  return { [Op.and]: clauses };
+  const hiddenComments = literal(
+    `(SELECT \`id\` FROM \`${Comment.tableName}\` WHERE \`bookId\` IN ${String(hiddenBooks.val)})`
+  );
+  return {
+    [Op.and]: [
+      { [Op.or]: [{ bookId: null }, { bookId: { [Op.notIn]: hiddenBooks } }] },
+      {
+        [Op.or]: [
+          { commentId: null },
+          { commentId: { [Op.notIn]: hiddenComments } },
+        ],
+      },
+    ],
+  };
 }
 
 function buildWhere(query: ListLikesQuery): WhereOptions {
