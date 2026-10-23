@@ -5,7 +5,7 @@ import {
   PublicationTimeFields,
   type PublicationTimeValues,
 } from '@/components/molecules/PublicationTimeFields/PublicationTimeFields';
-import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
+import { CHAPTER_TEXT_MAX_LENGTH, CHAPTER_TITLE_MAX_LENGTH } from 'shared';
 import type { PublishedAtPayload } from 'shared';
 import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';
@@ -142,6 +142,10 @@ export const ChapterForm: FC<ChapterFormProps> = ({
               required: true,
               whitespace: true,
               message: 'Enter the chapter text',
+            },
+            {
+              max: CHAPTER_TEXT_MAX_LENGTH,
+              message: `Chapter text must be at most ${CHAPTER_TEXT_MAX_LENGTH} characters`,
             },
           ]}
         >

@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
+import { CHAPTER_TEXT_MAX_LENGTH } from 'shared';
 import { ChapterForm } from './ChapterForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
@@ -213,6 +214,67 @@ describe('ChapterForm', () => {
     expect(await screen.findByText('Enter a title')).toBeInTheDocument();
     expect(screen.getByText('Enter the chapter text')).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  describe('text length', () => {
+    const tooLong = `Chapter text must be at most ${CHAPTER_TEXT_MAX_LENGTH} characters`;
+
+    it('blocks text one character past the limit and keeps the whole value', async () => {
+      const onSubmit = jest.fn();
+      const text = 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH + 1);
+      renderWithProviders(
+        <ChapterForm
+          initialValues={{ title: 'Chapter One', text }}
+          onSubmit={onSubmit}
+        />
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+      expect(await screen.findByText(tooLong)).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+      expect(screen.getByLabelText('Text')).toHaveValue(text);
+    });
+
+    it('submits text of exactly the limit', async () => {
+      const onSubmit = jest.fn();
+      const text = 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH);
+      renderWithProviders(
+        <ChapterForm
+          initialValues={{ title: 'Chapter One', text }}
+          onSubmit={onSubmit}
+        />
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith({
+          title: 'Chapter One',
+          text,
+          publishedAt: 'now',
+        })
+      );
+      expect(screen.queryByText(tooLong)).not.toBeInTheDocument();
+    });
+
+    it('shows the required message, not the length one, for blank text', async () => {
+      const onSubmit = jest.fn();
+      renderWithProviders(
+        <ChapterForm
+          initialValues={{ title: 'Chapter One', text: '   ' }}
+          onSubmit={onSubmit}
+        />
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: 'Publish' }));
+
+      expect(
+        await screen.findByText('Enter the chapter text')
+      ).toBeInTheDocument();
+      expect(screen.queryByText(tooLong)).not.toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
   });
 
   it('shows a server error above the fields', () => {
