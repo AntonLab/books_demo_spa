@@ -1,6 +1,7 @@
 import {
   col,
   fn,
+  literal,
   Op,
   UniqueConstraintError,
   type InferAttributes,
@@ -350,12 +351,15 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
         attributes: ['status'],
       });
       if (!target || target.status === 'draft') return { items: [], total: 0 };
-      const holding = await ReadingListItemRow.findAll({
-        where: { bookId: query.bookId },
-        attributes: ['listId'],
-      });
       const { rows, count } = await ReadingList.findAndCountAll({
-        where: { id: holding.map((row) => row.listId) },
+        // bookId is a validated number, coerced so nothing else reaches the SQL
+        where: {
+          id: {
+            [Op.in]: literal(
+              `(SELECT listId FROM reading_list_items WHERE bookId = ${Number(query.bookId)})`
+            ),
+          },
+        },
         include: [withOwner],
         order: NEWEST_FIRST,
         limit: query.pageSize,
