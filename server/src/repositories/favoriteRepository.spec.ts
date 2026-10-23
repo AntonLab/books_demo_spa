@@ -17,10 +17,8 @@ import {
   createCreditedSeries,
 } from '../models/creditedBook.testkit.ts';
 import { NotFoundError } from '../types/errors.ts';
-import {
-  createSequelizeFavoriteRepository,
-  type Account,
-} from './favoriteRepository.ts';
+import { createSequelizeFavoriteRepository } from './favoriteRepository.ts';
+import type { Account } from './visibility.ts';
 import { favoriteRepositoryContract } from './favoriteRepository.contract.testkit.ts';
 
 const skip = await skipWithoutMysql();

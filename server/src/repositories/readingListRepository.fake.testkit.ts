@@ -16,10 +16,8 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
-import type {
-  Account,
-  ReadingListRepository,
-} from './readingListRepository.ts';
+import type { ReadingListRepository } from './readingListRepository.ts';
+import type { Account } from './visibility.ts';
 
 export interface FakeReadingListRepositoryOptions {
   // The accounts that exist, with their names and status (Active by default).

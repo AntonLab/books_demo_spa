@@ -7,7 +7,8 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
-import type { Account, ReportRepository } from './reportRepository.ts';
+import type { ReportRepository } from './reportRepository.ts';
+import type { Account } from './visibility.ts';
 
 // An id no row in either implementation has.
 export const MISSING_ID = 999_999;

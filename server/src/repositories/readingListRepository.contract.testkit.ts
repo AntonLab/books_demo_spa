@@ -2,10 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { UserRole } from 'shared';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
-import type {
-  Account,
-  ReadingListRepository,
-} from './readingListRepository.ts';
+import type { ReadingListRepository } from './readingListRepository.ts';
+import type { Account } from './visibility.ts';
 
 // An id no row in either implementation has.
 export const MISSING_ID = 999_999;

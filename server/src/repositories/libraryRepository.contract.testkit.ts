@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NotFoundError } from '../types/errors.ts';
-import type { Account, LibraryRepository } from './libraryRepository.ts';
+import type { LibraryRepository } from './libraryRepository.ts';
+import type { Account } from './visibility.ts';
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;

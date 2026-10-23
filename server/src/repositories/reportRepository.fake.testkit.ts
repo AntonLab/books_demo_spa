@@ -23,7 +23,8 @@ import type {
   ListReportsQuery,
   ReportRange,
 } from '../types/report.ts';
-import type { Account, ReportRepository } from './reportRepository.ts';
+import type { ReportRepository } from './reportRepository.ts';
+import type { Account } from './visibility.ts';
 
 export interface FakeAccount {
   login: string;

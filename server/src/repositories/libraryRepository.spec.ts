@@ -12,10 +12,8 @@ import { Book } from '../models/Book.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
-import {
-  createSequelizeLibraryRepository,
-  type Account,
-} from './libraryRepository.ts';
+import { createSequelizeLibraryRepository } from './libraryRepository.ts';
+import type { Account } from './visibility.ts';
 import { libraryRepositoryContract } from './libraryRepository.contract.testkit.ts';
 
 const skip = await skipWithoutMysql();
