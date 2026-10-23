@@ -8,6 +8,7 @@ coverage/
 
 # Secrets (.env.local holds the DB credentials)
 .env*
+!.env.example
 
 # Claude Code, per clone: restored skills (db-reset is checked in), agents,
 # worktrees, personal settings
@@ -18,10 +19,8 @@ coverage/
 /.claude/worktrees/
 /.claude/settings.local.json
 
-# Agent scratch (docs/agents/ and docs/adr/ are real docs)
-/docs/*
-!/docs/agents/
-!/docs/adr/
+# Agent scratch
+/docs/superpowers/
 /.superpowers/
 /.playwright-mcp/
 /.fallow/
