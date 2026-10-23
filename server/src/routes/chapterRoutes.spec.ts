@@ -270,6 +270,22 @@ test('POST and PATCH answer 413 for a body over the 5 MiB chapter limit', async 
   );
 });
 
+// A text over CHAPTER_TEXT_MAX_LENGTH answers 400 from the text-length rule,
+// which only runs once the parser has accepted the body: a 400, not a 413, is
+// what proves the 5 MiB limit holds just under its edge.
+test('POST and PATCH accept a body just under the 5 MiB chapter limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES - 1024);
+
+      assert.equal((await post(base, { ...valid, text })).status, 400);
+      assert.equal((await patch(base, created.id, { text })).status, 400);
+    }
+  );
+});
+
 test('PATCH rejects an empty body with 400', async () => {
   await withAuthenticatedApp(
     { chapterRepository: createFakeRepository() },
