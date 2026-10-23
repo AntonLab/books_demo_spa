@@ -28,6 +28,9 @@ the gates", "every result arrives twice".
   three such items could not run as written (`removeQueries` refetched a
   mounted observer; TanStack Query 5.104.1 has no `refetchPage`; the hook had
   one flag).
+- **A count in a brief** ("a like has two keys", "N handlers", "three
+  callers") gets the same: read the code or `git grep -c` and quote the
+  output. In the queue-b follow-ups a wrong key count cost a review round.
 - **Before `gh issue create` from a retro, audit or summary:** check each factual
   line against the primary source: the transcript (`npm run tokens -- <id>`
   tallies one session; `Grep` the `.jsonl` for the event), the skill text, the
