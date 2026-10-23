@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { useState } from 'react';
 import { Alert, Button, Form, Input, Result } from 'antd';
+import { EMAIL_MAX_LENGTH } from 'shared';
 import { useRequestReset } from '@/queries/auth';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import type { AuthModalProps } from '@/components/organisms/AuthModals/AuthModals';
@@ -68,7 +69,10 @@ export const ResetRequestModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
               rules={[
                 { required: true, message: 'Enter an email address' },
                 { type: 'email', message: 'Enter a valid email address' },
-                { max: 255, message: 'Email must be at most 255 characters' },
+                {
+                  max: EMAIL_MAX_LENGTH,
+                  message: `Email must be at most ${EMAIL_MAX_LENGTH} characters`,
+                },
               ]}
             >
               <Input autoComplete="email" />
