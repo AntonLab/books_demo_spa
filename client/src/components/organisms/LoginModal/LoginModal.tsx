@@ -13,7 +13,6 @@ interface LoginValues {
 export const LoginModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
   const [form] = Form.useForm<LoginValues>();
   const login = useLogin();
-  // `submitting` is gone — the mutation tracks it.
   const [formError, setFormError] = useState<string | null>(null);
 
   const handleFinish = async (values: LoginValues) => {

@@ -8,6 +8,8 @@ export const buildOptimization = (): Configuration['optimization'] => ({
   // Keeps the webpack runtime out of the entry chunk so vendor hashes stay
   // stable across app-only changes.
   runtimeChunk: 'single',
+  // No `performance` key on purpose: webpack's "entrypoint size limit ... main
+  // (1010 KiB)" warning stays as the bundle-size signal.
   splitChunks: {
     cacheGroups: {
       vendors: {
@@ -16,7 +18,9 @@ export const buildOptimization = (): Configuration['optimization'] => ({
         // 'initial', not 'all': 'all' pulls every lazy page's libraries (antd
         // pickers, dnd-kit) into the first load.
         chunks: 'initial',
-        maxSize: 250_000, // 250kb; split out large libraries (antd, dnd-kit) into their own chunks
+        // Cuts the vendors group by size into several vendors-<hash> pieces; it
+        // does not give antd or dnd-kit their own chunks.
+        maxSize: 250_000,
       },
     },
   },
