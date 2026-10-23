@@ -107,23 +107,25 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 
 ## Rate limiting (`middleware/authRateLimit.ts`)
 
-Sign-in, registration, password and upload budgets. In memory, fixed window.
-Login, register and reset mount before `validate` so a refusal costs no parse,
-lookup or argon2. Upload PUTs mount after `requirePermission` and `validate`,
-before `express.raw`, so a refused body is never read. A request with no user
-passes the limiter; the route refuses it. A limited Account is not Blocked.
+Sign-in, registration, password, upload and write budgets. In memory, fixed
+window. Login, register and reset mount before `validate`, and so do comment,
+like, report and chapter writes (after the permission check, before
+`chapterJson`), so a refusal costs no parse, lookup or argon2. Upload PUTs mount
+after `validate`, before `express.raw`, so a refused body is never read. A
+request with no user passes the limiter; the route refuses it. A limited
+Account is not Blocked.
 
-| Route                                       | Key        | Limit         | Counts                                                               |
-| ------------------------------------------- | ---------- | ------------- | -------------------------------------------------------------------- |
-| `POST /api/auth/login`                      | IP + login | 10 per 15 min | failed or aborted attempts                                           |
-| `POST /api/auth/login`                      | IP         | 50 per 15 min | failed or aborted attempts                                           |
-| `POST /api/auth/register`                   | IP         | 5 per hour    | every request                                                        |
-| `POST /api/auth/password-reset/request`     | IP         | 5 per hour    | every request                                                        |
-| `PATCH /api/users/:id`                      | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it |
-| `PUT` book cover, series cover, user avatar | user id    | 20 per 15 min | every request that passes the permission check and `validate`        |
+| Route                                                  | Key        | Limit         | Counts                                                                  |
+| ------------------------------------------------------ | ---------- | ------------- | ----------------------------------------------------------------------- |
+| `POST /api/auth/login`                                 | IP + login | 10 per 15 min | failed or aborted attempts                                              |
+| `POST /api/auth/login`                                 | IP         | 50 per 15 min | failed or aborted attempts                                              |
+| `POST /api/auth/register`                              | IP         | 5 per hour    | every request                                                           |
+| `POST /api/auth/password-reset/request`                | IP         | 5 per hour    | every request                                                           |
+| `PATCH /api/users/:id`                                 | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it    |
+| `PUT` book cover, series cover, user avatar            | user id    | 20 per 15 min | every request that passes the permission check and `validate`           |
+| `POST/PATCH/DELETE` comments, likes, reports, chapters | user id    | 60 per 15 min | every request that passes the permission check; `validate` not required |
 
-- **Uploads count before `express.raw`**, so the 429 goes out before the body is
-  read, and a malformed image spends budget. The DELETE routes are unlimited.
+- A malformed image spends upload budget; the upload DELETE routes are free.
 - **Login claims both budgets on arrival** (`hit`), or parallel attempts would
   all read the same unspent count while argon2 runs. A refusal releases
   **both** claims, or refused attempts would keep extending their own lockout.
@@ -135,16 +137,14 @@ passes the limiter; the route refuses it. A limited Account is not Blocked.
 - **`currentPassword` is charged on arrival**, before argon2, in
   `userController.assertCurrentPassword`, for the same parallel-guess reason.
   Over budget is 429 even with the right password. A missing `currentPassword`
-  stays 400 and uncharged, as does a change that needs none (a name, or an
-  admin acting on another row).
-- The login half of the key is trimmed, lower-cased and SHA-256 hashed, so case
-  or whitespace buys no fresh budget, and an unbounded `login` (this runs
-  before `validate`) cannot leave an unbounded key in memory.
+  stays 400 and uncharged, as does a change needing none.
+- The login key half is trimmed, lower-cased and SHA-256 hashed: case or
+  whitespace buys no fresh budget, and an unbounded `login` (read before
+  `validate`) leaves no unbounded key in memory.
 - Refusal is 429 with `Retry-After` in whole seconds and "Try again in N
-  minutes." (singular at 1).
-- Keyed on `req.ip`, so `TRUST_PROXY` matters behind a proxy. Production must set
-  it (0 is valid); boot fails otherwise. Each process keeps its own counts, and a
-  restart forgets them.
-- Test harnesses pass `unlimitedAuthRateLimits()`; only
-  `authRateLimit.spec.ts`, `uploadRateLimit.spec.ts` and the rate-limit cases
-  in `authRoutes.spec.ts` use the real set.
+  minutes." (singular at 1). IP budgets key on `req.ip`, so `TRUST_PROXY`
+  matters behind a proxy: production must set it (0 is valid) or boot fails.
+  Counts are per process and lost on restart.
+- Harnesses pass `unlimitedAuthRateLimits()`; the real set is used only by
+  `authRateLimit`, `uploadRateLimit` and `writeRateLimit` specs and
+  `authRoutes.spec.ts`'s rate-limit cases.

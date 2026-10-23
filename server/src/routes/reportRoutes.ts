@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createReportController } from '../controllers/reportController.ts';
+import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequireModerator } from '../middleware/requireModerator.ts';
 import { validate } from '../middleware/validate.ts';
@@ -21,6 +22,7 @@ export function createCommentReportRoutes(deps: RouteDeps): Router {
   router.post(
     '/:id/report',
     requireAuth,
+    limitEveryRequestByUser(deps.authRateLimits.write),
     validate({ params: idParamSchema, body: createReportSchema }),
     controller.create
   );
@@ -31,6 +33,7 @@ export function createCommentReportRoutes(deps: RouteDeps): Router {
 export function createReportRoutes(deps: RouteDeps): Router {
   const controller = createReportController(deps.reportRepository);
   const guard = [createRequireAuth(deps), createRequireModerator()];
+  const limitWrites = limitEveryRequestByUser(deps.authRateLimits.write);
   const router = Router();
 
   router.get(
@@ -49,6 +52,7 @@ export function createReportRoutes(deps: RouteDeps): Router {
     router.post(
       `/:commentId/${action}`,
       ...guard,
+      limitWrites,
       validate({ params: commentIdParamSchema }),
       controller[action]
     );
