@@ -1,10 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NotFoundError } from '../types/errors.ts';
+import type { UserRole } from 'shared';
 import type { CommentRepository } from './commentRepository.ts';
+import type { Account } from './visibility.ts';
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;
+export const as = (id: number, role: UserRole = 'user'): Account => ({
+  id,
+  role,
+});
 
 // What a contract case needs besides the repository: the rows it assumes exist
 // before it starts. The real side writes them through the models on MySQL,
@@ -35,11 +41,11 @@ export function commentRepositoryContract(
 
     const created = await repository.create(
       { bookId, parentId: null, text: 'First' },
-      actorId
+      as(actorId)
     );
     const reply = await repository.create(
       { bookId, parentId: created.id, text: 'Second' },
-      actorId
+      as(actorId)
     );
 
     assert.equal(created.userId, actorId);
@@ -61,16 +67,19 @@ export function commentRepositoryContract(
     await assert.rejects(
       repository.create(
         { bookId: MISSING_ID, parentId: null, text: 'x' },
-        actorId
+        as(actorId)
       ),
       new NotFoundError('Book', MISSING_ID)
     );
     await assert.rejects(
-      repository.create({ bookId, parentId: MISSING_ID, text: 'x' }, actorId),
+      repository.create(
+        { bookId, parentId: MISSING_ID, text: 'x' },
+        as(actorId)
+      ),
       new NotFoundError('Comment', MISSING_ID)
     );
     await assert.rejects(
-      repository.create({ bookId, parentId: null, text: 'x' }, MISSING_ID),
+      repository.create({ bookId, parentId: null, text: 'x' }, as(MISSING_ID)),
       new NotFoundError('User', MISSING_ID)
     );
   });
@@ -82,13 +91,13 @@ export function commentRepositoryContract(
     const otherBookId = await aBook();
     const parent = await repository.create(
       { bookId: otherBookId, parentId: null, text: 'Elsewhere' },
-      actorId
+      as(actorId)
     );
 
     await assert.rejects(
       repository.create(
         { bookId, parentId: parent.id, text: 'Orphan' },
-        actorId
+        as(actorId)
       ),
       new NotFoundError('Comment', parent.id)
     );
@@ -118,15 +127,15 @@ export function commentRepositoryContract(
     const otherBookId = await aBook();
     const one = await repository.create(
       { bookId, parentId: null, text: 'One' },
-      firstId
+      as(firstId)
     );
     const two = await repository.create(
       { bookId, parentId: one.id, text: 'Two' },
-      secondId
+      as(secondId)
     );
     await repository.create(
       { bookId: otherBookId, parentId: null, text: 'Elsewhere' },
-      firstId
+      as(firstId)
     );
 
     const page = await repository.list({ limit: 20, offset: 0, bookId }, null);
@@ -145,7 +154,10 @@ export function commentRepositoryContract(
     const { repository, anAccount, aBook } = await setUp();
     const actorId = await anAccount();
     const bookId = await aBook();
-    await repository.create({ bookId, parentId: null, text: 'Plain' }, actorId);
+    await repository.create(
+      { bookId, parentId: null, text: 'Plain' },
+      as(actorId)
+    );
     const query = { limit: 20, offset: 0, bookId };
 
     for (const viewer of [null, { id: actorId, role: 'user' as const }]) {
@@ -160,7 +172,7 @@ export function commentRepositoryContract(
     const actorId = await anAccount();
     const created = await repository.create(
       { bookId: await aBook(), parentId: null, text: 'Before' },
-      actorId
+      as(actorId)
     );
 
     const updated = await repository.update(created.id, { text: 'After' });
@@ -178,7 +190,7 @@ export function commentRepositoryContract(
     for (const kind of ['deleted', 'removed'] as const) {
       const created = await repository.create(
         { bookId, parentId: null, text: kind },
-        actorId
+        as(actorId)
       );
 
       assert.equal(await repository.remove(created.id, kind, actorId), true);
@@ -194,7 +206,7 @@ export function commentRepositoryContract(
     const actorId = await anAccount();
     const created = await repository.create(
       { bookId: await aBook(), parentId: null, text: 'Moderated' },
-      actorId
+      as(actorId)
     );
     await repository.remove(created.id, 'removed', actorId);
 

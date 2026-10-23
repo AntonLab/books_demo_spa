@@ -1,18 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { UserRole } from 'shared';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
-import type {
-  Account,
-  ReadingListRepository,
-} from './readingListRepository.ts';
+import { as } from './commentRepository.contract.testkit.ts';
+import type { ReadingListRepository } from './readingListRepository.ts';
+
+export { as };
 
 // An id no row in either implementation has.
 export const MISSING_ID = 999_999;
-
-export function as(id: number, role: UserRole = 'user'): Account {
-  return { id, role };
-}
 
 // What a contract case needs besides the repository: the rows it assumes
 // exist. The real side writes them on MySQL, the fake side into its maps.

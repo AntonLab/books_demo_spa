@@ -74,7 +74,8 @@ const valid = {
 
 // The matrix grants `users × create` to superadmin alone — this is the
 // administrative create, not registration — so the structural tests below
-// (validation, conflicts, paging) act as that persona by default.
+// create as that persona by default. Their reads (list, GET by id) use the
+// admin cookie: a plain user has no `users × read`.
 const post = (
   base: string,
   body: unknown,
@@ -203,7 +204,7 @@ test('GET list returns items with the paging envelope', async () => {
     async (base) => {
       await post(base, valid);
       const response = await fetch(`${base}/api/users`, {
-        headers: { cookie: AUTH_COOKIE },
+        headers: { cookie: ROLE_COOKIES.admin },
       });
       const body = await json<{
         total: number;
@@ -226,7 +227,7 @@ test('GET by id returns 404 for a missing record', async () => {
     { userRepository: createFakeRepository() },
     async (base) => {
       const response = await fetch(`${base}/api/users/999`, {
-        headers: { cookie: AUTH_COOKIE },
+        headers: { cookie: ROLE_COOKIES.admin },
       });
 
       assert.equal(response.status, 404);
@@ -239,7 +240,7 @@ test('GET by id rejects a non-numeric id with 400', async () => {
     { userRepository: createFakeRepository() },
     async (base) => {
       const response = await fetch(`${base}/api/users/abc`, {
-        headers: { cookie: AUTH_COOKIE },
+        headers: { cookie: ROLE_COOKIES.admin },
       });
 
       assert.equal(response.status, 400);
@@ -476,6 +477,34 @@ test('GET /api/users/:id requires a session for the same reason', async () => {
   await withApp({ userRepository: createFakeRepository() }, async (base) => {
     assert.equal((await fetch(`${base}/api/users/1`)).status, 401);
   });
+});
+
+test('a user and an author may not read the user directory', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      for (const role of ['user', 'author'] as const) {
+        for (const path of ['/api/users', '/api/users/1']) {
+          const response = await fetch(`${base}${path}`, {
+            headers: { cookie: ROLE_COOKIES[role] },
+          });
+          assert.equal(response.status, 403, `${path} ${role}`);
+        }
+      }
+    }
+  );
+});
+
+test('an admin may read the user directory', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeRepository(seedPersonaRows()) },
+    async (base) => {
+      const response = await fetch(`${base}/api/users`, {
+        headers: { cookie: ROLE_COOKIES.admin },
+      });
+      assert.equal(response.status, 200);
+    }
+  );
 });
 
 test('a user may edit their own row and not another', async () => {
@@ -939,7 +968,7 @@ test('the 6th wrong currentPassword is refused with 429 and Retry-After, even wi
 
     const stored = await json<PublicUser>(
       await fetch(`${base}/api/users/${USER_IDS.user}`, {
-        headers: { cookie: as },
+        headers: { cookie: ROLE_COOKIES.admin },
       })
     );
     assert.equal(stored.email, `persona-${USER_IDS.user}@example.com`);

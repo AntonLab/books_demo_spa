@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createCommentController } from '../controllers/commentController.ts';
+import { limitUserWrites } from '../middleware/authRateLimit.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -13,6 +14,7 @@ import type { RouteDeps } from './index.ts';
 export function createCommentRoutes(deps: RouteDeps): Router {
   const controller = createCommentController(deps.commentRepository);
   const requirePermission = createRequirePermission(deps);
+  const limitWrites = limitUserWrites(deps);
   const router = Router();
 
   // Every route runs through the matrix, reads included: every role has
@@ -40,18 +42,21 @@ export function createCommentRoutes(deps: RouteDeps): Router {
     '/',
     requirePermission('comments', 'create'),
     validate({ body: createCommentSchema }),
+    limitWrites,
     controller.create
   );
   router.patch(
     '/:id',
     requirePermission('comments', 'update'),
     validate({ params: idParamSchema, body: updateCommentSchema }),
+    limitWrites,
     controller.update
   );
   router.delete(
     '/:id',
     requirePermission('comments', 'delete'),
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.remove
   );
 
@@ -62,6 +67,7 @@ export function createCommentRoutes(deps: RouteDeps): Router {
     '/:id/restore',
     requirePermission('comments', 'delete'),
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.restore
   );
 

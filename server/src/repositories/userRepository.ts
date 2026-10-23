@@ -42,9 +42,7 @@ import type {
 export type UserListResult = Pick<ListResponse<PublicUser>, 'items' | 'total'>;
 
 export interface UserRepository {
-  // The role is a separate argument rather than part of CreateUserInput, so
-  // the type itself says it is not caller-supplied body data — the same shape
-  // as `actorId` on the comment and like repositories.
+  // Separate from input: the type shows the role is not caller data.
   create(input: CreateUserInput, role?: UserRole): Promise<PublicUser>;
   list(query: ListUsersQuery): Promise<UserListResult>;
   // The accounts that can be made a Co-author — Role `author`, not blocked —

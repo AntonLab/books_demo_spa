@@ -32,11 +32,7 @@ import type {
   ReportRange,
 } from '../types/report.ts';
 import { joined } from './joined.ts';
-import type { Viewer } from './visibility.ts';
-
-// The signed-in account behind a Report. Never a Guest: every route that
-// reaches this repository is guarded.
-export type Account = NonNullable<Viewer>;
+import type { Account } from './visibility.ts';
 
 export interface ReportRepository {
   // Errors in this order: NotFoundError('Comment', id); ForbiddenError for the

@@ -12,6 +12,7 @@ import type {
   SessionRepository,
 } from '../repositories/sessionRepository.ts';
 import type { UserRepository } from '../repositories/userRepository.ts';
+import { hashToken } from '../tokens.ts';
 import { ForbiddenError, UnauthorizedError } from '../types/errors.ts';
 import type { PublicUser, UserStatus } from 'shared';
 
@@ -162,6 +163,7 @@ function accountDeps() {
     status: 'active',
   };
   const opened: string[] = [];
+  const replaced: (string | null)[] = [];
   const touched: number[] = [];
 
   const publicUser = (): PublicUser => ({
@@ -204,8 +206,10 @@ function accountDeps() {
       userId: number,
       tokenHash: string,
       _expiresAt: Date,
-      verifiedPasswordHash: string
+      verifiedPasswordHash: string,
+      replacedTokenHash: string | null
     ): Promise<SessionOpening> {
+      replaced.push(replacedTokenHash);
       if (userId !== account.id || account.password !== verifiedPasswordHash) {
         return 'credential-changed';
       }
@@ -215,7 +219,14 @@ function accountDeps() {
     },
   } as unknown as SessionRepository;
 
-  return { account, opened, touched, userRepository, sessionRepository };
+  return {
+    account,
+    opened,
+    replaced,
+    touched,
+    userRepository,
+    sessionRepository,
+  };
 }
 
 function recordingResponse() {
@@ -259,6 +270,24 @@ test('a login whose account is unchanged since the verify opens its session', as
   assert.deepEqual(deps.touched, [7]);
   // The session and the XSRF token derived from it are handed out together.
   assert.deepEqual(cookies, ['sid', 'xsrfToken']);
+});
+
+test('login hands the hash of the presented sid cookie to the session repository, null without one', async () => {
+  const withCookie = accountDeps();
+  const request = loginRequest('Racer', 'whatever12345');
+  request.cookies = { sid: 'previous-token' };
+  await loginController(withCookie, async () => true).login(
+    request,
+    recordingResponse().response
+  );
+  assert.deepEqual(withCookie.replaced, [hashToken('previous-token')]);
+
+  const without = accountDeps();
+  await loginController(without, async () => true).login(
+    loginRequest('Racer', 'whatever12345'),
+    recordingResponse().response
+  );
+  assert.deepEqual(without.replaced, [null]);
 });
 
 test('a password change that lands during the verify leaves the login without a session', async () => {

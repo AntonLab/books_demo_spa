@@ -19,7 +19,12 @@ import type {
   ListLikesQuery,
   UpdateLikeInput,
 } from '../types/like.ts';
-import { hiddenBookIds, type Viewer } from './visibility.ts';
+import {
+  assertDraftRefusal,
+  hiddenBookIds,
+  type Account,
+  type Viewer,
+} from './visibility.ts';
 
 // Not to be confused with likePattern.ts next door, which is about the SQL
 // LIKE operator and has nothing to do with this resource.
@@ -27,9 +32,8 @@ import { hiddenBookIds, type Viewer } from './visibility.ts';
 export type LikeListResult = Pick<ListResponse<PublicLike>, 'items' | 'total'>;
 
 export interface LikeRepository {
-  // actorId is separate from the input rather than folded into it, so the type
-  // itself says the liker is not caller-supplied data. See types/like.ts.
-  create(input: CreateLikeInput, actorId: number): Promise<PublicLike>;
+  // Separate from input: the type shows the liker is not caller data.
+  create(input: CreateLikeInput, actor: Account): Promise<PublicLike>;
   // Both leave out the likes on a Draft book the viewer may not read, and on
   // the comments under one.
   list(query: ListLikesQuery, viewer: Viewer): Promise<LikeListResult>;
@@ -75,23 +79,29 @@ function asMissingReference(
 // never changes, and a book's credits changing mid-request is covered below.
 async function assertLikeable(
   input: CreateLikeInput,
-  actorId: number
+  actor: Account
 ): Promise<void> {
   if (input.bookId !== null) {
     const book = await Book.findByPk(input.bookId, {
       attributes: ['id', 'status'],
     });
     if (!book) throw new NotFoundError('Book', input.bookId);
-    // Nobody likes a Draft book, its Co-authors and Moderators included.
+    // Nobody likes a Draft book. Whoever may not read it is told it is not
+    // there; its Co-authors and Moderators, who can, get the 403.
     if (book.status === 'draft') {
-      throw new ForbiddenError('You cannot like a draft book');
+      await assertDraftRefusal(
+        input.bookId,
+        actor,
+        new NotFoundError('Book', input.bookId),
+        'You cannot like a draft book'
+      );
     }
     // Every Co-author counts as the book's own, not just whoever created it.
     // Unlike a comment's owner, credits do change — but a co-author added
     // between this check and the insert could at worst leave one like that
     // predates their credit, which is no worse than liking before being added.
     const credited = await BookAuthor.count({
-      where: { bookId: input.bookId, userId: actorId },
+      where: { bookId: input.bookId, userId: actor.id },
     });
     if (credited > 0) {
       throw new ForbiddenError('You cannot like your own book');
@@ -101,20 +111,26 @@ async function assertLikeable(
 
   if (input.commentId !== null) {
     const comment = await Comment.findByPk(input.commentId, {
-      attributes: ['userId', 'tombstone'],
+      attributes: ['userId', 'bookId', 'tombstone'],
       include: [{ model: Book, as: 'book', attributes: ['status'] }],
     });
     if (!comment) throw new NotFoundError('Comment', input.commentId);
-    // A comment on a Draft book is not out either.
+    // A comment on a Draft book is not out either, with the same split: a 404
+    // for whoever may not read the book, so the caller learns nothing about it.
     if (comment.book?.status === 'draft') {
-      throw new ForbiddenError('You cannot like a comment on a draft book');
+      await assertDraftRefusal(
+        comment.bookId,
+        actor,
+        new NotFoundError('Comment', input.commentId),
+        'You cannot like a comment on a draft book'
+      );
     }
     // A tombstone takes no new reactions: a like there would be a vote on a
     // comment nobody can see.
     if (comment.tombstone !== null) {
       throw new ForbiddenError('You cannot like a deleted comment');
     }
-    if (comment.userId === actorId) {
+    if (comment.userId === actor.id) {
       throw new ForbiddenError('You cannot like your own comment');
     }
   }
@@ -181,18 +197,18 @@ function buildWhere(query: ListLikesQuery): WhereOptions {
 
 export function createSequelizeLikeRepository(): LikeRepository {
   return {
-    async create(input, actorId) {
-      await assertLikeable(input, actorId);
+    async create(input, actor) {
+      await assertLikeable(input, actor);
 
       try {
-        const like = await Like.create({ ...input, userId: actorId });
+        const like = await Like.create({ ...input, userId: actor.id });
         return toPublicLike(like);
       } catch (error) {
         // A unique violation and a missing reference are different answers —
         // 409 for "you already voted", 404 for "that book is not there" — so
         // the two are mapped separately rather than through one catch-all.
         if (error instanceof UniqueConstraintError) asConflict(error);
-        asMissingReference(error, input, actorId);
+        asMissingReference(error, input, actor.id);
       }
     },
 

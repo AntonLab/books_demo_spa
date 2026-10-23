@@ -1,10 +1,17 @@
 import type { RequestHandler } from 'express';
 import type { ItemsResponse, PublicIllustration } from 'shared';
 import { validatedBody, validatedParams } from '../middleware/validate.ts';
-import type { IllustrationRepository } from '../repositories/illustrationRepository.ts';
+import {
+  ILLUSTRATION_CAP_MESSAGE,
+  type IllustrationRepository,
+} from '../repositories/illustrationRepository.ts';
 import { viewerOf } from '../repositories/visibility.ts';
 import { processIllustrationImage } from '../images.ts';
-import { NotFoundError, UnsupportedMediaTypeError } from '../types/errors.ts';
+import {
+  NotFoundError,
+  StateConflictError,
+  UnsupportedMediaTypeError,
+} from '../types/errors.ts';
 import type {
   ReorderIllustrationsInput,
   UpdateIllustrationInput,
@@ -40,11 +47,15 @@ export function createIllustrationController(
       res.json({ items } satisfies ItemsResponse<PublicIllustration>);
     },
 
-    // The Co-author check runs before decoding: a refused upload is never decoded.
+    // The Co-author and cap checks run before decoding: a refused upload is
+    // never decoded. create() rechecks the cap under the chapter lock.
     upload: async (req, res) => {
       const { id } = validatedParams<{ id: number }>(req);
       await assertMayChange(req, chapterTarget(id), MAY_CHANGE_CHAPTERS);
       if (!Buffer.isBuffer(req.body)) throw new UnsupportedMediaTypeError();
+      if (await repository.isFull(id)) {
+        throw new StateConflictError(ILLUSTRATION_CAP_MESSAGE);
+      }
 
       const processed = await processIllustrationImage(req.body);
       res.status(201).json(await repository.create(id, processed));

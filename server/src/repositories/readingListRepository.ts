@@ -42,11 +42,7 @@ import type {
 import { publicBooksOf } from './bookRepository.ts';
 import { joined } from './joined.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
-import { visibleSeriesWhere, type Viewer } from './visibility.ts';
-
-// The signed-in account a Reading list belongs to. Never a Guest: every route
-// that reaches this repository is guarded.
-export type Account = NonNullable<Viewer>;
+import { visibleSeriesWhere, type Account } from './visibility.ts';
 
 // Every method that takes an `account` answers NotFoundError('ReadingList', id)
 // for a missing list first, then ForbiddenError when the account is not the

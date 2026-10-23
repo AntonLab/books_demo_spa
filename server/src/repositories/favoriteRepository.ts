@@ -23,12 +23,8 @@ import { publicSeriesOf } from './seriesRepository.ts';
 import {
   readableBookWhere,
   visibleSeriesWhere,
-  type Viewer,
+  type Account,
 } from './visibility.ts';
-
-// The signed-in account a Favorite belongs to. Never a Guest: every route
-// that reaches this repository is guarded.
-export type Account = NonNullable<Viewer>;
 
 type FavoriteBookListResult = Pick<
   ListResponse<FavoriteBook>,
@@ -40,9 +36,8 @@ type FavoriteSeriesListResult = Pick<
 >;
 
 export interface FavoriteRepository {
-  // The account is separate from the input, so the type says the holder is
-  // not caller-supplied data. A work the account may not see is the same
-  // NotFoundError as a missing one.
+  // Separate from input: the type shows the holder is not caller data.
+  // A work the account may not see is the same NotFoundError as a missing one.
   create(input: CreateFavoriteInput, account: Account): Promise<PublicFavorite>;
   // Scoped to the holder: another account's id answers false, exactly like a
   // missing one, so a refusal never reveals the id exists.

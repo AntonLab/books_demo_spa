@@ -23,6 +23,9 @@ export const AUTH_RATE_LIMITS = {
   // Upload PUTs (avatar, book cover, series cover) share one budget per user
   // id. It guards the image decode.
   upload: { limit: 20, windowMs: FIFTEEN_MINUTES_MS },
+  // Every comment, like, report and chapter write per user id; stops a
+  // signed-in account flooding the database.
+  write: { limit: 60, windowMs: FIFTEEN_MINUTES_MS },
 } as const;
 
 export interface AuthRateLimits {
@@ -32,6 +35,7 @@ export interface AuthRateLimits {
   readonly resetRequest: RateLimiter;
   readonly currentPassword: RateLimiter;
   readonly upload: RateLimiter;
+  readonly write: RateLimiter;
   // Stops every limiter's sweep; the graceful shutdown calls it.
   stop(): void;
 }
@@ -44,6 +48,7 @@ export function createAuthRateLimits(): AuthRateLimits {
     resetRequest: createRateLimiter(AUTH_RATE_LIMITS.resetRequest),
     currentPassword: createRateLimiter(AUTH_RATE_LIMITS.currentPassword),
     upload: createRateLimiter(AUTH_RATE_LIMITS.upload),
+    write: createRateLimiter(AUTH_RATE_LIMITS.write),
   };
 
   return {
@@ -123,6 +128,11 @@ export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
     count(req, res, next);
   };
 }
+
+// The shared per-user budget of the comment, like, report and chapter writes.
+export const limitUserWrites = (deps: {
+  authRateLimits: AuthRateLimits;
+}): RequestHandler => limitEveryRequestByUser(deps.authRateLimits.write);
 
 // Login: only a failure counts (a 401, or an abort: the connection closing
 // before any answer goes out). Both budgets are charged the moment the request

@@ -25,7 +25,12 @@ import type {
   ListCommentsQuery,
   UpdateCommentInput,
 } from '../types/comment.ts';
-import { readableBookInclude, type Viewer } from './visibility.ts';
+import {
+  assertDraftRefusal,
+  readableBookInclude,
+  type Account,
+  type Viewer,
+} from './visibility.ts';
 
 export type CommentListResult = Pick<
   ListResponse<CommentWithAuthor>,
@@ -33,9 +38,8 @@ export type CommentListResult = Pick<
 >;
 
 export interface CommentRepository {
-  // actorId is separate from the input rather than folded into it, so the type
-  // itself says the author is not caller-supplied data. See types/comment.ts.
-  create(input: CreateCommentInput, actorId: number): Promise<PublicComment>;
+  // Separate from input: the type shows the author is not caller data.
+  create(input: CreateCommentInput, actor: Account): Promise<PublicComment>;
   // Both leave out the comments on a Draft book the viewer may not read, and
   // the viewer is also who viewerLikeId is reported for.
   list(query: ListCommentsQuery, viewer: Viewer): Promise<CommentListResult>;
@@ -95,14 +99,21 @@ function buildWhere(query: ListCommentsQuery): WhereOptions {
 
 export function createSequelizeCommentRepository(): CommentRepository {
   return {
-    async create(input, actorId) {
+    async create(input, actor) {
       // Nobody comments on a Draft book, its Co-authors included: it is not
-      // out yet. A missing book falls through to the foreign key.
+      // out yet. The 403 is for a reader of the draft; everyone else gets the
+      // 404 a missing book gets, so a draft's existence stays hidden. A
+      // missing book falls through to the foreign key.
       const book = await Book.findByPk(input.bookId, {
         attributes: ['status'],
       });
       if (book?.status === 'draft') {
-        throw new ForbiddenError('You cannot comment on a draft book');
+        await assertDraftRefusal(
+          input.bookId,
+          actor,
+          new NotFoundError('Book', input.bookId),
+          'You cannot comment on a draft book'
+        );
       }
 
       // A reply needs a live parent. Checked before the insert because the
@@ -125,10 +136,10 @@ export function createSequelizeCommentRepository(): CommentRepository {
 
       try {
         // userId comes from the caller's session, never from the body.
-        const comment = await Comment.create({ ...input, userId: actorId });
+        const comment = await Comment.create({ ...input, userId: actor.id });
         return toPublicComment(comment);
       } catch (error) {
-        asMissingReference(error, input, actorId);
+        asMissingReference(error, input, actor.id);
       }
     },
 

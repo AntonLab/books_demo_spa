@@ -6,11 +6,7 @@ import { NotFoundError } from '../types/errors.ts';
 import type { ListLibraryQuery } from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
 import { joined } from './joined.ts';
-import { readableBookWhere, type Viewer } from './visibility.ts';
-
-// The signed-in account a Library belongs to. Never a Guest: every route that
-// reaches this repository is guarded.
-export type Account = NonNullable<Viewer>;
+import { readableBookWhere, type Account } from './visibility.ts';
 
 export interface LibraryRepository {
   // A Book the account may not read is the same NotFoundError('Book', id) as a

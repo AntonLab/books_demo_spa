@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createLikeController } from '../controllers/likeController.ts';
+import { limitUserWrites } from '../middleware/authRateLimit.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -13,6 +14,7 @@ import type { RouteDeps } from './index.ts';
 export function createLikeRoutes(deps: RouteDeps): Router {
   const controller = createLikeController(deps.likeRepository);
   const requirePermission = createRequirePermission(deps);
+  const limitWrites = limitUserWrites(deps);
   const router = Router();
 
   // Every route runs through the matrix, reads included: every role has
@@ -35,6 +37,7 @@ export function createLikeRoutes(deps: RouteDeps): Router {
     '/',
     requirePermission('likes', 'create'),
     validate({ body: createLikeSchema }),
+    limitWrites,
     controller.create
   );
   // PATCH carries isLike alone: flipping a like to a dislike is the only
@@ -44,12 +47,14 @@ export function createLikeRoutes(deps: RouteDeps): Router {
     '/:id',
     requirePermission('likes', 'update'),
     validate({ params: idParamSchema, body: updateLikeSchema }),
+    limitWrites,
     controller.update
   );
   router.delete(
     '/:id',
     requirePermission('likes', 'delete'),
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.remove
   );
 
