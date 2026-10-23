@@ -4,8 +4,6 @@
  * must appear in a tracked file outside the checked docs; a token with `/`
  * must be an existing path. A renamed symbol otherwise leaves the docs
  * pointing at nothing, and every session that loads them trusts the dead name.
- *
- * Exports the token extraction and lookup; the CLI wrapper lives elsewhere.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';

@@ -1,7 +1,8 @@
 # Tokens the docs name on purpose that check-doc-refs cannot verify.
 # One token per line; a `#` line is a comment. Group by reason.
+# Doc and bare file names: the file exists, but no tracked file's content spells its name.
 
-# Doc file names. The file exists but no tracked file's content spells its name.
+# Doc file names (rules/docs basenames).
 CODING_STANDARDS.md
 access.md
 api.md
@@ -52,7 +53,7 @@ queries/suggestions.ts
 types/bookSearch.ts
 types/capabilities.ts
 
-# Paths relative to client/ or server/, so the root-relative path check misses them.
+# Paths relative to client/ or server/ (not src/), so the root-relative check misses them.
 src/db/config.ts
 src/db/seed/seed.ts
 src/format/date.ts
@@ -68,7 +69,7 @@ src/test/styleMock.ts
 src/theme/tokens.ts
 src/types/css.d.ts
 
-# Bare file names. The file exists but no tracked file's content spells its name.
+# Bare source/test file names.
 App.test.tsx
 authController.spec.ts
 client.test.ts

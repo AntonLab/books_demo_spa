@@ -5,8 +5,6 @@
  * token per line, each group under a `#` comment that gives the reason.
  *
  *   node scripts/check-doc-refs.mjs
- *
- * Runs in `npm run lint` and in the pre-commit hook.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
