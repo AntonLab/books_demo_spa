@@ -351,12 +351,17 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
         attributes: ['status'],
       });
       if (!target || target.status === 'draft') return { items: [], total: 0 };
+      // Columns share their attribute's name; `satisfies` fails a rename here.
+      const listId =
+        'listId' satisfies keyof InferAttributes<ReadingListItemRow>;
+      const bookId =
+        'bookId' satisfies keyof InferAttributes<ReadingListItemRow>;
       const { rows, count } = await ReadingList.findAndCountAll({
         // bookId is a validated number, coerced so nothing else reaches the SQL
         where: {
           id: {
             [Op.in]: literal(
-              `(SELECT listId FROM reading_list_items WHERE bookId = ${Number(query.bookId)})`
+              `(SELECT ${listId} FROM ${ReadingListItemRow.tableName} WHERE ${bookId} = ${Number(query.bookId)})`
             ),
           },
         },
