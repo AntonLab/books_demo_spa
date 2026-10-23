@@ -21,7 +21,7 @@ paths:
   and so do `npx tsc`, and `npx jest`/`eslint` or `node --test` with no path;
   a run naming a path passes (`npm test -w client -- <path>`), and so does a
   gate piped into `| tail`/`| head`/`| grep` or redirected into the scratchpad
-  (needs swarm 1.4.4); `format-edited` runs
+  (needs swarm 1.4.5); `format-edited` runs
   Prettier from the nearest folder holding `.prettierrc.json`; `after-pr`
   reminds the main session to offer `/mattpocock-skills:retro`, then `/clear`,
   after `gh pr create`. Change them in
