@@ -12,7 +12,10 @@ export const buildWebpackConfig = (options: BuildOptions): Configuration => {
   const hash = isDevelopment ? '' : '.[contenthash:8]';
 
   return {
-    devtool: isDevelopment ? 'eval-cheap-module-source-map' : 'source-map',
+    // Production keeps the maps in build/ but does not link them from the bundles.
+    devtool: isDevelopment
+      ? 'eval-cheap-module-source-map'
+      : 'hidden-source-map',
     // Pin the context to the package root so resolution does not depend on the
     // directory webpack was invoked from.
     context: paths.root,
