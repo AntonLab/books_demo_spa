@@ -833,10 +833,11 @@ const putCover = (
   body: Buffer | string,
   contentType = 'image/webp',
   cookie: string | null = ROLE_COOKIES.author
-) =>
-  contentType === 'image/webp' && Buffer.isBuffer(body)
-    ? put(`${base}/api/series/${id}/cover`, cookie ?? undefined, body)
-    : fetch(`${base}/api/series/${id}/cover`, {
+) => {
+  const url = `${base}/api/series/${id}/cover`;
+  return contentType === 'image/webp' && Buffer.isBuffer(body)
+    ? put(url, cookie ?? undefined, body)
+    : fetch(url, {
         method: 'PUT',
         headers: {
           'content-type': contentType,
@@ -844,6 +845,7 @@ const putCover = (
         },
         body,
       });
+};
 
 const deleteCover = (
   base: string,
