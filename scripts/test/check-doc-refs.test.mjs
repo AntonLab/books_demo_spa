@@ -58,6 +58,17 @@ test('clean docs pass with no allowlist file', (t) => {
   assert.equal(runCli(repo).status, 0);
 });
 
+test('an allowlist entry no doc uses fails with its name', (t) => {
+  const repo = sandbox(t, {
+    rule: '`liveName`\n',
+    code: 'liveName',
+    allowlist: 'deadName\n',
+  });
+  const run = runCli(repo);
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /unused allowlist entry: deadName/);
+});
+
 test('allowlist skips comments and blank lines, silences its tokens', (t) => {
   const allowlist = '# why: generated at runtime\n\nstaleName\n';
   const repo = sandbox(t, { rule: '`staleName`\n', allowlist });

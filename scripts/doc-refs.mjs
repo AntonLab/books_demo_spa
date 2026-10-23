@@ -36,6 +36,16 @@ export const extractTokens = (text) => {
   return found;
 };
 
+// Allowlist entries that no doc spells as a token: the doc changed, the entry is dead.
+export const findUnusedAllowlist = ({ root, docs, allowlist }) => {
+  const used = new Set(
+    docs.flatMap((doc) =>
+      extractTokens(readFileSync(join(root, doc), 'utf8')).map((t) => t.token)
+    )
+  );
+  return [...allowlist].filter((entry) => !used.has(entry));
+};
+
 export const findMisses = ({ root, docs, allowlist = new Set() }) => {
   const paths = docs.map((doc) => doc.replace(/\\/g, '/'));
   // The allowlist and the doc-refs tests name stale tokens on purpose.

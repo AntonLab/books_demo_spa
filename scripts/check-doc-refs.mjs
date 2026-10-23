@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { findMisses } from './doc-refs.mjs';
+import { findMisses, findUnusedAllowlist } from './doc-refs.mjs';
 import { CLAUDE_DOCS, ruleDocs } from './steering-docs.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -26,4 +26,7 @@ const allowlist = new Set(
 const misses = findMisses({ root, docs, allowlist });
 for (const { path, line, token } of misses)
   console.error(`check-doc-refs: ${path}:${line} ${token}`);
-process.exitCode = misses.length ? 1 : 0;
+const unused = findUnusedAllowlist({ root, docs, allowlist });
+for (const entry of unused)
+  console.error(`check-doc-refs: unused allowlist entry: ${entry}`);
+process.exitCode = misses.length || unused.length ? 1 : 0;

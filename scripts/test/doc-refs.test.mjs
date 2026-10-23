@@ -4,7 +4,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { extractTokens, findMisses } from '../doc-refs.mjs';
+import {
+  extractTokens,
+  findMisses,
+  findUnusedAllowlist,
+} from '../doc-refs.mjs';
 
 // A git repo whose tracked files are `files` (path -> content).
 const repo = (t, files) => {
@@ -144,6 +148,17 @@ test('extractTokens skips non-identifiers, fences and double backticks', () => {
     '`keepMe`',
   ].join('\n');
   assert.deepEqual(extractTokens(text), [{ line: 6, token: 'keepMe' }]);
+});
+
+test('an allowlist entry that no doc uses is reported, a used one is not', (t) => {
+  const root = repo(t, {
+    [DOC]: '`usedName` `liveName`\n',
+    'src/code.ts': 'liveName',
+  });
+  const allowlist = new Set(['usedName', 'deadName']);
+  assert.deepEqual(findUnusedAllowlist({ root, docs: [DOC], allowlist }), [
+    'deadName',
+  ]);
 });
 
 test('extractTokens skips an indented fence', () => {
