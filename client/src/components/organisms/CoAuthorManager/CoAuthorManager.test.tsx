@@ -1,8 +1,9 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { CoAuthorManager } from './CoAuthorManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { waitPastDebounce } from '@/test/waitPastDebounce';
 import { ApiError } from '@/api/client';
 import * as authorsApi from '@/api/authors';
 import * as booksApi from '@/api/books';
@@ -133,9 +134,6 @@ describe('CoAuthorManager', () => {
 
     expect(mockedBooks.addCoAuthor).toHaveBeenCalledWith(1, ivan.id);
   });
-
-  const waitPastDebounce = () =>
-    act(() => new Promise<void>((resolve) => setTimeout(resolve, 300)));
 
   it('mounting requests nothing', async () => {
     renderManager();

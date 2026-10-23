@@ -10,8 +10,8 @@ export interface AccountRepository {
   findProfile(id: number): Promise<AccountProfile | null>;
 }
 
-// Subqueries, not id lists: an id list grows with an Account's works. The only
-// runtime value is the `:id` replacement.
+// No id lists: one would grow with an Account's works. The only runtime value
+// is the `:id` replacement.
 
 // Model.count takes no replacements, so the eight totals are scalar subqueries
 // of one raw SELECT that binds `:id`. Two CTEs hold the sets the totals share,

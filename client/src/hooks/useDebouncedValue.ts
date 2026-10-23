@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+export const SEARCH_DEBOUNCE_MS = 250;
+
 // Holds a typed value back until it settles, so a search sends one request
 // instead of one per keystroke.
 export const useDebouncedValue = <T>(value: T, delayMs: number): T => {

@@ -13,7 +13,10 @@ import {
 } from 'antd';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import {
+  SEARCH_DEBOUNCE_MS,
+  useDebouncedValue,
+} from '@/hooks/useDebouncedValue';
 import { useAuthorSearch } from '@/queries/authors';
 import {
   useAddCoAuthor,
@@ -65,7 +68,7 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
 }) => {
   const { token } = theme.useToken();
   const [term, setTerm] = useState('');
-  const search = useAuthorSearch(useDebouncedValue(term, 250));
+  const search = useAuthorSearch(useDebouncedValue(term, SEARCH_DEBOUNCE_MS));
   const add = useAddCoAuthor(work);
   const remove = useRemoveCoAuthor(work);
 

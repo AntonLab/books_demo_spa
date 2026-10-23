@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { useSuggestions } from './suggestions';
 import { createTestQueryClient } from '../test/queryClient';
+import { waitPastDebounce } from '../test/waitPastDebounce';
 import { publicBook, publicSeries } from '../test/works';
 import * as booksApi from '../api/books';
 import * as seriesApi from '../api/series';
@@ -72,8 +73,7 @@ const renderAll = (text: string) =>
 
 // Lets a query that was going to start do so, which gives a "not called"
 // assertion its meaning.
-const settle = () =>
-  act(() => new Promise<void>((resolve) => setTimeout(resolve, 300)));
+const settle = waitPastDebounce;
 
 beforeEach(() => {
   jest.resetAllMocks();

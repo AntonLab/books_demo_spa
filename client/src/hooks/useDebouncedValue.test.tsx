@@ -15,7 +15,7 @@ describe('useDebouncedValue', () => {
     expect(result.current).toBe('a');
   });
 
-  test('holds the old value until 250 ms of quiet, then takes the new one', async () => {
+  test('holds the old value until the delay passes in quiet, then takes the new one', async () => {
     const { result, rerender } = renderHook(
       ({ v }) => useDebouncedValue(v, 250),
       { initialProps: { v: 'a' } }
