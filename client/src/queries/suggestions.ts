@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { listBooks, type ListBooksParams } from '../api/books';
 import { listSeries } from '../api/series';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import type { AuthorSummary, PublicSeries } from '../types/api';
 import type { PublicBook } from '../types/book';
 import { queryKeys } from './keys';
@@ -54,8 +55,8 @@ export const authorLabelOf = (author: AuthorSummary): string =>
 
 // The first few books the term finds, one cache entry per term, as the
 // Co-author picker does. A blank term asks for nothing, since the server
-// refuses one.
-// ponytail: a request per keystroke, debounce if the server feels it.
+// refuses one; `useSuggestions` debounces the term, so typing is not a request
+// per keystroke.
 const useBookSuggestions = (field: 'q' | 'author', term: string) => {
   const params: ListBooksParams = {
     ...(field === 'q' ? { q: term } : { author: term }),
@@ -100,7 +101,7 @@ export function useSuggestions(
   kind: 'books' | 'authors' | 'series',
   text: string
 ): Suggestions<PublicBook | AuthorSummary | PublicSeries> {
-  const term = suggestionTermOf(text);
+  const term = suggestionTermOf(useDebouncedValue(text, 250));
   // Hooks cannot be called conditionally, so all three run. A blank term
   // keeps the two kinds nobody asked for from requesting anything.
   const books = useBookSuggestions('q', kind === 'books' ? term : '');

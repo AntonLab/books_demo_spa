@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { CoAuthorManager } from './CoAuthorManager';
@@ -132,6 +132,36 @@ describe('CoAuthorManager', () => {
     await userEvent.click(option);
 
     expect(mockedBooks.addCoAuthor).toHaveBeenCalledWith(1, ivan.id);
+  });
+
+  const waitPastDebounce = () =>
+    act(() => new Promise<void>((resolve) => setTimeout(resolve, 300)));
+
+  it('mounting requests nothing', async () => {
+    renderManager();
+    await waitPastDebounce();
+
+    expect(mockedAuthors.searchAuthors).not.toHaveBeenCalled();
+  });
+
+  it('a whitespace-only term requests nothing', async () => {
+    renderManager();
+    await userEvent.type(screen.getByRole('combobox'), '   ');
+    await waitPastDebounce();
+
+    expect(mockedAuthors.searchAuthors).not.toHaveBeenCalled();
+  });
+
+  it('typing fast requests only the last term', async () => {
+    renderManager();
+    const box = screen.getByRole('combobox');
+    await userEvent.type(box, 'pet');
+    await userEvent.type(box, 'rov');
+
+    await waitFor(() =>
+      expect(mockedAuthors.searchAuthors).toHaveBeenCalledWith('petrov')
+    );
+    expect(mockedAuthors.searchAuthors).toHaveBeenCalledTimes(1);
   });
 
   it('stops a search term at the length the server accepts', async () => {
