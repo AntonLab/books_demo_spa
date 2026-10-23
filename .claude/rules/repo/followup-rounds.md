@@ -12,7 +12,9 @@ brief file. It runs the same chain as a plan task: `sdd-implementer`, then
 - **Review package without a plan:** pass the brief file where the plan goes,
   `bash scripts/sdd-step.sh review <brief.md> <BASE> [HEAD]`. It writes the
   diff under `.superpowers/sdd/<brief-name>/` and prints the path. Do not
-  build the diff by hand.
+  build the diff by hand. The brief lives in the main checkout (git-ignored)
+  and the `*-followups.md` files in the task worktree: pass the brief by its
+  absolute path, since a relative one fails with `no such plan file`.
 - **Concerns land in the follow-ups file.** The brief's rule "do not edit the
   followups files" protects the lines being fixed. A `DONE_WITH_CONCERNS` still
   gets its `accepted without user: <concern> -> <choice>` line, or goes to the
