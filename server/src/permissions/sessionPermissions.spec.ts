@@ -4,7 +4,7 @@ import { permissionsFor } from './permissionStore.ts';
 
 test('permissionsFor is dense: every module has every action', () => {
   const permissions = permissionsFor('user');
-  assert.equal(permissions.users.read, 'any');
+  assert.equal(permissions.users.read, 'none');
   assert.equal(permissions.reports.create, 'none');
   assert.equal(Object.keys(permissions.books).length, 4);
 });

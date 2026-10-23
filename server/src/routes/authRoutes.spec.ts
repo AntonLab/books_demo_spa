@@ -550,7 +550,7 @@ test('register, login and /me all carry the Account permissions', async () => {
       })
     );
     assert.equal(me.permissions.users.update, 'own');
-    assert.equal(me.permissions.users.read, 'any');
+    assert.equal(me.permissions.users.read, 'none');
   });
 });
 

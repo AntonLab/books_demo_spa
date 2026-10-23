@@ -10,6 +10,18 @@ const scope = (role: string, module: string, action: string) =>
     (row) => row.role === role && row.module === module && row.action === action
   )?.scope;
 
+test('only moderators read the user directory', () => {
+  for (const role of ['guest', 'user', 'author']) {
+    assert.equal(scope(role, 'users', 'read'), 'none', role);
+  }
+  for (const role of ['admin', 'superadmin']) {
+    assert.equal(scope(role, 'users', 'read'), 'any', role);
+  }
+  // Editing and deleting one's own row is untouched.
+  assert.equal(scope('user', 'users', 'update'), 'own');
+  assert.equal(scope('author', 'users', 'delete'), 'own');
+});
+
 test('the matrix covers every role, module and action exactly once', () => {
   assert.equal(rows.length, ROLES.length * MODULES.length * ACTIONS.length);
 

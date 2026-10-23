@@ -35,8 +35,9 @@ const PUBLIC_READS: RoleGrants = {
 
 const USER_GRANTS: RoleGrants = {
   ...PUBLIC_READS,
-  // Any signed-in caller may read the directory and edit only their own row.
-  users: { read: 'any', update: 'own', delete: 'own' },
+  // The directory carries PublicUser with its email, so only moderators read
+  // it; every role edits only its own row.
+  users: { read: 'none', update: 'own', delete: 'own' },
   comments: { read: 'any', create: 'own', update: 'own', delete: 'own' },
   // update is what turns a like into a dislike; without it likeRoutes' PATCH
   // would be reachable by superadmin alone.

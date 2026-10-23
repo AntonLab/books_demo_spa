@@ -16,12 +16,12 @@ export function createAuthorRoutes(deps: RouteDeps): Router {
   const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // `users × read`, as the directory is: any signed-in caller, never a guest.
-  // A byline already names an author publicly, but an author with no book yet
-  // is named nowhere, and a guest has no book to credit anyone on.
+  // `books × update`: the picker is for roles that manage Co-authors (author
+  // `own`, admin and superadmin `any`). A plain user has no book to credit
+  // anyone on, and a guest is 401.
   router.get(
     '/',
-    requirePermission('users', 'read'),
+    requirePermission('books', 'update'),
     validate({ query: listAuthorsQuerySchema }),
     async (req, res) => {
       const query = validatedQuery<ListAuthorsQuery>(req);

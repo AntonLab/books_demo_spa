@@ -71,14 +71,28 @@ test('a signed-in caller searches authors and gets no email back', async () => {
   );
 });
 
-test('a plain user may search authors too', async () => {
+test('a plain user may not search authors', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeUsers([]) },
     async (base) => {
       const response = await fetch(`${base}/api/authors`, {
         headers: { cookie: ROLE_COOKIES.user },
       });
-      assert.equal(response.status, 200);
+      assert.equal(response.status, 403);
+    }
+  );
+});
+
+test('an admin and a superadmin may search authors', async () => {
+  await withAuthenticatedApp(
+    { userRepository: createFakeUsers([]) },
+    async (base) => {
+      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+        const response = await fetch(`${base}/api/authors`, {
+          headers: { cookie },
+        });
+        assert.equal(response.status, 200, cookie);
+      }
     }
   );
 });
