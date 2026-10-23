@@ -25,7 +25,10 @@ import {
   NotFoundError,
 } from '../types/errors.ts';
 import { createSequelizeLikeRepository } from './likeRepository.ts';
-import { likeRepositoryContract } from './likeRepository.contract.testkit.ts';
+import {
+  as,
+  likeRepositoryContract,
+} from './likeRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 const skip = await skipWithoutMysql();
@@ -94,7 +97,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('a like on a book round-trips with commentId left null', async () => {
     const created = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
 
     const reloaded = await repository.findById(created.id, null);
@@ -108,7 +111,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('a dislike on a comment round-trips with bookId left null', async () => {
     const created = await repository.create(
       { bookId: null, commentId, isLike: false },
-      likerId
+      as(likerId)
     );
 
     const reloaded = await repository.findById(created.id, null);
@@ -121,20 +124,29 @@ describe('likeRepository against real MySQL', { skip }, () => {
   // Enforced by the unique index, not by a findOne before the insert — that
   // would be a check-then-write race and an extra query on every like.
   test('the same user cannot like the same book twice', async () => {
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
 
     await assert.rejects(
-      repository.create({ bookId, commentId: null, isLike: false }, likerId),
+      repository.create(
+        { bookId, commentId: null, isLike: false },
+        as(likerId)
+      ),
       (error: unknown) =>
         error instanceof ConflictError && error.statusCode === 409
     );
   });
 
   test('the same user cannot like the same comment twice', async () => {
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
 
     await assert.rejects(
-      repository.create({ bookId: null, commentId, isLike: true }, likerId),
+      repository.create({ bookId: null, commentId, isLike: true }, as(likerId)),
       (error: unknown) => error instanceof ConflictError
     );
   });
@@ -149,11 +161,17 @@ describe('likeRepository against real MySQL', { skip }, () => {
       text: 'And the middle.',
     });
 
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
     await repository.create(
       { bookId: null, commentId: second.id, isLike: false },
-      likerId
+      as(likerId)
     );
 
     assert.equal(
@@ -169,10 +187,13 @@ describe('likeRepository against real MySQL', { skip }, () => {
       email: 'other@example.com',
     });
 
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
     await repository.create(
       { bookId, commentId: null, isLike: true },
-      other.id
+      as(likerId)
+    );
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(other.id)
     );
 
     assert.equal(
@@ -185,7 +206,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId: bookId + 10_000, commentId: null, isLike: true },
-        likerId
+        as(likerId)
       ),
       (error: unknown) =>
         error instanceof NotFoundError &&
@@ -200,7 +221,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId: null, commentId: commentId + 10_000, isLike: true },
-        likerId
+        as(likerId)
       ),
       (error: unknown) =>
         error instanceof NotFoundError &&
@@ -211,7 +232,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('liking your own book is refused', async () => {
     await assert.rejects(
       // The book belongs to `owner`, and `owner` is the actor here.
-      repository.create({ bookId, commentId: null, isLike: true }, userId),
+      repository.create({ bookId, commentId: null, isLike: true }, as(userId)),
       (error: unknown) =>
         error instanceof ForbiddenError && error.statusCode === 403
     );
@@ -234,7 +255,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId: shared.id, commentId: null, isLike: true },
-        coAuthorId
+        as(coAuthorId, 'author')
       ),
       (error: unknown) =>
         error instanceof ForbiddenError && error.statusCode === 403
@@ -243,7 +264,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
   test('liking your own comment is refused', async () => {
     await assert.rejects(
-      repository.create({ bookId: null, commentId, isLike: true }, userId),
+      repository.create({ bookId: null, commentId, isLike: true }, as(userId)),
       (error: unknown) =>
         error instanceof ForbiddenError && error.statusCode === 403
     );
@@ -256,7 +277,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     );
 
     await assert.rejects(
-      repository.create({ bookId: null, commentId, isLike: true }, likerId),
+      repository.create({ bookId: null, commentId, isLike: true }, as(likerId)),
       (error: unknown) =>
         error instanceof ForbiddenError &&
         error.message === 'You cannot like a deleted comment'
@@ -266,7 +287,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('flipping a like on a tombstone is refused, removing it is not', async () => {
     const like = await repository.create(
       { bookId: null, commentId, isLike: true },
-      likerId
+      as(likerId)
     );
     await Comment.update(
       { tombstone: 'removed' },
@@ -286,7 +307,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId, commentId: null, isLike: true },
-        userId + 10_000
+        as(userId + 10_000)
       ),
       (error: unknown) =>
         error instanceof NotFoundError &&
@@ -303,7 +324,10 @@ describe('likeRepository against real MySQL', { skip }, () => {
     });
     try {
       await assert.rejects(
-        repository.create({ bookId, commentId: null, isLike: true }, likerId),
+        repository.create(
+          { bookId, commentId: null, isLike: true },
+          as(likerId)
+        ),
         (error: unknown) =>
           error instanceof NotFoundError &&
           error.message === `Book ${bookId} not found`
@@ -319,7 +343,10 @@ describe('likeRepository against real MySQL', { skip }, () => {
     });
     try {
       await assert.rejects(
-        repository.create({ bookId: null, commentId, isLike: true }, likerId),
+        repository.create(
+          { bookId: null, commentId, isLike: true },
+          as(likerId)
+        ),
         (error: unknown) =>
           error instanceof NotFoundError &&
           error.message === `Comment ${commentId} not found`
@@ -334,7 +361,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   // passed on as it is.
   test('a create the database refuses for another reason is not reported as a missing row', async () => {
     await assert.rejects(
-      repository.create({ bookId, commentId: null, isLike: true }, -1),
+      repository.create({ bookId, commentId: null, isLike: true }, as(-1)),
       (error: unknown) =>
         error instanceof DatabaseError &&
         !(error instanceof ForeignKeyConstraintError)
@@ -342,8 +369,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
   });
 
   test('the list filters by commentId and reports the unpaged total', async () => {
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
 
     const onComment = await repository.list(
       {
@@ -360,10 +393,13 @@ describe('likeRepository against real MySQL', { skip }, () => {
 
   test('the list separates likes from dislikes', async () => {
     const second = await Comment.create({ userId, bookId, text: 'Meh.' });
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
     await repository.create(
       { bookId: null, commentId: second.id, isLike: false },
-      likerId
+      as(likerId)
     );
 
     const dislikes = await repository.list(
@@ -382,7 +418,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('an update flips a like into a dislike', async () => {
     const created = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
 
     const updated = await repository.update(created.id, { isLike: false });
@@ -399,7 +435,7 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('remove reports whether a row was actually deleted', async () => {
     const created = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
 
     assert.equal(await repository.remove(created.id), true);
@@ -410,8 +446,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
   // CASCADE rather than SET NULL: a like whose target was deleted would have
   // both columns null, the one state the model forbids.
   test('deleting a book takes its likes, and the likes on its comments', async () => {
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
 
     await Book.destroy({ where: { id: bookId } });
 
@@ -422,8 +464,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
   });
 
   test('deleting a comment takes the likes on it', async () => {
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
 
     await Comment.destroy({ where: { id: commentId } });
 
@@ -432,16 +480,50 @@ describe('likeRepository against real MySQL', { skip }, () => {
     assert.equal(left.items[0]?.bookId, bookId);
   });
 
-  test('nobody may like a draft or a comment on one', async () => {
+  test('a draft the actor cannot read is a 404 for the book and for a comment on it', async () => {
     await Book.update({ status: 'draft' }, { where: { id: bookId } });
 
     await assert.rejects(
-      repository.create({ bookId, commentId: null, isLike: true }, likerId),
-      (error: unknown) =>
-        error instanceof ForbiddenError && /draft/i.test(error.message)
+      repository.create({ bookId, commentId: null, isLike: true }, as(likerId)),
+      new NotFoundError('Book', bookId)
     );
     await assert.rejects(
-      repository.create({ bookId: null, commentId, isLike: true }, likerId),
+      repository.create({ bookId: null, commentId, isLike: true }, as(likerId)),
+      new NotFoundError('Comment', commentId)
+    );
+    assert.equal(await Like.count(), 0);
+  });
+
+  test('a moderator keeps the draft 403 on the book and on a comment on it', async () => {
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+    const isDraft403 = (error: unknown) =>
+      error instanceof ForbiddenError && /draft/i.test(error.message);
+
+    for (const role of ['admin', 'superadmin'] as const) {
+      await assert.rejects(
+        repository.create(
+          { bookId, commentId: null, isLike: true },
+          as(likerId, role)
+        ),
+        isDraft403
+      );
+      await assert.rejects(
+        repository.create(
+          { bookId: null, commentId, isLike: true },
+          as(likerId, role)
+        ),
+        isDraft403
+      );
+    }
+  });
+
+  test('a credited co-author keeps the draft 403 ahead of the own-book refusal', async () => {
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+    await assert.rejects(
+      repository.create(
+        { bookId, commentId: null, isLike: true },
+        as(userId, 'author')
+      ),
       (error: unknown) =>
         error instanceof ForbiddenError && /draft/i.test(error.message)
     );
@@ -450,11 +532,11 @@ describe('likeRepository against real MySQL', { skip }, () => {
   test('returning a book to draft hides its likes from readers and keeps them', async () => {
     const onBook = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
     const onComment = await repository.create(
       { bookId: null, commentId, isLike: true },
-      likerId
+      as(likerId)
     );
     await Book.update({ status: 'draft' }, { where: { id: bookId } });
 

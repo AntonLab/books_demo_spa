@@ -1,10 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ConflictError, NotFoundError } from '../types/errors.ts';
-import type { LikeRepository } from './likeRepository.ts';
+import type { UserRole } from 'shared';
+import type { Account, LikeRepository } from './likeRepository.ts';
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;
+export const as = (id: number, role: UserRole = 'user'): Account => ({
+  id,
+  role,
+});
 
 // What a contract case needs besides the repository: the rows it assumes exist
 // before it starts. The real side writes them through the models on MySQL,
@@ -45,11 +50,11 @@ export function likeRepositoryContract(
 
     const onBook = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
     const onComment = await repository.create(
       { bookId: null, commentId, isLike: false },
-      likerId
+      as(likerId)
     );
 
     assert.deepEqual(
@@ -71,29 +76,38 @@ export function likeRepositoryContract(
     await assert.rejects(
       repository.create(
         { bookId: MISSING_ID, commentId: null, isLike: true },
-        likerId
+        as(likerId)
       ),
       new NotFoundError('Book', MISSING_ID)
     );
     await assert.rejects(
       repository.create(
         { bookId: null, commentId: MISSING_ID, isLike: true },
-        likerId
+        as(likerId)
       ),
       new NotFoundError('Comment', MISSING_ID)
     );
     await assert.rejects(
-      repository.create({ bookId, commentId: null, isLike: true }, MISSING_ID),
+      repository.create(
+        { bookId, commentId: null, isLike: true },
+        as(MISSING_ID)
+      ),
       new NotFoundError('User', MISSING_ID)
     );
   });
 
   test('contract: a second like on the same target is a conflict', async () => {
     const { repository, likerId, bookId } = await withTargets();
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
 
     await assert.rejects(
-      repository.create({ bookId, commentId: null, isLike: false }, likerId),
+      repository.create(
+        { bookId, commentId: null, isLike: false },
+        as(likerId)
+      ),
       ConflictError
     );
   });
@@ -110,7 +124,7 @@ export function likeRepositoryContract(
     const { repository, likerId, bookId } = await withTargets();
     const created = await repository.create(
       { bookId, commentId: null, isLike: true },
-      likerId
+      as(likerId)
     );
 
     const updated = await repository.update(created.id, { isLike: false });
@@ -126,7 +140,7 @@ export function likeRepositoryContract(
     const { repository, likerId, commentId } = await withTargets();
     const created = await repository.create(
       { bookId: null, commentId, isLike: true },
-      likerId
+      as(likerId)
     );
 
     assert.equal(await repository.remove(created.id), true);

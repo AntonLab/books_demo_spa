@@ -38,7 +38,8 @@ export function createFakeLikeRepository(
   let nextId = 1;
 
   return {
-    async create(input, actorId) {
+    async create(input, actor) {
+      const actorId = actor.id;
       // The target first, as the real repository loads it before the insert.
       if (input.bookId !== null) {
         const coAuthorIds = books.get(input.bookId);

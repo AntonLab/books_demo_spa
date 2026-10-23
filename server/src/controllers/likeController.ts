@@ -5,12 +5,8 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { LikeRepository } from '../repositories/likeRepository.ts';
-import { viewerOf } from '../repositories/visibility.ts';
-import {
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-} from '../types/errors.ts';
+import { actorOf, viewerOf } from '../repositories/visibility.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import type { PublicLike } from 'shared';
 import type {
   CreateLikeInput,
@@ -38,13 +34,9 @@ export function createLikeController(repository: LikeRepository) {
 
   return {
     create: async (req, res) => {
-      // `guest` has no create grant, so req.user is set here; the check only
-      // narrows the optional type.
-      if (!req.user) throw new UnauthorizedError();
-
       const like = await repository.create(
         validatedBody<CreateLikeInput>(req),
-        req.user.id
+        actorOf(req)
       );
       res.status(201).json(like);
     },
