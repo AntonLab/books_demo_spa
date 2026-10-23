@@ -11,7 +11,8 @@ merges into. Both run the same automation.
 
 - `workflows/ci.yml` — on every PR into and push to `dev` or `main`, plus
   `workflow_dispatch`: five parallel jobs on `ubuntu-latest` with Node from
-  `.nvmrc` — `lint` (`lint`, `format:check`, `test:scripts` and
+  `.nvmrc` — `lint` (`lint`, `format:check`, `test:scripts`, a
+  `node --check` pass over `scripts/*.mjs` and
   `npm audit --omit=dev --audit-level=critical`), `typecheck`, `test-client`,
   `test-server`, `build`. A new check that needs no service or separate runner
   is a step in `lint`, as the audit is, so the ruleset stays as is; a new job
@@ -23,7 +24,9 @@ merges into. Both run the same automation.
   and `Analyze (actions)`. Test code (`*.spec.ts`, `*.test.ts(x)`,
   `*.testkit.ts`, `client/src/test/`) is excluded: it never deploys, and its
   one-middleware Express apps would be held to the real app's rules. The
-  `CodeQL` check it also reports is not required.
+  `CodeQL` check it also reports is not required. Both workflows group PR runs
+  per PR number (superseded runs cancel) and push runs per commit (never
+  cancel).
 - `dependabot.yml` — weekly npm and Actions updates, minor and patch grouped per
   ecosystem, majors one PR each, no labels (the labels are the triage roles).
   It documents each ignored major; drop an entry once its blocker catches up.

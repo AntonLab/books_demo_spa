@@ -50,8 +50,9 @@ paths:
 - The client config adds the rules `client/CLAUDE.md` lists;
   `no-restricted-imports` takes one option set per file, so each level block
   repeats the rules above it.
-- Plugins resolve by bare specifier because the root `package.json` declares
-  them and npm hoists them.
+- Root devDependencies hold `@eslint/js`, `eslint-config-prettier` and
+  `typescript-eslint`; `client/package.json` holds the React, react-hooks and
+  jsx-a11y plugins `client/eslint.config.mjs` imports. npm hoists them.
 
 ## Root `package.json`
 
@@ -91,10 +92,12 @@ the types the root CLAUDE.md lists; add a type to both at once. Git's own
 ## `scripts/`
 
 Plain Node (`*.mjs`) and one Bash script, with no dependencies; Prettier
-checks the `.mjs` files, but no package's ESLint config reaches them. Their
-tests sit in `scripts/test/` and run through `npm run test:scripts` (part of
-`npm test` and CI's `lint` job); a script that runs on import keeps its
-testable part in a sibling module, as `worktree.mjs` does with `remove-dir.mjs`.
+checks the `.mjs` files, but no package's ESLint config reaches them. CI's
+`lint` job syntax-checks every `scripts/*.mjs` with `node --check` (syntax only,
+no lint rules). Their tests sit in `scripts/test/` and run through
+`npm run test:scripts` (part of `npm test` and CI's `lint` job); a script that
+runs on import keeps its testable part in a sibling module, as `worktree.mjs`
+does with `remove-dir.mjs`.
 CI runs them on Linux, where `path` is POSIX and `\` is no separator: a check
 on a path or name holds for `path.posix` and `path.win32` alike, and its test
 covers both separators.

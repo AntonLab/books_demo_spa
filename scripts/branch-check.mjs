@@ -30,7 +30,7 @@ try {
   git('fetch', '--quiet', 'origin', 'dev');
 } catch {
   if (warnOnly) process.exit(0);
-  report(`branch-check: cannot fetch ${base}; the result below may be stale.`);
+  report(`branch-check: cannot fetch ${base}`);
 }
 
 let branch;

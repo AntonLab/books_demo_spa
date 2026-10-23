@@ -34,9 +34,11 @@ paths:
 - **Fast Refresh needs both** `@pmmmwh/react-refresh-webpack-plugin` and swc's
   `transform.react.refresh`; with one alone it silently breaks.
 - Dev: `historyApiFallback`, `static: false` (everything is bundled from `src/`,
-  which imports no image or font, so there is no asset rule; html-webpack-plugin's
+  which imports `public/header.svg` in `AppHeader`, served by the
+  `asset/resource` svg rule in `buildLoaders.ts`; html-webpack-plugin's
   `favicon` option emits `public/favicon.svg`),
-  `/api` proxied to `http://localhost:4000` so the browser sees one origin.
+  `/api` proxied to the API at `PORT`, default 4000 (`buildDevServer.ts`), so
+  the browser sees one origin.
 - Prod: `[contenthash]` names, `runtimeChunk: 'single'` and a `vendors` cache
   group so vendor hashes survive app-only changes. The group takes
   `chunks: 'initial'`: with `'all'` it also swallows the libraries only lazy

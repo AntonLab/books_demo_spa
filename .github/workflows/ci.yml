@@ -10,10 +10,10 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request cancels the run it supersedes; pushes to dev and
-# main each finish, so every commit on them keeps a result.
+# A new push to a PR cancels the run it supersedes. Pushes to dev and main
+# group per commit (github.sha), so every commit keeps a result.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The job ids double as the required status checks in the ruleset on dev and
@@ -35,6 +35,9 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run test:scripts
+      # node --check takes one file, and no ESLint config reaches scripts/, so a
+      # syntax error in a SessionStart hook script would otherwise pass CI.
+      - run: for f in scripts/*.mjs; do node --check "$f"; done
       # Critical only: sprintf-js (moderate) has no fix upstream, so a lower level
       # would keep CI red.
       - run: npm audit --omit=dev --audit-level=critical

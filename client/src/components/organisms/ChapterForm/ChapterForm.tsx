@@ -5,8 +5,9 @@ import {
   PublicationTimeFields,
   type PublicationTimeValues,
 } from '@/components/molecules/PublicationTimeFields/PublicationTimeFields';
-import { CHAPTER_TITLE_MAX_LENGTH } from 'shared';
+import { CHAPTER_TEXT_MAX_LENGTH, CHAPTER_TITLE_MAX_LENGTH } from 'shared';
 import type { PublishedAtPayload } from 'shared';
+import { maxLengthRule } from '@/constants/maxLengthRule';
 import { formatDateTime } from '@/format/date';
 import { chapterStateOf } from '@/types/chapter';
 import spacing from '@/theme/spacing.module.css';
@@ -143,6 +144,7 @@ export const ChapterForm: FC<ChapterFormProps> = ({
               whitespace: true,
               message: 'Enter the chapter text',
             },
+            maxLengthRule('Chapter text', CHAPTER_TEXT_MAX_LENGTH),
           ]}
         >
           <Input.TextArea rows={16} />

@@ -5,6 +5,7 @@ import {
   requireXsrfToken,
 } from './middleware/csrfProtection.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
+import { isChapterTextWrite } from './routes/chapterRoutes.ts';
 import { createApiRouter, type RouteDeps } from './routes/index.ts';
 
 // Stops a browser second-guessing a response's Content-Type: sniffing a JSON
@@ -43,7 +44,12 @@ export function createApp(deps: AppDeps): Express {
   // body express.json() refuses to parse.
   app.use(noSniff);
 
-  app.use(express.json());
+  // The global parser keeps its small default because authRateLimit.ts relies
+  // on it; only the chapter text writes skip it.
+  const globalJson = express.json();
+  app.use((req, res, next) =>
+    isChapterTextWrite(req) ? next() : globalJson(req, res, next)
+  );
   // Express 5 can set cookies but not read them; resolveSessionUser, behind
   // both requirePermission and requireAuth, needs req.cookies.
   app.use(cookieParser());

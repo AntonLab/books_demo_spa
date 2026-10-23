@@ -58,7 +58,11 @@
       "PowerShell(npm *seed*)",
       "PowerShell(node *seed.ts*)"
     ],
-    "deny": ["Edit(**/.env.local)", "Edit(package-lock.json)"]
+    "deny": [
+      "Read(**/.env.local)",
+      "Edit(**/.env.local)",
+      "Edit(package-lock.json)"
+    ]
   },
   "hooks": {
     "SessionStart": [

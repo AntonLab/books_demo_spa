@@ -93,6 +93,6 @@ database hiccup costs one pass, not the process.
 
 ## Error handler
 
-A body over `express.json()`'s 102,400-byte limit is 413 and an unsupported
-charset 415, both `{ error: 'Invalid request' }`. A `UniqueConstraintError` is a
-bare 409.
+A body over `express.json()`'s 102,400-byte limit is 413 (chapter create and
+update take 5 MiB) and an unsupported charset 415, both
+`{ error: 'Invalid request' }`. A `UniqueConstraintError` is a bare 409.

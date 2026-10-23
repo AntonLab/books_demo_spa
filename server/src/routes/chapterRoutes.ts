@@ -1,4 +1,4 @@
-import express, { Router } from 'express';
+import express, { Router, type Request } from 'express';
 import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import { createChapterController } from '../controllers/chapterController.ts';
 import { createIllustrationController } from '../controllers/illustrationController.ts';
@@ -13,6 +13,17 @@ import { reorderIllustrationsSchema } from '../types/illustration.ts';
 import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
+// A chapter text is up to CHAPTER_TEXT_MAX_LENGTH characters, up to 4 bytes
+// each, plus the JSON envelope.
+export const CHAPTER_JSON_LIMIT_BYTES = 5 * 1024 * 1024;
+
+// The two writes below that parse chapterJson, as app.ts sees them under
+// /api: it keeps the global parser off them. Case-insensitive like Express's
+// own routing, so no spelling of the path escapes the permission check.
+export const isChapterTextWrite = (req: Request): boolean =>
+  (req.method === 'POST' && /^\/api\/chapters\/?$/i.test(req.path)) ||
+  (req.method === 'PATCH' && /^\/api\/chapters\/[^/]+\/?$/i.test(req.path));
+
 export function createChapterRoutes(deps: RouteDeps): Router {
   const controller = createChapterController(deps.chapterRepository);
   const illustrations = createIllustrationController(
@@ -20,6 +31,10 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   );
   const requirePermission = createRequirePermission(deps);
   const router = Router();
+  // app.ts keeps the global parser off these two writes, so the large limit
+  // applies only after requirePermission: an unauthorised caller never has
+  // its body read.
+  const chapterJson = express.json({ limit: CHAPTER_JSON_LIMIT_BYTES });
 
   // Every route runs through the matrix, reads included: every role has
   // `read: any` on chapters, which is what keeps the list and detail routes
@@ -46,6 +61,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.post(
     '/',
     requirePermission('chapters', 'create'),
+    chapterJson,
     validate({ body: createChapterSchema }),
     controller.create
   );
@@ -70,6 +86,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.patch(
     '/:id',
     requirePermission('chapters', 'update'),
+    chapterJson,
     validate({ params: idParamSchema, body: updateChapterSchema }),
     controller.update
   );

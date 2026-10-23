@@ -8,6 +8,7 @@ import {
   NAME_MAX_LENGTH,
 } from 'shared';
 import { loginForbiddenCharacterRule } from '@/constants/loginRule';
+import { maxLengthRule } from '@/constants/maxLengthRule';
 import { useRegister } from '@/queries/auth';
 import { DiscardGuardModal } from '@/components/molecules/DiscardGuardModal/DiscardGuardModal';
 import { ApiError } from '@/api/client';
@@ -113,10 +114,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
           rules={[
             { required: true, message: 'Enter an email address' },
             { type: 'email', message: 'Enter a valid email address' },
-            {
-              max: EMAIL_MAX_LENGTH,
-              message: `Email must be at most ${EMAIL_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('Email', EMAIL_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="email" />
@@ -132,10 +130,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
               whitespace: true,
               message: 'Enter your first name',
             },
-            {
-              max: NAME_MAX_LENGTH,
-              message: `First name must be at most ${NAME_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('First name', NAME_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="given-name" />
@@ -150,10 +145,7 @@ export const RegisterModal: FC<AuthModalProps> = ({ onOpen, onClose }) => {
               whitespace: true,
               message: 'Enter your last name',
             },
-            {
-              max: NAME_MAX_LENGTH,
-              message: `Last name must be at most ${NAME_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('Last name', NAME_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="family-name" />

@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { CHAPTER_JSON_LIMIT_BYTES } from './chapterRoutes.ts';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
-import type { ChapterSummary, PublicChapter } from 'shared';
+import {
+  CHAPTER_TEXT_MAX_LENGTH,
+  type ChapterSummary,
+  type PublicChapter,
+} from 'shared';
 import {
   json,
   ROLE_COOKIES,
@@ -218,6 +223,114 @@ test('PATCH renames a chapter without touching its body', async () => {
       assert.equal(response.status, 200);
       assert.equal(body.title, 'Renamed');
       assert.equal(body.text, 'It was a dark night.');
+    }
+  );
+});
+
+test('POST accepts a text of exactly CHAPTER_TEXT_MAX_LENGTH characters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, {
+        ...valid,
+        text: 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH),
+        publishedAt: null,
+      });
+
+      assert.equal(response.status, 201);
+    }
+  );
+});
+
+test('PATCH accepts a text of exactly CHAPTER_TEXT_MAX_LENGTH characters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+
+      const response = await patch(base, created.id, {
+        text: 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH),
+      });
+
+      assert.equal(response.status, 200);
+    }
+  );
+});
+
+test('POST and PATCH answer 413 for a body over the 5 MiB chapter limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES + 1);
+
+      assert.equal((await post(base, { ...valid, text })).status, 413);
+      assert.equal((await patch(base, created.id, { text })).status, 413);
+    }
+  );
+});
+
+// A text over CHAPTER_TEXT_MAX_LENGTH answers 400 from the text-length rule,
+// which only runs once the parser has accepted the body: a 400, not a 413, is
+// what proves the 5 MiB limit holds just under its edge.
+test('POST and PATCH accept a body just under the 5 MiB chapter limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES - 1024);
+
+      assert.equal((await post(base, { ...valid, text })).status, 400);
+      assert.equal((await patch(base, created.id, { text })).status, 400);
+    }
+  );
+});
+
+test('POST and PATCH without a session answer 401 for a body over the 5 MiB limit, before the body is read', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES + 1);
+
+      assert.equal((await post(base, { ...valid, text }, null)).status, 401);
+      assert.equal((await patch(base, created.id, { text }, null)).status, 401);
+    }
+  );
+});
+
+test('a differently cased path is treated like /api/chapters: 401 without a session, not 413', async () => {
+  await withApp({ chapterRepository: createFakeRepository() }, async (base) => {
+    const response = await fetch(`${base}/API/Chapters`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...valid,
+        text: 'x'.repeat(200 * 1024),
+      }),
+    });
+
+    assert.equal(response.status, 401);
+  });
+});
+
+test('another chapter route keeps the 100 KB global body limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const response = await fetch(
+        `${base}/api/chapters/1/illustration-order`,
+        {
+          method: 'PUT',
+          headers: {
+            'content-type': 'application/json',
+            cookie: ROLE_COOKIES.author,
+          },
+          body: JSON.stringify({ padding: 'x'.repeat(102_400) }),
+        }
+      );
+
+      assert.equal(response.status, 413);
     }
   );
 });

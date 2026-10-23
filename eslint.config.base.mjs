@@ -8,8 +8,8 @@
  * `languageOptions` differ between the packages (browser globals and ES2020 vs
  * Node globals), so those stay in the package configs.
  *
- * The plugins are imported directly: npm hoists them from the root
- * package.json into the root `node_modules`, so bare specifiers resolve here.
+ * The plugins are imported by bare specifier; `.claude/rules/repo/tooling.md`
+ * says where each is declared.
  *
  * .ts and .tsx files are linted with type information: the project service
  * reads the tsconfig.json nearest each file (the client's webpack config has

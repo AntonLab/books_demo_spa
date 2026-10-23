@@ -19,6 +19,10 @@ export type ChapterSummary = Omit<PublicChapter, 'text'>;
 // Counted after trimming, as every title is.
 export const CHAPTER_TITLE_MAX_LENGTH = 255;
 
+// Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
+// were a 4-byte astral one, a million of them reach 4 MB.
+export const CHAPTER_TEXT_MAX_LENGTH = 1_000_000;
+
 // How a save sets the Publication time: 'now' publishes at the server's clock,
 // an ISO instant schedules, and null keeps the chapter a draft.
 export type PublishedAtPayload = 'now' | string | null;
