@@ -87,6 +87,23 @@ describe('report schemas', () => {
     );
   });
 
+  test('a bound must be an ISO date or datetime, not whatever Date can read', () => {
+    for (const loose of ['1', '2026', 'March 1 2026', '2026-03-01T00:00:00']) {
+      assert.equal(
+        reportRangeSchema.safeParse({ from: loose, to: RANGE.to }).success,
+        false,
+        loose
+      );
+    }
+    for (const iso of ['2026-03-01', '2026-03-01T01:00:00+01:00']) {
+      assert.equal(
+        reportRangeSchema.parse({ from: iso, to: RANGE.to }).from.toISOString(),
+        '2026-03-01T00:00:00.000Z',
+        iso
+      );
+    }
+  });
+
   test('the list query defaults its page and takes an optional status', () => {
     const parsed = listReportsQuerySchema.parse(RANGE);
     assert.deepEqual(

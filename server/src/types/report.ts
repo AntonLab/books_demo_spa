@@ -43,8 +43,12 @@ export const createReportSchema = z
   }));
 
 // [from, to): an empty or inverted range is a 400, not an empty result.
+const isoBoundSchema = z
+  .union([z.iso.datetime({ offset: true }), z.iso.date()])
+  .pipe(z.coerce.date());
+
 export const reportRangeSchema = z
-  .object({ from: z.coerce.date(), to: z.coerce.date() })
+  .object({ from: isoBoundSchema, to: isoBoundSchema })
   .refine(({ from, to }) => from < to, { message: 'from must be before to' });
 
 export const listReportsQuerySchema = reportRangeSchema.and(
