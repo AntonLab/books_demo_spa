@@ -11,7 +11,8 @@
  *
  * Removal refuses a worktree with uncommitted changes or a branch that
  * `origin/dev` does not contain yet. It also deletes the main checkout's
- * `.playwright-mcp` and the `docs/superpowers` notes whose topic is `<name>`.
+ * `.playwright-mcp` and the `docs/superpowers` notes whose topic is `<name>`;
+ * for `queue-<date>[-<letter>]` also that run's files in `docs/superpowers/queue`.
  */
 import { execFileSync, execSync } from 'node:child_process';
 import {
@@ -22,6 +23,7 @@ import {
   rmSync,
 } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { queueFilesFor } from './queue-files.mjs';
 import { removeDir } from './remove-dir.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -108,6 +110,13 @@ const remove = (name) => {
         .slice('YYYY-MM-DD-'.length)
         .replace(/(-design|-codemap|-followups)?\.md$/, '');
       if (topic === name) rmSync(join(notes, file));
+    }
+  }
+  // A queue run's checkpoint, log, map and briefs, once its PR has merged.
+  const queueDir = join(root, 'docs', 'superpowers', 'queue');
+  if (existsSync(queueDir)) {
+    for (const file of queueFilesFor(name, readdirSync(queueDir))) {
+      rmSync(join(queueDir, file));
     }
   }
   console.log(`worktree: removed ${name}`);

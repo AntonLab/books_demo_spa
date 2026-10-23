@@ -16,10 +16,12 @@ paths:
   `PowerShell` as well as `Bash`; a `Bash(...)` rule alone misses the other.
 - **Tool hooks come from the `swarm` plugin**, whose README lists what each
   one does: `guard-shell` refuses shell writes into repo files, `sed -i`,
-  pushes to `dev` or `main`, and package-wide gates in the main session. A
-  workspace gate (`npm run lint -w client`) counts as package-wide, and so
-  do `npx tsc`, and `npx jest`/`eslint` or `node --test` with no path; only
-  a run naming a path passes (`npm test -w client -- <path>`); `format-edited` runs
+  pushes to `dev` or `main`, and unbounded package-wide gates in the main
+  session. A workspace gate (`npm run lint -w client`) counts as package-wide,
+  and so do `npx tsc`, and `npx jest`/`eslint` or `node --test` with no path;
+  a run naming a path passes (`npm test -w client -- <path>`), and so does a
+  gate piped into `| tail`/`| head`/`| grep` or redirected into the scratchpad
+  (needs swarm 1.4.4); `format-edited` runs
   Prettier from the nearest folder holding `.prettierrc.json`; `after-pr`
   reminds the main session to offer `/mattpocock-skills:retro`, then `/clear`,
   after `gh pr create`. Change them in
