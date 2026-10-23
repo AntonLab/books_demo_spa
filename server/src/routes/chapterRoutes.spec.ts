@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
-import type { ChapterSummary, PublicChapter } from 'shared';
+import {
+  CHAPTER_TEXT_MAX_LENGTH,
+  type ChapterSummary,
+  type PublicChapter,
+} from 'shared';
 import {
   json,
   ROLE_COOKIES,
@@ -218,6 +222,49 @@ test('PATCH renames a chapter without touching its body', async () => {
       assert.equal(response.status, 200);
       assert.equal(body.title, 'Renamed');
       assert.equal(body.text, 'It was a dark night.');
+    }
+  );
+});
+
+test('POST accepts a text of exactly CHAPTER_TEXT_MAX_LENGTH characters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const response = await post(base, {
+        ...valid,
+        text: 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH),
+        publishedAt: null,
+      });
+
+      assert.equal(response.status, 201);
+    }
+  );
+});
+
+test('PATCH accepts a text of exactly CHAPTER_TEXT_MAX_LENGTH characters', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+
+      const response = await patch(base, created.id, {
+        text: 'x'.repeat(CHAPTER_TEXT_MAX_LENGTH),
+      });
+
+      assert.equal(response.status, 200);
+    }
+  );
+});
+
+test('POST and PATCH answer 413 for a body over the 5 MiB chapter limit', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(5 * 1024 * 1024 + 1);
+
+      assert.equal((await post(base, { ...valid, text })).status, 413);
+      assert.equal((await patch(base, created.id, { text })).status, 413);
     }
   );
 });
