@@ -6,7 +6,7 @@ import { idSchema } from './params.ts';
 // characters under utf8mb4 — so the bound sits well inside it rather than at
 // it, or MySQL truncates (or, in strict mode, rejects) the write. Chapters take
 // the same care at a far larger bound; see CHAPTER_TEXT_MAX_LENGTH in
-// types/chapter.ts.
+// shared/src/chapter.ts.
 export const COMMENT_TEXT_MAX_LENGTH = 10_000;
 
 // Deliberately untrimmed, like a chapter body and unlike a title: paragraph

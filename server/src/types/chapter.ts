@@ -1,11 +1,11 @@
-import { CHAPTER_TITLE_MAX_LENGTH, SEARCH_TEXT_MAX_LENGTH } from 'shared';
+import {
+  CHAPTER_TEXT_MAX_LENGTH,
+  CHAPTER_TITLE_MAX_LENGTH,
+  SEARCH_TEXT_MAX_LENGTH,
+} from 'shared';
 import { z } from 'zod';
 import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
-
-// Comfortably inside MEDIUMTEXT's 16,777,215 bytes: even if every character
-// were a 4-byte astral one, a million of them reach 4 MB.
-export const CHAPTER_TEXT_MAX_LENGTH = 1_000_000;
 
 // Trimmed, unlike the descriptions on series and books: a leading space in a
 // description is harmless, but a title is echoed in every summary list, where
