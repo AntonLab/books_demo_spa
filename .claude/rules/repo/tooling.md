@@ -102,6 +102,10 @@ CI runs them on Linux, where `path` is POSIX and `\` is no separator: a check
 on a path or name holds for `path.posix` and `path.win32` alike, and its test
 covers both separators.
 `doc-limits.mjs` holds CLAUDE.md files to 200 lines and rules to 150.
+`check-doc-refs.mjs` fails when a backtick identifier or file name in CLAUDE.md
+or a rule matches no tracked file content (`git grep -F`), or a `/` path does
+not exist; known false positives go in `doc-refs-allowlist.txt` with a reason.
+It runs in `npm run lint` after `doc-limits` and in the pre-commit hook.
 `sdd-step.sh` finds the superpowers scripts by globbing the plugin cache for
 the newest version, so it needs no update when the plugin does.
 `plan-check.mjs` tells a test block from implementation by a `test`/`it`/

@@ -1,0 +1,132 @@
+# Tokens the docs name on purpose that check-doc-refs cannot verify.
+# One token per line; a `#` line is a comment. Group by reason.
+
+# Doc file names. The file exists but no tracked file's content spells its name.
+CODING_STANDARDS.md
+access.md
+api.md
+chapter-page.md
+components-search.md
+components.md
+images.md
+operations.md
+pipeline.md
+queries.md
+routing.md
+seed.md
+store.md
+testing.md
+webpack.md
+
+# Server paths relative to server/src/, so the root-relative path check misses them.
+announcements/announcementPass.ts
+controllers/coAuthorGuard.ts
+controllers/creditHandlers.ts
+db/dropTestDatabases.testkit.ts
+db/mysqlProbe.testkit.ts
+db/seed/personas.ts
+delivery/mailDelivery.ts
+middleware/authRateLimit.ts
+middleware/csrfProtection.ts
+middleware/sessionUser.ts
+models/creditedBook.testkit.ts
+online/notificationPublisher.ts
+online/onlineRegistry.ts
+permissions/matrix.ts
+repositories/coAuthors.ts
+repositories/likePattern.ts
+repositories/visibility.ts
+routes/routeTestKit.testkit.ts
+seed/rng.ts
+types/book.ts
+types/errors.ts
+types/payloads.typetest.ts
+types/series.ts
+
+# Client paths relative to client/src/ or client/, so the root-relative path check misses them.
+api/notificationStream.ts
+api/notifications.ts
+config/tsconfig.json
+config/webpack/buildResolve.ts
+queries/suggestions.ts
+types/bookSearch.ts
+types/capabilities.ts
+
+# Paths relative to client/ or server/, so the root-relative path check misses them.
+src/db/config.ts
+src/db/seed/seed.ts
+src/format/date.ts
+src/images.ts
+src/index.ts
+src/logger.ts
+src/app.spec.ts
+src/test/eventSource.ts
+src/test/httpFixtures.ts
+src/test/setup.ts
+src/test/sortable.ts
+src/test/styleMock.ts
+src/theme/tokens.ts
+src/types/css.d.ts
+
+# Bare file names. The file exists but no tracked file's content spells its name.
+App.test.tsx
+authController.spec.ts
+client.test.ts
+errorHandler.spec.ts
+keys.ts
+persistence.ts
+plan.spec.ts
+reorder.ts
+shutdown.spec.ts
+tokens.test.tsx
+usePages.ts
+useProfileLists.ts
+useRecentlyViewed.ts
+useUnsavedText.ts
+
+# Spec file stems: the docs name the spec by its subject, and the file is <name>.spec.ts.
+uploadRateLimit
+writeRateLimit
+
+# Placeholders and patterns, not real files.
+.superpowers/sdd/<topic>/ui-check.md
+<name>Repository.contract.testkit.ts
+<name>Repository.spec.ts
+NNNN-name.ts
+docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md
+docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md
+repositories/<name>Repository.fake.testkit.ts
+…-codemap.md
+
+# Alias and URL examples.
+@/components/organisms/BookCard/BookCard
+/books/:id/chapters/:chapterId/edit
+
+# Repositories on GitHub, outside this tree.
+AntonLab/books_demo_spa
+AntonLab/custom-agents-swarm
+
+# Properties, columns and methods (Type.member, table.column) whose parent is a real
+# type or table. The member alone is found in code, the dotted form is not.
+BookDetail.commentCount
+BookDetail.favoriteCount
+DataTypes.JSONB
+bookRepository.update
+books.seriesPosition
+chapterRepository.update
+chapters.wordCount
+classNames.body
+comments.userId
+likeRepository.create
+seriesRepository.findDetailById
+seriesRepository.remove
+userController.assertCurrentPassword
+userController.assertMayTouch
+users.emailNotifications
+
+# Names that live in third-party libraries or other repos, not here.
+SendMessage
+afterCreate
+exactOptionalPropertyTypes
+noPropertyAccessFromIndexSignature
+refetchPage
