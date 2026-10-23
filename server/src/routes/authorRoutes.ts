@@ -16,9 +16,8 @@ export function createAuthorRoutes(deps: RouteDeps): Router {
   const requirePermission = createRequirePermission(deps);
   const router = Router();
 
-  // `books × update`: the picker is for roles that manage Co-authors (author
-  // `own`, admin and superadmin `any`). A plain user has no book to credit
-  // anyone on, and a guest is 401.
+  // `books × update`: the picker is for roles that manage Co-authors; a plain
+  // user has no book to credit anyone on.
   router.get(
     '/',
     requirePermission('books', 'update'),

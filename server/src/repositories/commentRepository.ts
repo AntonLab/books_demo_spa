@@ -25,9 +25,12 @@ import type {
   ListCommentsQuery,
   UpdateCommentInput,
 } from '../types/comment.ts';
-import { canReadBook, readableBookInclude, type Viewer } from './visibility.ts';
-
-export type Account = NonNullable<Viewer>;
+import {
+  assertDraftRefusal,
+  readableBookInclude,
+  type Account,
+  type Viewer,
+} from './visibility.ts';
 
 export type CommentListResult = Pick<
   ListResponse<CommentWithAuthor>,
@@ -35,8 +38,7 @@ export type CommentListResult = Pick<
 >;
 
 export interface CommentRepository {
-  // The actor is separate from the input rather than folded into it, so the type
-  // itself says the author is not caller-supplied data. See types/comment.ts.
+  // Separate from input: the type shows the author is not caller data.
   create(input: CreateCommentInput, actor: Account): Promise<PublicComment>;
   // Both leave out the comments on a Draft book the viewer may not read, and
   // the viewer is also who viewerLikeId is reported for.
@@ -106,10 +108,12 @@ export function createSequelizeCommentRepository(): CommentRepository {
         attributes: ['status'],
       });
       if (book?.status === 'draft') {
-        if (!(await canReadBook(input.bookId, actor))) {
-          throw new NotFoundError('Book', input.bookId);
-        }
-        throw new ForbiddenError('You cannot comment on a draft book');
+        await assertDraftRefusal(
+          input.bookId,
+          actor,
+          new NotFoundError('Book', input.bookId),
+          'You cannot comment on a draft book'
+        );
       }
 
       // A reply needs a live parent. Checked before the insert because the

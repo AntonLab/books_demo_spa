@@ -35,8 +35,7 @@ const PUBLIC_READS: RoleGrants = {
 
 const USER_GRANTS: RoleGrants = {
   ...PUBLIC_READS,
-  // The directory carries PublicUser with its email, so only moderators read
-  // it; every role edits only its own row.
+  // The directory carries PublicUser with its email, so only moderators read it.
   users: { read: 'none', update: 'own', delete: 'own' },
   comments: { read: 'any', create: 'own', update: 'own', delete: 'own' },
   // update is what turns a like into a dislike; without it likeRoutes' PATCH

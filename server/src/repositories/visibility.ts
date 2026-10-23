@@ -3,7 +3,11 @@ import { literal, Op, type IncludeOptions, type WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
-import { UnauthorizedError } from '../types/errors.ts';
+import {
+  ForbiddenError,
+  NotFoundError,
+  UnauthorizedError,
+} from '../types/errors.ts';
 import { isModeratorRole } from 'shared';
 import type { Role } from '../types/permission.ts';
 
@@ -11,6 +15,8 @@ import type { Role } from '../types/permission.ts';
 // id and Role, or null for a Guest. Passed to every repository read that can
 // reach a book, so the rule lives in the query rather than in each controller.
 export type Viewer = { id: number; role: Role } | null;
+
+export type Account = NonNullable<Viewer>;
 
 // The account behind a write, for the notifications it raises. Every route
 // that calls this is guarded, so an unset req.user here is a wiring mistake
@@ -48,6 +54,7 @@ export async function readableBookWhere(viewer: Viewer): Promise<WhereOptions> {
   return readableBookWhereFor(await creditedBookIds(viewer));
 }
 
+// The single-book form of readableBookWhere.
 export async function canReadBook(
   bookId: number,
   viewer: Viewer
@@ -57,6 +64,19 @@ export async function canReadBook(
     attributes: ['id'],
   });
   return book !== null;
+}
+
+// Refuses an action on a Draft book. A viewer who may not read the draft gets
+// the not-found answer a missing book gets, so its existence stays hidden; one
+// who may (a Co-author, a Moderator) is told plainly with a 403.
+export async function assertDraftRefusal(
+  bookId: number,
+  actor: Account,
+  notFound: NotFoundError,
+  forbiddenMessage: string
+): Promise<never> {
+  if (!(await canReadBook(bookId, actor))) throw notFound;
+  throw new ForbiddenError(forbiddenMessage);
 }
 
 // Split from readableBookWhere so readableChapterScope, which needs the

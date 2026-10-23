@@ -2,7 +2,7 @@ import express, { Router, type Request } from 'express';
 import { ACCEPTED_IMAGE_CONTENT_TYPES, IMAGE_MAX_BYTES } from 'shared';
 import { createChapterController } from '../controllers/chapterController.ts';
 import { createIllustrationController } from '../controllers/illustrationController.ts';
-import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
+import { limitUserWrites } from '../middleware/authRateLimit.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -31,7 +31,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
     deps.illustrationRepository
   );
   const requirePermission = createRequirePermission(deps);
-  const limitWrites = limitEveryRequestByUser(deps.authRateLimits.write);
+  const limitWrites = limitUserWrites(deps);
   const router = Router();
   // app.ts keeps the global parser off these two writes, so the large limit
   // applies only after requirePermission: an unauthorised caller never has

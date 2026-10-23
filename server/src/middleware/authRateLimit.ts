@@ -129,6 +129,11 @@ export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
   };
 }
 
+// The shared per-user budget of the comment, like, report and chapter writes.
+export const limitUserWrites = (deps: {
+  authRateLimits: AuthRateLimits;
+}): RequestHandler => limitEveryRequestByUser(deps.authRateLimits.write);
+
 // Login: only a failure counts (a 401, or an abort: the connection closing
 // before any answer goes out). Both budgets are charged the moment the request
 // arrives, before validate or argon2, and the hit is given back only when an

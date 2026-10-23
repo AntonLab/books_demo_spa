@@ -123,9 +123,8 @@ export function createAuthController(deps: AuthControllerDeps) {
         throw new UnauthorizedError('Invalid credentials');
       }
 
-      // A fresh row every login; the previous cookie is replaced, never
-      // reused, and its row is deleted with the insert. This is what rules out
-      // session fixation.
+      // Each login opens a fresh row and deletes the one its cookie names, so a
+      // planted cookie cannot be fixed onto a session.
       //
       // Opened only if the account still holds the hash verified above and is
       // still not blocked. A password change or a block can commit while the

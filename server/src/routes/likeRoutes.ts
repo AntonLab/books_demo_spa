@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createLikeController } from '../controllers/likeController.ts';
-import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
+import { limitUserWrites } from '../middleware/authRateLimit.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
 import {
@@ -14,7 +14,7 @@ import type { RouteDeps } from './index.ts';
 export function createLikeRoutes(deps: RouteDeps): Router {
   const controller = createLikeController(deps.likeRepository);
   const requirePermission = createRequirePermission(deps);
-  const limitWrites = limitEveryRequestByUser(deps.authRateLimits.write);
+  const limitWrites = limitUserWrites(deps);
   const router = Router();
 
   // Every route runs through the matrix, reads included: every role has

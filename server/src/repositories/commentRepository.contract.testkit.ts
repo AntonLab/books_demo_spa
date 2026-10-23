@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NotFoundError } from '../types/errors.ts';
 import type { UserRole } from 'shared';
-import type { Account, CommentRepository } from './commentRepository.ts';
+import type { CommentRepository } from './commentRepository.ts';
+import type { Account } from './visibility.ts';
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;

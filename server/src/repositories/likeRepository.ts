@@ -19,18 +19,20 @@ import type {
   ListLikesQuery,
   UpdateLikeInput,
 } from '../types/like.ts';
-import { canReadBook, hiddenBookIds, type Viewer } from './visibility.ts';
+import {
+  assertDraftRefusal,
+  hiddenBookIds,
+  type Account,
+  type Viewer,
+} from './visibility.ts';
 
 // Not to be confused with likePattern.ts next door, which is about the SQL
 // LIKE operator and has nothing to do with this resource.
 
 export type LikeListResult = Pick<ListResponse<PublicLike>, 'items' | 'total'>;
 
-export type Account = NonNullable<Viewer>;
-
 export interface LikeRepository {
-  // actor is separate from the input rather than folded into it, so the type
-  // itself says the liker is not caller-supplied data. See types/like.ts.
+  // Separate from input: the type shows the liker is not caller data.
   create(input: CreateLikeInput, actor: Account): Promise<PublicLike>;
   // Both leave out the likes on a Draft book the viewer may not read, and on
   // the comments under one.
@@ -87,10 +89,12 @@ async function assertLikeable(
     // Nobody likes a Draft book. Whoever may not read it is told it is not
     // there; its Co-authors and Moderators, who can, get the 403.
     if (book.status === 'draft') {
-      if (!(await canReadBook(input.bookId, actor))) {
-        throw new NotFoundError('Book', input.bookId);
-      }
-      throw new ForbiddenError('You cannot like a draft book');
+      await assertDraftRefusal(
+        input.bookId,
+        actor,
+        new NotFoundError('Book', input.bookId),
+        'You cannot like a draft book'
+      );
     }
     // Every Co-author counts as the book's own, not just whoever created it.
     // Unlike a comment's owner, credits do change — but a co-author added
@@ -114,10 +118,12 @@ async function assertLikeable(
     // A comment on a Draft book is not out either, with the same split: a 404
     // for whoever may not read the book, so the caller learns nothing about it.
     if (comment.book?.status === 'draft') {
-      if (!(await canReadBook(comment.bookId, actor))) {
-        throw new NotFoundError('Comment', input.commentId);
-      }
-      throw new ForbiddenError('You cannot like a comment on a draft book');
+      await assertDraftRefusal(
+        comment.bookId,
+        actor,
+        new NotFoundError('Comment', input.commentId),
+        'You cannot like a comment on a draft book'
+      );
     }
     // A tombstone takes no new reactions: a like there would be a vote on a
     // comment nobody can see.
