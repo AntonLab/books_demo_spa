@@ -17,6 +17,9 @@ export interface IllustrationRepository {
   findCoAuthorIds(id: number): Promise<number[] | null>;
   // The Co-author ids of the chapter's book; null when the chapter is missing.
   findChapterCoAuthorIds(chapterId: number): Promise<number[] | null>;
+  // A cheap look at the cap, so an upload past it is refused before its image
+  // is decoded. Unlocked; create() rechecks under the chapter lock.
+  isFull(chapterId: number): Promise<boolean>;
   // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
   create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
   // null when the illustration is missing.
@@ -33,6 +36,8 @@ export interface IllustrationRepository {
   // Whether a row went; its image cascades.
   remove(id: number): Promise<boolean>;
 }
+
+export const ILLUSTRATION_CAP_MESSAGE = `A chapter holds at most ${ILLUSTRATIONS_PER_CHAPTER_MAX} illustrations`;
 
 async function coAuthorIdsOfBook(bookId: number): Promise<number[]> {
   const credits = await BookAuthor.findAll({
@@ -107,6 +112,13 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
       return chapter ? coAuthorIdsOfBook(chapter.bookId) : null;
     },
 
+    async isFull(chapterId) {
+      return (
+        (await Illustration.count({ where: { chapterId } })) >=
+        ILLUSTRATIONS_PER_CHAPTER_MAX
+      );
+    },
+
     // The chapter row is locked so two uploads cannot both pass the cap or
     // share a position.
     async create(chapterId, data) {
@@ -123,9 +135,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
           (await Illustration.count({ where, transaction })) >=
           ILLUSTRATIONS_PER_CHAPTER_MAX
         ) {
-          throw new StateConflictError(
-            `A chapter holds at most ${ILLUSTRATIONS_PER_CHAPTER_MAX} illustrations`
-          );
+          throw new StateConflictError(ILLUSTRATION_CAP_MESSAGE);
         }
         const last = await Illustration.max<number | null, Illustration>(
           'position',

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { AppDeps } from '../app.ts';
 import { CHAPTER_JSON_LIMIT_BYTES } from './chapterRoutes.ts';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
@@ -753,3 +754,46 @@ test('a reorder conflict from the repository reaches the caller as a 409', async
     }
   );
 });
+
+// Bytes that are not an image: a decode would answer 400, so a 409 shows the
+// cap was checked first and nothing was decoded.
+const uploadGarbage = (base: string) =>
+  fetch(`${base}/api/chapters/1/illustrations`, {
+    method: 'POST',
+    headers: { 'content-type': 'image/png', cookie: ROLE_COOKIES.author },
+    body: 'not an image',
+  });
+
+const illustrationRepositoryWith = (
+  full: boolean
+): AppDeps['illustrationRepository'] =>
+  ({
+    async findChapterCoAuthorIds() {
+      return [USER_IDS.author];
+    },
+    async isFull() {
+      return full;
+    },
+  }) as unknown as AppDeps['illustrationRepository'];
+
+test('an upload past the illustration cap is refused with a 409 before the image is decoded', () =>
+  withAuthenticatedApp(
+    { illustrationRepository: illustrationRepositoryWith(true) },
+    async (base) => {
+      const response = await uploadGarbage(base);
+
+      assert.equal(response.status, 409);
+      assert.match(
+        (await json<{ error: string }>(response)).error,
+        /at most 20 illustrations/
+      );
+    }
+  ));
+
+test('an upload under the illustration cap is decoded', () =>
+  withAuthenticatedApp(
+    { illustrationRepository: illustrationRepositoryWith(false) },
+    async (base) => {
+      assert.equal((await uploadGarbage(base)).status, 400);
+    }
+  ));
