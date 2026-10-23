@@ -117,6 +117,10 @@ reviewers read it; implementers do not, so a rule there costs no context.
 
 ### Context-saving agents
 
+Dispatch is a recommendation: choose inline or a subagent by which costs fewer
+tokens at the same quality. A subagent pays for itself when its output is large
+and the main session needs only the verdict.
+
 - **`repo-auditor`** (Sonnet, read-only) takes any "check / audit / find all"
   request, `/ponytail-audit` included, and returns numbered findings. Grilling
   and the question of which findings to fix stay in the main session. The
@@ -124,18 +128,22 @@ reviewers read it; implementers do not, so a rule there costs no context.
   finding gets a line in `docs/agents/rejected-findings.md`, with the user's
   reason, so later audits skip it.
 - **`gate-runner`** (Haiku) runs the quality gates or reads a CI run and
-  returns only the failures. Dispatch it instead of running the gates inline.
+  returns only the failures. Prefer it to running the gates inline, which
+  floods the main context with passing output. The `guard-shell` hook blocks an
+  unbounded package-wide gate in the main session; a focused test or a gate
+  piped through `| tail` passes.
 - **`ui-checker`** (Sonnet, no edits) checks pages and flows in the browser
-  through the Playwright MCP and returns pass/fail per item. Dispatch it after
-  a UI change and for a PR test plan's manual items; the main session starts
-  no dev server, takes no snapshot and never Reads a screenshot. It never
-  deletes, edits, blocks or bans seed records: a destructive check acts on a
-  record it created first.
-- **Search goes to `Explore` or `caveman:cavecrew-investigator`**, never
-  `general-purpose`: the latter ran on Sonnet and loaded the full context.
-  While a plan pipeline runs, `code-mapper` does the mapping and
-  `sdd-implementer` makes the changes. Neither a search agent nor
-  `cavecrew-builder` stands in for them.
+  through the Playwright MCP and returns pass/fail per item. Prefer it after
+  a UI change and for a PR test plan's manual items: its calls and DOM dumps
+  stay out of the main context, but its cost grows with every call, so give it
+  a short list. One quick look inline (a snapshot, a screenshot) is fine when
+  a single check settles the question. It never deletes, edits, blocks or bans
+  seed records: a destructive check acts on a record it created first.
+- **Prefer `Explore` or `caveman:cavecrew-investigator` for broad search**:
+  `general-purpose` runs on Sonnet and loads the full context. A direct Grep
+  or Read is cheaper when the file is known. While a plan pipeline runs,
+  `code-mapper` and `sdd-implementer` are the default for mapping and changes;
+  `cavecrew-builder` and the search agents do not replace them.
 - The agents come from the `swarm` plugin: dispatch them as `swarm:<name>`
   (`swarm:code-mapper`). Every agent preloads `caveman`
   (`.claude/rules/repo/claude-config.md` has the detail).
@@ -178,7 +186,7 @@ with `EPERM ... uv_spawn 'rg'`, fall back to `git grep`.
 ### Plan pipeline agents
 
 Plan pipeline: **Read `.claude/rules/repo/pipeline.md` before running it**; it
-does not load itself. Save the spec before dispatching `plan-writer`. Run one
-spec per main session (`/clear` after its PR). Pass `model` on every dispatch,
+does not load itself. Save the spec before dispatching `plan-writer`. Prefer
+one spec per main session (`/clear` after its PR). Pass `model` on every dispatch,
 opus only when the user asks. Before a brief or an issue states a fact, run its
 command: `.claude/rules/repo/claims.md`.

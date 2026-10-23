@@ -17,7 +17,7 @@ const sandbox = (t) => {
   const root = mkdtempSync(join(tmpdir(), 'worktree-guard-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(join(root, 'scripts'));
-  for (const file of ['worktree.mjs', 'remove-dir.mjs']) {
+  for (const file of ['worktree.mjs', 'remove-dir.mjs', 'queue-files.mjs']) {
     copyFileSync(join(scripts, file), join(root, 'scripts', file));
   }
   mkdirSync(join(root, '.claude', 'worktrees'), { recursive: true });

@@ -17,19 +17,18 @@ per-call values.
   session first (`/grill-with-docs`, which also updates `CONTEXT.md` and the
   ADRs). The spec names the test seam agreed while grilling: the highest
   existing one the behaviour can be tested through, ideally one. plan-writer
-  asks only about decisions the
-  spec left open, as one `NEEDS_CONTEXT` round — put it to the user verbatim
-  and resume the agent with the answers through `SendMessage`. A plan over 6
-  tasks or two workspaces comes back as part 1 with the other parts listed;
+  asks only about decisions the spec left open, as one `NEEDS_CONTEXT` round —
+  put it to the user verbatim and resume the agent with the answers through
+  `SendMessage`. A plan over 6 tasks or two workspaces comes back as part 1
+  with the other parts listed;
   **resume the same plan-writer through `SendMessage` for each next part**,
   since it already holds the code it read. Dispatch a fresh one only when the
   resume fails.
 - **Dispatch `code-mapper` once per spec, first** (light mode skips it), and pass its
   `…-codemap.md` to every plan-writer part. Do not run `Explore` or
   `cavecrew-investigator` before it: they map the same code twice. Plans carry
-  contracts and tests, not implementation bodies;
-  `node scripts/plan-check.mjs <plan>` enforces it, and fails a task over
-  180 lines.
+  contracts and tests, not implementation bodies; `node scripts/plan-check.mjs
+<plan>` enforces it, and fails a task over 180 lines.
 - **Every plan goes through plan-writer.** The main session never writes one:
   it costs several times the plan-writer's tokens for a plan of the same size.
 - **A `DONE_WITH_CONCERNS` from any agent:** take a recommendation that stays
@@ -37,15 +36,15 @@ per-call values.
   follow-ups file, and go on; the user reviews those lines with the other
   follow-ups. Put a concern with no recommendation, or one that changes what
   the spec asks for, to the user verbatim and wait. An audit finding is not a
-  concern: fix it as the audit bullet below says.
+  concern: fix it as the audit bullet below says. Re-read an accepted fix from
+  the diff, not the report: a report line can say done for a change not made.
 - **The main session edits no source file while a plan runs**, and it fixes
   nothing through `cavecrew-builder` or another ad-hoc agent. Every change
   goes through an `sdd-implementer` brief, so it gets a ledger line and a
   review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
   task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
-  review costs about 0.08M tokens,
-  and skipping it let defects through. Do not run
+  review costs about 0.08M tokens, and skipping it let defects through. Do not run
   `superpowers:executing-plans` inline: the Opus session pays about as much as
   all the implementers together and compacts more often.
 - **Light mode** is for a spec that touches no `client/src` and names at most
@@ -54,11 +53,11 @@ per-call values.
   review already covered the whole diff. The changed-files audit and
   `gate-runner` still run, audit first, so the gates run once. A plan that
   comes back with more than two tasks leaves light mode for the final review.
-- **One spec, one main session.** After the PR for a spec is opened (or its
-  part of a shared branch is finished), have the user run `/clear` before the
-  next spec: a long context compacts repeatedly and costs far more. The spec,
-  code map, plan, ledger and follow-ups files carry the state. A PostToolUse
-  hook prints this reminder after `gh pr create`.
+- **Prefer one spec per main session.** After the PR for a spec is opened,
+  suggest `/clear` before the next spec: a long context compacts repeatedly and
+  costs more. Continuing is fine when the next spec is small and related. The
+  spec, code map, plan, ledger and follow-ups files carry the state. A
+  PostToolUse hook prints a reminder after `gh pr create`.
 - **One PR per spec** (or per two or three small related specs, or per
   `/swarm:queue` run of up to 5 issues with one commit group per issue): a
   giant PR is unreviewable. `dev` is the default branch, so a `Fixes #<n>`
@@ -69,23 +68,24 @@ per-call values.
 - **Run the gates through `gate-runner` before the final review**, in every
   mode, and quote its last line in the dispatch (`gates green at <sha>`, with
   the subset if it ran one). Never write that line yourself: a past run
-  claimed typecheck and lint that never ran. The `guard-shell` hook refuses a
-  package-wide gate in the main session.
+  claimed typecheck and lint that never ran. `guard-shell` refuses an
+  unbounded package-wide gate in the main session; one piped through
+  `| tail` passes, but it is not a `gates green` line.
 - **A PR body reports only checks that have finished**, with their result: a
   past PR body listed a plan-check run before it ran. Write a pending check
   as pending, never as its expected result; update the body once it finishes.
 - **A diff that touches `client/src` gets a `ui-checker` run** after the
   changed-files audit's fixes and before `finishing-a-development-branch`, because it finds
-  defects every review passed: a numbered checklist from the spec's
-  user-visible behavior, the worktree as working directory. It serves the
-  worktree on ports 3100/4100 and never touches the user's server on 3000. Its
+  defects every review passed: a numbered checklist of at most 8 items from
+  the spec's user-visible behavior, the worktree as working directory. It
+  serves the worktree on ports 3100/4100, never the user's server on 3000. Its
   FAIL items are fixed like final-review findings: the fix brief quotes the
   FAIL line with its measured values, and the implementer's report says why
-  the change moves them. Build each checklist item
-  from what the seeded data can reach: roles are `user`, `author`, `admin` and
-  `superadmin` (check `USER_ROLES` in `shared/`), so an item that needs another
-  role cannot be verified. Fix all FAIL items first, then send one recheck run
-  with only those items; one recheck per fix multiplies the cost. Save each
+  the change moves them. Build each item from what the seeded data can reach:
+  roles are `user`, `author`, `admin` and `superadmin` (check `USER_ROLES` in
+  `shared/`). Fix all FAIL items first, then send one recheck run with only
+  those items. Skip it in a follow-up round that changes no rendered output
+  (its cost grows with every call: 32% of workers in PR #251). Save each
   run's returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md`
   under a `## <sha>` heading; `/swarm:ship` builds the test plan from it.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
@@ -144,7 +144,7 @@ per-call values.
   `.env.local` files an agent may not copy, and an install. Name the worktree
   after the spec's `<topic>`. Once the PR merges,
   `npm run worktree -- --remove <name>` deletes it with its branch,
-  `.playwright-mcp` and the `docs/superpowers` spec, code map, follow-ups and
-  plan whose topic is `<name>`; bare `git worktree remove` leaves the
-  directory. No agent sets `isolation: worktree`: it hides implementer commits
-  from the reviewer.
+  `.playwright-mcp`, the `docs/superpowers` spec, code map, follow-ups and
+  plan whose topic is `<name>`, and a `queue-<date>[-b]` run's queue files;
+  bare `git worktree remove` leaves the directory. No agent sets
+  `isolation: worktree`: it hides implementer commits from the reviewer.
