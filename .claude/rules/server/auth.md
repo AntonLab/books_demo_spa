@@ -105,4 +105,4 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 - Route specs get the token from `routeTestKit.testkit.ts`; the refusals are
   covered in `csrfProtection.spec.ts`; `app.spec.ts` does the real handshake.
 
-Sign-in, registration, password, upload and write rate limits: see rate-limits.md.
+Rate limits: `rate-limits.md`.

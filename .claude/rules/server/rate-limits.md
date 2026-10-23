@@ -2,6 +2,7 @@
 paths:
   - 'server/src/middleware/authRateLimit.ts'
   - 'server/src/routes/*Routes.ts'
+  - 'server/src/rateLimit.ts'
 ---
 
 # Rate limiting (`middleware/authRateLimit.ts`)
