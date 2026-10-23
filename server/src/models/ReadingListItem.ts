@@ -30,8 +30,8 @@ export class ReadingListItem extends Model<
   declare series?: NonAttribute<Series>;
 }
 
-// A named function with an explicit `this`, so strict mode sees no implicit
-// any. MySQL gets no CHECK for this (see .claude/rules/server/sequelize.md).
+// Named function with explicit `this`: see Like.ts. MySQL gets no CHECK for
+// this (see .claude/rules/server/sequelize.md).
 function exactlyOneTarget(this: ReadingListItem): void {
   if (!exactlyOneSet(this.bookId, this.seriesId)) {
     throw new Error('Exactly one of bookId or seriesId must be set');
