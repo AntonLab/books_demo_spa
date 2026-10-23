@@ -589,8 +589,14 @@ describe('likeRepository against real MySQL', { skip }, () => {
   });
 
   test('an author who does not co-author the draft book sees none of its likes', async () => {
-    await repository.create({ bookId, commentId: null, isLike: true }, likerId);
-    await repository.create({ bookId: null, commentId, isLike: true }, likerId);
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
     const strangerId = (
       await User.create({
         ...liker,
