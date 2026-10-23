@@ -13,6 +13,11 @@ const targetIdSchema = idSchema.nullable().default(null);
 // No userId. The liker comes from req.user.id, never from the body —
 // otherwise the self-like ban is defeated by naming someone else, and the
 // unique indexes would be enforcing "one like per *claimed* user".
+//
+// The exactly-one-target rule is enforced again by the model validate in
+// models/Like.ts, because a caller reaching Sequelize directly never passes
+// through zod; migration 0003 adds the CHECK behind it (see
+// .claude/rules/server/sequelize.md).
 export const createLikeSchema = z
   .object({
     bookId: targetIdSchema,

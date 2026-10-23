@@ -262,8 +262,6 @@ async function shownCounts(listIds: number[]): Promise<Map<number, number>> {
 }
 
 // A rejected foreign key means the work went away after the check in addItem.
-// MySQL names the column in the constraint text, the only place the two are
-// distinguishable.
 function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
   const detail = foreignKeyDetail(error);
   if (detail !== null) {

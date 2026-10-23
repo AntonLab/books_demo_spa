@@ -1,4 +1,4 @@
-// Backs the exactly-one-target checks of Favorite, Like and ReadingListItem.
+// True when exactly one of a, b is non-null/undefined; 0 and '' count as set.
 export function exactlyOneSet(a: unknown, b: unknown): boolean {
   return (a == null) !== (b == null);
 }

@@ -31,7 +31,7 @@ export const clearReadingStatus = (bookId: number): Promise<void> => {
   return request<void>(`/library/${bookId}`, { method: 'DELETE' });
 };
 
-// An undefined param is left out, as listBooks does.
+// Undefined, null and empty-string params are left out, as listBooks does.
 export const listLibrary = (
   params: ListLibraryParams = {}
 ): Promise<PagedResponse<LibraryBook>> => {
