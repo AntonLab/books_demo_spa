@@ -63,8 +63,8 @@ export function createUserRoutes(deps: RouteDeps): Router {
     controller.update
   );
   // The one door for role changes. `users × update` gets the caller through
-  // the door; who may set *which* role is decided below, because the matrix
-  // grades resources, not values.
+  // the door; who may set *which* role is decided in `controller.updateRole`,
+  // because the matrix grades resources, not values.
   router.patch(
     '/:id/role',
     requirePermission('users', 'update'),
