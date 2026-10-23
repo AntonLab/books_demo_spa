@@ -148,11 +148,12 @@ function asConflict(error: unknown): never {
 // comments under one. NULL-safe on both columns: every like leaves one of them
 // empty, and `NOT IN` alone would drop those rows too.
 async function visibleLikeWhere(viewer: Viewer): Promise<WhereOptions> {
-  const hiddenBooks = await hiddenBooksSubquery(viewer);
-  if (hiddenBooks === null) return {};
+  const hiddenBooksSql = await hiddenBooksSubquery(viewer);
+  if (hiddenBooksSql === null) return {};
 
+  const hiddenBooks = literal(hiddenBooksSql);
   const hiddenComments = literal(
-    `(SELECT \`id\` FROM \`${Comment.tableName}\` WHERE \`bookId\` IN ${String(hiddenBooks.val)})`
+    `(SELECT \`id\` FROM \`${Comment.tableName}\` WHERE \`bookId\` IN ${hiddenBooksSql})`
   );
   return {
     [Op.and]: [

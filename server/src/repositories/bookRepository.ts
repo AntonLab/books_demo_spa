@@ -689,6 +689,7 @@ export function createSequelizeBookRepository(): BookRepository {
       return sequelizeOf(Book).transaction(async (transaction) => {
         const namedSeriesId =
           typeof input.seriesId === 'number' ? input.seriesId : null;
+        // A move from series A to B locks only B, which still follows the order.
         const lockedSeriesId = namedSeriesId ?? peeked.seriesId;
         if (lockedSeriesId !== null)
           await lockSeries(lockedSeriesId, transaction);

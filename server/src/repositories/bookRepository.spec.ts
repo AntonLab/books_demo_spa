@@ -68,6 +68,18 @@ describe('bookRepository against real MySQL', { skip }, () => {
     return created;
   };
 
+  // A reorder that lost a race sees a changed set: a 409, never a database
+  // error (a deadlock surfaces as a DatabaseError).
+  const assertNoDbError = (results: PromiseSettledResult<unknown>[]) => {
+    for (const result of results) {
+      assert.ok(
+        result.status === 'fulfilled' ||
+          result.reason instanceof StateConflictError,
+        String(result.status === 'rejected' && result.reason)
+      );
+    }
+  };
+
   const listAsGuest = (query: Parameters<typeof repository.list>[0]) =>
     repository.list(query, null);
 
@@ -1694,26 +1706,13 @@ describe('bookRepository against real MySQL', { skip }, () => {
         repository.update(mover.id, { seriesId }),
         repository.reorderInSeries(seriesId, [two.id, one.id]),
       ]);
-      // A reorder that lost the race sees a changed set: a 409, never a
-      // database error (a deadlock surfaces as a DatabaseError).
-      for (const result of results) {
-        assert.ok(
-          result.status === 'fulfilled' ||
-            result.reason instanceof StateConflictError,
-          String(result.status === 'rejected' && result.reason)
-        );
-      }
-      const moved = await Promise.allSettled([
-        repository.update(mover.id, { seriesId: null }),
-        repository.reorderInSeries(seriesId, [one.id, two.id]),
-      ]);
-      for (const result of moved) {
-        assert.ok(
-          result.status === 'fulfilled' ||
-            result.reason instanceof StateConflictError,
-          String(result.status === 'rejected' && result.reason)
-        );
-      }
+      assertNoDbError(results);
+      assertNoDbError(
+        await Promise.allSettled([
+          repository.update(mover.id, { seriesId: null }),
+          repository.reorderInSeries(seriesId, [one.id, two.id]),
+        ])
+      );
     }
   });
 

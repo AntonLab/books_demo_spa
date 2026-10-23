@@ -103,11 +103,11 @@ transactions deadlock:
 
 Followed today by `reorderInSeries` and `bookRepository.update` (series, then
 book; `update` peeks the series unlocked first and answers a 409 if the book
-moved meanwhile), `userRepository.remove` (credited series, then books, then
-comments before reports; see its comment at `:431-433`), `addCoAuthor` /
-`removeCoAuthor` (work row, then credits), and
-`passwordResetRepository.replaceForUser` / `redeem` (user, then tokens; see the
-comments at `:33` and `:61`).
+moved meanwhile), `seriesRepository.remove` (series row, then its book rows),
+`userRepository.remove` (credited series, then books, then comments before
+reports; see the comment in `remove`), `addCoAuthor` / `removeCoAuthor` (work
+row, then credits), and `passwordResetRepository.replaceForUser` / `redeem`
+(user, then tokens; see the comments in those two functions).
 
 ## Changing a table's shape
 

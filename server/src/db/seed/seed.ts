@@ -366,13 +366,6 @@ function seriesPositionOf(
   return position;
 }
 
-// Two unread notifications for each author, drawn from the credits the plan
-// already holds so that none contradicts a byline. Every Co-author credited on
-// a shared work beyond its first is told the first added them; and each author
-// is told the next author in AUTHORS left one of their books that nobody else
-// shares now — which reads true, since a Co-author who left is credited
-// nowhere on it. The actor's name is written as a notification would have
-// written it at the time.
 function workIdOf<T extends { title: string }>(
   ids: Map<T, number>,
   work: T
@@ -384,6 +377,13 @@ function workIdOf<T extends { title: string }>(
   return id;
 }
 
+// Two unread notifications for each author, drawn from the credits the plan
+// already holds so that none contradicts a byline. Every Co-author credited on
+// a shared work beyond its first is told the first added them; and each author
+// is told the next author in AUTHORS left one of their books that nobody else
+// shares now — which reads true, since a Co-author who left is credited
+// nowhere on it. The actor's name is written as a notification would have
+// written it at the time.
 async function writeNotifications(
   plan: Plan,
   accountIds: readonly number[],

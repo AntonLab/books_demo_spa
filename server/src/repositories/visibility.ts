@@ -102,7 +102,8 @@ function bookIncludeWhere(where: WhereOptions): IncludeOptions {
 }
 
 // The same rule turned inside out: the Draft books a viewer may not read, as a
-// subquery on `books`, or null for a Moderator (nothing is hidden). For the
+// parenthesised SQL subquery on `books` (the caller wraps it in `literal`, or
+// nests it in a larger one), or null for a Moderator (nothing is hidden). For the
 // reads that cannot join a single `book` — a like points at a book or at a
 // comment on one — excluding the hidden drafts is simpler than enumerating
 // every readable book.
@@ -112,15 +113,13 @@ function bookIncludeWhere(where: WhereOptions): IncludeOptions {
 // integers read from the database through creditedBookIds.
 export async function hiddenBooksSubquery(
   viewer: Viewer
-): Promise<ReturnType<typeof literal> | null> {
+): Promise<string | null> {
   if (isModerator(viewer)) return null;
 
   const credited = await creditedBookIds(viewer);
   const notCredited =
     credited.length > 0 ? ` AND \`id\` NOT IN (${credited.join(',')})` : '';
-  return literal(
-    `(SELECT \`id\` FROM \`books\` WHERE \`status\` = 'draft'${notCredited})`
-  );
+  return `(SELECT \`id\` FROM \`${Book.tableName}\` WHERE \`status\` = 'draft'${notCredited})`;
 }
 
 // Every series holding at least one Published book, for any viewer. A series
