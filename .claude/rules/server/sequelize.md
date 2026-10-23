@@ -90,6 +90,25 @@ paths:
   `NotFoundError('User')`: the first credit is the only reference that can
   fail, because a series is checked under lock by `nextSeriesPosition` first.
 
+## Lock order
+
+Take row locks in this order and never an earlier one after a later one, or two
+transactions deadlock:
+
+1. a series row;
+2. that series' book rows;
+3. a work row (book or series) before its credit rows;
+4. a user row before its tokens;
+5. comment rows before their reports.
+
+Followed today by `reorderInSeries` and `bookRepository.update` (series, then
+book; `update` peeks the series unlocked first and answers a 409 if the book
+moved meanwhile), `userRepository.remove` (credited series, then books, then
+comments before reports; see its comment at `:431-433`), `addCoAuthor` /
+`removeCoAuthor` (work row, then credits), and
+`passwordResetRepository.replaceForUser` / `redeem` (user, then tokens; see the
+comments at `:33` and `:61`).
+
 ## Changing a table's shape
 
 A schema change is a model change plus a new migration in

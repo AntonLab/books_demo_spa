@@ -142,21 +142,30 @@ const credits: CreditTable = {
     BookAuthor.destroy({ where: { bookId, userId }, transaction }),
 };
 
-// The place a book filed into `seriesId` takes: after the last one. Under a
-// lock on the series row, which a reorder takes too, so two books filed at
-// once cannot share a place and one filed mid-reorder cannot land inside it.
-// The lock also settles whether the series exists.
-async function nextSeriesPosition(
+// Locks the series row, which settles whether the series exists. Lock order
+// is the series row, then its book rows (.claude/rules/server/sequelize.md),
+// so a caller that locks a book too takes this first.
+async function lockSeries(
   seriesId: number,
   transaction: Transaction
-): Promise<number> {
+): Promise<void> {
   const series = await Series.findByPk(seriesId, {
     attributes: ['id'],
     transaction,
     lock: transaction.LOCK.UPDATE,
   });
   if (!series) throw new NotFoundError('Series', seriesId);
+}
 
+// The place a book filed into `seriesId` takes: after the last one. Under a
+// lock on the series row, which a reorder takes too, so two books filed at
+// once cannot share a place and one filed mid-reorder cannot land inside it.
+// A caller that already holds the lock re-takes it harmlessly.
+async function nextSeriesPosition(
+  seriesId: number,
+  transaction: Transaction
+): Promise<number> {
+  await lockSeries(seriesId, transaction);
   const last = await Book.max<number | null, Book>('seriesPosition', {
     where: { seriesId },
     transaction,
@@ -666,13 +675,37 @@ export function createSequelizeBookRepository(): BookRepository {
     // No foreign-key mapping, unlike create: seriesId and genreId are the only
     // references an update can write, and asMissingUser (coAuthors.ts) explains why neither
     // can be rejected.
+    //
+    // Lock order: the series row, then the book row (the order reorderInSeries
+    // takes), so a move and a reorder cannot deadlock. The series to lock is
+    // read before the transaction, unlocked, since the book row cannot be
+    // locked first.
     async update(id, input) {
+      const peeked = await Book.findByPk(id, {
+        attributes: ['id', 'seriesId'],
+      });
+      if (!peeked) return null;
+
       return sequelizeOf(Book).transaction(async (transaction) => {
+        const namedSeriesId =
+          typeof input.seriesId === 'number' ? input.seriesId : null;
+        const lockedSeriesId = namedSeriesId ?? peeked.seriesId;
+        if (lockedSeriesId !== null)
+          await lockSeries(lockedSeriesId, transaction);
+
         const book = await Book.findByPk(id, {
           transaction,
           lock: transaction.LOCK.UPDATE,
         });
         if (!book) return null;
+
+        // The book was moved after the peek, so the series locked is not its
+        // own: a retry locks the right one.
+        if (namedSeriesId === null && book.seriesId !== peeked.seriesId) {
+          throw new StateConflictError(
+            'The book was moved to another series; try again'
+          );
+        }
 
         await assertGenreExists(input.genreId, transaction);
 

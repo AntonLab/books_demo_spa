@@ -1684,6 +1684,48 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal(new Set(positions).size, 5);
   });
 
+  test('a book moving in and out of a series while it is reordered never deadlocks', async () => {
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    const mover = await fileBook('Mover', null);
+
+    for (let round = 0; round < 5; round += 1) {
+      const results = await Promise.allSettled([
+        repository.update(mover.id, { seriesId }),
+        repository.reorderInSeries(seriesId, [two.id, one.id]),
+      ]);
+      // A reorder that lost the race sees a changed set: a 409, never a
+      // database error (a deadlock surfaces as a DatabaseError).
+      for (const result of results) {
+        assert.ok(
+          result.status === 'fulfilled' ||
+            result.reason instanceof StateConflictError,
+          String(result.status === 'rejected' && result.reason)
+        );
+      }
+      const moved = await Promise.allSettled([
+        repository.update(mover.id, { seriesId: null }),
+        repository.reorderInSeries(seriesId, [one.id, two.id]),
+      ]);
+      for (const result of moved) {
+        assert.ok(
+          result.status === 'fulfilled' ||
+            result.reason instanceof StateConflictError,
+          String(result.status === 'rejected' && result.reason)
+        );
+      }
+    }
+  });
+
+  test('a book update names a missing target series before anything else is written', async () => {
+    const book = await fileBook('Solo', null);
+    await assert.rejects(
+      repository.update(book.id, { title: 'Renamed', seriesId: 999_999 }),
+      new NotFoundError('Series', 999_999)
+    );
+    assert.equal((await Book.findByPk(book.id))?.title, 'Solo');
+  });
+
   test('a series reorder rewrites the order its lists follow, and the editor list keeps its drafts', async () => {
     const one = await fileBook('One');
     const draft = await repository.create({
