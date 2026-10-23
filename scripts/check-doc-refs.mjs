@@ -6,20 +6,14 @@
  *
  *   node scripts/check-doc-refs.mjs
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { findMisses } from './doc-refs.mjs';
+import { CLAUDE_DOCS, ruleDocs } from './steering-docs.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 
-const docs = [
-  'CLAUDE.md',
-  'client/CLAUDE.md',
-  'server/CLAUDE.md',
-  ...readdirSync(join(root, '.claude', 'rules'), { recursive: true })
-    .filter((file) => file.endsWith('.md'))
-    .map((file) => join('.claude', 'rules', file)),
-];
+const docs = [...CLAUDE_DOCS, ...ruleDocs(root)];
 
 const allowlistFile = join(root, 'scripts', 'doc-refs-allowlist.txt');
 const allowlist = new Set(

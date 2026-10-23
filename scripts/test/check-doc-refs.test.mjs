@@ -23,7 +23,11 @@ const sandbox = (t, { rule, code, allowlist }) => {
   mkdirSync(join(repo, 'server'));
   mkdirSync(join(repo, 'src'));
   mkdirSync(join(repo, '.claude', 'rules', 'server'), { recursive: true });
-  for (const file of ['check-doc-refs.mjs', 'doc-refs.mjs'])
+  for (const file of [
+    'check-doc-refs.mjs',
+    'doc-refs.mjs',
+    'steering-docs.mjs',
+  ])
     copyFileSync(join(scripts, file), join(repo, 'scripts', file));
   for (const file of ['CLAUDE.md', 'client/CLAUDE.md', 'server/CLAUDE.md'])
     writeFileSync(join(repo, file), 'plain text\n');
