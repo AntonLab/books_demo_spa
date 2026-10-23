@@ -77,5 +77,5 @@ paths:
   superadmin's comment.
 - On your own row, a `status` key is 403 even when it changes nothing. A new
   `password` or `email` needs `currentPassword` in the same body (missing 400,
-  wrong 403; guesses are rate limited, see `auth.md`); it is never stored.
+  wrong 403; guesses are rate limited, see `rate-limits.md`); it is never stored.
 - `pending` is the default status and restricts nothing (`CONTEXT.md`).

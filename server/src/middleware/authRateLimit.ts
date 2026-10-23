@@ -117,7 +117,7 @@ export function limitEveryRequest(
 }
 
 // Upload PUTs: every request counts, by user id. No user: pass on, the route
-// refuses it. Mount order: see rules/server/auth.md.
+// refuses it. Mount order: see rules/server/rate-limits.md.
 export function limitEveryRequestByUser(limiter: RateLimiter): RequestHandler {
   const count = limitEveryRequest(limiter, (req) => String(req.user?.id));
   return (req, res, next) => {

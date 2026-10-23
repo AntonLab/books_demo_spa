@@ -13,7 +13,8 @@ Rules live in `.claude/rules/server/`:
 | `access.md`      | ownership, Co-authors                                                                     |
 | `visibility.md`  | Notifications, Draft books, comment tombstones                                            |
 | `permissions.md` | Roles, the permission matrix, account rank rules                                          |
-| `auth.md`        | sessions, login, password reset, CSRF, sign-in rate limiting                              |
+| `auth.md`        | sessions, login, password reset, CSRF                                                     |
+| `rate-limits.md` | sign-in, registration, password, upload and write budgets                                 |
 | `images.md`      | Covers and Avatars: storage, `sharp`, the six routes                                      |
 | `sequelize.md`   | model typing, MySQL column and foreign-key choices, schema changes                        |
 | `testing.md`     | test layers, fakes and contracts, the MySQL-backed suites and their schemas               |
