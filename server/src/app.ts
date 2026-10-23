@@ -1,5 +1,9 @@
 import cookieParser from 'cookie-parser';
-import express, { type Express, type RequestHandler } from 'express';
+import express, {
+  type Express,
+  type Request,
+  type RequestHandler,
+} from 'express';
 import {
   createCrossOriginProtection,
   requireXsrfToken,
@@ -16,9 +20,11 @@ const noSniff: RequestHandler = (_req, res, next) => {
   next();
 };
 
-// A chapter text is up to CHAPTER_TEXT_MAX_LENGTH characters, up to 4 bytes
-// each, plus the JSON envelope.
-export const CHAPTER_JSON_LIMIT_BYTES = 5 * 1024 * 1024;
+// The two chapter writes that carry text parse their own body in
+// chapterRoutes.ts, after requirePermission, with a larger limit.
+const isChapterTextWrite = (req: Request): boolean =>
+  (req.method === 'POST' && /^\/api\/chapters\/?$/.test(req.path)) ||
+  (req.method === 'PATCH' && /^\/api\/chapters\/[^/]+\/?$/.test(req.path));
 
 const notFound: RequestHandler = (req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
@@ -47,14 +53,12 @@ export function createApp(deps: AppDeps): Express {
   // body express.json() refuses to parse.
   app.use(noSniff);
 
-  // Only the two chapter writes that carry text get the large limit; the global
-  // parser keeps its small default because authRateLimit.ts relies on it. This
-  // runs first because a parser skips a request that is already finished: once
-  // this one has read the body, the global parser below is a no-op for it.
-  const chapterJson = express.json({ limit: CHAPTER_JSON_LIMIT_BYTES });
-  app.post('/api/chapters', chapterJson);
-  app.patch('/api/chapters/:id', chapterJson);
-  app.use(express.json());
+  // The global parser keeps its small default because authRateLimit.ts relies
+  // on it; only the chapter text writes skip it.
+  const globalJson = express.json();
+  app.use((req, res, next) =>
+    isChapterTextWrite(req) ? next() : globalJson(req, res, next)
+  );
   // Express 5 can set cookies but not read them; resolveSessionUser, behind
   // both requirePermission and requireAuth, needs req.cookies.
   app.use(cookieParser());

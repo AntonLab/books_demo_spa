@@ -13,6 +13,10 @@ import { reorderIllustrationsSchema } from '../types/illustration.ts';
 import { idParamSchema } from '../types/params.ts';
 import type { RouteDeps } from './index.ts';
 
+// A chapter text is up to CHAPTER_TEXT_MAX_LENGTH characters, up to 4 bytes
+// each, plus the JSON envelope.
+export const CHAPTER_JSON_LIMIT_BYTES = 5 * 1024 * 1024;
+
 export function createChapterRoutes(deps: RouteDeps): Router {
   const controller = createChapterController(deps.chapterRepository);
   const illustrations = createIllustrationController(
@@ -20,6 +24,10 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   );
   const requirePermission = createRequirePermission(deps);
   const router = Router();
+  // app.ts keeps the global parser off these two writes, so the large limit
+  // applies only after requirePermission: an unauthorised caller never has
+  // its body read.
+  const chapterJson = express.json({ limit: CHAPTER_JSON_LIMIT_BYTES });
 
   // Every route runs through the matrix, reads included: every role has
   // `read: any` on chapters, which is what keeps the list and detail routes
@@ -46,6 +54,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.post(
     '/',
     requirePermission('chapters', 'create'),
+    chapterJson,
     validate({ body: createChapterSchema }),
     controller.create
   );
@@ -70,6 +79,7 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.patch(
     '/:id',
     requirePermission('chapters', 'update'),
+    chapterJson,
     validate({ params: idParamSchema, body: updateChapterSchema }),
     controller.update
   );

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CHAPTER_JSON_LIMIT_BYTES } from '../app.ts';
+import { CHAPTER_JSON_LIMIT_BYTES } from './chapterRoutes.ts';
 import { StateConflictError } from '../types/errors.ts';
 import type { ChapterRepository } from '../repositories/chapterRepository.ts';
 import { createFakeChapterRepository } from '../repositories/chapterRepository.fake.testkit.ts';
@@ -282,6 +282,19 @@ test('POST and PATCH accept a body just under the 5 MiB chapter limit', async ()
 
       assert.equal((await post(base, { ...valid, text })).status, 400);
       assert.equal((await patch(base, created.id, { text })).status, 400);
+    }
+  );
+});
+
+test('POST and PATCH without a session answer 401 for a body over the 5 MiB limit, before the body is read', async () => {
+  await withAuthenticatedApp(
+    { chapterRepository: createFakeRepository() },
+    async (base) => {
+      const created = await json<PublicChapter>(await post(base, valid));
+      const text = 'x'.repeat(CHAPTER_JSON_LIMIT_BYTES + 1);
+
+      assert.equal((await post(base, { ...valid, text }, null)).status, 401);
+      assert.equal((await patch(base, created.id, { text }, null)).status, 401);
     }
   );
 });
