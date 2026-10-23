@@ -63,9 +63,9 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.post(
     '/',
     requirePermission('chapters', 'create'),
-    limitWrites,
     chapterJson,
     validate({ body: createChapterSchema }),
+    limitWrites,
     controller.create
   );
   // Raw parser after permission and params, so those failures never read the
@@ -89,16 +89,16 @@ export function createChapterRoutes(deps: RouteDeps): Router {
   router.patch(
     '/:id',
     requirePermission('chapters', 'update'),
-    limitWrites,
     chapterJson,
     validate({ params: idParamSchema, body: updateChapterSchema }),
+    limitWrites,
     controller.update
   );
   router.delete(
     '/:id',
     requirePermission('chapters', 'delete'),
-    limitWrites,
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.remove
   );
 

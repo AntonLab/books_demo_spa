@@ -36,8 +36,8 @@ export function createLikeRoutes(deps: RouteDeps): Router {
   router.post(
     '/',
     requirePermission('likes', 'create'),
-    limitWrites,
     validate({ body: createLikeSchema }),
+    limitWrites,
     controller.create
   );
   // PATCH carries isLike alone: flipping a like to a dislike is the only
@@ -46,15 +46,15 @@ export function createLikeRoutes(deps: RouteDeps): Router {
   router.patch(
     '/:id',
     requirePermission('likes', 'update'),
-    limitWrites,
     validate({ params: idParamSchema, body: updateLikeSchema }),
+    limitWrites,
     controller.update
   );
   router.delete(
     '/:id',
     requirePermission('likes', 'delete'),
-    limitWrites,
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.remove
   );
 

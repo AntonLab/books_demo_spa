@@ -22,8 +22,8 @@ export function createCommentReportRoutes(deps: RouteDeps): Router {
   router.post(
     '/:id/report',
     requireAuth,
-    limitUserWrites(deps),
     validate({ params: idParamSchema, body: createReportSchema }),
+    limitUserWrites(deps),
     controller.create
   );
   return router;
@@ -52,8 +52,8 @@ export function createReportRoutes(deps: RouteDeps): Router {
     router.post(
       `/:commentId/${action}`,
       ...guard,
-      limitWrites,
       validate({ params: commentIdParamSchema }),
+      limitWrites,
       controller[action]
     );
   }

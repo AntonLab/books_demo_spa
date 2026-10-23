@@ -41,22 +41,22 @@ export function createCommentRoutes(deps: RouteDeps): Router {
   router.post(
     '/',
     requirePermission('comments', 'create'),
-    limitWrites,
     validate({ body: createCommentSchema }),
+    limitWrites,
     controller.create
   );
   router.patch(
     '/:id',
     requirePermission('comments', 'update'),
-    limitWrites,
     validate({ params: idParamSchema, body: updateCommentSchema }),
+    limitWrites,
     controller.update
   );
   router.delete(
     '/:id',
     requirePermission('comments', 'delete'),
-    limitWrites,
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.remove
   );
 
@@ -66,8 +66,8 @@ export function createCommentRoutes(deps: RouteDeps): Router {
   router.post(
     '/:id/restore',
     requirePermission('comments', 'delete'),
-    limitWrites,
     validate({ params: idParamSchema }),
+    limitWrites,
     controller.restore
   );
 
