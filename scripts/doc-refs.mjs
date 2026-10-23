@@ -37,7 +37,12 @@ export const extractTokens = (text) => {
 
 export const findMisses = ({ root, docs, allowlist = new Set() }) => {
   const paths = docs.map((doc) => doc.replace(/\\/g, '/'));
-  const excludes = paths.map((path) => `:(exclude)${path}`);
+  // The allowlist and the doc-refs tests name stale tokens on purpose.
+  const excludes = [
+    ...paths,
+    'scripts/doc-refs-allowlist.txt',
+    'scripts/test/*doc-refs*',
+  ].map((path) => `:(exclude)${path}`);
   const cache = new Map();
 
   const exists = (token) => {

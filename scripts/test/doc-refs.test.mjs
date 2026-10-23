@@ -49,6 +49,18 @@ test('a token found only in a checked doc is a miss', (t) => {
   assert.equal(findMisses({ root, docs }).length, 2);
 });
 
+test('the allowlist and the doc-refs tests do not vouch for a token', (t) => {
+  const root = repo(t, {
+    [DOC]: '`staleName`\n',
+    'scripts/doc-refs-allowlist.txt': 'staleName reason\n',
+    'scripts/test/doc-refs.test.mjs': "'staleName'\n",
+    'src/code.ts': '',
+  });
+  assert.deepEqual(findMisses({ root, docs: [DOC] }), [
+    { path: DOC, line: 1, token: 'staleName' },
+  ]);
+});
+
 test('allowlisted token is not reported', (t) => {
   const root = repo(t, { [DOC]: '`ghostName`\n', 'src/code.ts': '' });
   const allowlist = new Set(['ghostName']);
