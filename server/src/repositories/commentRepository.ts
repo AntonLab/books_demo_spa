@@ -62,8 +62,8 @@ export interface CommentRepository {
 // SequelizeForeignKeyConstraintError would produce.
 //
 // Same approach as likeRepository's (it explains why the constraint text is
-// read), over bookId, parentId and userId. parentId is only a candidate when one was supplied, and
-// userId is the safe fallback because every row carries it.
+// read), over bookId, parentId and userId. parentId is a candidate only when
+// one was supplied; userId is the fallback because every row carries it.
 function asMissingReference(
   error: unknown,
   input: CreateCommentInput,

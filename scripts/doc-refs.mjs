@@ -36,7 +36,7 @@ export const extractTokens = (text) => {
   return found;
 };
 
-// Allowlist entries that no doc spells as a token: the doc changed, the entry is dead.
+// Allowlist entries no doc spells as a token.
 export const findUnusedAllowlist = ({ root, docs, allowlist }) => {
   const used = new Set(
     docs.flatMap((doc) =>

@@ -1,8 +1,7 @@
 /**
- * Fails when a backtick identifier in a CLAUDE.md or a `.claude/rules/` doc
- * matches no tracked file content, or a file name or path matches no tracked
- * path. Known false positives go in `scripts/doc-refs-allowlist.txt`, one
- * token per line, each group under a `#` comment that gives the reason.
+ * Runs `findMisses` and `findUnusedAllowlist` (from `doc-refs.mjs`) over the
+ * steering docs. Known false positives go in `scripts/doc-refs-allowlist.txt`,
+ * one token per line, each group under a `#` comment that gives the reason.
  *
  *   node scripts/check-doc-refs.mjs
  */

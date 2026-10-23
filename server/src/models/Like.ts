@@ -46,8 +46,7 @@ export class Like extends Model<
 // readable error before the database refuses them.
 //
 // A named function with an explicit `this`: a method in the options object
-// would leave `this` implicitly any under strict mode. Favorite and
-// ReadingListItem do the same for their own XOR.
+// would leave `this` implicitly any under strict mode.
 function exactlyOneTarget(this: Like): void {
   if (!exactlyOneSet(this.bookId, this.commentId)) {
     throw new Error('Exactly one of bookId or commentId must be set');

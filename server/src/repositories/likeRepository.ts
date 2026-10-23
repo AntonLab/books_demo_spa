@@ -44,9 +44,9 @@ export interface LikeRepository {
 // SequelizeForeignKeyConstraintError would produce.
 //
 // MySQL names the offending column in the constraint text, which is the only
-// place bookId, commentId and userId are distinguishable. Each target is only a candidate when one was supplied — a
-// like fills exactly one of them — so userId is the safe fallback, as it is
-// the only key every row carries.
+// place bookId, commentId and userId are distinguishable. A like fills exactly
+// one target, so each target is a candidate only when it was supplied. userId
+// is the safe fallback, as every row carries it.
 function asMissingReference(
   error: unknown,
   input: CreateLikeInput,
