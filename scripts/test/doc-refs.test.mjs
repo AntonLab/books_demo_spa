@@ -114,6 +114,16 @@ test('extractTokens skips non-identifiers, fences and double backticks', () => {
   assert.deepEqual(extractTokens(text), [{ line: 6, token: 'keepMe' }]);
 });
 
+test('extractTokens skips an indented fence', () => {
+  const text = ['  ```', '`fencedName`', '  ```', '`keepMe`'].join('\n');
+  assert.deepEqual(extractTokens(text), [{ line: 4, token: 'keepMe' }]);
+});
+
+test('extractTokens skips a ~~~ fence, and a ``` line inside it does not close it', () => {
+  const text = ['~~~', '```', '`fencedName`', '~~~', '`keepMe`'].join('\n');
+  assert.deepEqual(extractTokens(text), [{ line: 5, token: 'keepMe' }]);
+});
+
 test('token boundary table', () => {
   const yes = ['aB', 'xAy', 'x.ts', 'x.tsx', 'x.mjs', 'x.md', 'x.json'];
   const no = ['ab', 'AB', 'Ab', 'a', 'x.js', 'x.txt', 'x.TS', ''];

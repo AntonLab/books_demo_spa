@@ -19,14 +19,15 @@ const isToken = (span) =>
 
 export const extractTokens = (text) => {
   const found = [];
-  let fenced = false;
+  let fence = ''; // the marker that opened the current fence
   text.split('\n').forEach((raw, index) => {
     const line = raw.replace(/\r$/, '');
-    if (line.startsWith('```')) {
-      fenced = !fenced;
+    const marker = /^\s*(```|~~~)/.exec(line)?.[1];
+    if (marker && (!fence || marker === fence)) {
+      fence = fence ? '' : marker;
       return;
     }
-    if (fenced) return;
+    if (fence) return;
     for (const [, span] of line.matchAll(SPAN))
       if (isToken(span)) found.push({ line: index + 1, token: span });
   });
