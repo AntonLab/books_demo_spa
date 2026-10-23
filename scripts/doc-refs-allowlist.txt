@@ -56,7 +56,9 @@ users.emailNotifications
 # Names that live in third-party libraries or other repos, not here.
 SendMessage
 afterCreate
-exactOptionalPropertyTypes
-noPropertyAccessFromIndexSignature
 refetchPage
 res.json
+
+# tsconfig options the docs name as left off on purpose (tooling.md), so no tracked file spells them.
+exactOptionalPropertyTypes
+noPropertyAccessFromIndexSignature
