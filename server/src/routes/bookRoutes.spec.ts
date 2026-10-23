@@ -19,6 +19,7 @@ import {
   aWebpImage,
   AUTH_COOKIE,
   json,
+  put,
   ROLE_COOKIES,
   USER_IDS,
   withApp,
@@ -1433,11 +1434,11 @@ test('credit changes and deletes are made as the signed-in caller, whom their no
 
 test('PUT /api/books/:id/cover answers 401 with no session', async () => {
   await withApp({}, async (base) => {
-    const response = await fetch(`${base}/api/books/${KNOWN_SERIES_ID}/cover`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp' },
-      body: await aWebpImage(),
-    });
+    const response = await put(
+      `${base}/api/books/${KNOWN_SERIES_ID}/cover`,
+      undefined,
+      await aWebpImage()
+    );
     assert.equal(response.status, 401);
   });
 });
@@ -1446,11 +1447,11 @@ test('PUT /api/books/:id/cover answers 404 before 403 for a book that does not e
   await withAuthenticatedApp(
     { bookRepository: createFakeRepository() },
     async (base) => {
-      const response = await fetch(`${base}/api/books/999999/cover`, {
-        method: 'PUT',
-        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
-        body: await aWebpImage(),
-      });
+      const response = await put(
+        `${base}/api/books/999999/cover`,
+        ROLE_COOKIES.author,
+        await aWebpImage()
+      );
       assert.equal(response.status, 404);
     }
   );
@@ -1466,11 +1467,11 @@ test('PUT /api/books/:id/cover answers 403 for a signed-in author who does not c
     tags: [],
   });
   await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
-    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
-      body: await aWebpImage(),
-    });
+    const response = await put(
+      `${base}/api/books/${created.id}/cover`,
+      ROLE_COOKIES.author,
+      await aWebpImage()
+    );
     assert.equal(response.status, 403);
   });
 });
@@ -1485,14 +1486,11 @@ test('PUT /api/books/:id/cover answers 413 for a body over 2 MiB', async () => {
     tags: [],
   });
   await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
-    const response = await fetch(`${base}/api/books/${created.id}/cover`, {
-      method: 'PUT',
-      headers: {
-        'content-type': 'image/webp',
-        cookie: ROLE_COOKIES.author,
-      },
-      body: Buffer.alloc(2 * 1024 * 1024 + 1),
-    });
+    const response = await put(
+      `${base}/api/books/${created.id}/cover`,
+      ROLE_COOKIES.author,
+      Buffer.alloc(2 * 1024 * 1024 + 1)
+    );
     assert.equal(response.status, 413);
   });
 });
@@ -1564,11 +1562,11 @@ test('PUT /api/books/:id/cover replaces the cover and answers with the updated b
     tags: [],
   });
   await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
-    const first = await fetch(`${base}/api/books/${created.id}/cover`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
-      body: await aWebpImage(),
-    });
+    const first = await put(
+      `${base}/api/books/${created.id}/cover`,
+      ROLE_COOKIES.author,
+      await aWebpImage()
+    );
     assert.equal(first.status, 200);
     const firstBody = await json<PublicBook>(first);
     assert.match(
@@ -1577,11 +1575,11 @@ test('PUT /api/books/:id/cover replaces the cover and answers with the updated b
     );
 
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const second = await fetch(`${base}/api/books/${created.id}/cover`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
-      body: await aWebpImage(200, 300),
-    });
+    const second = await put(
+      `${base}/api/books/${created.id}/cover`,
+      ROLE_COOKIES.author,
+      await aWebpImage(200, 300)
+    );
     const secondBody = await json<PublicBook>(second);
     assert.notEqual(secondBody.coverUrl, firstBody.coverUrl);
   });
@@ -1687,11 +1685,11 @@ test('GET /api/books/:id/cover serves the WebP bytes with the versioned cache he
     tags: [],
   });
   await withAuthenticatedApp({ bookRepository: repository }, async (base) => {
-    await fetch(`${base}/api/books/${created.id}/cover`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.author },
-      body: await aWebpImage(),
-    });
+    await put(
+      `${base}/api/books/${created.id}/cover`,
+      ROLE_COOKIES.author,
+      await aWebpImage()
+    );
   });
   await withApp({ bookRepository: repository }, async (base) => {
     const response = await fetch(`${base}/api/books/${created.id}/cover`);
