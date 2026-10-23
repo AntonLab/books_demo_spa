@@ -21,7 +21,10 @@ import { User } from '../models/User.ts';
 import { createCreditedBook } from '../models/creditedBook.testkit.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeCommentRepository } from './commentRepository.ts';
-import { commentRepositoryContract } from './commentRepository.contract.testkit.ts';
+import {
+  as,
+  commentRepositoryContract,
+} from './commentRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
 
 const skip = await skipWithoutMysql();
@@ -41,6 +44,13 @@ const reader = {
   firstName: 'Remy',
   lastName: 'Reader',
   status: 'active' as const,
+};
+
+const DRAFT = {
+  title: 'Draft',
+  description: 'Private',
+  tags: [],
+  status: 'draft' as const,
 };
 
 describe('commentRepository against real MySQL', { skip }, () => {
@@ -85,7 +95,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('create takes the author from the actor, not the input', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'hello' },
-      readerId
+      as(readerId)
     );
 
     assert.equal(comment.userId, readerId);
@@ -96,7 +106,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId: bookId + 10_000, parentId: null, text: 'orphan' },
-        readerId
+        as(readerId)
       ),
       NotFoundError
     );
@@ -106,7 +116,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId, parentId: null, text: 'from nobody' },
-        readerId + 10_000
+        as(readerId + 10_000)
       ),
       (error: unknown) =>
         error instanceof NotFoundError &&
@@ -120,7 +130,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('a parent deleted between the lookup and the insert is still a NotFoundError naming the comment', async () => {
     const parent = await repository.create(
       { bookId, parentId: null, text: 'Soon gone' },
-      ownerId
+      as(ownerId)
     );
     Comment.addHook('beforeCreate', 'deleteParent', async () => {
       await Comment.destroy({ where: { id: parent.id } });
@@ -129,7 +139,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
       await assert.rejects(
         repository.create(
           { bookId, parentId: parent.id, text: 'Too late' },
-          readerId
+          as(readerId)
         ),
         (error: unknown) =>
           error instanceof NotFoundError &&
@@ -146,7 +156,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId, parentId: null, text: 'x'.repeat(70_000) },
-        readerId
+        as(readerId)
       ),
       (error: unknown) =>
         error instanceof DatabaseError &&
@@ -158,14 +168,14 @@ describe('commentRepository against real MySQL', { skip }, () => {
     for (const kind of ['deleted', 'removed'] as const) {
       const parent = await repository.create(
         { bookId, parentId: null, text: `Parent (${kind})` },
-        ownerId
+        as(ownerId)
       );
       await repository.remove(parent.id, kind, readerId);
 
       await assert.rejects(
         repository.create(
           { bookId, parentId: parent.id, text: 'Too late' },
-          readerId
+          as(readerId)
         ),
         (error: unknown) =>
           error instanceof ForbiddenError &&
@@ -178,7 +188,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     await assert.rejects(
       repository.create(
         { bookId, parentId: 999_999, text: 'To nobody' },
-        readerId
+        as(readerId)
       ),
       (error: unknown) =>
         error instanceof NotFoundError &&
@@ -189,7 +199,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('remove marks the comment with the given tombstone and keeps its text on the row', async () => {
     const created = await repository.create(
       { bookId, parentId: null, text: 'Gone soon' },
-      ownerId
+      as(ownerId)
     );
 
     assert.equal(
@@ -210,7 +220,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('remove refuses a comment that is already a tombstone', async () => {
     const created = await repository.create(
       { bookId, parentId: null, text: 'Once' },
-      ownerId
+      as(ownerId)
     );
 
     assert.equal(
@@ -227,11 +237,11 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('remove keeps the replies, so the thread stays readable', async () => {
     const root = await repository.create(
       { bookId, parentId: null, text: 'root' },
-      readerId
+      as(readerId)
     );
     const child = await repository.create(
       { bookId, parentId: root.id, text: 'child' },
-      ownerId
+      as(ownerId)
     );
 
     await repository.remove(root.id, 'deleted', readerId);
@@ -249,7 +259,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('restore brings back a removed comment, text and owner included', async () => {
     const created = await repository.create(
       { bookId, parentId: null, text: 'Mistaken removal' },
-      ownerId
+      as(ownerId)
     );
     await repository.remove(created.id, 'removed', readerId);
 
@@ -263,12 +273,12 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('restore returns null for a deleted comment, a live one and a missing id', async () => {
     const deleted = await repository.create(
       { bookId, parentId: null, text: 'Mine to delete' },
-      ownerId
+      as(ownerId)
     );
     await repository.remove(deleted.id, 'deleted', readerId);
     const live = await repository.create(
       { bookId, parentId: null, text: 'Still here' },
-      ownerId
+      as(ownerId)
     );
 
     assert.equal(await repository.restore(deleted.id), null);
@@ -280,7 +290,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('the list serves a tombstone without its text, author or owner id', async () => {
     const created = await repository.create(
       { bookId, parentId: null, text: 'Hidden' },
-      ownerId
+      as(ownerId)
     );
     await repository.remove(created.id, 'deleted', readerId);
 
@@ -306,7 +316,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     });
     const created = await repository.create(
       { bookId, parentId: null, text: 'Left behind' },
-      leaving.id
+      as(leaving.id)
     );
     await Comment.update(
       { tombstone: 'deleted' },
@@ -328,11 +338,11 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('the list leaves tombstones out of a ?userId= filter', async () => {
     const kept = await repository.create(
       { bookId, parentId: null, text: 'Visible' },
-      ownerId
+      as(ownerId)
     );
     const gone = await repository.create(
       { bookId, parentId: null, text: 'Removed' },
-      ownerId
+      as(ownerId)
     );
     await repository.remove(gone.id, 'removed', readerId);
 
@@ -356,7 +366,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     for (let depth = 0; depth < 20; depth += 1) {
       const comment = await repository.create(
         { bookId, parentId, text: `depth ${depth}` },
-        readerId
+        as(readerId)
       );
       parentId = comment.id;
     }
@@ -369,7 +379,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('list embeds the author and reports no likes by default', async () => {
     await repository.create(
       { bookId, parentId: null, text: 'hello' },
-      readerId
+      as(readerId)
     );
 
     const { items, total } = await repository.list(
@@ -391,7 +401,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('list keeps the comment of a blocked author and reports its status', async () => {
     await repository.create(
       { bookId, parentId: null, text: 'hello' },
-      readerId
+      as(readerId)
     );
     await User.update({ status: 'blocked' }, { where: { id: readerId } });
 
@@ -407,7 +417,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('list counts likes and reports only the viewer own one', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'hello' },
-      readerId
+      as(readerId)
     );
     const ownersLike = await Like.create({
       userId: ownerId,
@@ -440,11 +450,11 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('list filters replies by parentId', async () => {
     const root = await repository.create(
       { bookId, parentId: null, text: 'root' },
-      readerId
+      as(readerId)
     );
     await repository.create(
       { bookId, parentId: root.id, text: 'reply' },
-      ownerId
+      as(ownerId)
     );
 
     const replies = await repository.list(
@@ -459,7 +469,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('update rewrites the text and leaves the author alone', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'first' },
-      readerId
+      as(readerId)
     );
 
     const updated = await repository.update(comment.id, { text: 'second' });
@@ -471,7 +481,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('update refuses a tombstone and leaves its stored text alone', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'Before removal' },
-      readerId
+      as(readerId)
     );
     // The edit was let in while the comment was live and lost the race to a
     // moderator's removal.
@@ -487,7 +497,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
   test('update still answers when the text is resubmitted unchanged', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'Same words' },
-      readerId
+      as(readerId)
     );
 
     // Within the same second nothing on the row changes at all; the update
@@ -498,31 +508,46 @@ describe('commentRepository against real MySQL', { skip }, () => {
     assert.equal(updated?.text, 'Same words');
   });
 
-  test('nobody may comment on a draft, its co-authors included', async () => {
-    const draftId = (
-      await createCreditedBook(
-        { title: 'Draft', description: 'Private', tags: [], status: 'draft' },
-        [ownerId]
-      )
-    ).id;
+  test('a draft the actor cannot read is a NotFoundError, as a missing book is', async () => {
+    const draftId = (await createCreditedBook(DRAFT, [ownerId])).id;
+    const input = { bookId: draftId, parentId: null, text: 'Too early' };
 
-    for (const actorId of [ownerId, readerId]) {
-      await assert.rejects(
-        repository.create(
-          { bookId: draftId, parentId: null, text: 'Too early' },
-          actorId
-        ),
-        (error: unknown) =>
-          error instanceof ForbiddenError &&
-          /draft/i.test((error as Error).message)
-      );
-    }
+    await assert.rejects(
+      repository.create(input, as(readerId)),
+      new NotFoundError('Book', draftId)
+    );
+    // A non-credited account holding the author role reads no draft either.
+    await assert.rejects(
+      repository.create(input, as(readerId, 'author')),
+      new NotFoundError('Book', draftId)
+    );
+    assert.equal(await Comment.count({ where: { bookId: draftId } }), 0);
+  });
+
+  test('a co-author and a moderator keep the draft 403', async () => {
+    const draftId = (await createCreditedBook(DRAFT, [ownerId])).id;
+    const input = { bookId: draftId, parentId: null, text: 'Too early' };
+    const isDraft403 = (error: unknown) =>
+      error instanceof ForbiddenError && /draft/i.test(error.message);
+
+    await assert.rejects(
+      repository.create(input, as(ownerId, 'author')),
+      isDraft403
+    );
+    await assert.rejects(
+      repository.create(input, as(readerId, 'admin')),
+      isDraft403
+    );
+    await assert.rejects(
+      repository.create(input, as(readerId, 'superadmin')),
+      isDraft403
+    );
   });
 
   test('returning a book to draft hides its comments from readers and keeps them', async () => {
     const comment = await repository.create(
       { bookId, parentId: null, text: 'Said while it was out' },
-      readerId
+      as(readerId)
     );
     await Book.update({ status: 'draft' }, { where: { id: bookId } });
 
@@ -554,7 +579,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     async function aComment() {
       return repository.create(
         { bookId, parentId: null, text: 'flag me' },
-        ownerId
+        as(ownerId)
       );
     }
 
@@ -635,7 +660,7 @@ describe('commentRepository against real MySQL', { skip }, () => {
     });
 
     const aComment = () =>
-      repository.create({ bookId, parentId: null, text: LONG }, ownerId);
+      repository.create({ bookId, parentId: null, text: LONG }, as(ownerId));
 
     const report = (commentId: number, extra: Partial<Report['dataValues']>) =>
       Report.create({

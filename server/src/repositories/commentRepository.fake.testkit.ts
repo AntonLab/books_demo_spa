@@ -43,7 +43,7 @@ export function createFakeCommentRepository(
     row.tombstone === null ? row : { ...row, text: '', userId: null };
 
   return {
-    async create(input, actorId) {
+    async create(input, actor) {
       // Mirror the real repository: a missing parent, a parent on another
       // book, or a missing book or user is a NotFoundError.
       if (input.parentId !== null) {
@@ -55,14 +55,14 @@ export function createFakeCommentRepository(
       if (!books.has(input.bookId)) {
         throw new NotFoundError('Book', input.bookId);
       }
-      if (!accounts.has(actorId)) throw new NotFoundError('User', actorId);
+      if (!accounts.has(actor.id)) throw new NotFoundError('User', actor.id);
 
       while (rows.has(nextId)) nextId += 1;
       const now = new Date();
       const comment: PublicComment = {
         id: nextId,
         parentId: input.parentId,
-        userId: actorId,
+        userId: actor.id,
         bookId: input.bookId,
         text: input.text,
         tombstone: null,

@@ -5,7 +5,7 @@ import {
   validatedQuery,
 } from '../middleware/validate.ts';
 import type { CommentRepository } from '../repositories/commentRepository.ts';
-import { viewerOf } from '../repositories/visibility.ts';
+import { actorOf, viewerOf } from '../repositories/visibility.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -55,7 +55,7 @@ export function createCommentController(repository: CommentRepository) {
     create: async (req, res) => {
       const comment = await repository.create(
         validatedBody<CreateCommentInput>(req),
-        actorId(req)
+        actorOf(req)
       );
       res.status(201).json(comment);
     },

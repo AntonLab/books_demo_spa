@@ -48,6 +48,17 @@ export async function readableBookWhere(viewer: Viewer): Promise<WhereOptions> {
   return readableBookWhereFor(await creditedBookIds(viewer));
 }
 
+export async function canReadBook(
+  bookId: number,
+  viewer: Viewer
+): Promise<boolean> {
+  const book = await Book.findOne({
+    where: { [Op.and]: [{ id: bookId }, await readableBookWhere(viewer)] },
+    attributes: ['id'],
+  });
+  return book !== null;
+}
+
 // Split from readableBookWhere so readableChapterScope, which needs the
 // credited ids twice, looks them up once.
 function readableBookWhereFor(credited: number[]): WhereOptions {
