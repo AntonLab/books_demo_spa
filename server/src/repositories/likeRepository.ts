@@ -1,9 +1,4 @@
-import {
-  ForeignKeyConstraintError,
-  literal,
-  Op,
-  UniqueConstraintError,
-} from 'sequelize';
+import { literal, Op, UniqueConstraintError } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
@@ -14,6 +9,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import type { ListResponse, PublicLike } from 'shared';
 import type {
   CreateLikeInput,
@@ -47,19 +43,17 @@ export interface LikeRepository {
 // that as a 404 is more useful than the generic 500 an unmapped
 // SequelizeForeignKeyConstraintError would produce.
 //
-// The same shape as bookRepository's, stretched to three keys: MySQL names the
-// offending column in the constraint text, which is the only place they are
-// distinguishable. Each target is only a candidate when one was supplied — a
-// like fills exactly one of them — so userId is the safe fallback, as it is
-// the only key every row carries.
+// MySQL names the offending column in the constraint text, which is the only
+// place bookId, commentId and userId are distinguishable. A like fills exactly
+// one target, so each target is a candidate only when it was supplied. userId
+// is the safe fallback, as every row carries it.
 function asMissingReference(
   error: unknown,
   input: CreateLikeInput,
   actorId: number
 ): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
-
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (input.bookId !== null && detail.includes('bookId')) {
       throw new NotFoundError('Book', input.bookId);
     }

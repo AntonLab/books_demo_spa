@@ -139,9 +139,11 @@ describe('SearchForm', () => {
 
     await userEvent.type(screen.getByLabelText('Text'), 'drag');
 
-    expect(mockedBooks.listBooks).toHaveBeenLastCalledWith({
-      q: 'drag',
-      pageSize: 8,
+    await waitFor(() => {
+      expect(mockedBooks.listBooks).toHaveBeenLastCalledWith({
+        q: 'drag',
+        pageSize: 8,
+      });
     });
     await userEvent.click(await screen.findByTitle('A Tale of Dragons'));
 
@@ -156,9 +158,11 @@ describe('SearchForm', () => {
 
     await userEvent.type(screen.getByLabelText('Author'), 'lee');
 
-    expect(mockedBooks.listBooks).toHaveBeenLastCalledWith({
-      author: 'lee',
-      pageSize: 8,
+    await waitFor(() => {
+      expect(mockedBooks.listBooks).toHaveBeenLastCalledWith({
+        author: 'lee',
+        pageSize: 8,
+      });
     });
     await userEvent.click(await screen.findByTitle('Ann Lee (annlee)'));
     await userEvent.click(screen.getByRole('button', { name: 'Search' }));
@@ -209,9 +213,11 @@ describe('SearchForm', () => {
 
     await userEvent.type(screen.getByLabelText('Series'), 'saga');
 
-    expect(mockedSeries.listSeries).toHaveBeenLastCalledWith({
-      q: 'saga',
-      limit: 8,
+    await waitFor(() => {
+      expect(mockedSeries.listSeries).toHaveBeenLastCalledWith({
+        q: 'saga',
+        limit: 8,
+      });
     });
     expect(
       await screen.findByLabelText('Loading suggestions')

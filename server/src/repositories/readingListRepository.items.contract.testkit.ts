@@ -333,6 +333,49 @@ export function readingListItemsContract(
     );
   });
 
+  test('contract: listByBook total counts lists, not item rows, across a page boundary', async () => {
+    const { repository, ownerId, aBook, pause } = await withList();
+    const [target, other1, other2] = [
+      await aBook(),
+      await aBook(),
+      await aBook(),
+    ];
+    const lists = [];
+    for (let i = 0; i < 3; i += 1) {
+      const list = await repository.create(NEW_LIST, as(ownerId));
+      await repository.addItem(list.id, as(ownerId), book(target));
+      await repository.addItem(list.id, as(ownerId), book(other1));
+      await repository.addItem(list.id, as(ownerId), book(other2));
+      lists.push(list);
+      await pause();
+    }
+    const unrelated = await repository.create(NEW_LIST, as(ownerId));
+    await repository.addItem(unrelated.id, as(ownerId), book(other1));
+
+    const page1 = await repository.listByBook({
+      bookId: target,
+      current: 1,
+      pageSize: 2,
+    });
+    const page2 = await repository.listByBook({
+      bookId: target,
+      current: 2,
+      pageSize: 2,
+    });
+    assert.deepEqual(
+      [page1.items.length, page2.items.length, page1.total, page2.total],
+      [2, 1, 3, 3]
+    );
+    assert.deepEqual(
+      page1.items.map((l) => l.id),
+      [lists[2]!.id, lists[1]!.id]
+    );
+    assert.equal(
+      [...page1.items, ...page2.items].some((l) => l.id === unrelated.id),
+      false
+    );
+  });
+
   test('contract: listByBook is an empty page for a Published Book no list holds', async () => {
     const { repository, aBook } = await withList();
     assert.deepEqual(

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { useSuggestions } from './suggestions';
 import { createTestQueryClient } from '../test/queryClient';
+import { waitPastDebounce } from '../test/waitPastDebounce';
 import { publicBook, publicSeries } from '../test/works';
 import * as booksApi from '../api/books';
 import * as seriesApi from '../api/series';
@@ -72,7 +73,7 @@ const renderAll = (text: string) =>
 
 // Lets a query that was going to start do so, which gives a "not called"
 // assertion its meaning.
-const settle = () => act(async () => {});
+const settle = waitPastDebounce;
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -124,6 +125,24 @@ describe('useSuggestions', () => {
     });
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       author: 'drag',
+      pageSize: 8,
+    });
+  });
+
+  it('typing fast requests only the last term', async () => {
+    const { rerender } = renderHook(
+      ({ text }) => useSuggestions('books', text),
+      { initialProps: { text: '' }, wrapper: wrapper() }
+    );
+    rerender({ text: 'dra' });
+    rerender({ text: 'drag' });
+    rerender({ text: 'drago' });
+
+    await waitFor(() => {
+      expect(mockedBooks.listBooks).toHaveBeenCalledTimes(1);
+    });
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+      q: 'drago',
       pageSize: 8,
     });
   });

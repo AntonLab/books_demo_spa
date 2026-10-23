@@ -8,5 +8,6 @@ export const useAuthorSearch = (q: string) => {
   return useQuery({
     queryKey: queryKeys.authors(q),
     queryFn: () => searchAuthors(q),
+    enabled: q.trim() !== '',
   });
 };

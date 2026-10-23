@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type {
   PagedResponse,
   BookSort,
@@ -47,18 +47,7 @@ export interface ListBooksParams {
 export const listBooks = (
   params: ListBooksParams = {}
 ): Promise<PagedResponse<PublicBook>> => {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params) as [
-    string,
-    string | number | undefined,
-  ][]) {
-    if (value !== undefined && value !== '') search.set(key, String(value));
-  }
-
-  const query = search.toString();
-  return request<PagedResponse<PublicBook>>(
-    query ? `/books?${query}` : '/books'
-  );
+  return request<PagedResponse<PublicBook>>(`/books${toQueryString(params)}`);
 };
 
 // The server adds `favoriteId` to each item exactly when `favoritedBy=me`, so

@@ -12,6 +12,7 @@ import type { Book } from './Book.ts';
 import type { Comment } from './Comment.ts';
 import type { User } from './User.ts';
 import type { PublicLike } from 'shared';
+import { exactlyOneSet } from '../types/target.ts';
 
 export class Like extends Model<
   InferAttributes<Like>,
@@ -47,7 +48,7 @@ export class Like extends Model<
 // A named function with an explicit `this`: a method in the options object
 // would leave `this` implicitly any under strict mode.
 function exactlyOneTarget(this: Like): void {
-  if ((this.bookId == null) === (this.commentId == null)) {
+  if (!exactlyOneSet(this.bookId, this.commentId)) {
     throw new Error('Exactly one of bookId or commentId must be set');
   }
 }

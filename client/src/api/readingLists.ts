@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type {
   AddReadingListItemPayload,
   ItemsResponse,
@@ -24,18 +24,6 @@ export type ListReadingListsParams = (
 
 export type WorkTarget = { bookId: number } | { seriesId: number };
 
-const withQuery = (path: string, params: object): string => {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params) as [
-    string,
-    string | number | undefined,
-  ][]) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-  const query = search.toString();
-  return query ? `${path}?${query}` : path;
-};
-
 export const getReadingList = (id: number): Promise<ReadingListDetail> =>
   request<ReadingListDetail>(`/reading-lists/${id}`);
 
@@ -43,7 +31,7 @@ export const listReadingLists = (
   params: ListReadingListsParams
 ): Promise<PagedResponse<PublicReadingList>> =>
   request<PagedResponse<PublicReadingList>>(
-    withQuery('/reading-lists', params)
+    `/reading-lists${toQueryString(params)}`
   );
 
 // Owner only: an item the owner cannot see comes back as 'unavailable'.
@@ -56,7 +44,7 @@ export const listMyReadingLists = (
   target: WorkTarget
 ): Promise<ItemsResponse<MyReadingList>> =>
   request<ItemsResponse<MyReadingList>>(
-    withQuery('/reading-lists/mine', target)
+    `/reading-lists/mine${toQueryString(target)}`
   );
 
 export const createReadingList = (

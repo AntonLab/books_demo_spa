@@ -12,6 +12,7 @@ import type { Book } from './Book.ts';
 import type { Series } from './Series.ts';
 import type { User } from './User.ts';
 import type { PublicFavorite } from 'shared';
+import { exactlyOneSet } from '../types/target.ts';
 
 export class Favorite extends Model<
   InferAttributes<Favorite>,
@@ -31,11 +32,11 @@ export class Favorite extends Model<
   declare series?: NonAttribute<Series>;
 }
 
-// A named function with an explicit `this`, so strict mode sees no implicit
-// any. Migration 0003 adds the matching CHECK (see
+// Named function with explicit `this`: see Like.ts. Migration 0003 adds the
+// matching CHECK (see
 // .claude/rules/server/sequelize.md); this validator guards model writes.
 function exactlyOneTarget(this: Favorite): void {
-  if ((this.bookId == null) === (this.seriesId == null)) {
+  if (!exactlyOneSet(this.bookId, this.seriesId)) {
     throw new Error('Exactly one of bookId or seriesId must be set');
   }
 }

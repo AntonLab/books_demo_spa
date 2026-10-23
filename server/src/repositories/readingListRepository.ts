@@ -1,7 +1,7 @@
 import {
   col,
   fn,
-  ForeignKeyConstraintError,
+  literal,
   Op,
   UniqueConstraintError,
   type InferAttributes,
@@ -40,6 +40,7 @@ import type {
   UpdateReadingListInput,
 } from '../types/readingList.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { joined } from './joined.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
 import { visibleSeriesWhere, type Account } from './visibility.ts';
@@ -262,11 +263,9 @@ async function shownCounts(listIds: number[]): Promise<Map<number, number>> {
 }
 
 // A rejected foreign key means the work went away after the check in addItem.
-// MySQL names the column in the constraint text, the only place the two are
-// distinguishable.
 function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (target.seriesId !== null && detail.includes('seriesId')) {
       throw new NotFoundError('Series', target.seriesId);
     }
@@ -352,12 +351,20 @@ export function createSequelizeReadingListRepository(): ReadingListRepository {
         attributes: ['status'],
       });
       if (!target || target.status === 'draft') return { items: [], total: 0 };
-      const holding = await ReadingListItemRow.findAll({
-        where: { bookId: query.bookId },
-        attributes: ['listId'],
-      });
+      // Columns share their attribute's name; `satisfies` fails a rename here.
+      const listId =
+        'listId' satisfies keyof InferAttributes<ReadingListItemRow>;
+      const bookId =
+        'bookId' satisfies keyof InferAttributes<ReadingListItemRow>;
       const { rows, count } = await ReadingList.findAndCountAll({
-        where: { id: holding.map((row) => row.listId) },
+        // bookId is a validated number, coerced so nothing else reaches the SQL
+        where: {
+          id: {
+            [Op.in]: literal(
+              `(SELECT ${listId} FROM ${ReadingListItemRow.tableName} WHERE ${bookId} = ${Number(query.bookId)})`
+            ),
+          },
+        },
         include: [withOwner],
         order: NEWEST_FIRST,
         limit: query.pageSize,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOOK_SORTS } from 'shared';
+import { BOOK_SORTS, SEARCH_TEXT_MAX_LENGTH } from 'shared';
 import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
 import {
@@ -55,7 +55,7 @@ export const listSeriesQuerySchema = z.object({
   sort: z.enum(BOOK_SORTS).optional(),
   genreId: idSchema.optional(),
   tag: z.string().min(1).max(WORK_TAG_MAX_LENGTH).optional(),
-  q: z.string().min(1).max(200).optional(),
+  q: z.string().min(1).max(SEARCH_TEXT_MAX_LENGTH).optional(),
 });
 
 export const seriesBookParamSchema = z.object({

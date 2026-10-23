@@ -46,7 +46,8 @@ Run from the repo root before commit; each fans out over every workspace
 (`-w client` targets one):
 
 - `npm run typecheck`
-- `npm run lint` (`npm run lint:fix` applies fixes)
+- `npm run lint` (`npm run lint:fix` applies fixes); it also runs
+  `scripts/doc-limits.mjs` and `scripts/check-doc-refs.mjs`
 - `npm run format:check` (`npm run format`) — Prettier is root-only; no package
   defines a format script.
 - `npm test` — both packages. A green server run drops its test schemas through

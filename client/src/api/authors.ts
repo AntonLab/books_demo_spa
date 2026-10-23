@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type { ItemsResponse } from 'shared';
 import type { AuthorSummary } from '../types/api';
 
@@ -6,9 +6,8 @@ import type { AuthorSummary } from '../types/api';
 // an email. A blank term is not sent — the server rejects an empty `q` — and
 // lists the first authors instead.
 export const searchAuthors = async (q: string): Promise<AuthorSummary[]> => {
-  const query = q ? `?${new URLSearchParams({ q }).toString()}` : '';
   const { items } = await request<ItemsResponse<AuthorSummary>>(
-    `/authors${query}`
+    `/authors${toQueryString({ q })}`
   );
   return items;
 };

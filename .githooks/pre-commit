@@ -126,9 +126,11 @@ run_tool . "$bin/prettier" "$work/staged" \
 run_tool . git "$work/staged" add --
 
 # A staged steering file is checked against its line budget, so a CLAUDE.md
-# or rule never grows past it unnoticed.
+# or rule never grows past it unnoticed, and its backtick identifiers against
+# the code, so a rename never leaves a dead name behind.
 if grep -Eq '(^|/)CLAUDE\.md$|^\.claude/rules/' "$work/staged"; then
   node scripts/doc-limits.mjs || status=1
+  node scripts/check-doc-refs.mjs || status=1
 fi
 
 exit $status

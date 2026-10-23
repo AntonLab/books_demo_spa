@@ -13,6 +13,7 @@ import type {
 import {
   aWebpImage,
   json,
+  put,
   ROLE_COOKIES,
   USER_IDS,
   withApp,
@@ -832,15 +833,19 @@ const putCover = (
   body: Buffer | string,
   contentType = 'image/webp',
   cookie: string | null = ROLE_COOKIES.author
-) =>
-  fetch(`${base}/api/series/${id}/cover`, {
-    method: 'PUT',
-    headers: {
-      'content-type': contentType,
-      ...(cookie ? { cookie } : {}),
-    },
-    body,
-  });
+) => {
+  const url = `${base}/api/series/${id}/cover`;
+  return contentType === 'image/webp' && Buffer.isBuffer(body)
+    ? put(url, cookie ?? undefined, body)
+    : fetch(url, {
+        method: 'PUT',
+        headers: {
+          'content-type': contentType,
+          ...(cookie ? { cookie } : {}),
+        },
+        body,
+      });
+};
 
 const deleteCover = (
   base: string,

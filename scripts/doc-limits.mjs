@@ -8,21 +8,17 @@
  *
  * Runs in `npm run lint` and in the pre-commit hook.
  */
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
+import { CLAUDE_DOCS, ruleDocs } from './steering-docs.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const lineCount = (path) =>
   readFileSync(path, 'utf8').replace(/\n$/, '').split('\n').length;
 
 const limits = [
-  ...['CLAUDE.md', 'client/CLAUDE.md', 'server/CLAUDE.md'].map((file) => [
-    join(root, file),
-    200,
-  ]),
-  ...readdirSync(join(root, '.claude', 'rules'), { recursive: true })
-    .filter((file) => file.endsWith('.md'))
-    .map((file) => [join(root, '.claude', 'rules', file), 150]),
+  ...CLAUDE_DOCS.map((file) => [join(root, file), 200]),
+  ...ruleDocs(root).map((file) => [join(root, file), 150]),
 ];
 
 const over = limits

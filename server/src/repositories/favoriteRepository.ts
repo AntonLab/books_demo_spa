@@ -1,8 +1,4 @@
-import {
-  ForeignKeyConstraintError,
-  Op,
-  UniqueConstraintError,
-} from 'sequelize';
+import { Op, UniqueConstraintError } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite, toPublicFavorite } from '../models/Favorite.ts';
 import { Series } from '../models/Series.ts';
@@ -18,6 +14,7 @@ import type {
   ListFavoritesQuery,
 } from '../types/favorite.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { joined } from './joined.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
 import {
@@ -92,8 +89,8 @@ function asMissingReference(
   input: CreateFavoriteInput,
   accountId: number
 ): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (input.bookId !== null && detail.includes('bookId')) {
       throw new NotFoundError('Book', input.bookId);
     }

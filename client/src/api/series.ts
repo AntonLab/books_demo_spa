@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type {
   BookSort,
   ItemsResponse,
@@ -33,21 +33,18 @@ export interface ListSeriesParams {
 export const listSeries = (
   params: ListSeriesParams = {}
 ): Promise<ListResponse<PublicSeries>> => {
-  const search = new URLSearchParams();
-  if (params.userId !== undefined) search.set('userId', String(params.userId));
-  if (params.genreId !== undefined)
-    search.set('genreId', String(params.genreId));
-  if (params.limit !== undefined) search.set('limit', String(params.limit));
-  if (params.q) search.set('q', params.q);
-  if (params.tag) search.set('tag', params.tag);
-  if (params.offset !== undefined) search.set('offset', String(params.offset));
-  if (params.favoritedBy) search.set('favoritedBy', params.favoritedBy);
-  if (params.sort) search.set('sort', params.sort);
-  if (params.published) search.set('published', params.published);
-
-  const query = search.toString();
   return request<ListResponse<PublicSeries>>(
-    query ? `/series?${query}` : '/series'
+    `/series${toQueryString({
+      userId: params.userId,
+      genreId: params.genreId,
+      limit: params.limit,
+      q: params.q,
+      tag: params.tag,
+      offset: params.offset,
+      favoritedBy: params.favoritedBy,
+      sort: params.sort,
+      published: params.published,
+    })}`
   );
 };
 

@@ -10,36 +10,38 @@ export interface AccountRepository {
   findProfile(id: number): Promise<AccountProfile | null>;
 }
 
-// Subqueries, not id lists: an id list grows with an Account's works. The only
-// runtime value is the `:id` replacement.
+// No id lists: one would grow with an Account's works. The only runtime value
+// is the `:id` replacement.
 
-// The Published Books the Account co-authors.
-const PUBLISHED_BOOK_IDS =
-  "(SELECT ba.`bookId` FROM `book_authors` ba JOIN `books` pb ON pb.`id` = ba.`bookId` WHERE ba.`userId` = :id AND pb.`status` <> 'draft')";
-
-// The Account's Series that hold a Published Book (of any author), so a Series
-// with only Drafts is dropped.
-const COUNTED_SERIES_IDS =
-  "(SELECT sa.`seriesId` FROM `series_authors` sa WHERE sa.`userId` = :id AND EXISTS (SELECT 1 FROM `books` sb WHERE sb.`seriesId` = sa.`seriesId` AND sb.`status` <> 'draft'))";
-
-// Every Published Book of those Series, whoever wrote it.
-const COUNTED_SERIES_BOOK_IDS =
-  "(SELECT cb.`id` FROM `books` cb WHERE cb.`status` <> 'draft' AND cb.`seriesId` IN " +
-  COUNTED_SERIES_IDS +
-  ')';
-
-// Model.count takes no replacements, so the eight totals are scalar
-// subqueries of one raw SELECT that binds `:id`.
-const PROFILE_COUNTS = `SELECT
-  (SELECT COUNT(*) FROM books WHERE id IN ${PUBLISHED_BOOK_IDS}) AS bookCount,
-  (SELECT COUNT(*) FROM series WHERE id IN ${COUNTED_SERIES_IDS}) AS seriesCount,
-  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${PUBLISHED_BOOK_IDS}) AS bookLikes,
-  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN ${COUNTED_SERIES_BOOK_IDS}) AS seriesLikes,
-  (SELECT COUNT(*) FROM comments WHERE tombstone IS NULL AND bookId IN ${PUBLISHED_BOOK_IDS}) AS commentsOnBooks,
-  (SELECT COUNT(*) FROM favorites WHERE bookId IN ${PUBLISHED_BOOK_IDS})
-    + (SELECT COUNT(*) FROM favorites WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS favorites,
-  (SELECT COUNT(*) FROM reading_list_items WHERE bookId IN ${PUBLISHED_BOOK_IDS}) AS booksInReadingLists,
-  (SELECT COUNT(*) FROM reading_list_items WHERE seriesId IN ${COUNTED_SERIES_IDS}) AS seriesInReadingLists`;
+// Model.count takes no replacements, so the eight totals are scalar subqueries
+// of one raw SELECT that binds `:id`. Two CTEs hold the sets the totals share,
+// so MySQL materializes each once instead of re-running its join per total.
+//   published: the Published Books the Account co-authors.
+//   counted_series: the Account's Series that hold a Published Book (of any
+//     author), so a Series with only Drafts is dropped.
+//   counted_series_books: every Published Book of those Series, whoever wrote it.
+const PROFILE_COUNTS = `WITH published AS (
+    SELECT ba.bookId FROM book_authors ba
+    JOIN books pb ON pb.id = ba.bookId
+    WHERE ba.userId = :id AND pb.status <> 'draft'
+  ), counted_series AS (
+    SELECT sa.seriesId FROM series_authors sa
+    WHERE sa.userId = :id
+      AND EXISTS (SELECT 1 FROM books sb WHERE sb.seriesId = sa.seriesId AND sb.status <> 'draft')
+  ), counted_series_books AS (
+    SELECT cb.id AS bookId FROM books cb
+    WHERE cb.status <> 'draft' AND cb.seriesId IN (SELECT seriesId FROM counted_series)
+  )
+SELECT
+  (SELECT COUNT(*) FROM books WHERE id IN (SELECT bookId FROM published)) AS bookCount,
+  (SELECT COUNT(*) FROM series WHERE id IN (SELECT seriesId FROM counted_series)) AS seriesCount,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN (SELECT bookId FROM published)) AS bookLikes,
+  (SELECT COUNT(*) FROM likes WHERE isLike = TRUE AND bookId IN (SELECT bookId FROM counted_series_books)) AS seriesLikes,
+  (SELECT COUNT(*) FROM comments WHERE tombstone IS NULL AND bookId IN (SELECT bookId FROM published)) AS commentsOnBooks,
+  (SELECT COUNT(*) FROM favorites WHERE bookId IN (SELECT bookId FROM published))
+    + (SELECT COUNT(*) FROM favorites WHERE seriesId IN (SELECT seriesId FROM counted_series)) AS favorites,
+  (SELECT COUNT(*) FROM reading_list_items WHERE bookId IN (SELECT bookId FROM published)) AS booksInReadingLists,
+  (SELECT COUNT(*) FROM reading_list_items WHERE seriesId IN (SELECT seriesId FROM counted_series)) AS seriesInReadingLists`;
 
 // COUNT(*) is a BIGINT, which the driver may hand back as a string.
 type ProfileCountKey =

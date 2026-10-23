@@ -182,6 +182,12 @@ describe('SearchBar suggestions', () => {
 
     await userEvent.type(screen.getByLabelText('Search books'), 'drag');
 
+    await waitFor(() => {
+      expect(mockedSeries.listSeries).toHaveBeenCalledWith({
+        q: 'drag',
+        limit: 8,
+      });
+    });
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       q: 'drag',
       pageSize: 8,
@@ -189,10 +195,6 @@ describe('SearchBar suggestions', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       author: 'drag',
       pageSize: 8,
-    });
-    expect(mockedSeries.listSeries).toHaveBeenCalledWith({
-      q: 'drag',
-      limit: 8,
     });
     expect(await screen.findByTitle('Dragon Saga')).toBeInTheDocument();
     expect(screen.getByText('Books')).toBeInTheDocument();

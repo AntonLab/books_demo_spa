@@ -77,7 +77,8 @@ test('an item has no timestamps', () => {
 
 test('exactly one of bookId and seriesId passes validation', async () => {
   await assert.rejects(
-    ReadingListItem.build({ listId: 1, position: 1 }).validate()
+    ReadingListItem.build({ listId: 1, position: 1 }).validate(),
+    /Exactly one of bookId or seriesId/
   );
   await assert.rejects(
     ReadingListItem.build({
@@ -85,7 +86,8 @@ test('exactly one of bookId and seriesId passes validation', async () => {
       position: 1,
       bookId: 1,
       seriesId: 1,
-    }).validate()
+    }).validate(),
+    /Exactly one of bookId or seriesId/
   );
   await ReadingListItem.build({ listId: 1, position: 1, bookId: 1 }).validate();
   await ReadingListItem.build({

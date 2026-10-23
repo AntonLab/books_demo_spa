@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type {
   PagedResponse,
   ReadingStatus,
@@ -31,20 +31,11 @@ export const clearReadingStatus = (bookId: number): Promise<void> => {
   return request<void>(`/library/${bookId}`, { method: 'DELETE' });
 };
 
-// An undefined param is left out, as listBooks does.
+// Undefined, null and empty-string params are left out, as listBooks does.
 export const listLibrary = (
   params: ListLibraryParams = {}
 ): Promise<PagedResponse<LibraryBook>> => {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params) as [
-    string,
-    string | number | undefined,
-  ][]) {
-    if (value !== undefined) search.set(key, String(value));
-  }
-
-  const query = search.toString();
   return request<PagedResponse<LibraryBook>>(
-    query ? `/library?${query}` : '/library'
+    `/library${toQueryString(params)}`
   );
 };

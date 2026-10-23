@@ -1,4 +1,4 @@
-import { request } from './client';
+import { request, toQueryString } from './client';
 import type { ListResponse, ReportPayload, ReportStatus } from 'shared';
 import type { ReportRow, ReportStatistics } from '../types/api';
 
@@ -13,23 +13,27 @@ export interface ListReportsParams extends ReportRange {
   offset?: number;
 }
 
-// Built key by key rather than by iterating the params: the URL, and so the
-// request a test asserts, does not depend on the order a caller wrote them in.
+// The object lists the keys one by one rather than spreading the params:
+// toQueryString keeps the order given, so the URL, and so the request a test
+// asserts, does not depend on the order a caller wrote them in.
 export const listReports = (
   params: ListReportsParams
 ): Promise<ListResponse<ReportRow>> => {
-  const search = new URLSearchParams({ from: params.from, to: params.to });
-  if (params.status !== undefined) search.set('status', params.status);
-  if (params.limit !== undefined) search.set('limit', String(params.limit));
-  if (params.offset !== undefined) search.set('offset', String(params.offset));
-  return request<ListResponse<ReportRow>>(`/reports?${search.toString()}`);
+  const query = toQueryString({
+    from: params.from,
+    to: params.to,
+    status: params.status,
+    limit: params.limit,
+    offset: params.offset,
+  });
+  return request<ListResponse<ReportRow>>(`/reports${query}`);
 };
 
 export const getReportStatistics = (
   range: ReportRange
 ): Promise<ReportStatistics> => {
-  const search = new URLSearchParams({ from: range.from, to: range.to });
-  return request<ReportStatistics>(`/reports/statistics?${search.toString()}`);
+  const query = toQueryString({ from: range.from, to: range.to });
+  return request<ReportStatistics>(`/reports/statistics${query}`);
 };
 
 export const reportComment = (

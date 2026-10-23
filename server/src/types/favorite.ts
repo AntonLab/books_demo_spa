@@ -1,29 +1,24 @@
 import { z } from 'zod';
 import { limitOffsetShape } from './pagination.ts';
 import { idSchema } from './params.ts';
+import { exactlyOneSet } from './target.ts';
 
 // Nullable and defaulted to null, as in types/like.ts: an omitted key and an
 // explicit null reach the refine as the same value.
 const targetIdSchema = idSchema.nullable().default(null);
 
-// Enforced again by the model validate in models/Favorite.ts, because a
-// caller reaching Sequelize directly never passes through zod; migration 0003
-// adds the CHECK behind it.
-function exactlyOneTarget(value: {
-  bookId: number | null;
-  seriesId: number | null;
-}): boolean {
-  return (value.bookId === null) !== (value.seriesId === null);
-}
-
 // No userId: the holder comes from the session, or the unique indexes would
 // enforce "one favorite per *claimed* account".
+//
+// The exactly-one-target rule is enforced again by the model validate in
+// models/Favorite.ts, because a caller reaching Sequelize directly never passes
+// through zod; migration 0003 adds the CHECK behind it.
 export const createFavoriteSchema = z
   .object({
     bookId: targetIdSchema,
     seriesId: targetIdSchema,
   })
-  .refine(exactlyOneTarget, {
+  .refine((value) => exactlyOneSet(value.bookId, value.seriesId), {
     message: 'Exactly one of bookId or seriesId must be set',
     path: ['bookId'],
   });

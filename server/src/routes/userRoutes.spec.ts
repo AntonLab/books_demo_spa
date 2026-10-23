@@ -13,6 +13,7 @@ import {
   aWebpImage,
   AUTH_COOKIE,
   json,
+  put,
   ROLE_COOKIES,
   USER_IDS,
   withApp,
@@ -1145,13 +1146,10 @@ test('PUT /api/users/:id/avatar answers 401 with no session', async () => {
   await withApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const response = await fetch(
+      const response = await put(
         `${base}/api/users/${USER_IDS.user}/avatar`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'image/webp' },
-          body: await aWebpImage(),
-        }
+        undefined,
+        await aWebpImage()
       );
       assert.equal(response.status, 401);
     }
@@ -1165,11 +1163,11 @@ test('PUT /api/users/:id/avatar answers 404 before 403 for an account that does 
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const response = await fetch(`${base}/api/users/999999/avatar`, {
-        method: 'PUT',
-        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.admin },
-        body: await aWebpImage(),
-      });
+      const response = await put(
+        `${base}/api/users/999999/avatar`,
+        ROLE_COOKIES.admin,
+        await aWebpImage()
+      );
       assert.equal(response.status, 404);
     }
   );
@@ -1179,13 +1177,10 @@ test("PUT /api/users/:id/avatar answers 403 for a user or author touching someon
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const response = await fetch(
+      const response = await put(
         `${base}/api/users/${USER_IDS.author}/avatar`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
-          body: await aWebpImage(),
-        }
+        ROLE_COOKIES.user,
+        await aWebpImage()
       );
       assert.equal(response.status, 403);
     }
@@ -1196,13 +1191,10 @@ test("PUT /api/users/:id/avatar answers 403 for an admin touching a superadmin's
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const response = await fetch(
+      const response = await put(
         `${base}/api/users/${USER_IDS.superadmin}/avatar`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.admin },
-          body: await aWebpImage(),
-        }
+        ROLE_COOKIES.admin,
+        await aWebpImage()
       );
       assert.equal(response.status, 403);
     }
@@ -1213,13 +1205,10 @@ test('PUT /api/users/:id/avatar answers 413 for a body over 2 MiB', async () => 
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const response = await fetch(
+      const response = await put(
         `${base}/api/users/${USER_IDS.user}/avatar`,
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
-          body: Buffer.alloc(2 * 1024 * 1024 + 1),
-        }
+        ROLE_COOKIES.user,
+        Buffer.alloc(2 * 1024 * 1024 + 1)
       );
       assert.equal(response.status, 413);
     }
@@ -1281,11 +1270,11 @@ test('PUT /api/users/:id/avatar replaces the avatar and answers with the updated
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      const first = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
-        method: 'PUT',
-        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
-        body: await aWebpImage(),
-      });
+      const first = await put(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        ROLE_COOKIES.user,
+        await aWebpImage()
+      );
       assert.equal(first.status, 200);
       const firstBody = await json<PublicUser>(first);
       assert.match(
@@ -1294,11 +1283,11 @@ test('PUT /api/users/:id/avatar replaces the avatar and answers with the updated
       );
 
       await new Promise((resolve) => setTimeout(resolve, 10));
-      const second = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
-        method: 'PUT',
-        headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
-        body: await aWebpImage(50, 50),
-      });
+      const second = await put(
+        `${base}/api/users/${USER_IDS.user}/avatar`,
+        ROLE_COOKIES.user,
+        await aWebpImage(50, 50)
+      );
       assert.equal(second.status, 200);
       const secondBody = await json<PublicUser>(second);
       assert.notEqual(secondBody.avatarUrl, firstBody.avatarUrl);
@@ -1354,11 +1343,11 @@ test('GET /api/users/:id/avatar answers 404 for an account with no avatar, and f
 test('GET /api/users/:id/avatar serves the WebP bytes with the versioned cache headers, publicly (a guest included)', async () => {
   const repository = createFakeRepository(seedPersonaRows());
   await withAuthenticatedApp({ userRepository: repository }, async (base) => {
-    await fetch(`${base}/api/users/${USER_IDS.user}/avatar`, {
-      method: 'PUT',
-      headers: { 'content-type': 'image/webp', cookie: ROLE_COOKIES.user },
-      body: await aWebpImage(),
-    });
+    await put(
+      `${base}/api/users/${USER_IDS.user}/avatar`,
+      ROLE_COOKIES.user,
+      await aWebpImage()
+    );
   });
   await withApp({ userRepository: repository }, async (base) => {
     const response = await fetch(`${base}/api/users/${USER_IDS.user}/avatar`);

@@ -117,6 +117,30 @@ describe('listSeries sort and published', () => {
       '/api/series?userId=3&limit=20&offset=40&sort=new&published=true'
     );
   });
+
+  it('sends keys in a fixed order whatever order the caller gives', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({
+      published: 'true',
+      sort: 'new',
+      offset: 0,
+      q: 'x',
+      userId: 3,
+    });
+
+    expect(callOf(fetchMock)[0]).toBe(
+      '/api/series?userId=3&q=x&offset=0&sort=new&published=true'
+    );
+  });
+
+  it('leaves out an empty q and tag', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listSeries({ q: '', tag: '' });
+
+    expect(callOf(fetchMock)[0]).toBe('/api/series');
+  });
 });
 
 describe('getSeries', () => {
