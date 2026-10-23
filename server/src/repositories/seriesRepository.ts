@@ -441,8 +441,6 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       });
     },
 
-    // Under a lock on the series row, which addCoAuthor and removeCoAuthor
-    // (coAuthors.ts) rely on.
     async addCoAuthor(seriesId, userId, actor) {
       return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {
@@ -471,8 +469,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       return true;
     },
 
-    // Under a lock on the series row, which removeCoAuthor (coAuthors.ts)
-    // relies on.
+    // Lock order: .claude/rules/server/sequelize.md.
     async removeCoAuthor(seriesId, userId, actor) {
       return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {

@@ -676,10 +676,8 @@ export function createSequelizeBookRepository(): BookRepository {
     // references an update can write, and asMissingUser (coAuthors.ts) explains why neither
     // can be rejected.
     //
-    // Lock order: the series row, then the book row (the order reorderInSeries
-    // takes), so a move and a reorder cannot deadlock. The series to lock is
-    // read before the transaction, unlocked, since the book row cannot be
-    // locked first.
+    // Locks the series, then the book (sequelize.md Lock order). The series is
+    // peeked unlocked first: the book row cannot be locked first.
     async update(id, input) {
       const peeked = await Book.findByPk(id, {
         attributes: ['id', 'seriesId'],
@@ -700,8 +698,6 @@ export function createSequelizeBookRepository(): BookRepository {
         });
         if (!book) return null;
 
-        // The book was moved after the peek, so the series locked is not its
-        // own: a retry locks the right one.
         if (namedSeriesId === null && book.seriesId !== peeked.seriesId) {
           throw new StateConflictError(
             'The book was moved to another series; try again'
@@ -790,8 +786,6 @@ export function createSequelizeBookRepository(): BookRepository {
       });
     },
 
-    // Under a lock on the book row, which addCoAuthor and removeCoAuthor
-    // (coAuthors.ts) rely on.
     async addCoAuthor(bookId, userId, actor) {
       return sequelizeOf(Book).transaction(async (transaction) => {
         const book = await Book.findByPk(bookId, {

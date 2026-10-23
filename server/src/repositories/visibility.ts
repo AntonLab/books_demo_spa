@@ -101,16 +101,11 @@ function bookIncludeWhere(where: WhereOptions): IncludeOptions {
   return { model: Book, as: 'book', attributes: [], required: true, where };
 }
 
-// The same rule turned inside out: the Draft books a viewer may not read, as a
-// parenthesised SQL subquery on `books` (the caller wraps it in `literal`, or
-// nests it in a larger one), or null for a Moderator (nothing is hidden). For the
-// reads that cannot join a single `book` — a like points at a book or at a
-// comment on one — excluding the hidden drafts is simpler than enumerating
-// every readable book.
-//
-// A subquery rather than an id list, because the drafts grow with the
-// catalogue. The only values interpolated are the viewer's credited book ids,
-// integers read from the database through creditedBookIds.
+// The Draft books a viewer may not read, as a parenthesised SQL subquery on
+// `books` for `literal` or nesting; null for a Moderator. For reads that cannot
+// join one `book` (a like points at a book or a comment on one). A subquery,
+// not an id list, because drafts grow with the catalogue. Only credited book
+// ids from creditedBookIds are interpolated; they are integers.
 export async function hiddenBooksSubquery(
   viewer: Viewer
 ): Promise<string | null> {
