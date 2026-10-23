@@ -8,8 +8,9 @@
  * `languageOptions` differ between the packages (browser globals and ES2020 vs
  * Node globals), so those stay in the package configs.
  *
- * The plugins are imported directly: npm hoists them from the root
- * package.json into the root `node_modules`, so bare specifiers resolve here.
+ * The base plugins are root devDependencies; the React, react-hooks and
+ * jsx-a11y plugins are declared in client/package.json and imported by
+ * client/eslint.config.mjs. npm hoists them, so bare specifiers resolve.
  *
  * .ts and .tsx files are linted with type information: the project service
  * reads the tsconfig.json nearest each file (the client's webpack config has

@@ -50,8 +50,9 @@ paths:
 - The client config adds the rules `client/CLAUDE.md` lists;
   `no-restricted-imports` takes one option set per file, so each level block
   repeats the rules above it.
-- Plugins resolve by bare specifier because the root `package.json` declares
-  them and npm hoists them.
+- Root devDependencies hold `@eslint/js`, `eslint-config-prettier` and
+  `typescript-eslint`; `client/package.json` holds the React, react-hooks and
+  jsx-a11y plugins `client/eslint.config.mjs` imports. npm hoists them.
 
 ## Root `package.json`
 

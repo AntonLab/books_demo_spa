@@ -98,9 +98,12 @@ accident.
 ## Scripts
 
 The scripts are in the root `package.json` and each package's own; run the root
-ones from the repo root. Every script except the Prettier pair fans out over
-every workspace that defines it; target one with npm's `-w` flag
-(`npm run dev -w client`, `npm run build -w server`).
+ones from the repo root. `build`, `typecheck`, `lint`, `lint:fix` and `test`
+fan out over every workspace that defines them; `dev` runs the client and
+server together, and the rest (`format`, `format:check`, `prepare`, `skills`,
+`worktree`, `branch:check`, `tokens`, `baseline`, `test:scripts`) run once at
+the root. Target one workspace with npm's `-w` flag (`npm run dev -w client`,
+`npm run build -w server`).
 
 `npm run dev` serves the client on :3000 and the API on :4000. `npm run start -w
 server` runs the API without the file watcher, and `npm run test:watch -w client`

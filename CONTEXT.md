@@ -105,8 +105,10 @@ Account's Unsaved text is kept for when it signs back in.
 _Avoid_: Sign out (for a session the Account did not end itself)
 
 **Pending**:
-An Account status reserved for a future email-verification step. Today it
-restricts nothing: a Pending Account signs in like an active one.
+An Account status reserved for a future email-verification step. A Pending
+Account signs in like an Active one but has no Public profile
+(`accountRepository.ts:8-10`). Registration sets `active`
+(`authController.ts:89`), so no current Account is Pending.
 
 **Avatar**:
 The optional picture an Account shows beside its name, whatever its Role. An
