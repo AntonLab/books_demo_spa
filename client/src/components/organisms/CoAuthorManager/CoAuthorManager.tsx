@@ -68,7 +68,11 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
 }) => {
   const { token } = theme.useToken();
   const [term, setTerm] = useState('');
-  const search = useAuthorSearch(useDebouncedValue(term, SEARCH_DEBOUNCE_MS));
+  const debounced = useDebouncedValue(term, SEARCH_DEBOUNCE_MS);
+  const search = useAuthorSearch(debounced);
+  // While the typed term runs ahead of the debounced one, `search.data` still
+  // holds the previous term's rows.
+  const pending = term !== debounced;
   const add = useAddCoAuthor(work);
   const remove = useRemoveCoAuthor(work);
 
@@ -78,9 +82,10 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
   // not offered. They delete the work instead.
   const canLeave = authors.length > 1;
 
-  const candidates = (search.data ?? []).filter(
-    (author) => !credited.has(author.id)
-  );
+  const candidates = pending
+    ? []
+    : (search.data ?? []).filter((author) => !credited.has(author.id));
+  const searching = pending || search.isFetching;
 
   return (
     <section>
@@ -163,8 +168,8 @@ export const CoAuthorManager: FC<CoAuthorManagerProps> = ({
             setTerm(value.slice(0, AUTHOR_SEARCH_MAX_LENGTH))
           }
           value={null}
-          loading={search.isFetching}
-          notFoundContent={search.isFetching ? null : 'No authors found'}
+          loading={searching}
+          notFoundContent={searching ? null : 'No authors found'}
           options={candidates.map((author): CandidateOption => ({
             value: author.id,
             label: `${nameOf(author)} (${author.login})`,

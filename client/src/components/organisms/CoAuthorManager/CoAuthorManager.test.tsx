@@ -1,10 +1,11 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AUTHOR_SEARCH_MAX_LENGTH } from 'shared';
 import { CoAuthorManager } from './CoAuthorManager';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { waitPastDebounce } from '@/test/waitPastDebounce';
 import { ApiError } from '@/api/client';
+import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedValue';
 import * as authorsApi from '@/api/authors';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
@@ -175,6 +176,41 @@ describe('CoAuthorManager', () => {
     );
     expect(mockedAuthors.searchAuthors).not.toHaveBeenCalledWith(tooLong);
     expect(screen.getByRole('combobox')).toHaveValue(accepted);
+  });
+
+  it('offers no candidates from the old term once one is picked', async () => {
+    mockedBooks.addCoAuthor.mockResolvedValue({} as never);
+    renderManager();
+    const box = screen.getByRole('combobox');
+
+    await userEvent.type(box, 'petrov');
+    await userEvent.click(await screen.findByTitle('Ivan Petrov (ipetrov)'));
+    // Within the debounce window of the cleared term: the old rows are stale.
+    await userEvent.click(box);
+
+    // antd keeps a closed dropdown's last rows in the DOM; with no candidates
+    // and no "not found" text it stays hidden, with stale rows it opens.
+    expect(document.querySelector('.ant-select-dropdown')).toHaveClass(
+      'ant-select-dropdown-hidden'
+    );
+  });
+
+  describe('debounce timing', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('requests nothing before the debounce delay and once after it', async () => {
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      renderManager();
+
+      await user.type(screen.getByRole('combobox'), 'petrov');
+      act(() => jest.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1));
+      expect(mockedAuthors.searchAuthors).not.toHaveBeenCalled();
+
+      await act(async () => jest.advanceTimersByTime(1));
+      expect(mockedAuthors.searchAuthors).toHaveBeenCalledTimes(1);
+      expect(mockedAuthors.searchAuthors).toHaveBeenCalledWith('petrov');
+    });
   });
 
   it('removes another co-author', async () => {
