@@ -35,11 +35,10 @@ paths:
   from the swarm plugin or a second `playwright` server beside it), nothing
   when ready, always exit 0. An MCP fix reaches a session only after a
   restart: `/clear` keeps the old servers.
-- **`.env.local` is behind a `Read` and an `Edit` deny**
-  (`Read(**/.env.local)`, `Edit(**/.env.local)`). The `Read` deny keeps
-  `DB_PASSWORD` out of model context and the transcript. The `Edit` deny also
-  stops an agent's `cp` into a worktree. `npm run worktree` copies it instead;
-  keep both denies.
+- **`.env.local` has a `Read` and an `Edit` deny** in `settings.json`. `Read`
+  keeps `DB_PASSWORD` out of model context and the transcript. `Edit` also
+  stops an agent's `cp` into a worktree; `npm run worktree` copies it instead.
+  Keep both.
 - **`.claude/skills/`** is ignored except `db-reset/`: the rest are junctions
   `scripts/link-skills.mjs` makes, and that script leaves a real directory
   alone.
