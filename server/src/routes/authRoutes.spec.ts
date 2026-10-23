@@ -200,6 +200,14 @@ function sessionCookie(response: Response): string | null {
   return match?.[1] ?? null;
 }
 
+// The same read for tests that replay the token: a missing one fails here
+// instead of becoming the cookie value "null".
+function sessionToken(response: Response): string {
+  const token = sessionCookie(response);
+  assert.ok(token, 'the response set no session cookie');
+  return token;
+}
+
 test('POST /register creates the user and opens a session', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
@@ -564,7 +572,7 @@ test('GET /me without a cookie is 401', async () => {
 });
 
 const loginBody = { login: 'Bob', password: 'hunter2hunter2' };
-const meStatus = (base: string, token: string | null) =>
+const meStatus = (base: string, token: string) =>
   fetch(`${base}/api/auth/me`, {
     headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
   }).then((response) => response.status);
@@ -573,8 +581,8 @@ test('login with the previous sid cookie revokes it', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
-    const tokenA = sessionCookie(await post(base, 'login', loginBody));
-    const tokenB = sessionCookie(
+    const tokenA = sessionToken(await post(base, 'login', loginBody));
+    const tokenB = sessionToken(
       await post(base, 'login', loginBody, `${SESSION_COOKIE_NAME}=${tokenA}`)
     );
 
@@ -586,7 +594,7 @@ test('login with the previous sid cookie revokes it', async () => {
 test('login without a cookie, or with a token no row matches, still succeeds and touches nothing', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
-    const other = sessionCookie(await post(base, 'register', registration));
+    const other = sessionToken(await post(base, 'register', registration));
 
     const bare = await post(base, 'login', loginBody);
     const garbage = await post(
@@ -606,7 +614,7 @@ test('a wrong password leaves the presented session alive', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
     await post(base, 'register', registration);
-    const tokenA = sessionCookie(await post(base, 'login', loginBody));
+    const tokenA = sessionToken(await post(base, 'login', loginBody));
 
     const response = await post(
       base,
@@ -629,7 +637,7 @@ test("the presented cookie of another account's session is revoked too", async (
       login: 'Carol',
       email: 'carol@example.com',
     });
-    const tokenX = sessionCookie(await post(base, 'login', loginBody));
+    const tokenX = sessionToken(await post(base, 'login', loginBody));
 
     const loginY = await post(
       base,
