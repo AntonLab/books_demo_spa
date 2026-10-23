@@ -91,8 +91,9 @@ the types the root CLAUDE.md lists; add a type to both at once. Git's own
 ## `scripts/`
 
 Plain Node (`*.mjs`) and one Bash script, with no dependencies; Prettier
-checks the `.mjs` files, but no package's ESLint config reaches them. Their
-tests sit in `scripts/test/` and run through `npm run test:scripts` (part of
+checks the `.mjs` files, but no package's ESLint config reaches them. CI's
+`lint` job syntax-checks every `scripts/*.mjs` with `node --check` (syntax only,
+no lint rules). Their tests sit in `scripts/test/` and run through `npm run test:scripts` (part of
 `npm test` and CI's `lint` job); a script that runs on import keeps its
 testable part in a sibling module, as `worktree.mjs` does with `remove-dir.mjs`.
 CI runs them on Linux, where `path` is POSIX and `\` is no separator: a check
