@@ -373,6 +373,17 @@ function seriesPositionOf(
 // shares now — which reads true, since a Co-author who left is credited
 // nowhere on it. The actor's name is written as a notification would have
 // written it at the time.
+function workIdOf<T extends { title: string }>(
+  ids: Map<T, number>,
+  work: T
+): number {
+  const id = ids.get(work);
+  if (id === undefined) {
+    throw new Error(`No row was created for "${work.title}"`);
+  }
+  return id;
+}
+
 async function writeNotifications(
   plan: Plan,
   accountIds: readonly number[],
@@ -411,7 +422,7 @@ async function writeNotifications(
           kind: 'co_author_added',
           workType: 'series',
           bookId: null,
-          seriesId: seriesIds.get(entry) ?? null,
+          seriesId: workIdOf(seriesIds, entry),
           workTitle: entry.title,
           actorKind: 'co_author',
           actorName: nameOf(author),
@@ -425,7 +436,7 @@ async function writeNotifications(
           userId: idOf(login),
           kind: 'co_author_added',
           workType: 'book',
-          bookId: bookIds.get(book) ?? null,
+          bookId: workIdOf(bookIds, book),
           seriesId: null,
           workTitle: book.title,
           actorKind: 'co_author',
@@ -448,7 +459,7 @@ async function writeNotifications(
         userId: idOf(author.spec.login),
         kind: 'co_author_left',
         workType: 'book',
-        bookId: bookIds.get(left) ?? null,
+        bookId: workIdOf(bookIds, left),
         seriesId: null,
         workTitle: left.title,
         actorKind: 'co_author',
@@ -590,22 +601,11 @@ async function writeFavorites(
   seriesIds: Map<PlannedSeries, number>,
   transaction: Transaction
 ): Promise<number> {
-  const idOf = <T extends { title: string }>(
-    ids: Map<T, number>,
-    work: T
-  ): number => {
-    const id = ids.get(work);
-    if (id === undefined) {
-      throw new Error(`No row was created for "${work.title}"`);
-    }
-    return id;
-  };
-
   const rows = plan.favorites.map((favorite) => ({
     ...createFavoriteSchema.parse({
-      bookId: favorite.book === null ? null : idOf(bookIds, favorite.book),
+      bookId: favorite.book === null ? null : workIdOf(bookIds, favorite.book),
       seriesId:
-        favorite.series === null ? null : idOf(seriesIds, favorite.series),
+        favorite.series === null ? null : workIdOf(seriesIds, favorite.series),
     }),
     userId: itemAt(accountIds, favorite.accountIndex, 'account id'),
     createdAt: favorite.createdAt,
@@ -622,19 +622,13 @@ async function writeLibrary(
   bookIds: Map<PlannedBook, number>,
   transaction: Transaction
 ): Promise<number> {
-  const rows = plan.library.map((entry) => {
-    const bookId = bookIds.get(entry.book);
-    if (bookId === undefined) {
-      throw new Error(`No row was created for "${entry.book.title}"`);
-    }
-    return {
-      ...setReadingStatusSchema.parse({ status: entry.status }),
-      userId: itemAt(accountIds, entry.accountIndex, 'account id'),
-      bookId,
-      createdAt: entry.updatedAt,
-      updatedAt: entry.updatedAt,
-    };
-  });
+  const rows = plan.library.map((entry) => ({
+    ...setReadingStatusSchema.parse({ status: entry.status }),
+    userId: itemAt(accountIds, entry.accountIndex, 'account id'),
+    bookId: workIdOf(bookIds, entry.book),
+    createdAt: entry.updatedAt,
+    updatedAt: entry.updatedAt,
+  }));
 
   // About 25 rows: far below INSERT_BATCH, so one insert.
   await LibraryEntry.bulkCreate(rows, { transaction });
@@ -648,17 +642,6 @@ async function writeReadingLists(
   seriesIds: Map<PlannedSeries, number>,
   transaction: Transaction
 ): Promise<{ readingLists: number; readingListItems: number }> {
-  const idOf = <T extends { title: string }>(
-    ids: Map<T, number>,
-    work: T
-  ): number => {
-    const id = ids.get(work);
-    if (id === undefined) {
-      throw new Error(`No row was created for "${work.title}"`);
-    }
-    return id;
-  };
-
   const lists = await ReadingList.bulkCreate(
     plan.readingLists.map((list) => ({
       ...createReadingListSchema.parse({
@@ -677,8 +660,8 @@ async function writeReadingLists(
   const items = plan.readingLists.flatMap((list, listIndex) =>
     list.items.map((item, position) => ({
       listId: itemAt(lists, listIndex, 'reading list').id,
-      bookId: item.book === null ? null : idOf(bookIds, item.book),
-      seriesId: item.series === null ? null : idOf(seriesIds, item.series),
+      bookId: item.book === null ? null : workIdOf(bookIds, item.book),
+      seriesId: item.series === null ? null : workIdOf(seriesIds, item.series),
       position,
     }))
   );
@@ -705,11 +688,11 @@ async function main(): Promise<void> {
   // idempotent, so a fresh clone can seed before the server has ever run.
   await ensureDatabase(config.db);
   const sequelize = createSequelize(config.db);
-  initModels(sequelize);
-  await sequelize.authenticate();
-  await createMigrator(sequelize).up();
-
   try {
+    initModels(sequelize);
+    await sequelize.authenticate();
+    await createMigrator(sequelize).up();
+
     if (!force) {
       logger.info(
         `Dry run: pass --force to delete these rows and reseed ${config.db.database}`,
