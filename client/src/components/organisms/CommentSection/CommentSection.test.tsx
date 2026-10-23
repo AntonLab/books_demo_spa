@@ -1252,54 +1252,70 @@ describe('CommentSection paging', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
   };
 
-  it('fetches every remaining page after a create so the new comment shows', async () => {
-    const server = makeComments(250);
-    serve(server);
-    serveCreate(server);
-    renderSignedIn();
-    await screen.findByText('Comment 1');
+  // Rendering 100-250 comments and typing a post exceeds Jest's 5 s default on
+  // a CI runner.
+  const SLOW_TEST_MS = 20_000;
 
-    await post('New');
+  it(
+    'fetches every remaining page after a create so the new comment shows',
+    async () => {
+      const server = makeComments(250);
+      serve(server);
+      serveCreate(server);
+      renderSignedIn();
+      await screen.findByText('Comment 1');
 
-    expect(await screen.findByText('Comment 251')).toBeInTheDocument();
-    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 100);
-    expect(mockedComments.listComments).toHaveBeenCalledWith(1, 200);
-  });
+      await post('New');
 
-  it('shows the new comment when exactly one full page was loaded', async () => {
-    const server = makeComments(100);
-    serve(server);
-    serveCreate(server);
-    renderSignedIn();
-    await screen.findByText('Comment 1');
+      expect(await screen.findByText('Comment 251')).toBeInTheDocument();
+      expect(mockedComments.listComments).toHaveBeenCalledWith(1, 100);
+      expect(mockedComments.listComments).toHaveBeenCalledWith(1, 200);
+    },
+    SLOW_TEST_MS
+  );
 
-    await post('New');
+  it(
+    'shows the new comment when exactly one full page was loaded',
+    async () => {
+      const server = makeComments(100);
+      serve(server);
+      serveCreate(server);
+      renderSignedIn();
+      await screen.findByText('Comment 1');
 
-    expect(await screen.findByText('Comment 101')).toBeInTheDocument();
-  });
+      await post('New');
 
-  it('stops draining after a failed page, toasts once and keeps the button', async () => {
-    const server = makeComments(250);
-    serve(server);
-    serveCreate(server);
-    const { store } = renderSignedIn();
-    await screen.findByText('Comment 1');
-    const served = mockedComments.listComments.getMockImplementation()!;
-    mockedComments.listComments.mockImplementation((id, offset) =>
-      offset === 100
-        ? Promise.reject(new TypeError('Failed to fetch'))
-        : served(id, offset)
-    );
+      expect(await screen.findByText('Comment 101')).toBeInTheDocument();
+    },
+    SLOW_TEST_MS
+  );
 
-    await post('New');
+  it(
+    'stops draining after a failed page, toasts once and keeps the button',
+    async () => {
+      const server = makeComments(250);
+      serve(server);
+      serveCreate(server);
+      const { store } = renderSignedIn();
+      await screen.findByText('Comment 1');
+      const served = mockedComments.listComments.getMockImplementation()!;
+      mockedComments.listComments.mockImplementation((id, offset) =>
+        offset === 100
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : served(id, offset)
+      );
 
-    expect(
-      await screen.findAllByText('Could not load more comments.')
-    ).toHaveLength(1);
-    expect(callsAt(200)).toBe(0);
-    expect(loadMoreButton()).toBeInTheDocument();
-    // The create succeeded, so the composer closes and the draft goes.
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(store.getState().unsavedText.entries).toEqual({});
-  });
+      await post('New');
+
+      expect(
+        await screen.findAllByText('Could not load more comments.')
+      ).toHaveLength(1);
+      expect(callsAt(200)).toBe(0);
+      expect(loadMoreButton()).toBeInTheDocument();
+      // The create succeeded, so the composer closes and the draft goes.
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(store.getState().unsavedText.entries).toEqual({});
+    },
+    SLOW_TEST_MS
+  );
 });
