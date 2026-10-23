@@ -43,9 +43,8 @@ export interface LikeRepository {
 // that as a 404 is more useful than the generic 500 an unmapped
 // SequelizeForeignKeyConstraintError would produce.
 //
-// The same shape as commentRepository's, with two keys: MySQL names the
-// offending column in the constraint text, which is the only place they are
-// distinguishable. Each target is only a candidate when one was supplied — a
+// MySQL names the offending column in the constraint text, which is the only
+// place bookId, commentId and userId are distinguishable. Each target is only a candidate when one was supplied — a
 // like fills exactly one of them — so userId is the safe fallback, as it is
 // the only key every row carries.
 function asMissingReference(
