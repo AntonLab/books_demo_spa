@@ -124,7 +124,8 @@ export function createAuthController(deps: AuthControllerDeps) {
       }
 
       // A fresh row every login; the previous cookie is replaced, never
-      // reused. This is what rules out session fixation.
+      // reused, and its row is deleted with the insert. This is what rules out
+      // session fixation.
       //
       // Opened only if the account still holds the hash verified above and is
       // still not blocked. A password change or a block can commit while the
@@ -132,11 +133,15 @@ export function createAuthController(deps: AuthControllerDeps) {
       // see sessionRepository.createIfCredentialCurrent for how the re-check
       // closes that window.
       const token = createToken();
+      const previous: unknown = req.cookies?.[SESSION_COOKIE_NAME];
       const opening = await deps.sessionRepository.createIfCredentialCurrent(
         user.id,
         hashToken(token),
         new Date(Date.now() + SESSION_TTL_MS),
-        credential.password
+        credential.password,
+        typeof previous === 'string' && previous.length > 0
+          ? hashToken(previous)
+          : null
       );
       if (opening === 'credential-changed') {
         throw new UnauthorizedError('Invalid credentials');

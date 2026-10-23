@@ -157,13 +157,67 @@ describe('sessionRepository against real MySQL', { skip }, () => {
 
   const sessionCount = (userId: number) => Session.count({ where: { userId } });
 
-  const openFor = (userId: number, token: string, verifiedHash: string) =>
+  const openFor = (
+    userId: number,
+    token: string,
+    verifiedHash: string,
+    replacedToken: string | null = null
+  ) =>
     repository.createIfCredentialCurrent(
       userId,
       hashToken(token),
       new Date(Date.now() + hour),
-      verifiedHash
+      verifiedHash,
+      replacedToken === null ? null : hashToken(replacedToken)
     );
+
+  test('createIfCredentialCurrent deletes the replaced session in the same call', async () => {
+    const userId = await makeUser('ReplacedOwner');
+    const verified = await storedHash(userId);
+    await openFor(userId, 'tok-replaced', verified);
+
+    assert.equal(
+      await openFor(userId, 'tok-replacement', verified, 'tok-replaced'),
+      'created'
+    );
+    assert.equal(
+      await repository.findValidByTokenHash(hashToken('tok-replaced')),
+      null
+    );
+    assert.equal(
+      (await repository.findValidByTokenHash(hashToken('tok-replacement')))
+        ?.userId,
+      userId
+    );
+    assert.equal(await sessionCount(userId), 1);
+  });
+
+  test('a replaced session survives a refused opening', async () => {
+    const userId = await makeUser('KeepsOld');
+    const verified = await storedHash(userId);
+    await openFor(userId, 'tok-keep', verified);
+    await User.update({ status: 'blocked' }, { where: { id: userId } });
+
+    assert.equal(
+      await openFor(userId, 'tok-x', verified, 'tok-keep'),
+      'blocked'
+    );
+    assert.equal(await sessionCount(userId), 1);
+  });
+
+  test('a replaced token that matches no row is ignored', async () => {
+    const userId = await makeUser('NoOldRow');
+    assert.equal(
+      await openFor(
+        userId,
+        'tok-unmatched',
+        await storedHash(userId),
+        'tok-never-issued'
+      ),
+      'created'
+    );
+    assert.equal(await sessionCount(userId), 1);
+  });
 
   test('createIfCredentialCurrent opens the session while the verified hash is current', async () => {
     const userId = await makeUser('CurrentOwner');

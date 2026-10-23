@@ -28,7 +28,10 @@ export interface SessionRepository {
     userId: number,
     tokenHash: string,
     expiresAt: Date,
-    verifiedPasswordHash: string
+    verifiedPasswordHash: string,
+    // The session this login replaces, deleted with the insert; null when the
+    // request carried no cookie.
+    replacedTokenHash: string | null
   ): Promise<SessionOpening>;
   findValidByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   // Which of these token hashes still open a session — not expired, account
@@ -72,7 +75,8 @@ export function createSequelizeSessionRepository(): SessionRepository {
       userId,
       tokenHash,
       expiresAt,
-      verifiedPasswordHash
+      verifiedPasswordHash,
+      replacedTokenHash
     ) {
       return sequelizeOf(Session).transaction(async (transaction) => {
         // unscoped so the password comes back at all. MySQL receives the
@@ -89,6 +93,13 @@ export function createSequelizeSessionRepository(): SessionRepository {
         // gone stale learns nothing about the account's status.
         if (user.status === 'blocked') return 'blocked';
 
+        // Only on this path, so a refused login keeps the session it carried.
+        if (replacedTokenHash !== null) {
+          await Session.destroy({
+            where: { tokenHash: replacedTokenHash },
+            transaction,
+          });
+        }
         await Session.create({ userId, tokenHash, expiresAt }, { transaction });
         return 'created';
       });

@@ -50,7 +50,8 @@ function createFakeSessions(users: UserRepository) {
       userId,
       tokenHash,
       expiresAt,
-      verifiedPasswordHash
+      verifiedPasswordHash,
+      replacedTokenHash
     ) {
       const password = await users.findPasswordHashById(userId);
       const user = await users.findById(userId);
@@ -58,6 +59,7 @@ function createFakeSessions(users: UserRepository) {
         return 'credential-changed';
       }
       if (user.status === 'blocked') return 'blocked';
+      if (replacedTokenHash !== null) rows.delete(replacedTokenHash);
       insert(userId, tokenHash, expiresAt);
       return 'created';
     },
@@ -558,6 +560,86 @@ test('GET /me without a cookie is 401', async () => {
   const { deps } = authDeps();
   await withApp(deps, async (base) => {
     assert.equal((await fetch(`${base}/api/auth/me`)).status, 401);
+  });
+});
+
+const loginBody = { login: 'Bob', password: 'hunter2hunter2' };
+const meStatus = (base: string, token: string | null) =>
+  fetch(`${base}/api/auth/me`, {
+    headers: { cookie: `${SESSION_COOKIE_NAME}=${token}` },
+  }).then((response) => response.status);
+
+test('login with the previous sid cookie revokes it', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    const tokenA = sessionCookie(await post(base, 'login', loginBody));
+    const tokenB = sessionCookie(
+      await post(base, 'login', loginBody, `${SESSION_COOKIE_NAME}=${tokenA}`)
+    );
+
+    assert.equal(await meStatus(base, tokenA), 401);
+    assert.equal(await meStatus(base, tokenB), 200);
+  });
+});
+
+test('login without a cookie, or with a token no row matches, still succeeds and touches nothing', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    const other = sessionCookie(await post(base, 'register', registration));
+
+    const bare = await post(base, 'login', loginBody);
+    const garbage = await post(
+      base,
+      'login',
+      loginBody,
+      `${SESSION_COOKIE_NAME}=not-a-real-token`
+    );
+
+    assert.equal(bare.status, 200);
+    assert.equal(garbage.status, 200);
+    assert.equal(await meStatus(base, other), 200);
+  });
+});
+
+test('a wrong password leaves the presented session alive', async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    const tokenA = sessionCookie(await post(base, 'login', loginBody));
+
+    const response = await post(
+      base,
+      'login',
+      { ...loginBody, password: 'wrong-password-123' },
+      `${SESSION_COOKIE_NAME}=${tokenA}`
+    );
+
+    assert.equal(response.status, 401);
+    assert.equal(await meStatus(base, tokenA), 200);
+  });
+});
+
+test("the presented cookie of another account's session is revoked too", async () => {
+  const { deps } = authDeps();
+  await withApp(deps, async (base) => {
+    await post(base, 'register', registration);
+    await post(base, 'register', {
+      ...registration,
+      login: 'Carol',
+      email: 'carol@example.com',
+    });
+    const tokenX = sessionCookie(await post(base, 'login', loginBody));
+
+    const loginY = await post(
+      base,
+      'login',
+      { login: 'Carol', password: registration.password },
+      `${SESSION_COOKIE_NAME}=${tokenX}`
+    );
+
+    assert.equal(loginY.status, 200);
+    assert.equal(await meStatus(base, tokenX), 401);
   });
 });
 

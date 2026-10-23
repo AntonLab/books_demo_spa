@@ -22,7 +22,7 @@ paths:
   production, seven days. Set and cleared through one options object in
   `sessionCookie.ts`: a `clearCookie` with different options leaves the cookie.
 - Session and reset tokens are stored as SHA-256 hashes, not argon2 (ADR-0001).
-- Login always opens a new session row, which rules out session fixation.
+- Login opens a new row and deletes the one its cookie names (fixation).
 - `resolveSessionUser` (`middleware/sessionUser.ts`) reports nobody for a
   missing cookie, unknown token, expired session, deleted or Blocked
   Account: a guarded route answers 401, a public one serves a Guest. The
