@@ -87,11 +87,11 @@ test('an admin and a superadmin may search authors', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeUsers([]) },
     async (base) => {
-      for (const cookie of [ROLE_COOKIES.admin, ROLE_COOKIES.superadmin]) {
+      for (const role of ['admin', 'superadmin'] as const) {
         const response = await fetch(`${base}/api/authors`, {
-          headers: { cookie },
+          headers: { cookie: ROLE_COOKIES[role] },
         });
-        assert.equal(response.status, 200, cookie);
+        assert.equal(response.status, 200, role);
       }
     }
   );

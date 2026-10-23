@@ -1,16 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ConflictError, NotFoundError } from '../types/errors.ts';
-import type { UserRole } from 'shared';
+import { as } from './commentRepository.contract.testkit.ts';
 import type { LikeRepository } from './likeRepository.ts';
-import type { Account } from './visibility.ts';
+
+export { as };
 
 // An id no row in either implementation has.
 const MISSING_ID = 999_999;
-export const as = (id: number, role: UserRole = 'user'): Account => ({
-  id,
-  role,
-});
 
 // What a contract case needs besides the repository: the rows it assumes exist
 // before it starts. The real side writes them through the models on MySQL,

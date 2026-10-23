@@ -205,6 +205,22 @@ describe('sessionRepository against real MySQL', { skip }, () => {
     assert.equal(await sessionCount(userId), 1);
   });
 
+  test('a replaced session survives an opening refused for a changed credential', async () => {
+    const userId = await makeUser('KeepsOldCredential');
+    const verified = await storedHash(userId);
+    await openFor(userId, 'tok-keep-credential', verified);
+    const user = await User.unscoped().findByPk(userId);
+    assert.ok(user);
+    user.password = 'hunter2hunter2';
+    await user.save();
+
+    assert.equal(
+      await openFor(userId, 'tok-y', verified, 'tok-keep-credential'),
+      'credential-changed'
+    );
+    assert.equal(await sessionCount(userId), 1);
+  });
+
   test('a replaced token that matches no row is ignored', async () => {
     const userId = await makeUser('NoOldRow');
     assert.equal(

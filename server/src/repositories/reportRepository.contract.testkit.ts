@@ -1,21 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ReportReason, ReportStatus, Tombstone, UserRole } from 'shared';
+import type { ReportReason, ReportStatus, Tombstone } from 'shared';
 import {
   AppError,
   BadRequestError,
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
+import { as } from './commentRepository.contract.testkit.ts';
 import type { ReportRepository } from './reportRepository.ts';
-import type { Account } from './visibility.ts';
+
+export { as };
 
 // An id no row in either implementation has.
 export const MISSING_ID = 999_999;
-export const as = (id: number, role: UserRole = 'user'): Account => ({
-  id,
-  role,
-});
 export const SPAM = { reason: 'spam' as const, explanation: null };
 export const isConflict = (error: unknown) =>
   error instanceof AppError && error.statusCode === 409;

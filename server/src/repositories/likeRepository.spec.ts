@@ -517,6 +517,37 @@ describe('likeRepository against real MySQL', { skip }, () => {
     }
   });
 
+  test('a credited co-author who does not own the comment gets the draft 403, not a 404, on a comment on their draft book', async () => {
+    const coAuthorId = (
+      await User.create({
+        ...owner,
+        login: 'LikeDraftCoAuthor',
+        email: 'like-draft-coauthor@example.com',
+        role: 'author',
+      })
+    ).id;
+    const draft = await createCreditedBook(
+      { title: 'Draft Novel', description: 'Co-written', tags: [] },
+      [userId, coAuthorId]
+    );
+    await Book.update({ status: 'draft' }, { where: { id: draft.id } });
+    const onDraft = await Comment.create({
+      userId,
+      bookId: draft.id,
+      text: 'A note on the draft.',
+    });
+
+    await assert.rejects(
+      repository.create(
+        { bookId: null, commentId: onDraft.id, isLike: true },
+        as(coAuthorId, 'author')
+      ),
+      (error: unknown) =>
+        error instanceof ForbiddenError && /draft/i.test(error.message)
+    );
+    assert.equal(await Like.count(), 0);
+  });
+
   test('a credited co-author keeps the draft 403 ahead of the own-book refusal', async () => {
     await Book.update({ status: 'draft' }, { where: { id: bookId } });
     await assert.rejects(

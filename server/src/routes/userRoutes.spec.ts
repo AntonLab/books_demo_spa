@@ -74,7 +74,8 @@ const valid = {
 
 // The matrix grants `users × create` to superadmin alone — this is the
 // administrative create, not registration — so the structural tests below
-// (validation, conflicts, paging) act as that persona by default.
+// create as that persona by default. Their reads (list, GET by id) use the
+// admin cookie: a plain user has no `users × read`.
 const post = (
   base: string,
   body: unknown,
@@ -482,12 +483,12 @@ test('a user and an author may not read the user directory', async () => {
   await withAuthenticatedApp(
     { userRepository: createFakeRepository(seedPersonaRows()) },
     async (base) => {
-      for (const cookie of [ROLE_COOKIES.user, ROLE_COOKIES.author]) {
+      for (const role of ['user', 'author'] as const) {
         for (const path of ['/api/users', '/api/users/1']) {
           const response = await fetch(`${base}${path}`, {
-            headers: { cookie },
+            headers: { cookie: ROLE_COOKIES[role] },
           });
-          assert.equal(response.status, 403, `${path} ${cookie}`);
+          assert.equal(response.status, 403, `${path} ${role}`);
         }
       }
     }

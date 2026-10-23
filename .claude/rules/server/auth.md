@@ -108,22 +108,22 @@ Two layers ahead of every route; neither leans on `sameSite: 'lax'`. Reads pass.
 ## Rate limiting (`middleware/authRateLimit.ts`)
 
 Sign-in, registration, password, upload and write budgets. In memory, fixed
-window. Login, register and reset mount before `validate`, and so do comment,
-like, report and chapter writes (after the permission check, before
-`chapterJson`), so a refusal costs no parse, lookup or argon2. Upload PUTs mount
-after `validate`, before `express.raw`, so a refused body is never read. A
+window. Login, register and reset mount before `validate`, so a refusal costs
+no parse, lookup or argon2. Comment, like, report and chapter writes mount
+after `validate` (an invalid request spends nothing), upload PUTs after
+`validate` and before `express.raw`, so a refused body is never read. A
 request with no user passes the limiter; the route refuses it. A limited
 Account is not Blocked.
 
-| Route                                                  | Key        | Limit         | Counts                                                                  |
-| ------------------------------------------------------ | ---------- | ------------- | ----------------------------------------------------------------------- |
-| `POST /api/auth/login`                                 | IP + login | 10 per 15 min | failed or aborted attempts                                              |
-| `POST /api/auth/login`                                 | IP         | 50 per 15 min | failed or aborted attempts                                              |
-| `POST /api/auth/register`                              | IP         | 5 per hour    | every request                                                           |
-| `POST /api/auth/password-reset/request`                | IP         | 5 per hour    | every request                                                           |
-| `PATCH /api/users/:id`                                 | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it    |
-| `PUT` book cover, series cover, user avatar            | user id    | 20 per 15 min | every request that passes the permission check and `validate`           |
-| `POST/PATCH/DELETE` comments, likes, reports, chapters | user id    | 60 per 15 min | every request that passes the permission check; `validate` not required |
+| Route                                                  | Key        | Limit         | Counts                                                               |
+| ------------------------------------------------------ | ---------- | ------------- | -------------------------------------------------------------------- |
+| `POST /api/auth/login`                                 | IP + login | 10 per 15 min | failed or aborted attempts                                           |
+| `POST /api/auth/login`                                 | IP         | 50 per 15 min | failed or aborted attempts                                           |
+| `POST /api/auth/register`                              | IP         | 5 per hour    | every request                                                        |
+| `POST /api/auth/password-reset/request`                | IP         | 5 per hour    | every request                                                        |
+| `PATCH /api/users/:id`                                 | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it |
+| `PUT` book cover, series cover, user avatar            | user id    | 20 per 15 min | every request that passes the permission check and `validate`        |
+| `POST/PATCH/DELETE` comments, likes, reports, chapters | user id    | 60 per 15 min | every request that passes the permission check and `validate`        |
 
 - A malformed image spends upload budget; the upload DELETE routes are free.
 - **Login claims both budgets on arrival** (`hit`), or parallel attempts would
