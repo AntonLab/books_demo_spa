@@ -24,7 +24,8 @@ const tokens = (text) => extractTokens(text).map((entry) => entry.token);
 test('hit: identifier and file name found in tracked code', (t) => {
   const root = repo(t, {
     [DOC]: 'x\nSee `fooBar` and `app.json`.\n',
-    'src/code.ts': 'export const fooBar = 1; // app.json',
+    'src/code.ts': 'export const fooBar = 1;',
+    'config/app.json': '{}',
   });
   assert.deepEqual(findMisses({ root, docs: [DOC] }), []);
 });
@@ -82,6 +83,37 @@ test('token with / is checked as an existing path', (t) => {
   assert.deepEqual(
     findMisses({ root, docs: [DOC] }).map((m) => m.token),
     ['server/src/gone.ts']
+  );
+});
+
+test('a bare file name resolves to a tracked file, not to code that mentions it', (t) => {
+  const root = repo(t, {
+    [DOC]: '`real.ts` `renamed.ts`\n',
+    'server/src/a/real.ts': '',
+    'src/code.ts': '// see renamed.ts',
+  });
+  assert.deepEqual(
+    findMisses({ root, docs: [DOC] }).map((m) => m.token),
+    ['renamed.ts']
+  );
+});
+
+test('a package-relative path resolves against the tracked file suffix', (t) => {
+  const root = repo(t, {
+    [DOC]: '`src/db/config.ts` `db/config.ts` `src/db/gone.ts`\n',
+    'server/src/db/config.ts': '',
+  });
+  assert.deepEqual(
+    findMisses({ root, docs: [DOC] }).map((m) => m.token),
+    ['src/db/gone.ts']
+  );
+});
+
+test('a suffix match respects the path segment boundary', (t) => {
+  const root = repo(t, { [DOC]: '`ar.ts` `a/ar.ts`\n', 'src/bar.ts': '' });
+  assert.deepEqual(
+    findMisses({ root, docs: [DOC] }).map((m) => m.token),
+    ['ar.ts', 'a/ar.ts']
   );
 });
 

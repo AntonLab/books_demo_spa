@@ -1,89 +1,17 @@
 # Tokens the docs name on purpose that check-doc-refs cannot verify.
 # One token per line; a `#` line is a comment. Group by reason.
-# Doc and bare file names: the file exists, but no tracked file's content spells its name.
+# File names and paths need no entry: a `.ts/.tsx/.mjs/.md/.json` name resolves
+# against the tail of any tracked path, so only placeholders and patterns belong here.
 
-# Doc file names (rules/docs basenames).
-CODING_STANDARDS.md
-access.md
-api.md
-chapter-page.md
-components-search.md
-components.md
-images.md
-operations.md
-pipeline.md
-queries.md
-routing.md
-seed.md
-store.md
-testing.md
-webpack.md
+# Extension fragments, not whole files.
+.fake.spec.ts
+.mjs
+.ts
 
-# Server paths relative to server/src/, so the root-relative path check misses them.
-announcements/announcementPass.ts
-controllers/coAuthorGuard.ts
-controllers/creditHandlers.ts
-db/dropTestDatabases.testkit.ts
-db/mysqlProbe.testkit.ts
-db/seed/personas.ts
-delivery/mailDelivery.ts
-middleware/authRateLimit.ts
-middleware/csrfProtection.ts
-middleware/sessionUser.ts
-models/creditedBook.testkit.ts
-online/notificationPublisher.ts
-online/onlineRegistry.ts
-permissions/matrix.ts
-repositories/coAuthors.ts
-repositories/likePattern.ts
-repositories/visibility.ts
-routes/routeTestKit.testkit.ts
-seed/rng.ts
-types/book.ts
-types/errors.ts
-types/payloads.typetest.ts
-types/series.ts
-
-# Client paths relative to client/src/ or client/, so the root-relative path check misses them.
-api/notificationStream.ts
-api/notifications.ts
-config/tsconfig.json
-config/webpack/buildResolve.ts
-queries/suggestions.ts
-types/bookSearch.ts
-types/capabilities.ts
-
-# Paths relative to client/ or server/ (not src/), so the root-relative check misses them.
-src/db/config.ts
-src/db/seed/seed.ts
-src/format/date.ts
-src/images.ts
-src/index.ts
-src/logger.ts
-src/app.spec.ts
-src/test/eventSource.ts
-src/test/httpFixtures.ts
-src/test/setup.ts
-src/test/sortable.ts
-src/test/styleMock.ts
-src/theme/tokens.ts
-src/types/css.d.ts
-
-# Bare source/test file names.
-App.test.tsx
-authController.spec.ts
-client.test.ts
-errorHandler.spec.ts
-keys.ts
-persistence.ts
-plan.spec.ts
-reorder.ts
-shutdown.spec.ts
-tokens.test.tsx
-usePages.ts
-useProfileLists.ts
-useRecentlyViewed.ts
-useUnsavedText.ts
+# Git-ignored or generated files, absent from `git ls-files`.
+.mcp.json
+progress.md
+settings.local.json
 
 # Spec file stems: the docs name the spec by its subject, and the file is <name>.spec.ts.
 uploadRateLimit
@@ -131,3 +59,4 @@ afterCreate
 exactOptionalPropertyTypes
 noPropertyAccessFromIndexSignature
 refetchPage
+res.json

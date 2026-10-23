@@ -1,9 +1,11 @@
 /**
  * Fails when a steering doc names a code identifier or file that no longer
- * exists. A backticked camelCase identifier or `.ts/.tsx/.mjs/.md/.json` name
- * must appear in a tracked file outside the checked docs; a token with `/`
- * must be an existing path. A renamed symbol otherwise leaves the docs
- * pointing at nothing, and every session that loads them trusts the dead name.
+ * exists. A backticked camelCase identifier must appear in a tracked file
+ * outside the checked docs. A `.ts/.tsx/.mjs/.md/.json` name, bare or with a
+ * `/`, must be a root-relative path or the tail of a tracked path (`git
+ * ls-files`), so `db/config.ts` finds `server/src/db/config.ts` and a renamed
+ * file is caught. A renamed symbol otherwise leaves the docs pointing at
+ * nothing, and every session that loads them trusts the dead name.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -44,8 +46,24 @@ export const findMisses = ({ root, docs, allowlist = new Set() }) => {
   ].map((path) => `:(exclude)${path}`);
   const cache = new Map();
 
+  let files; // tracked paths, listed once and only when a file token needs them
+  const isTrackedSuffix = (token) => {
+    if (!files) {
+      const { status, stdout, stderr } = spawnSync('git', ['ls-files', '-z'], {
+        cwd: root,
+        encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
+      });
+      if (status !== 0) throw new Error(`git ls-files failed: ${stderr}`);
+      files = stdout.split('\0');
+    }
+    return files.some((file) => file === token || file.endsWith(`/${token}`));
+  };
+
   const exists = (token) => {
-    if (token.includes('/')) return existsSync(join(root, token));
+    if (token.includes('/'))
+      return existsSync(join(root, token)) || isTrackedSuffix(token);
+    if (FILE_NAME.test(token)) return isTrackedSuffix(token);
     const { status, stderr } = spawnSync(
       'git',
       ['grep', '-F', '-q', '-e', token, '--', '.', ...excludes],
