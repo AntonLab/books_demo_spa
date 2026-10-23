@@ -18,15 +18,15 @@ merges into. Both run the same automation.
   is a step in `lint`, as the audit is, so the ruleset stays as is; a new job
   needs its own ruleset entry. `test-server` runs against a `mysql:8.4` service;
   a broken database fails the MySQL suites, as it does locally without
-  `SKIP_MYSQL=1`, so the job cannot go green with none of them run. PR runs are
-  grouped per PR number and cancel when superseded; push runs are grouped per
-  commit and never cancel.
+  `SKIP_MYSQL=1`, so the job cannot go green with none of them run.
 - `workflows/codeql.yml` — `security-extended` over `javascript-typescript`
   and `actions`, same triggers plus weekly, as `Analyze (javascript-typescript)`
   and `Analyze (actions)`. Test code (`*.spec.ts`, `*.test.ts(x)`,
   `*.testkit.ts`, `client/src/test/`) is excluded: it never deploys, and its
   one-middleware Express apps would be held to the real app's rules. The
-  `CodeQL` check it also reports is not required.
+  `CodeQL` check it also reports is not required. Both workflows group PR runs
+  per PR number (superseded runs cancel) and push runs per commit (never
+  cancel).
 - `dependabot.yml` — weekly npm and Actions updates, minor and patch grouped per
   ecosystem, majors one PR each, no labels (the labels are the triage roles).
   It documents each ignored major; drop an entry once its blocker catches up.

@@ -10,9 +10,8 @@ on:
 permissions:
   contents: read
 
-# A new push to a pull request cancels the run it supersedes; pushes to dev and
-# main are grouped per commit (github.sha), so no run is cancelled and every
-# commit keeps a result.
+# A new push to a PR cancels the run it supersedes. Pushes to dev and main
+# group per commit (github.sha), so every commit keeps a result.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
