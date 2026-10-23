@@ -1,4 +1,4 @@
-import { ApiError, request } from './client';
+import { ApiError, request, toQueryString } from './client';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (response: Response): jest.Mock => {
@@ -6,6 +6,23 @@ const mockFetch = (response: Response): jest.Mock => {
   window.fetch = fn as unknown as typeof fetch;
   return fn;
 };
+
+describe('toQueryString', () => {
+  it('returns an empty string when nothing is set', () => {
+    expect(toQueryString({})).toBe('');
+    expect(toQueryString({ q: undefined, a: null, b: '' })).toBe('');
+  });
+
+  it('skips undefined, null and empty strings but keeps 0 and false', () => {
+    expect(
+      toQueryString({ a: undefined, b: null, c: '', d: 0, e: false, f: 'x' })
+    ).toBe('?d=0&e=false&f=x');
+  });
+
+  it('keeps the key order it was given and encodes values', () => {
+    expect(toQueryString({ z: 1, a: 'b c' })).toBe('?z=1&a=b+c');
+  });
+});
 
 describe('request', () => {
   it('prefixes /api and sends credentials so the sid cookie travels', async () => {

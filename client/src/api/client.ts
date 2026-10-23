@@ -53,6 +53,22 @@ const xsrfToken = (): string | undefined => {
   return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 };
 
+// `?a=1&b=2` in the order given, or '' when no param survives. An undefined,
+// null or empty value is left out; 0 and false are sent.
+export const toQueryString = (params: object): string => {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params) as [
+    string,
+    string | number | boolean | null | undefined,
+  ][]) {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  }
+  const query = search.toString();
+  return query ? `?${query}` : '';
+};
+
 export const request = async <T>(
   path: string,
   options: RequestOptions = {}
