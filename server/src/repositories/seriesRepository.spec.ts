@@ -25,7 +25,11 @@ import {
   createCreditedBook,
   createCreditedSeries,
 } from '../models/creditedBook.testkit.ts';
-import { AppError, NotFoundError } from '../types/errors.ts';
+import {
+  AppError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import { createSequelizeSeriesRepository } from './seriesRepository.ts';
 import { seriesRepositoryContract } from './seriesRepository.contract.testkit.ts';
 import type { Viewer } from './visibility.ts';
@@ -276,8 +280,8 @@ describe('seriesRepository against real MySQL', { skip }, () => {
 
   // As on a book: only the unique index's rejection is a 409. An account
   // deleted between the lookup and the insert fails the foreign key, and that
-  // reaches the caller unmapped.
-  test('a credit that fails for any reason but a duplicate is not reported as a conflict', async () => {
+  // is answered as 404 on the user.
+  test('an account deleted between the lookup and the insert is a missing user, not a conflict', async () => {
     const doomedId = (await User.create({ ...coAuthor, role: 'author' })).id;
     const created = await repository.create({
       userId: ownerId,
@@ -292,12 +296,58 @@ describe('seriesRepository against real MySQL', { skip }, () => {
     try {
       await assert.rejects(
         repository.addCoAuthor(created.id, doomedId, asOwner()),
-        ForeignKeyConstraintError
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          /User \d+ not found/.test(error.message)
       );
     } finally {
       SeriesAuthor.removeHook('beforeCreate', 'deleteAccount');
     }
     assert.deepEqual(await repository.findCoAuthorIds(created.id), [ownerId]);
+  });
+
+  test('two co-authors of a two-author series leaving at once: one leaves, one gets a conflict', async () => {
+    const otherId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+    await repository.addCoAuthor(created.id, otherId, asOwner());
+
+    const results = await Promise.allSettled([
+      repository.removeCoAuthor(created.id, ownerId, asOwner()),
+      repository.removeCoAuthor(created.id, otherId, {
+        id: otherId,
+        role: 'author',
+      }),
+    ]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [
+      'fulfilled',
+      'rejected',
+    ]);
+    const rejected = results.find((r) => r.status === 'rejected');
+    assert.ok(rejected && rejected.reason instanceof StateConflictError);
+    assert.equal((await repository.findCoAuthorIds(created.id))?.length, 1);
+  });
+
+  test('crediting a co-author while the series is deleted never fails unmapped', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      title: 'Test Series',
+      description: 'Shared',
+      tags: [],
+    });
+
+    const [added] = await Promise.allSettled([
+      repository.addCoAuthor(created.id, coAuthorId, asOwner()),
+      repository.remove(created.id, asOwner()),
+    ]);
+
+    assert.equal(added.status, 'fulfilled'); // the series, or null once it is gone
   });
 
   // Only a rejected foreign key means a missing user; anything else the

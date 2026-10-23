@@ -442,11 +442,16 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
     },
 
     async addCoAuthor(seriesId, userId, actor) {
-      const series = await Series.findByPk(seriesId);
-      if (!series) return null;
+      return sequelizeOf(Series).transaction(async (transaction) => {
+        const series = await Series.findByPk(seriesId, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!series) return null;
 
-      await addCoAuthor(credits, sequelizeOf(Series), series, userId, actor);
-      return publicSeriesRow(series);
+        await addCoAuthor(credits, series, userId, actor, transaction);
+        return publicSeriesRow(series, transaction);
+      });
     },
 
     async removeBook(seriesId, bookId) {
@@ -464,8 +469,7 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       return true;
     },
 
-    // Under a lock on the series row, which removeCoAuthor (coAuthors.ts)
-    // relies on.
+    // Lock order: .claude/rules/server/sequelize.md.
     async removeCoAuthor(seriesId, userId, actor) {
       return sequelizeOf(Series).transaction(async (transaction) => {
         const series = await Series.findByPk(seriesId, {

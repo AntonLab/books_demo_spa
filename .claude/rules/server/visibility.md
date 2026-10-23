@@ -57,7 +57,7 @@ in `repositories/visibility.ts`; every read that can reach a book takes a
   same 404, or the same absence from a list, as a missing one.
 - **Chapters** add `readableChapterScope`: a reader sees a chapter once its book
   is readable and `publishedAt` has passed. Co-authors and Moderators see all.
-- **Likes** exclude instead (`hiddenBookIds`); drafts are few, so lists stay short.
+- **Likes** exclude instead (`hiddenBooksSubquery`, a SQL subquery on drafts, not an id list).
 - **Listed is narrower than readable** (`listedBookWhere`): no book list shows
   a draft, a Moderator's included, except `?userId=` naming the caller ("My
   books").

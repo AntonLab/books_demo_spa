@@ -2,7 +2,7 @@ process.env.NODE_ENV ??= 'test';
 
 import { after, before, beforeEach, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ForeignKeyConstraintError, type Sequelize } from 'sequelize';
+import type { Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
 import { ensureDatabase } from '../db/ensureDatabase.ts';
 import { testDbConfig } from '../db/testDb.testkit.ts';
@@ -66,6 +66,18 @@ describe('bookRepository against real MySQL', { skip }, () => {
     const created = await repository.create(input);
     await repository.update(created.id, { status: 'in_progress' });
     return created;
+  };
+
+  // A reorder that lost a race sees a changed set: a 409, never a database
+  // error (a deadlock surfaces as a DatabaseError).
+  const assertNoDbError = (results: PromiseSettledResult<unknown>[]) => {
+    for (const result of results) {
+      assert.ok(
+        result.status === 'fulfilled' ||
+          result.reason instanceof StateConflictError,
+        String(result.status === 'rejected' && result.reason)
+      );
+    }
   };
 
   const listAsGuest = (query: Parameters<typeof repository.list>[0]) =>
@@ -518,8 +530,8 @@ describe('bookRepository against real MySQL', { skip }, () => {
 
   // Only the unique index's rejection means "already credited". An account
   // deleted between the lookup and the insert fails the foreign key instead,
-  // which reaches the caller unmapped rather than as a misleading 409.
-  test('a credit that fails for any reason but a duplicate is not reported as a conflict', async () => {
+  // which is answered as 404 on the user, not as a misleading 409.
+  test('an account deleted between the lookup and the insert is a missing user, not a conflict', async () => {
     const doomedId = (await User.create({ ...coAuthor, role: 'author' })).id;
     const created = await repository.create({
       userId: ownerId,
@@ -535,12 +547,60 @@ describe('bookRepository against real MySQL', { skip }, () => {
     try {
       await assert.rejects(
         repository.addCoAuthor(created.id, doomedId, asOwner()),
-        ForeignKeyConstraintError
+        (error: unknown) =>
+          error instanceof NotFoundError &&
+          /User \d+ not found/.test(error.message)
       );
     } finally {
       BookAuthor.removeHook('beforeCreate', 'deleteAccount');
     }
     assert.deepEqual(await repository.findCoAuthorIds(created.id), [ownerId]);
+  });
+
+  test('two co-authors of a two-author book leaving at once: one leaves, one gets a conflict', async () => {
+    const otherId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Shared',
+      tags: [],
+    });
+    await repository.addCoAuthor(created.id, otherId, asOwner());
+
+    const results = await Promise.allSettled([
+      repository.removeCoAuthor(created.id, ownerId, asOwner()),
+      repository.removeCoAuthor(created.id, otherId, {
+        id: otherId,
+        role: 'author',
+      }),
+    ]);
+
+    assert.deepEqual(results.map((r) => r.status).sort(), [
+      'fulfilled',
+      'rejected',
+    ]);
+    const rejected = results.find((r) => r.status === 'rejected');
+    assert.ok(rejected && rejected.reason instanceof StateConflictError);
+    assert.equal((await repository.findCoAuthorIds(created.id))?.length, 1);
+  });
+
+  test('crediting a co-author while the work is deleted never fails unmapped', async () => {
+    const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Test Book',
+      description: 'Shared',
+      tags: [],
+    });
+
+    const [added] = await Promise.allSettled([
+      repository.addCoAuthor(created.id, coAuthorId, asOwner()),
+      repository.remove(created.id, asOwner()),
+    ]);
+
+    assert.equal(added.status, 'fulfilled'); // the book, or null once it is gone
   });
 
   test('the userId filter matches a book through any of its co-authors', async () => {
@@ -1634,6 +1694,35 @@ describe('bookRepository against real MySQL', { skip }, () => {
       })
     ).map((book) => book.seriesPosition);
     assert.equal(new Set(positions).size, 5);
+  });
+
+  test('a book moving in and out of a series while it is reordered never deadlocks', async () => {
+    const one = await fileBook('One');
+    const two = await fileBook('Two');
+    const mover = await fileBook('Mover', null);
+
+    for (let round = 0; round < 5; round += 1) {
+      const results = await Promise.allSettled([
+        repository.update(mover.id, { seriesId }),
+        repository.reorderInSeries(seriesId, [two.id, one.id]),
+      ]);
+      assertNoDbError(results);
+      assertNoDbError(
+        await Promise.allSettled([
+          repository.update(mover.id, { seriesId: null }),
+          repository.reorderInSeries(seriesId, [one.id, two.id]),
+        ])
+      );
+    }
+  });
+
+  test('a book update names a missing target series before anything else is written', async () => {
+    const book = await fileBook('Solo', null);
+    await assert.rejects(
+      repository.update(book.id, { title: 'Renamed', seriesId: 999_999 }),
+      new NotFoundError('Series', 999_999)
+    );
+    assert.equal((await Book.findByPk(book.id))?.title, 'Solo');
   });
 
   test('a series reorder rewrites the order its lists follow, and the editor list keeps its drafts', async () => {

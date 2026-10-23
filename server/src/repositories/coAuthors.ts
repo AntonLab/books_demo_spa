@@ -1,7 +1,6 @@
 import {
   ForeignKeyConstraintError,
   UniqueConstraintError,
-  type Sequelize,
   type Transaction,
 } from 'sequelize';
 import { toAuthorSummary, User } from '../models/User.ts';
@@ -48,9 +47,10 @@ interface Work {
   title: string;
 }
 
-// A rejected FK while creating a work means its first credit names an account
-// that is gone. Reporting that as a 404 on the user is more useful than the
-// generic 500 an unmapped SequelizeForeignKeyConstraintError would produce.
+// A rejected FK on a work's first credit, or on the credit addCoAuthor
+// inserts, means the account is gone (the locked work row cannot be the
+// missing key). Answer 404 on the user, not the 500 an unmapped
+// SequelizeForeignKeyConstraintError gives.
 //
 // The credit's userId is the only foreign key this maps. A work's genreId
 // cannot fail: assertGenreExists (genreRepository.ts) holds the Genre under a
@@ -102,14 +102,19 @@ export async function loadAuthors(
   return authors;
 }
 
+// The caller holds the work row under FOR UPDATE in `transaction`, as for
+// removeCoAuthor. A credit then cannot race a work delete or a leave's count.
 export async function addCoAuthor(
   table: CreditTable,
-  sequelize: Sequelize,
   work: Work,
   userId: number,
-  actor: Actor
+  actor: Actor,
+  transaction: Transaction
 ): Promise<void> {
-  const user = await User.findByPk(userId, { attributes: ['role'] });
+  const user = await User.findByPk(userId, {
+    attributes: ['role'],
+    transaction,
+  });
   if (!user) throw new NotFoundError('User', userId);
   if (user.role !== 'author') {
     throw new BadRequestError(
@@ -118,22 +123,20 @@ export async function addCoAuthor(
   }
 
   try {
-    await sequelize.transaction(async (transaction) => {
-      await table.create(work.id, userId, transaction);
-      await notify(
-        [
-          {
-            recipientIds: [userId],
-            kind: 'co_author_added',
-            work: { type: table.type, id: work.id, title: work.title },
-            actorKind: 'co_author',
-            actorName: await displayNameOf(actor.id, transaction),
-          },
-        ],
-        actor.id,
-        transaction
-      );
-    });
+    await table.create(work.id, userId, transaction);
+    await notify(
+      [
+        {
+          recipientIds: [userId],
+          kind: 'co_author_added',
+          work: { type: table.type, id: work.id, title: work.title },
+          actorKind: 'co_author',
+          actorName: await displayNameOf(actor.id, transaction),
+        },
+      ],
+      actor.id,
+      transaction
+    );
   } catch (error) {
     // The unique index, not a lookup, is what refuses a second credit.
     if (error instanceof UniqueConstraintError) {
@@ -141,7 +144,7 @@ export async function addCoAuthor(
         `That account is already a co-author of this ${table.type}`
       );
     }
-    throw error;
+    return asMissingUser(error, userId);
   }
 }
 

@@ -588,6 +588,34 @@ describe('likeRepository against real MySQL', { skip }, () => {
     assert.equal(await total(null), 2);
   });
 
+  test('an author who does not co-author the draft book sees none of its likes', async () => {
+    await repository.create(
+      { bookId, commentId: null, isLike: true },
+      as(likerId)
+    );
+    await repository.create(
+      { bookId: null, commentId, isLike: true },
+      as(likerId)
+    );
+    const strangerId = (
+      await User.create({
+        ...liker,
+        login: 'LikeStranger',
+        email: 'stranger@example.com',
+        role: 'author',
+      })
+    ).id;
+    await Book.update({ status: 'draft' }, { where: { id: bookId } });
+
+    const stranger: Viewer = { id: strangerId, role: 'author' };
+    const own: Viewer = { id: userId, role: 'author' };
+    const total = async (viewer: Viewer): Promise<number> =>
+      (await repository.list({ limit: 20, offset: 0 }, viewer)).total;
+
+    assert.equal(await total(stranger), 0);
+    assert.equal(await total(own), 2);
+  });
+
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   let contractAccounts = 0;
