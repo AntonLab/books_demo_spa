@@ -10,6 +10,7 @@ import {
   PASSWORD_MAX_LENGTH,
 } from 'shared';
 import { loginForbiddenCharacterRule } from '@/constants/loginRule';
+import { maxLengthRule } from '@/constants/maxLengthRule';
 import { useUpdateAccount } from '@/queries/users';
 import type { AccountChanges } from '@/api/users';
 import { accountFieldErrors } from '@/types/accountErrors';
@@ -125,10 +126,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
               whitespace: true,
               message: 'Enter your first name',
             },
-            {
-              max: NAME_MAX_LENGTH,
-              message: `First name must be at most ${NAME_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('First name', NAME_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="given-name" />
@@ -143,10 +141,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
               whitespace: true,
               message: 'Enter your last name',
             },
-            {
-              max: NAME_MAX_LENGTH,
-              message: `Last name must be at most ${NAME_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('Last name', NAME_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="family-name" />
@@ -158,10 +153,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
           rules={[
             { required: true, message: 'Enter an email address' },
             { type: 'email', message: 'Enter a valid email address' },
-            {
-              max: EMAIL_MAX_LENGTH,
-              message: `Email must be at most ${EMAIL_MAX_LENGTH} characters`,
-            },
+            maxLengthRule('Email', EMAIL_MAX_LENGTH),
           ]}
         >
           <Input autoComplete="email" />
@@ -170,12 +162,7 @@ export const AccountDetailsForm: FC<{ user: PublicUser }> = ({ user }) => {
         <Form.Item
           name="about"
           label="About"
-          rules={[
-            {
-              max: ABOUT_MAX_LENGTH,
-              message: `About must be at most ${ABOUT_MAX_LENGTH} characters`,
-            },
-          ]}
+          rules={[maxLengthRule('About', ABOUT_MAX_LENGTH)]}
         >
           <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} />
         </Form.Item>
