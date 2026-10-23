@@ -1,9 +1,4 @@
-import {
-  ForeignKeyConstraintError,
-  literal,
-  Op,
-  UniqueConstraintError,
-} from 'sequelize';
+import { literal, Op, UniqueConstraintError } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
@@ -14,6 +9,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from '../types/errors.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import type { ListResponse, PublicLike } from 'shared';
 import type {
   CreateLikeInput,
@@ -57,9 +53,8 @@ function asMissingReference(
   input: CreateLikeInput,
   actorId: number
 ): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
-
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (input.bookId !== null && detail.includes('bookId')) {
       throw new NotFoundError('Book', input.bookId);
     }

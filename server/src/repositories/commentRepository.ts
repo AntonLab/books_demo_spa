@@ -1,4 +1,4 @@
-import { ForeignKeyConstraintError, Op } from 'sequelize';
+import { Op } from 'sequelize';
 import type { WhereOptions } from 'sequelize';
 import {
   Comment,
@@ -10,6 +10,7 @@ import { Like } from '../models/Like.ts';
 import { Report } from '../models/Report.ts';
 import { User, toAuthorSummary } from '../models/User.ts';
 import { ForbiddenError, NotFoundError } from '../types/errors.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
 import { loadAvatarUrls } from './userRepository.ts';
 import { shouldReopen } from '../reportText.ts';
@@ -69,9 +70,8 @@ function asMissingReference(
   input: CreateCommentInput,
   actorId: number
 ): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
-
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (detail.includes('bookId')) {
       throw new NotFoundError('Book', input.bookId);
     }

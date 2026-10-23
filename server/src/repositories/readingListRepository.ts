@@ -1,7 +1,6 @@
 import {
   col,
   fn,
-  ForeignKeyConstraintError,
   Op,
   UniqueConstraintError,
   type InferAttributes,
@@ -40,6 +39,7 @@ import type {
   UpdateReadingListInput,
 } from '../types/readingList.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { joined } from './joined.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
 import { visibleSeriesWhere, type Account } from './visibility.ts';
@@ -265,8 +265,8 @@ async function shownCounts(listIds: number[]): Promise<Map<number, number>> {
 // MySQL names the column in the constraint text, the only place the two are
 // distinguishable.
 function asMissingWork(error: unknown, target: AddReadingListItemInput): never {
-  if (error instanceof ForeignKeyConstraintError) {
-    const detail = `${error.index ?? ''} ${error.parent?.message ?? error.message}`;
+  const detail = foreignKeyDetail(error);
+  if (detail !== null) {
     if (target.seriesId !== null && detail.includes('seriesId')) {
       throw new NotFoundError('Series', target.seriesId);
     }
