@@ -546,6 +546,31 @@ test('series action skips a Book the Account co-authors', async () => {
   );
 });
 
+test('series not-interested with a co-authored Book: the free Books are marked, a second press clears them', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: fakeRepository() },
+    async (base) => {
+      const path = seriesPath(MIXED_SERIES_ID, 'not-interested');
+      const cookie = ROLE_COOKIES.author;
+      // The shared flag still reads false: the co-authored Book holds no entry.
+      const flags = { inLibrary: false, notInterested: false };
+      assert.deepEqual(await seriesPress(base, path, cookie), flags);
+      const marked = await json<Wire<PagedResponse<LibraryBook>>>(
+        await list(base, cookie, '?status=not_interested')
+      );
+      assert.deepEqual(
+        marked.items.map((item) => item.id),
+        [MIXED_FREE_BOOK_ID]
+      );
+      assert.deepEqual(await seriesPress(base, path, cookie), flags);
+      const cleared = await json<Wire<PagedResponse<LibraryBook>>>(
+        await list(base, cookie, '?status=not_interested')
+      );
+      assert.equal(cleared.total, 0);
+    }
+  );
+});
+
 test('a Co-author of the Series gets 403; a missing Series gets 404; a Guest 401; id abc 400', async () => {
   await withApp({ libraryRepository: fakeRepository() }, async (base) => {
     for (const action of ['add', 'not-interested']) {

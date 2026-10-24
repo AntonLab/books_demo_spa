@@ -308,11 +308,17 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         account,
         'You cannot mark your own work as not interested',
         async (bookIds, transaction) => {
-          const { notInterested } = await seriesLibraryStateOf(
-            seriesId,
-            account.id
-          );
-          if (!notInterested) {
+          // Decided in the transaction over the Books this account can hold, so
+          // a co-authored Book (which never has an entry) does not block it.
+          const marked = await LibraryEntry.count({
+            where: {
+              userId: account.id,
+              bookId: bookIds,
+              status: 'not_interested',
+            },
+            transaction,
+          });
+          if (marked < bookIds.length) {
             await insertMissing(
               bookIds,
               'not_interested',

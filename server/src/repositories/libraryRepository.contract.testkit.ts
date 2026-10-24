@@ -373,6 +373,22 @@ export function libraryRepositoryContract(
     assert.equal(await statusOf(repository, me, none), 'not_interested');
   });
 
+  test('contract: toggleSeriesNotInterested with a co-authored Book marks the free Books, and a second press clears them', async () => {
+    const { repository, aBookInSeries, anAccount, seriesId, books } =
+      await arrangeSeries(2);
+    const both = reader(await anAccount());
+    const own = await aBookInSeries(seriesId, [both.id]);
+    await repository.toggleSeriesNotInterested(seriesId, both);
+    for (const id of books) {
+      assert.equal(await statusOf(repository, both, id), 'not_interested');
+    }
+    assert.equal(await statusOf(repository, both, own), undefined);
+    await repository.toggleSeriesNotInterested(seriesId, both);
+    for (const id of books) {
+      assert.equal(await statusOf(repository, both, id), undefined);
+    }
+  });
+
   test('contract: clearSeries deletes the entries of every Published Book', async () => {
     const { repository, me, seriesId, books } = await arrangeSeries();
     await repository.set(books[0]!, 'read', me);

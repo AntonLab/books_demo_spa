@@ -198,7 +198,10 @@ export function createFakeLibraryRepository(
         'You cannot mark your own work as not interested'
       );
       const ids = holdableIn(seriesId, account);
-      if (seriesStateOf(seriesId, account).notInterested) {
+      const allMarked =
+        ids.length > 0 &&
+        ids.every((id) => statusOf(id, account) === 'not_interested');
+      if (allMarked) {
         drop(ids, account);
       } else {
         for (const id of ids) {
