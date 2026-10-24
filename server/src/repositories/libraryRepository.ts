@@ -23,6 +23,12 @@ import type {
 } from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
 import { joined } from './joined.ts';
+import {
+  ADD_OWN_WORK,
+  NOT_INTERESTED_OWN_WORK,
+  PROGRESS_OWN_WORK,
+  REMOVE_FROM_LIBRARY_FIRST,
+} from './libraryMessages.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
 import { seriesLibraryStateOf } from './seriesLibraryState.ts';
 import {
@@ -249,11 +255,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
 
   return {
     async addBook(bookId, account) {
-      await assertMayHold(
-        bookId,
-        account,
-        'You cannot add your own work to your Library'
-      );
+      await assertMayHold(bookId, account, ADD_OWN_WORK);
       // Each step is one statement guarded by the stored status, so a
       // concurrent write of Reading or Read is never lowered.
       await insertIfAbsent(bookId, 'plan_to_read', account);
@@ -266,11 +268,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     },
 
     async toggleNotInterested(bookId, account) {
-      await assertMayHold(
-        bookId,
-        account,
-        'You cannot mark your own work as not interested'
-      );
+      await assertMayHold(bookId, account, NOT_INTERESTED_OWN_WORK);
       // A lost race (the entry removed between two statements) tries again, a
       // bounded number of times.
       for (let attempt = 0; attempt < TOGGLE_ATTEMPTS; attempt += 1) {
@@ -289,7 +287,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         // Neither matched: Reading or Read, or the entry was removed meanwhile.
         if (await held(bookId, account)) break;
       }
-      throw new StateConflictError('Remove it from your Library first');
+      throw new StateConflictError(REMOVE_FROM_LIBRARY_FIRST);
     },
 
     async clear(bookId, account) {
@@ -300,7 +298,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        'You cannot add your own work to your Library',
+        ADD_OWN_WORK,
         async (bookIds, transaction) => {
           await insertMissing(bookIds, 'plan_to_read', account, transaction);
           await LibraryEntry.update(
@@ -322,7 +320,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        'You cannot mark your own work as not interested',
+        NOT_INTERESTED_OWN_WORK,
         async (bookIds, transaction) => {
           // Decided in the transaction over the Books this account can hold, so
           // a co-authored Book (which never has an entry) does not block it.
@@ -370,11 +368,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     },
 
     async recordProgress(bookId, input, account) {
-      await assertMayHold(
-        bookId,
-        account,
-        'You cannot track reading progress on your own work'
-      );
+      await assertMayHold(bookId, account, PROGRESS_OWN_WORK);
       const published = {
         bookId,
         publishedAt: { [Op.lte]: new Date() },

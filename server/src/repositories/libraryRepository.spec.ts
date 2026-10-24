@@ -18,6 +18,7 @@ import {
   createCreditedSeries,
 } from '../models/creditedBook.testkit.ts';
 import { NotFoundError, StateConflictError } from '../types/errors.ts';
+import { REMOVE_FROM_LIBRARY_FIRST } from './libraryMessages.ts';
 import { createSequelizeLibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 import { libraryRepositoryContract } from './libraryRepository.contract.testkit.ts';
@@ -179,7 +180,7 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     t.mock.method(LibraryEntry, 'findOne', async () => null);
     await assert.rejects(
       repository.toggleNotInterested(book.id, as(me)),
-      new StateConflictError('Remove it from your Library first')
+      new StateConflictError(REMOVE_FROM_LIBRARY_FIRST)
     );
     assert.equal(create.mock.callCount(), 3);
   });

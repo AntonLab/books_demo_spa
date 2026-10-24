@@ -6,6 +6,12 @@ import {
   StateConflictError,
 } from '../types/errors.ts';
 import type { ReadingStatus } from 'shared';
+import {
+  ADD_OWN_WORK,
+  NOT_INTERESTED_OWN_WORK,
+  PROGRESS_OWN_WORK,
+  REMOVE_FROM_LIBRARY_FIRST,
+} from './libraryMessages.ts';
 import type { LibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 
@@ -15,7 +21,7 @@ const MISSING_ID = 999_999;
 const FIRST_PAGE = { current: 1, pageSize: 20 };
 
 // Writes whose order matters need distinct timestamps.
-const pause = () => new Promise<void>((r) => setTimeout(r, 5));
+const pause = (ms = 5) => new Promise<void>((r) => setTimeout(r, ms));
 
 function reader(id: number): Account {
   return { id, role: 'user' };
@@ -149,20 +155,27 @@ export function libraryRepositoryContract(
   });
 
   test('contract: toggleNotInterested never overwrites a status set at the same moment', async () => {
-    const { repository, seedStatus, me, books } = await arrange();
-    await Promise.allSettled([
-      seedStatus(me.id, books[0]!, 'read'),
-      repository.toggleNotInterested(books[0]!, me),
-    ]);
+    // One round per Book, the status write starting a millisecond later each
+    // time, so one round lands it between the toggle's statements.
+    const { repository, seedStatus, me, books } = await arrange(6);
+    for (const [delay, book] of books.entries()) {
+      await Promise.allSettled([
+        pause(delay).then(() => seedStatus(me.id, book, 'read')),
+        repository.toggleNotInterested(book, me),
+      ]);
+    }
     const page = await repository.list(FIRST_PAGE, me);
-    assert.equal(page.items[0]?.readingStatus, 'read');
+    assert.deepEqual(
+      page.items.map((item) => item.readingStatus),
+      books.map(() => 'read')
+    );
   });
 
-  test('contract: addBook refuses the Co-author,a missing Book and a Draft', async () => {
+  test('contract: addBook refuses the Co-author, a missing Book and a Draft', async () => {
     const { repository, aDraftBook, me, author, books } = await arrange();
     await assert.rejects(
       repository.addBook(books[0]!, author),
-      new ForbiddenError('You cannot add your own work to your Library')
+      new ForbiddenError(ADD_OWN_WORK)
     );
     await assert.rejects(
       repository.addBook(MISSING_ID, me),
@@ -206,7 +219,7 @@ export function libraryRepositoryContract(
     for (const id of books) {
       await assert.rejects(
         repository.toggleNotInterested(id, me),
-        new StateConflictError('Remove it from your Library first')
+        new StateConflictError(REMOVE_FROM_LIBRARY_FIRST)
       );
     }
     assert.equal((await repository.list(FIRST_PAGE, me)).total, 2);
@@ -216,7 +229,7 @@ export function libraryRepositoryContract(
     const { repository, aDraftBook, me, author, books } = await arrange();
     await assert.rejects(
       repository.toggleNotInterested(books[0]!, author),
-      new ForbiddenError('You cannot mark your own work as not interested')
+      new ForbiddenError(NOT_INTERESTED_OWN_WORK)
     );
     await assert.rejects(
       repository.toggleNotInterested(MISSING_ID, me),
@@ -465,11 +478,8 @@ export function libraryRepositoryContract(
   test('contract: Series actions refuse a missing Series, add and not-interested also a Co-author', async () => {
     const { repository, me, author, seriesId } = await arrangeSeries();
     const actions = [
-      ['addSeries', 'You cannot add your own work to your Library'],
-      [
-        'toggleSeriesNotInterested',
-        'You cannot mark your own work as not interested',
-      ],
+      ['addSeries', ADD_OWN_WORK],
+      ['toggleSeriesNotInterested', NOT_INTERESTED_OWN_WORK],
       ['clearSeries', null],
     ] as const;
     for (const [action, message] of actions) {
@@ -674,7 +684,7 @@ export function libraryRepositoryContract(
         { event: 'opened', chapterId: otherChapter },
         author
       ),
-      new ForbiddenError('You cannot track reading progress on your own work')
+      new ForbiddenError(PROGRESS_OWN_WORK)
     );
     await assert.rejects(
       repository.recordProgress(

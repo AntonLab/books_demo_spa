@@ -5,6 +5,12 @@ import {
 } from '../types/errors.ts';
 import { isModeratorRole, type PublicBook, type ReadingStatus } from 'shared';
 import { aPublicBook } from './favoriteRepository.fake.testkit.ts';
+import {
+  ADD_OWN_WORK,
+  NOT_INTERESTED_OWN_WORK,
+  PROGRESS_OWN_WORK,
+  REMOVE_FROM_LIBRARY_FIRST,
+} from './libraryMessages.ts';
 import type { LibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 
@@ -162,25 +168,17 @@ export function createFakeLibraryRepository(
     },
 
     async addBook(bookId, account) {
-      assertMayHold(
-        bookId,
-        account,
-        'You cannot add your own work to your Library'
-      );
+      assertMayHold(bookId, account, ADD_OWN_WORK);
       const status = entries.get(`${account.id}:${bookId}`)?.status;
       if (status && status !== 'not_interested') return { bookId, status };
       return { bookId, status: save(bookId, 'plan_to_read', account).status };
     },
 
     async toggleNotInterested(bookId, account) {
-      assertMayHold(
-        bookId,
-        account,
-        'You cannot mark your own work as not interested'
-      );
+      assertMayHold(bookId, account, NOT_INTERESTED_OWN_WORK);
       const status = entries.get(`${account.id}:${bookId}`)?.status;
       if (status === 'reading' || status === 'read') {
-        throw new StateConflictError('Remove it from your Library first');
+        throw new StateConflictError(REMOVE_FROM_LIBRARY_FIRST);
       }
       if (status === 'not_interested') {
         entries.delete(`${account.id}:${bookId}`);
@@ -194,11 +192,7 @@ export function createFakeLibraryRepository(
     },
 
     async addSeries(seriesId, account) {
-      assertMayHoldSeries(
-        seriesId,
-        account,
-        'You cannot add your own work to your Library'
-      );
+      assertMayHoldSeries(seriesId, account, ADD_OWN_WORK);
       for (const id of holdableIn(seriesId, account)) {
         const status = statusOf(id, account);
         if (status === undefined || status === 'not_interested') {
@@ -209,11 +203,7 @@ export function createFakeLibraryRepository(
     },
 
     async toggleSeriesNotInterested(seriesId, account) {
-      assertMayHoldSeries(
-        seriesId,
-        account,
-        'You cannot mark your own work as not interested'
-      );
+      assertMayHoldSeries(seriesId, account, NOT_INTERESTED_OWN_WORK);
       const ids = holdableIn(seriesId, account);
       const allMarked =
         ids.length > 0 &&
@@ -240,11 +230,7 @@ export function createFakeLibraryRepository(
     },
 
     async recordProgress(bookId, input, account) {
-      assertMayHold(
-        bookId,
-        account,
-        'You cannot track reading progress on your own work'
-      );
+      assertMayHold(bookId, account, PROGRESS_OWN_WORK);
       const now = Date.now();
       const published = chapters
         .filter(
