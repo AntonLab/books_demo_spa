@@ -238,7 +238,6 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     const { me, book } = await arrangeBooks();
     t.mock.method(LibraryEntry, 'bulkCreate', async () => []);
     const update = t.mock.method(LibraryEntry, 'update', async () => [0]);
-    update.mock.mockImplementationOnce(async () => [0], 0);
     update.mock.mockImplementationOnce(async () => [1], 1);
     t.mock.method(LibraryEntry, 'destroy', async () => 0);
     const find = t.mock.method(LibraryEntry, 'findOne', async () => null);
@@ -273,7 +272,8 @@ describe('libraryRepository against real MySQL', { skip }, () => {
       assert.ok(
         row === null ||
           row.status === 'not_interested' ||
-          row.status === 'plan_to_read'
+          row.status === 'plan_to_read',
+        `unexpected status: ${row?.status}`
       );
     }
   });

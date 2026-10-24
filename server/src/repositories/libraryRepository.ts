@@ -373,6 +373,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
             },
           }
         );
+        // Result unused: called only for its 404 when the Book vanished mid-write.
         await heldAfterInsert(bookId, account);
         return;
       }
