@@ -5,7 +5,7 @@ import { BookRowActions, SeriesRowActions } from './WorkRowActions';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
-import { openWorkMenu } from '@/test/workMenu';
+import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
@@ -102,15 +102,9 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
     const onEdit = jest.fn();
     renderAs(author, kind.ui('mine', onEdit));
 
-    await openWorkMenu(kind.title);
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Edit' })
-    );
+    await clickWorkMenuItem(kind.title, 'Edit');
     expect(onEdit).toHaveBeenCalledTimes(1);
-    await openWorkMenu(kind.title);
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Delete' })
-    );
+    await clickWorkMenuItem(kind.title, 'Delete');
     // modal.confirm renders its title twice (dialog label and body).
     expect(await screen.findAllByText(kind.confirm[0])).not.toHaveLength(0);
     expect(screen.getByText(kind.confirm[1])).toBeInTheDocument();
@@ -126,10 +120,7 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
   it('deletes nothing when the confirmation is cancelled', async () => {
     renderAs(author, kind.ui('mine'));
 
-    await openWorkMenu(kind.title);
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Delete' })
-    );
+    await clickWorkMenuItem(kind.title, 'Delete');
     await userEvent.click(
       await screen.findByRole('button', { name: 'Cancel' })
     );
@@ -161,10 +152,7 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
     const { queryClient } = renderAs(author, kind.ui('mine'));
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await openWorkMenu(kind.title);
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Delete' })
-    );
+    await clickWorkMenuItem(kind.title, 'Delete');
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete' })
     );
@@ -192,10 +180,7 @@ it('does not let one row block another row from removing its favorite', async ()
     </>
   );
 
-  await openWorkMenu(book.title);
-  await userEvent.click(
-    await screen.findByRole('menuitem', { name: 'Remove from favorites' })
-  );
+  await clickWorkMenuItem(book.title, 'Remove from favorites');
   await openWorkMenu(series.title);
   // The first, closed menu stays in the DOM (zeroRuntime); the open one is last.
   const items = await screen.findAllByRole('menuitem', {
@@ -244,11 +229,9 @@ describe.each(kinds)('$noun row actions in Favorites', (kind) => {
       .mockResolvedValueOnce(undefined);
     renderAs(author, kind.ui('favorites', jest.fn(), 43));
 
-    await openWorkMenu(kind.title);
-    await userEvent.click(await removeItem());
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
     expect(await screen.findByText('Favorite not found')).toBeInTheDocument();
-    await openWorkMenu(kind.title);
-    await userEvent.click(await removeItem());
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
 
     await waitFor(() =>
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2)
@@ -261,8 +244,7 @@ describe.each(kinds)('$noun row actions in Favorites', (kind) => {
     );
     renderAs(author, kind.ui('favorites', jest.fn(), 42));
 
-    await openWorkMenu(kind.title);
-    await userEvent.click(await removeItem());
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
 
     expect(await screen.findByText('Favorite not found')).toBeInTheDocument();
   });

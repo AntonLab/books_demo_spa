@@ -6,3 +6,8 @@ export const openWorkMenu = async (title: string) => {
     await screen.findByRole('button', { name: `More actions for ${title}` })
   );
 };
+
+export const clickWorkMenuItem = async (title: string, name: string) => {
+  await openWorkMenu(title);
+  await userEvent.click(await screen.findByRole('menuitem', { name }));
+};

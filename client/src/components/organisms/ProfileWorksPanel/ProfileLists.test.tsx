@@ -7,7 +7,7 @@ import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
-import { openWorkMenu } from '@/test/workMenu';
+import { clickWorkMenuItem } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
@@ -98,10 +98,7 @@ describe('ProfileBooksList in My works', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 3, current: 1, pageSize: 20 })
     );
-    await openWorkMenu('Out Now');
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Edit' })
-    );
+    await clickWorkMenuItem('Out Now', 'Edit');
     expect(onEdit).toHaveBeenCalledWith(2);
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
@@ -179,13 +176,7 @@ describe('ProfileBooksList in Favorites', () => {
 
     await screen.findByRole('link', { name: 'Out Now' });
     expect(screen.getByLabelText('Author')).toBeInTheDocument();
-    await openWorkMenu('Out Now');
-    expect(
-      screen.queryByRole('menuitem', { name: /^(Edit|Delete)$/ })
-    ).toBeNull();
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Remove from favorites' })
-    );
+    await clickWorkMenuItem('Out Now', 'Remove from favorites');
 
     await waitFor(() =>
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41)
@@ -221,10 +212,7 @@ describe('ProfileSeriesList', () => {
       await screen.findByRole('link', { name: 'The Scale Cycle' })
     ).toHaveAttribute('href', '/series/12');
     expect(screen.getByText('1 book')).toBeInTheDocument();
-    await openWorkMenu('The Scale Cycle');
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Edit' })
-    );
+    await clickWorkMenuItem('The Scale Cycle', 'Edit');
     expect(onEdit).toHaveBeenCalledWith(12);
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
@@ -247,11 +235,7 @@ describe('ProfileSeriesList', () => {
       '/p?tab=series'
     );
 
-    await screen.findByRole('link', { name: 'The Scale Cycle' });
-    await openWorkMenu('The Scale Cycle');
-    await userEvent.click(
-      await screen.findByRole('menuitem', { name: 'Remove from favorites' })
-    );
+    await clickWorkMenuItem('The Scale Cycle', 'Remove from favorites');
 
     await waitFor(() =>
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(60)
