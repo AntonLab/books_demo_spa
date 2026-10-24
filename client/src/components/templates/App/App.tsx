@@ -79,7 +79,7 @@ const BookRedirect: FC = () => {
 };
 
 // matchPath reads `new` as a chapter id, but that route redirects to the Book
-// page; `/edit` does not match since `end` defaults to true.
+// page. `/edit` fails the match because `end` defaults to true.
 export const isChapterPath = (pathname: string): boolean => {
   const match = matchPath('/books/:bookId/chapters/:chapterId', pathname);
   return !!match && match.params.chapterId !== 'new';
@@ -99,7 +99,7 @@ export const AppShell: FC = () => {
   const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
-  // The Chapter page is bare: no header, no footer, so no AuthModals either.
+  // No header, footer or AuthModals on the Chapter page (routing.md).
   const isChapter = isChapterPath(pathname);
 
   return (
@@ -107,9 +107,10 @@ export const AppShell: FC = () => {
       {!isChapter && <AppHeader />}
       <Layout.Content className={styles.content}>
         {/* One boundary and one fallback for every route, both inside the
-            content area so the header and the auth modals survive a page
-            that throws or a chunk still in flight. Keyed by pathname so a
-            caught error clears on the next navigation. */}
+            content area so the header and the auth modals (absent on the
+            Chapter page) survive a page that throws or a chunk still in
+            flight. Keyed by pathname so a caught error clears on the next
+            navigation. */}
         <ErrorBoundary key={boundaryKey}>
           <Suspense fallback={<PageSpinner />}>
             <Routes>
