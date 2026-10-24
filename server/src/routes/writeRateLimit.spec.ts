@@ -6,9 +6,10 @@ import { ROLE_COOKIES, withAuthenticatedApp } from './routeTestKit.testkit.ts';
 
 // Comment, like, report, chapter and reading-progress writes share one budget
 // per user id: 60 per 15 minutes. Driven through createApp, because only the
-// app wiring shows the budget is shared across five routers. The limiter sits after validate,
-// so only a request that passes validation spends budget: INVALID answers 400
-// and costs nothing, VALID reaches a repository and costs one.
+// app wiring shows the budget is shared across five routers. The limiter sits
+// after validate, so only a request that passes validation spends budget:
+// INVALID answers 400 and costs nothing, VALID reaches a repository and costs
+// one.
 const BUDGET = 60;
 
 type Write = [method: string, path: string, body?: unknown];

@@ -9,8 +9,6 @@ import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
-import { Series } from '../models/Series.ts';
-import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import { User } from '../models/User.ts';
 import {
   ForbiddenError,
@@ -22,6 +20,12 @@ import type {
   ReadingProgressInput,
 } from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
+import {
+  assertReadableBook,
+  assertVisibleSeries,
+  coAuthorsBook,
+  coAuthorsSeries,
+} from './holdGuards.ts';
 import { joined } from './joined.ts';
 import {
   ADD_OWN_WORK,
@@ -31,11 +35,7 @@ import {
 } from './libraryMessages.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
 import { seriesLibraryStateOf } from './seriesLibraryState.ts';
-import {
-  readableBookWhere,
-  visibleSeriesWhere,
-  type Account,
-} from './visibility.ts';
+import type { Account } from './visibility.ts';
 
 export interface LibraryRepository {
   // Add to the Library: none or Not interested becomes Plan to read, any other
@@ -89,34 +89,13 @@ export interface LibraryRepository {
 const TOGGLE_ATTEMPTS = 3;
 
 export function createSequelizeLibraryRepository(): LibraryRepository {
-  // A Book the account may not read answers exactly as a missing one, so a
-  // refusal never reveals that a Draft exists.
-  async function assertReadable(bookId: number, account: Account) {
-    const book = await Book.findOne({
-      where: { [Op.and]: [{ id: bookId }, await readableBookWhere(account)] },
-      attributes: ['id'],
-    });
-    if (!book) throw new NotFoundError('Book', bookId);
-  }
-
-  async function assertNotCoAuthor(
-    bookId: number,
-    account: Account,
-    message: string
-  ) {
-    const credited = await BookAuthor.count({
-      where: { bookId, userId: account.id },
-    });
-    if (credited > 0) throw new ForbiddenError(message);
-  }
-
   async function assertMayHold(
     bookId: number,
     account: Account,
     message: string
   ) {
-    await assertReadable(bookId, account);
-    await assertNotCoAuthor(bookId, account, message);
+    await assertReadableBook(bookId, account);
+    if (await coAuthorsBook(bookId, account)) throw new ForbiddenError(message);
   }
 
   async function save(bookId: number, status: ReadingStatus, account: Account) {
@@ -173,20 +152,13 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   async function assertMayHoldSeries(
     seriesId: number,
     account: Account,
-    // null: a Co-author is not refused.
-    message: string | null
+    // Without a message a Co-author is not refused.
+    message?: string
   ) {
-    const series = await Series.findOne({
-      where: {
-        [Op.and]: [{ id: seriesId }, await visibleSeriesWhere(account)],
-      },
-      attributes: ['id'],
-    });
-    if (!series) throw new NotFoundError('Series', seriesId);
-    const credited = await SeriesAuthor.count({
-      where: { seriesId, userId: account.id },
-    });
-    if (message && credited > 0) throw new ForbiddenError(message);
+    await assertVisibleSeries(seriesId, account);
+    if (message && (await coAuthorsSeries(seriesId, account))) {
+      throw new ForbiddenError(message);
+    }
   }
 
   // The Published Books of the Series; without `withOwn`, those the account
@@ -215,11 +187,16 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   async function actOnSeries(
     seriesId: number,
     account: Account,
-    message: string | null,
+    // refuseCoAuthor: the refusal text for a Co-author, none lets one through;
+    // includeOwn: also reach the Books the account co-authors.
+    {
+      refuseCoAuthor,
+      includeOwn = false,
+    }: { refuseCoAuthor?: string; includeOwn?: boolean },
     write: (bookIds: number[], transaction: Transaction) => Promise<void>
   ) {
-    await assertMayHoldSeries(seriesId, account, message);
-    const bookIds = await publishedBooksOf(seriesId, account, !message);
+    await assertMayHoldSeries(seriesId, account, refuseCoAuthor);
+    const bookIds = await publishedBooksOf(seriesId, account, includeOwn);
     if (bookIds.length > 0) {
       await sequelizeOf(LibraryEntry).transaction((transaction) =>
         write(bookIds, transaction)
@@ -298,7 +275,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        ADD_OWN_WORK,
+        { refuseCoAuthor: ADD_OWN_WORK },
         async (bookIds, transaction) => {
           await insertMissing(bookIds, 'plan_to_read', account, transaction);
           await LibraryEntry.update(
@@ -320,7 +297,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        NOT_INTERESTED_OWN_WORK,
+        { refuseCoAuthor: NOT_INTERESTED_OWN_WORK },
         async (bookIds, transaction) => {
           // Decided in the transaction over the Books this account can hold, so
           // a co-authored Book (which never has an entry) does not block it.
@@ -357,7 +334,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        null,
+        { includeOwn: true },
         async (bookIds, transaction) => {
           await LibraryEntry.destroy({
             where: { userId: account.id, bookId: bookIds },

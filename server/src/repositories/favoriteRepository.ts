@@ -1,9 +1,7 @@
 import { Op, UniqueConstraintError } from 'sequelize';
 import { Book } from '../models/Book.ts';
-import { BookAuthor } from '../models/BookAuthor.ts';
 import { Favorite, toPublicFavorite } from '../models/Favorite.ts';
 import { Series } from '../models/Series.ts';
-import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import {
   ConflictError,
   ForbiddenError,
@@ -22,12 +20,14 @@ import type {
 import { publicBooksOf } from './bookRepository.ts';
 import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { joined } from './joined.ts';
-import { publicSeriesOf } from './seriesRepository.ts';
 import {
-  readableBookWhere,
-  visibleSeriesWhere,
-  type Account,
-} from './visibility.ts';
+  assertReadableBook,
+  assertVisibleSeries,
+  coAuthorsBook,
+  coAuthorsSeries,
+} from './holdGuards.ts';
+import { publicSeriesOf } from './seriesRepository.ts';
+import { visibleSeriesWhere, type Account } from './visibility.ts';
 
 type FavoriteBookListResult = Pick<
   ListResponse<FavoriteBook>,
@@ -66,24 +66,9 @@ async function assertVisibleTarget(
   input: CreateFavoriteInput,
   account: Account
 ): Promise<void> {
-  if (input.bookId !== null) {
-    const book = await Book.findOne({
-      where: {
-        [Op.and]: [{ id: input.bookId }, await readableBookWhere(account)],
-      },
-      attributes: ['id'],
-    });
-    if (!book) throw new NotFoundError('Book', input.bookId);
-  }
-  if (input.seriesId !== null) {
-    const series = await Series.findOne({
-      where: {
-        [Op.and]: [{ id: input.seriesId }, await visibleSeriesWhere(account)],
-      },
-      attributes: ['id'],
-    });
-    if (!series) throw new NotFoundError('Series', input.seriesId);
-  }
+  if (input.bookId !== null) await assertReadableBook(input.bookId, account);
+  if (input.seriesId !== null)
+    await assertVisibleSeries(input.seriesId, account);
 }
 
 // After the visibility check, so an unreadable work stays a 404 and the
@@ -93,18 +78,10 @@ async function assertNotOwnWork(
   account: Account
 ): Promise<void> {
   const [asBookAuthor, asSeriesAuthor] = await Promise.all([
-    input.bookId === null
-      ? 0
-      : BookAuthor.count({
-          where: { bookId: input.bookId, userId: account.id },
-        }),
-    input.seriesId === null
-      ? 0
-      : SeriesAuthor.count({
-          where: { seriesId: input.seriesId, userId: account.id },
-        }),
+    input.bookId !== null && coAuthorsBook(input.bookId, account),
+    input.seriesId !== null && coAuthorsSeries(input.seriesId, account),
   ]);
-  if (asBookAuthor + asSeriesAuthor > 0) {
+  if (asBookAuthor || asSeriesAuthor) {
     throw new ForbiddenError('You cannot favorite your own work');
   }
 }

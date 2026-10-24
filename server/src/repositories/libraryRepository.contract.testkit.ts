@@ -497,18 +497,21 @@ export function libraryRepositoryContract(
 
   test('contract: Series actions refuse a missing Series, add and not-interested also a Co-author', async () => {
     const { repository, me, author, seriesId } = await arrangeSeries();
-    const actions = [
+    const refusingCoAuthor = [
       ['addSeries', ADD_OWN_WORK],
       ['toggleSeriesNotInterested', NOT_INTERESTED_OWN_WORK],
-      ['clearSeries', null],
     ] as const;
-    for (const [action, message] of actions) {
-      if (message) {
-        await assert.rejects(
-          repository[action](seriesId, author),
-          new ForbiddenError(message)
-        );
-      }
+    for (const [action, message] of refusingCoAuthor) {
+      await assert.rejects(
+        repository[action](seriesId, author),
+        new ForbiddenError(message)
+      );
+    }
+    for (const action of [
+      'addSeries',
+      'toggleSeriesNotInterested',
+      'clearSeries',
+    ] as const) {
       await assert.rejects(
         repository[action](MISSING_ID, me),
         new NotFoundError('Series', MISSING_ID)
