@@ -90,6 +90,17 @@ export const useBooksInSeries = (seriesId: number) => {
   });
 };
 
+// The viewer's own books in no series: what the Edit series Books tab can file. The server filters by author only; `select` drops books already in a series.
+// ponytail: one page at the server's cap, as useBooksInSeries.
+export const useOwnBooksWithoutSeries = (userId: number, enabled: boolean) => {
+  return useQuery({
+    queryKey: queryKeys.books({ userId, pageSize: PAGE_SIZE_MAX }),
+    queryFn: () => listBooks({ userId, pageSize: PAGE_SIZE_MAX }),
+    select: (page) => page.items.filter((book) => book.seriesId === null),
+    enabled,
+  });
+};
+
 export const useBook = (id: number) => {
   return useQuery({
     queryKey: queryKeys.book(id),

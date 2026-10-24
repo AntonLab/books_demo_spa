@@ -6,7 +6,7 @@ import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { useDeleteChapter } from '@/queries/chapters';
 import { isBlank, unsavedTextKeys } from '@/store/unsavedTextSlice';
 import { useUnsavedText } from '@/store/useUnsavedText';
-import { formatDate } from '@/format/date';
+import { formatDate, formatDateTime } from '@/format/date';
 import { chapterStateOf, type ChapterSummary } from '@/types/chapter';
 
 interface ChapterRowProps {
@@ -34,12 +34,15 @@ export const ChapterRow: FC<ChapterRowProps> = ({
         <Typography.Text>{chapter.title}</Typography.Text>
         {state === 'draft' && <Tag>Draft</Tag>}
         {state === 'scheduled' && <Tag color="blue">Scheduled</Tag>}
+        {state === 'published' && <Tag color="green">Published</Tag>}
         {entry && !isBlank(entry) && <Tag color="orange">Unsaved changes</Tag>}
       </Space>
       <Space>
         {chapter.publishedAt !== null && (
           <Typography.Text type="secondary">
-            {formatDate(chapter.publishedAt)}
+            {state === 'scheduled'
+              ? formatDateTime(chapter.publishedAt)
+              : formatDate(chapter.publishedAt)}
           </Typography.Text>
         )}
         <IconButton

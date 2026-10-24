@@ -188,6 +188,8 @@ describe('ChapterForm', () => {
     expect(
       screen.getByText(`Published on ${formatDateTime(published)}`)
     ).toBeInTheDocument();
+    expect(screen.queryByText('Draft: not visible to readers')).toBeNull();
+    expect(screen.queryByText(/^Scheduled for /)).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Publish' })).toBeNull();
 
@@ -203,6 +205,42 @@ describe('ChapterForm', () => {
         publishedAt: null,
       })
     );
+  });
+
+  it('says a chapter without a publication time is hidden from readers', () => {
+    renderWithProviders(
+      <ChapterForm initialValues={filled} onSubmit={jest.fn()} />
+    );
+    expect(
+      screen.getByText('Draft: not visible to readers')
+    ).toBeInTheDocument();
+  });
+
+  it('names the moment a scheduled chapter will go out', () => {
+    const scheduled = new Date(Date.now() + 86_400_000).toISOString();
+    renderWithProviders(
+      <ChapterForm
+        initialValues={filled}
+        publishedAt={scheduled}
+        onSubmit={jest.fn()}
+      />
+    );
+    expect(
+      screen.getByText(`Scheduled for ${formatDateTime(scheduled)}`)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Draft: not visible to readers')).toBeNull();
+  });
+
+  it('keeps the saved-state text while the publish-immediately checkbox is toggled', async () => {
+    renderWithProviders(
+      <ChapterForm initialValues={filled} onSubmit={jest.fn()} />
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Publish immediately' })
+    );
+    expect(
+      screen.getByText('Draft: not visible to readers')
+    ).toBeInTheDocument();
   });
 
   it('refuses to save without a title or a text', async () => {
