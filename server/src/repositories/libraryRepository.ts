@@ -99,8 +99,37 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     }
   }
 
+  const ownedBy = (bookId: number, account: Account) => ({
+    userId: account.id,
+    bookId,
+  });
+
   const held = (bookId: number, account: Account) =>
-    LibraryEntry.findOne({ where: { userId: account.id, bookId } });
+    LibraryEntry.findOne({ where: ownedBy(bookId, account) });
+
+  // Creates the entry unless one exists; true when it created it.
+  async function insertIfAbsent(
+    bookId: number,
+    status: ReadingStatus,
+    account: Account
+  ) {
+    try {
+      const [, created] = await LibraryEntry.findOrCreate({
+        where: ownedBy(bookId, account),
+        defaults: {
+          ...ownedBy(bookId, account),
+          status,
+          updatedAt: new Date(),
+        },
+      });
+      return created;
+    } catch (error) {
+      if (error instanceof ForeignKeyConstraintError) {
+        throw new NotFoundError('Book', bookId);
+      }
+      throw error;
+    }
+  }
 
   return {
     async set(bookId, status, account) {
@@ -114,12 +143,15 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         account,
         'You cannot add your own work to your Library'
       );
-      const status = (await held(bookId, account))?.status;
-      if (status && status !== 'not_interested') return { bookId, status };
-      return {
-        bookId,
-        status: (await save(bookId, 'plan_to_read', account)).status,
-      };
+      // Each step is one statement guarded by the stored status, so a
+      // concurrent `set` to Reading or Read is never lowered.
+      await insertIfAbsent(bookId, 'plan_to_read', account);
+      await LibraryEntry.update(
+        { status: 'plan_to_read', updatedAt: new Date() },
+        { where: { ...ownedBy(bookId, account), status: 'not_interested' } }
+      );
+      const status = (await held(bookId, account))?.status ?? 'plan_to_read';
+      return { bookId, status };
     },
 
     async toggleNotInterested(bookId, account) {
@@ -128,18 +160,24 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         account,
         'You cannot mark your own work as not interested'
       );
-      const status = (await held(bookId, account))?.status;
-      if (status === 'reading' || status === 'read') {
+      // Conditional writes on the stored status, as in `addBook`.
+      if (await insertIfAbsent(bookId, 'not_interested', account)) {
+        return { bookId, status: 'not_interested' };
+      }
+      const [marked] = await LibraryEntry.update(
+        { status: 'not_interested', updatedAt: new Date() },
+        { where: { ...ownedBy(bookId, account), status: 'plan_to_read' } }
+      );
+      if (marked > 0) return { bookId, status: 'not_interested' };
+      const cleared = await LibraryEntry.destroy({
+        where: { ...ownedBy(bookId, account), status: 'not_interested' },
+      });
+      if (cleared > 0) return { bookId, status: null };
+      // Neither matched: Reading or Read, or the entry was removed meanwhile.
+      if (await held(bookId, account)) {
         throw new StateConflictError('Remove it from your Library first');
       }
-      if (status === 'not_interested') {
-        await LibraryEntry.destroy({ where: { userId: account.id, bookId } });
-        return { bookId, status: null };
-      }
-      return {
-        bookId,
-        status: (await save(bookId, 'not_interested', account)).status,
-      };
+      return this.toggleNotInterested(bookId, account);
     },
 
     async clear(bookId, account) {

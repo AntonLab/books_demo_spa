@@ -155,7 +155,27 @@ export function libraryRepositoryContract(
     assert.deepEqual(statuses, ['plan_to_read', 'reading', 'read']);
   });
 
-  test('contract: addBook refuses the Co-author, a missing Book and a Draft', async () => {
+  test('contract: addBook never lowers a status set at the same moment', async () => {
+    const { repository, me, books } = await arrange();
+    await Promise.all([
+      repository.set(books[0]!, 'reading', me),
+      repository.addBook(books[0]!, me),
+    ]);
+    const page = await repository.list(FIRST_PAGE, me);
+    assert.equal(page.items[0]?.readingStatus, 'reading');
+  });
+
+  test('contract: toggleNotInterested never overwrites a status set at the same moment', async () => {
+    const { repository, me, books } = await arrange();
+    await Promise.allSettled([
+      repository.set(books[0]!, 'read', me),
+      repository.toggleNotInterested(books[0]!, me),
+    ]);
+    const page = await repository.list(FIRST_PAGE, me);
+    assert.equal(page.items[0]?.readingStatus, 'read');
+  });
+
+  test('contract: addBook refuses the Co-author,a missing Book and a Draft', async () => {
     const { repository, aDraftBook, me, author, books } = await arrange();
     await assert.rejects(
       repository.addBook(books[0]!, author),
