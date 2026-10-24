@@ -102,6 +102,8 @@ export const listBooksQuerySchema = z
     // Narrows to Published Books for every viewer: a public page lists an
     // Owner's work without their Drafts.
     published: z.literal('true').optional(),
+    // Search and the Main page only: leaves out the viewer's Not interested Books.
+    hideNotInterested: z.literal('true').optional(),
     seriesId: idSchema.optional(),
     // A public lookup of the named Books, Published only for every viewer.
     ids: bookIdsSchema.optional(),

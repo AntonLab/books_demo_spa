@@ -326,6 +326,8 @@ interface IdLookups {
   seriesIds?: number[];
   // bookId to the viewer's Favorite id, set by `?favoritedBy=me`.
   favorites?: Map<number, number>;
+  // The viewer's Not interested Books, set by `?hideNotInterested=true`.
+  notInterestedBookIds?: number[];
 }
 
 // The books any of whose Co-authors matches by login, first or last name.
@@ -378,6 +380,15 @@ async function favoritesOf(viewer: Viewer): Promise<Map<number, number>> {
   );
 }
 
+async function notInterestedOf(viewer: Viewer): Promise<number[]> {
+  if (viewer === null) return [];
+  const rows = await LibraryEntry.findAll({
+    where: { userId: viewer.id, status: 'not_interested' },
+    attributes: ['bookId'],
+  });
+  return rows.map((row) => row.bookId);
+}
+
 function buildWhere(
   query: ListBooksQuery,
   lookups: IdLookups,
@@ -401,6 +412,10 @@ function buildWhere(
   }
   if (lookups.favorites !== undefined) {
     clauses.push({ id: [...lookups.favorites.keys()] });
+  }
+  // An empty list excludes nothing, so it adds no clause.
+  if (lookups.notInterestedBookIds?.length) {
+    clauses.push({ id: { [Op.notIn]: lookups.notInterestedBookIds } });
   }
 
   if (query.status !== undefined) {
@@ -546,6 +561,10 @@ export function createSequelizeBookRepository(): BookRepository {
           query.favoritedBy === undefined
             ? undefined
             : await favoritesOf(viewer),
+        notInterestedBookIds:
+          query.hideNotInterested === undefined
+            ? undefined
+            : await notInterestedOf(viewer),
       };
 
       const rank = query.sort === undefined ? undefined : rankOf(query.sort);

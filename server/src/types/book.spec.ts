@@ -166,6 +166,20 @@ test('listBooksQuerySchema takes favoritedBy=me and refuses any other value', ()
   }
 });
 
+test('listBooksQuerySchema takes hideNotInterested=true and refuses any other value', () => {
+  assert.equal(
+    listBooksQuerySchema.parse({ hideNotInterested: 'true' }).hideNotInterested,
+    'true'
+  );
+  assert.equal(listBooksQuerySchema.parse({}).hideNotInterested, undefined);
+  for (const bad of ['false', '1']) {
+    assert.equal(
+      listBooksQuerySchema.safeParse({ hideNotInterested: bad }).success,
+      false
+    );
+  }
+});
+
 test('listBooksQuerySchema trims text filters and refuses a blank or over-long one', () => {
   const parsed = listBooksQuerySchema.parse({
     q: '  dragon ',
