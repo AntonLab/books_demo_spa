@@ -110,11 +110,14 @@ export function createFakeLibraryRepository(
   function assertMayHoldSeries(
     seriesId: number,
     account: Account,
-    message: string
+    // null: a Co-author is not refused.
+    message: string | null
   ) {
     const row = series.get(seriesId);
     if (!row) throw new NotFoundError('Series', seriesId);
-    if (row.authorIds.includes(account.id)) throw new ForbiddenError(message);
+    if (message && row.authorIds.includes(account.id)) {
+      throw new ForbiddenError(message);
+    }
   }
 
   const publishedIn = (seriesId: number) =>
@@ -228,12 +231,11 @@ export function createFakeLibraryRepository(
     },
 
     async clearSeries(seriesId, account) {
-      assertMayHoldSeries(
-        seriesId,
-        account,
-        'You cannot remove your own work from your Library'
+      assertMayHoldSeries(seriesId, account, null);
+      drop(
+        publishedIn(seriesId).map((book) => book.id),
+        account
       );
-      drop(holdableIn(seriesId, account), account);
       return seriesStateOf(seriesId, account);
     },
 

@@ -532,7 +532,34 @@ test('series not-interested with a co-authored Book: the free Books are marked, 
   );
 });
 
-test('a Co-author of the Series gets 403; a missing Series gets 404; a Guest 401; id abc 400', async () => {
+test('series remove deletes the leftover entry of a Book the Account co-authors', async () => {
+  const leftover = {
+    userId: USER_IDS.author,
+    bookId: MIXED_OWN_BOOK_ID,
+    status: 'read' as const,
+    updatedAt: new Date(),
+  };
+  await withAuthenticatedApp(
+    { libraryRepository: fakeRepository([leftover]) },
+    async (base) => {
+      const cookie = ROLE_COOKIES.author;
+      assert.deepEqual(await statusesOf(base, cookie), {
+        [MIXED_OWN_BOOK_ID]: 'read',
+      });
+      const res = await fetch(
+        `${base}/api/library/${seriesPath(MIXED_SERIES_ID)}`,
+        {
+          method: 'DELETE',
+          headers: { cookie },
+        }
+      );
+      assert.equal(res.status, 200);
+      assert.deepEqual(await statusesOf(base, cookie), {});
+    }
+  );
+});
+
+test('a Co-author of the Series gets 403 on add and not-interested; a missing Series gets 404; a Guest 401; id abc 400', async () => {
   await withApp({ libraryRepository: fakeRepository() }, async (base) => {
     for (const action of ['add', 'not-interested']) {
       const res = await post(base, '', seriesPath(SERIES_ID, action));
@@ -557,9 +584,10 @@ test('a Co-author of the Series gets 403; a missing Series gets 404; a Guest 401
       for (const action of ['add', 'not-interested', 'remove']) {
         const status = async (id: number | string, cookie: string) =>
           (await request(id, action, cookie)).status;
+        // Remove only deletes entries, so a Co-author may press it.
         assert.equal(
           await status(CREDITED_SERIES_ID, ROLE_COOKIES.author),
-          403
+          action === 'remove' ? 200 : 403
         );
         assert.equal(await status(MISSING_ID, ROLE_COOKIES.user), 404);
         assert.equal(await status('abc', ROLE_COOKIES.user), 400);

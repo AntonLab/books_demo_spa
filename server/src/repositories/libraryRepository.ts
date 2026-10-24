@@ -50,7 +50,8 @@ export interface LibraryRepository {
   // account co-authors; a Co-author of the Series is refused with
   // ForbiddenError, and a Series the account may not see is a NotFoundError.
   // addSeries lifts none and Not interested to Plan to read and keeps every
-  // other status.
+  // other status. clearSeries is the exception: it reaches every Published
+  // Book, co-authored ones too, and a Co-author of the Series may call it.
   addSeries(seriesId: number, account: Account): Promise<SeriesLibraryState>;
   // Not interested on or off: once every Book is Not interested a press
   // deletes those entries; otherwise it marks the Books with no status.
@@ -58,7 +59,7 @@ export interface LibraryRepository {
     seriesId: number,
     account: Account
   ): Promise<SeriesLibraryState>;
-  // Deletes the entries of all of them, whatever the status.
+  // Deletes the entries of every Published Book, whatever the status.
   clearSeries(seriesId: number, account: Account): Promise<SeriesLibraryState>;
   // A reader opened or finished a Chapter. The Book is checked like `addBook`
   // (404 Book, then 403 Co-author), then the Chapter must be a Published one of
@@ -165,7 +166,8 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   async function assertMayHoldSeries(
     seriesId: number,
     account: Account,
-    message: string
+    // null: a Co-author is not refused.
+    message: string | null
   ) {
     const series = await Series.findOne({
       where: {
@@ -177,17 +179,22 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     const credited = await SeriesAuthor.count({
       where: { seriesId, userId: account.id },
     });
-    if (credited > 0) throw new ForbiddenError(message);
+    if (message && credited > 0) throw new ForbiddenError(message);
   }
 
-  // The Published Books of the Series the account does not co-author.
-  async function publishedBooksOf(seriesId: number, accountId: number) {
+  // The Published Books of the Series; without `withOwn`, those the account
+  // co-authors are left out.
+  async function publishedBooksOf(
+    seriesId: number,
+    accountId: number,
+    withOwn: boolean
+  ) {
     const books = await Book.findAll({
       where: { seriesId, status: { [Op.ne]: 'draft' } },
       attributes: ['id'],
     });
     const bookIds = books.map((book) => book.id);
-    if (bookIds.length === 0) return [];
+    if (withOwn || bookIds.length === 0) return bookIds;
     const own = await BookAuthor.findAll({
       where: { userId: accountId, bookId: bookIds },
       attributes: ['bookId'],
@@ -201,11 +208,11 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   async function actOnSeries(
     seriesId: number,
     account: Account,
-    message: string,
+    message: string | null,
     write: (bookIds: number[], transaction: Transaction) => Promise<void>
   ) {
     await assertMayHoldSeries(seriesId, account, message);
-    const bookIds = await publishedBooksOf(seriesId, account.id);
+    const bookIds = await publishedBooksOf(seriesId, account.id, !message);
     if (bookIds.length > 0) {
       await sequelizeOf(LibraryEntry).transaction((transaction) =>
         write(bookIds, transaction)
@@ -342,7 +349,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       return actOnSeries(
         seriesId,
         account,
-        'You cannot remove your own work from your Library',
+        null,
         async (bookIds, transaction) => {
           await LibraryEntry.destroy({
             where: { userId: account.id, bookId: bookIds },

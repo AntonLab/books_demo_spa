@@ -392,6 +392,36 @@ export function libraryRepositoryContract(
     assert.equal(await statusOf(repository, both, own), undefined);
   });
 
+  test('contract: clearSeries deletes a leftover entry of a Book the Account co-authors', async () => {
+    const {
+      repository,
+      seedStatus,
+      aBookInSeries,
+      anAccount,
+      seriesId,
+      books,
+    } = await arrangeSeries(1);
+    const both = reader(await anAccount());
+    const own = await aBookInSeries(seriesId, [both.id]);
+    await seedStatus(both.id, books[0]!, 'reading');
+    await seedStatus(both.id, own, 'read');
+    await repository.clearSeries(seriesId, both);
+    assert.equal(await statusOf(repository, both, books[0]!), undefined);
+    assert.equal(await statusOf(repository, both, own), undefined);
+  });
+
+  test('contract: a Co-author of the Series may clearSeries, deleting a leftover entry', async () => {
+    const { repository, seedStatus, author, seriesId, books } =
+      await arrangeSeries(1);
+    assert.deepEqual(await repository.clearSeries(seriesId, author), {
+      inLibrary: false,
+      notInterested: false,
+    });
+    await seedStatus(author.id, books[0]!, 'read');
+    await repository.clearSeries(seriesId, author);
+    assert.equal(await statusOf(repository, author, books[0]!), undefined);
+  });
+
   test('contract: a Series with no Published Book writes nothing and answers both flags false', async () => {
     const { repository, aBookInSeries, aSeries, anAccount, author } =
       await arrange(0);
@@ -408,7 +438,7 @@ export function libraryRepositoryContract(
     assert.equal(await statusOf(repository, moderator, draft), undefined);
   });
 
-  test('contract: Series actions refuse a Co-author and a missing Series', async () => {
+  test('contract: Series actions refuse a missing Series, add and not-interested also a Co-author', async () => {
     const { repository, me, author, seriesId } = await arrangeSeries();
     const actions = [
       ['addSeries', 'You cannot add your own work to your Library'],
@@ -416,13 +446,15 @@ export function libraryRepositoryContract(
         'toggleSeriesNotInterested',
         'You cannot mark your own work as not interested',
       ],
-      ['clearSeries', 'You cannot remove your own work from your Library'],
+      ['clearSeries', null],
     ] as const;
     for (const [action, message] of actions) {
-      await assert.rejects(
-        repository[action](seriesId, author),
-        new ForbiddenError(message)
-      );
+      if (message) {
+        await assert.rejects(
+          repository[action](seriesId, author),
+          new ForbiddenError(message)
+        );
+      }
       await assert.rejects(
         repository[action](MISSING_ID, me),
         new NotFoundError('Series', MISSING_ID)
