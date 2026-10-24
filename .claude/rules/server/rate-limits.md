@@ -9,7 +9,7 @@ paths:
 
 Sign-in, registration, password, upload and write budgets. In memory, fixed
 window. Login, register and reset mount before `validate`, so a refusal costs
-no parse, lookup or argon2. Comment, like, report and chapter writes mount
+no parse, lookup or argon2. Comment, like, report, chapter and reading-progress writes mount
 after `validate` (an invalid request spends nothing), upload PUTs after
 `validate` and before `express.raw`, so a refused body is never read. A
 request with no user passes the limiter; the route refuses it. A limited
@@ -24,6 +24,7 @@ Account is not Blocked.
 | `PATCH /api/users/:id`                                 | user id    | 5 per 15 min  | wrong or aborted `currentPassword` attempts; a correct one clears it |
 | `PUT` book cover, series cover, user avatar            | user id    | 20 per 15 min | every request that passes the permission check and `validate`        |
 | `POST/PATCH/DELETE` comments, likes, reports, chapters | user id    | 60 per 15 min | every request that passes the permission check and `validate`        |
+| `POST /api/books/:id/reading-progress`                 | user id    | 60 per 15 min | the same budget; every request that passes `requireAuth`, `validate` |
 
 - A malformed image spends upload budget; the upload DELETE routes are free.
 - **Login claims both budgets on arrival** (`hit`), or parallel attempts would

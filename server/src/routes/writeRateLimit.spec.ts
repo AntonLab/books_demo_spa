@@ -4,9 +4,9 @@ import { createAuthRateLimits } from '../middleware/authRateLimit.ts';
 import type { AppDeps } from '../app.ts';
 import { ROLE_COOKIES, withAuthenticatedApp } from './routeTestKit.testkit.ts';
 
-// Comment, like, report and chapter writes share one budget per user id: 60
-// per 15 minutes. Driven through createApp, because only the app wiring shows
-// the budget is shared across four routers. The limiter sits after validate,
+// Comment, like, report, chapter and reading-progress writes share one budget
+// per user id: 60 per 15 minutes. Driven through createApp, because only the
+// app wiring shows the budget is shared across five routers. The limiter sits after validate,
 // so only a request that passes validation spends budget: INVALID answers 400
 // and costs nothing, VALID reaches a repository and costs one.
 const BUDGET = 60;
@@ -25,6 +25,7 @@ const INVALID: Write[] = [
   ['POST', '/api/chapters'],
   ['PATCH', '/api/chapters/abc'],
   ['DELETE', '/api/chapters/abc'],
+  ['POST', '/api/books/abc/reading-progress'],
 ];
 
 const VALID: Write[] = [
@@ -43,6 +44,7 @@ const VALID: Write[] = [
     { title: 't', expectedUpdatedAt: '2026-01-01T00:00:00Z' },
   ],
   ['DELETE', '/api/chapters/1'],
+  ['POST', '/api/books/1/reading-progress', { event: 'opened', chapterId: 1 }],
 ];
 
 const TAKE: Write = ['POST', '/api/reports/1/take'];
@@ -62,6 +64,7 @@ const emptyRepositories = (): Partial<AppDeps> => ({
   likeRepository: emptyRepository(),
   reportRepository: emptyRepository(),
   chapterRepository: emptyRepository(),
+  libraryRepository: emptyRepository(),
 });
 
 async function withLimitedWrites(
@@ -108,7 +111,7 @@ async function spendBudget(
   }
 }
 
-test('60 writes across comments, likes, reports and chapters pass, the 61st on any route is 429 with Retry-After', () =>
+test('60 writes across comments, likes, reports, chapters and reading progress pass, the 61st on any route is 429 with Retry-After', () =>
   withLimitedWrites(async (base) => {
     const as = ROLE_COOKIES.author;
     for (let i = 0; i < BUDGET; i += 1) {
