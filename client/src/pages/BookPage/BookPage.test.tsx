@@ -576,8 +576,7 @@ describe('BookPage lower tabs', () => {
     pageSize: 10,
   });
 
-  it('counts the Comments from the Book and opens on them, the thread inside the tab', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 3 });
+  it('opens on the Comments tab, the thread inside it', async () => {
     renderPage();
 
     expect(
@@ -634,8 +633,7 @@ describe('BookPage lower tabs', () => {
     expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
   });
 
-  it('shows a Guest both lower tabs with their counts and no write controls', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+  it('shows a Guest both lower tabs, the lists counted, and no write controls', async () => {
     mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
     renderPage();
 
@@ -652,7 +650,6 @@ describe('BookPage lower tabs', () => {
   });
 
   it('names each lower tab by its label, for a regex lookup and for its panel', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
     mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
     renderPage();
 
@@ -685,10 +682,7 @@ describe('BookPage lower tabs', () => {
     ).toBeInTheDocument();
   });
 
-  it('raises the Comments count when a Comment is posted and the Book refetches', async () => {
-    mockedBooks.getBook
-      .mockResolvedValueOnce({ ...book, commentCount: 0 })
-      .mockResolvedValue({ ...book, commentCount: 1 });
+  it('posts the typed Comment on the Book from the Comments tab', async () => {
     mockedComments.createComment.mockResolvedValue({} as never);
     renderPage(reader);
 
@@ -698,9 +692,13 @@ describe('BookPage lower tabs', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Lovely');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-    expect(
-      await screen.findByRole('tab', { name: 'Comments' })
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalledWith({
+        bookId: 1,
+        parentId: null,
+        text: 'Lovely',
+      })
+    );
   });
 });
 
