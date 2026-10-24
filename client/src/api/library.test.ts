@@ -1,4 +1,10 @@
-import { clearReadingStatus, listLibrary, setReadingStatus } from './library';
+import {
+  addBookToLibrary,
+  clearReadingStatus,
+  listLibrary,
+  setReadingStatus,
+  toggleBookNotInterested,
+} from './library';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (response: Response): jest.Mock => {
@@ -49,6 +55,33 @@ describe('clearReadingStatus', () => {
 
     const [url, init] = callOf(fetchMock);
     expect([url, init.method]).toEqual(['/api/library/7', 'DELETE']);
+  });
+});
+
+describe('addBookToLibrary', () => {
+  it('posts /library/7/add and resolves to the state', async () => {
+    const state = { bookId: 7, status: 'plan_to_read' };
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(addBookToLibrary(7)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual(['/api/library/7/add', 'POST']);
+  });
+});
+
+describe('toggleBookNotInterested', () => {
+  it('posts /library/7/not-interested', async () => {
+    const state = { bookId: 7, status: null };
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(toggleBookNotInterested(7)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([
+      '/api/library/7/not-interested',
+      'POST',
+    ]);
   });
 });
 

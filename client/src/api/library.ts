@@ -4,7 +4,11 @@ import type {
   ReadingStatus,
   SetReadingStatusPayload,
 } from 'shared';
-import type { LibraryBook, PublicLibraryEntry } from '../types/library';
+import type {
+  BookLibraryState,
+  LibraryBook,
+  PublicLibraryEntry,
+} from '../types/library';
 
 export interface ListLibraryParams {
   status?: ReadingStatus;
@@ -22,6 +26,23 @@ export const setReadingStatus = (
   return request<PublicLibraryEntry>(`/library/${bookId}`, {
     method: 'PUT',
     body: payload,
+  });
+};
+
+// Plan to read, unless the Book already has a status; 404 when the viewer
+// cannot see the book.
+export const addBookToLibrary = (bookId: number): Promise<BookLibraryState> => {
+  return request<BookLibraryState>(`/library/${bookId}/add`, {
+    method: 'POST',
+  });
+};
+
+// A toggle; the server answers 409 from reading or read.
+export const toggleBookNotInterested = (
+  bookId: number
+): Promise<BookLibraryState> => {
+  return request<BookLibraryState>(`/library/${bookId}/not-interested`, {
+    method: 'POST',
   });
 };
 

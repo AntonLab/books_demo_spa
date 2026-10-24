@@ -5,7 +5,17 @@ import {
   EditOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
-import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Divider,
+  Skeleton,
+  Space,
+  Tabs,
+  Typography,
+  theme,
+} from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BOOK_GONE } from '@/constants/goneMessages';
@@ -13,7 +23,6 @@ import { isId } from '@/types/id';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
-import { ReadingStatusSelect } from '@/components/molecules/ReadingStatusSelect/ReadingStatusSelect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
@@ -30,7 +39,7 @@ import { useBook } from '@/queries/books';
 import { useChapters } from '@/queries/chapters';
 import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
-import { useSetReadingStatus } from '@/queries/library';
+import { useBookLibraryActions } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
 import { publishedChapters } from '@/types/chapter';
 import {
@@ -68,7 +77,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const readingLists = useBookReadingLists(bookId);
   const toggleLike = useToggleLike(queryKeys.book(bookId));
   const toggleFavorite = useToggleFavorite(queryKeys.book(bookId));
-  const setStatus = useSetReadingStatus();
+  const libraryActions = useBookLibraryActions();
   const { message } = App.useApp();
   const toastError = (error: Error) => void message.error(error.message);
 
@@ -100,6 +109,11 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   // The public list: only what is out, even for a Co-author, who manages the
   // rest from the Edit modal. The Chapters and Statistics tabs share it, so
   // they cannot disagree about what is out.
+  const status = book.viewerReadingStatus;
+  // not_interested is not "in the Library": the Book can be added from it.
+  const inLibrary = status !== null && status !== 'not_interested';
+  // The server answers 409 for Not interested from these two.
+  const keptAsReader = status === 'reading' || status === 'read';
   const published = publishedChapters(chapters.data?.items ?? []);
   // No count until the first response is in, so no false (0) flashes.
   const readingListsLabel =
@@ -143,20 +157,45 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           />
         )}
         {mayKeepInLibrary && (
-          <ReadingStatusSelect
-            // Its own id: rc-component's generated ids all read `test-id`
-            // under Jest, and this select would then name any modal whose
-            // title is labelled by that id.
-            id="book-reading-status"
-            value={book.viewerReadingStatus}
-            disabled={setStatus.isPending}
-            onChange={(status) =>
-              setStatus.mutate(
-                { bookId: book.id, status },
-                { onError: toastError }
-              )
-            }
-          />
+          <>
+            {/* One request at a time: a second click before the refetch
+                lands would act on a stale status. */}
+            {inLibrary ? (
+              <Button
+                disabled={libraryActions.isPending}
+                onClick={() =>
+                  libraryActions.remove.mutate(book.id, { onError: toastError })
+                }
+              >
+                Remove from Library
+              </Button>
+            ) : (
+              <Button
+                disabled={libraryActions.isPending}
+                onClick={() =>
+                  libraryActions.add.mutate(book.id, { onError: toastError })
+                }
+              >
+                Add to Library
+              </Button>
+            )}
+            <Button
+              aria-pressed={status === 'not_interested'}
+              disabled={libraryActions.isPending || keptAsReader}
+              onClick={() =>
+                libraryActions.toggleNotInterested.mutate(book.id, {
+                  onError: toastError,
+                })
+              }
+            >
+              Not interested
+            </Button>
+            {keptAsReader && (
+              <Typography.Text type="secondary">
+                Remove it from your Library first
+              </Typography.Text>
+            )}
+          </>
         )}
         {mayAddBookToReadingList(book, session) && (
           <AddToReadingList target={{ bookId: book.id }} />

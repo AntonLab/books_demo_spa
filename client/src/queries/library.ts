@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReadingStatus } from 'shared';
 import {
+  addBookToLibrary,
   clearReadingStatus,
   listLibrary,
   setReadingStatus,
+  toggleBookNotInterested,
   type ListLibraryParams,
 } from '../api/library';
 import { queryKeys } from './keys';
@@ -14,6 +16,41 @@ export const useLibrary = (params: ListLibraryParams, enabled = true) => {
     queryFn: () => listLibrary(params),
     enabled,
   });
+};
+
+// The Book page's Library buttons. The responses are ignored: the refetch of
+// the Book detail carries the viewer's status. onSettled for the reason
+// useSetReadingStatus gives. isPending covers all three, so one request is
+// in flight at a time.
+export const useBookLibraryActions = () => {
+  const queryClient = useQueryClient();
+  const onSettled = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
+    ]);
+
+  // Wrapped: useMutation hands mutationFn a second argument.
+  const add = useMutation({
+    mutationFn: (bookId: number) => addBookToLibrary(bookId),
+    onSettled,
+  });
+  const toggleNotInterested = useMutation({
+    mutationFn: (bookId: number) => toggleBookNotInterested(bookId),
+    onSettled,
+  });
+  const remove = useMutation({
+    mutationFn: (bookId: number) => clearReadingStatus(bookId),
+    onSettled,
+  });
+
+  return {
+    add,
+    toggleNotInterested,
+    remove,
+    isPending:
+      add.isPending || toggleNotInterested.isPending || remove.isPending,
+  };
 };
 
 // One hook for set and clear: a null status removes the Book from the

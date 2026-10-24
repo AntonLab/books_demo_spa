@@ -317,7 +317,7 @@ describe('SeriesPage star', () => {
     });
   });
 
-  it('removes a co-author’s own Favorite by its id', async () => {
+  it('removes the reader’s own Favorite by its id', async () => {
     mockedSeries.getSeries.mockResolvedValue({
       ...series,
       favoriteCount: 1,
@@ -325,7 +325,7 @@ describe('SeriesPage star', () => {
     });
     mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
 
-    renderPage('/series/12', account());
+    renderPage('/series/12', account({ id: 9, role: 'user' }));
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Remove from favorites' })
