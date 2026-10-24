@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import type { ReadingStatus } from 'shared';
@@ -8,6 +8,10 @@ import { seededClient } from '@/test/session';
 import { publicBook } from '@/test/works';
 import * as libraryApi from '@/api/library';
 import { ApiError } from '@/api/client';
+import {
+  devicePreferences,
+  type ResultsLayout,
+} from '@/store/devicePreferencesSlice';
 import type { PublicUser } from '@/types/api';
 import type { LibraryBook } from '@/types/library';
 
@@ -58,8 +62,64 @@ const renderPanel = (route = '/profile/library') =>
     }
   );
 
+const setLayout = (
+  store: ReturnType<typeof renderPanel>['store'],
+  layout: ResultsLayout
+) =>
+  act(() => {
+    store.dispatch(devicePreferences.resultsLayoutChanged(layout));
+  });
+
 describe('LibraryPanel', () => {
   beforeEach(() => jest.resetAllMocks());
+
+  it('shows tiles in grid layout: narrow columns, no description, Remove under the tile', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading')])
+    );
+    const { store } = renderPanel();
+    const link = await titleLink('Dragons');
+    setLayout(store, 'grid');
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
+    expect(screen.queryByText('D.')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Remove Dragons from Library' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the full-width list with descriptions in list layout', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading')])
+    );
+    const { store } = renderPanel();
+    const link = await titleLink('Dragons');
+    setLayout(store, 'list');
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    expect(screen.getAllByText('D.').length).toBeGreaterThan(0);
+  });
+
+  it('switches layout from the toolbar and keeps it in the Device preferences', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading')])
+    );
+    const { store } = renderPanel();
+    await titleLink('Dragons');
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    await userEvent.click(screen.getByRole('button', { name: 'Grid' }));
+    expect(store.getState().devicePreferences.resultsLayout).toBe('grid');
+  });
+
+  it('keeps the layout switch on an empty Library', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(page([]));
+    renderPanel();
+    expect(
+      await screen.findByText('Your Library is empty.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
 
   it('lists the books with their statuses, asking for every status but Not interested', async () => {
     mockedLibrary.listLibrary.mockResolvedValue(

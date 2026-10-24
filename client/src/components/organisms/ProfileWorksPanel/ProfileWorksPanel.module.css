@@ -9,8 +9,8 @@
   margin-top: var(--ant-margin-lg);
 }
 
-/* Filters hold the toolbar's right end whether or not toolbarStart is shown,
-   and move to their own line, still right, when it fills the first one. */
+/* Pushes the toolbar's controls to the right end; wraps to its own line, still
+   right, when `toolbarStart` fills the first one. */
 .toolbarEnd {
   margin-inline-start: auto;
 }

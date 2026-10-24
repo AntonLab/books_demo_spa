@@ -1,10 +1,11 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { PublicWorksList } from './PublicWorksList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
+import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { publicBook, publicSeries } from '@/test/works';
 
 jest.mock('@/api/books');
@@ -138,5 +139,63 @@ describe('PublicWorksList', () => {
     await waitFor(() =>
       expect(screen.getByTestId('search')).toHaveTextContent('?page=3')
     );
+  });
+
+  it('shows Books as tiles in grid layout and full width in list layout', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book(1, 'Alpha')],
+      total: 1,
+      current: 1,
+      pageSize: 20,
+    });
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="books" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    const link = await screen.findByRole('link', { name: 'Alpha' });
+    act(() => {
+      store.dispatch(devicePreferences.resultsLayoutChanged('grid'));
+    });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
+    expect(screen.queryByText('D.')).toBeNull();
+    act(() => {
+      store.dispatch(devicePreferences.resultsLayoutChanged('list'));
+    });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+  });
+
+  it('has the layout switch on Books, next to the Sort order, and keeps it on an empty list', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 20,
+    });
+    renderWithProviders(<PublicWorksList kind="books" userId={7} />, {
+      route: '/accounts/7',
+    });
+    expect(await screen.findByText('No books yet.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps Series as a list with no switch even when the layout is grid', async () => {
+    mockedSeries.listSeries.mockResolvedValue({
+      items: [series(4, 'Saga')],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="series" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    const link = await screen.findByRole('link', { name: 'Saga' });
+    act(() => {
+      store.dispatch(devicePreferences.resultsLayoutChanged('grid'));
+    });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    expect(screen.queryByRole('group', { name: 'Results layout' })).toBeNull();
   });
 });
