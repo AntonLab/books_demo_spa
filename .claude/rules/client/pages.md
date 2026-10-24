@@ -48,10 +48,11 @@ Routing and the App shell: `routing.md`.
   to its first broken field (expanded synchronously first, or a hidden field
   has nowhere to scroll to). The result count is in the title, which keeps the
   last count while the next search runs ("Searching…" only before any).
-  Results show as tiles or a list by `resultsLayout` (`ResultsLayoutSwitch`,
-  also on `SeriesPage`). `MainPage`'s sections are always tiles
-  (`TILE_COLUMNS`) and ignore it; other pages' `CardList`s keep their default
-  columns.
+  Book lists follow `resultsLayout` through `useResultsLayout` and show
+  `ResultsLayoutSwitch` (`SearchPage`, `SeriesPage`, `LibraryPanel`, Books in
+  `ProfileListShell` and `PublicListShell`). Series lists, `ReadingListPage`
+  and the reading-list cards keep `RESULTS_COLUMNS.list`; `MainPage`'s
+  sections are always tiles (`TILE_COLUMNS`) and ignore it.
 - `MainPage` is one section per `BOOK_SORTS` entry, six books each. "Show
   more" (`searchPath({ sort })`, a bare `/search` for Popular) shows only once
   the section has loaded more than six.

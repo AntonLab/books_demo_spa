@@ -12,7 +12,7 @@ interface CardListProps<T extends { id: number }> {
   isError: boolean;
   error: Error | null;
   emptyText?: string;
-  // Each item's `Col` spans; SearchPage's results layout sets them.
+  // Each item's `Col` spans; the results layout of the Book lists sets them.
   columns?: ColProps;
 }
 
