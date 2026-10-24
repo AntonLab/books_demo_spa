@@ -122,7 +122,6 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       <Space size={token.marginSM} wrap>
         {mayLike && (
           <LikeButton
-            count={book.likeCount}
             likedId={book.viewerLikeId}
             onToggle={(existingId) =>
               toggleLike.mutate({
@@ -134,7 +133,6 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         )}
         {mayFavorite && (
           <FavoriteButton
-            count={book.favoriteCount}
             favoriteId={book.viewerFavoriteId}
             // A second click before the refetch lands would send the
             // same add twice and meet a 409.
@@ -229,7 +227,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           {
             key: 'comments',
             icon: <CommentOutlined aria-hidden />,
-            label: `Comments (${book.commentCount})`,
+            label: 'Comments',
             children: <CommentSection bookId={bookId} closed={isDraft} />,
           },
           {

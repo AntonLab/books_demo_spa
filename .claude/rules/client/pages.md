@@ -99,7 +99,8 @@ Routing and the App shell: `routing.md`.
   takes Chapters, Release time and Last update from that same list (earliest
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
-  come from `BookDetail`.
+  come from `BookDetail`. Likes, Favorites and Comments counts show only
+  here: the Like and Favorite buttons and the Comments tab carry none.
 - `usePageClamp` redirects a page past the end, with `replace`, to the last
   page of the true `total`. A books page past the end is served as the last
   non-empty page and a series page comes back empty, both with the true

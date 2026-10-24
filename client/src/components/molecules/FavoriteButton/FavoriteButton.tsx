@@ -3,7 +3,7 @@ import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { StarFilled, StarOutlined } from '@ant-design/icons';
 
 interface FavoriteButtonProps {
-  count: number;
+  count?: number;
   // The viewer's own Favorite, straight from viewerFavoriteId: null means the
   // work is not one. Handing it back on click lets the caller delete that
   // row without a lookup, as LikeButton does.
@@ -34,7 +34,7 @@ export const FavoriteButton: FC<FavoriteButtonProps> = ({
       }
       onClick={() => onToggle(favoriteId)}
     >
-      {count}
+      {count !== undefined && count}
     </IconButton>
   );
 };

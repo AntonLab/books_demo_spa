@@ -499,9 +499,7 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
     // The tab took the old section's place, heading and all.
     expect(screen.queryByRole('heading', { name: 'Chapters' })).toBeNull();
-    expect(
-      screen.getByRole('tab', { name: 'Comments (0)' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1, 0);
   });
@@ -574,7 +572,7 @@ describe('BookPage lower tabs', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('tab', { name: 'Comments (3)', selected: true })
+      await screen.findByRole('tab', { name: 'Comments', selected: true })
     ).toBeInTheDocument();
     // The tab label names the region: no second "Comments" heading inside it.
     expect(screen.queryByRole('heading', { name: 'Comments' })).toBeNull();
@@ -624,9 +622,7 @@ describe('BookPage lower tabs', () => {
     expect(
       await screen.findByRole('tab', { name: 'Reading lists' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', { name: 'Comments (0)' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
   });
 
   it('shows a Guest both lower tabs with their counts and no write controls', async () => {
@@ -635,7 +631,7 @@ describe('BookPage lower tabs', () => {
     renderPage();
 
     expect(
-      await screen.findByRole('tab', { name: 'Comments (2)' })
+      await screen.findByRole('tab', { name: 'Comments' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: 'Reading lists (1)' })
@@ -652,9 +648,9 @@ describe('BookPage lower tabs', () => {
     renderPage();
 
     const comments = await screen.findByRole('tab', { name: /Comments/ });
-    expect(comments).toHaveAccessibleName('Comments (2)');
+    expect(comments).toHaveAccessibleName('Comments');
     expect(
-      screen.getByRole('tabpanel', { name: 'Comments (2)' })
+      screen.getByRole('tabpanel', { name: 'Comments' })
     ).toBeInTheDocument();
 
     const lists = await screen.findByRole('tab', { name: /Reading lists/ });
@@ -694,7 +690,7 @@ describe('BookPage lower tabs', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
     expect(
-      await screen.findByRole('tab', { name: 'Comments (1)' })
+      await screen.findByRole('tab', { name: 'Comments' })
     ).toBeInTheDocument();
   });
 });
@@ -884,7 +880,7 @@ describe('BookPage on a draft', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
-      'Comments (0)',
+      'Comments',
       'Reading lists (0)',
     ]);
   });
@@ -1008,6 +1004,23 @@ describe('BookPage header and action row', () => {
     expect(screen.queryByRole('tab', { name: 'Description' })).toBeNull();
   });
 
+  it('shows no counts on Like, Favorite or the Comments tab', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      likeCount: 4,
+      favoriteCount: 2,
+      commentCount: 7,
+    });
+    renderPage(reader);
+
+    const like = await screen.findByRole('button', { name: 'Like' });
+    expect(like).not.toHaveTextContent(/\d/);
+    expect(
+      screen.getByRole('button', { name: 'Add to favorites' })
+    ).not.toHaveTextContent(/\d/);
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
+  });
+
   it('lays the actions out as Like, Favorite, Library buttons, Add to reading list, Edit, then the library counts', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
     renderPage(moderator);
@@ -1091,7 +1104,7 @@ describe('BookPage tabs', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
-      'Comments (0)',
+      'Comments',
       'Reading lists (0)',
     ]);
     expect(
