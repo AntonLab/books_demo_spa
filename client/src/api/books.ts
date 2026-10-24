@@ -36,6 +36,9 @@ export interface ListBooksParams {
   favoritedBy?: 'me';
   // Only Published Books, even for the Owner.
   published?: 'true';
+  // Leaves out the caller's Not interested Books. Search page and Main
+  // sections only; the server ignores it for a Guest.
+  hideNotInterested?: 'true';
   // Book ids, comma-separated, 1 to BOOK_IDS_MAX; only the Published ones among
   // them answer.
   ids?: string;

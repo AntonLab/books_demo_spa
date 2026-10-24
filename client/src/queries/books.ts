@@ -24,9 +24,14 @@ const BOOKS_PAGE_SIZE = 20;
 // A ranking's first `pageSize` books, for the main page's sections; the search
 // page pages through `useBookSearch` instead.
 export const useSortedBooks = (sort: BookSort, pageSize = BOOKS_PAGE_SIZE) => {
+  const params: ListBooksParams = {
+    sort,
+    pageSize,
+    hideNotInterested: 'true',
+  };
   return useQuery({
-    queryKey: queryKeys.books({ sort, pageSize }),
-    queryFn: () => listBooks({ sort, pageSize }),
+    queryKey: queryKeys.books(params),
+    queryFn: () => listBooks(params),
   });
 };
 

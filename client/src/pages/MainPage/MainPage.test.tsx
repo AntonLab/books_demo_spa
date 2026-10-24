@@ -122,7 +122,11 @@ describe('MainPage', () => {
       within(section('New releases')).getByRole('link', { name: 'Fresh' })
     ).toBeInTheDocument();
     for (const sort of ['popular', 'new', 'updated']) {
-      expect(mockedBooks.listBooks).toHaveBeenCalledWith({ sort, pageSize: 6 });
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+        sort,
+        pageSize: 6,
+        hideNotInterested: 'true',
+      });
     }
   });
 
@@ -221,6 +225,10 @@ describe('MainPage', () => {
         ids: '1,2,3',
         pageSize: 20,
       });
+      const idsCall = mockedBooks.listBooks.mock.calls.find(
+        ([params]) => params?.ids !== undefined
+      );
+      expect(idsCall?.[0]).not.toHaveProperty('hideNotInterested');
     });
 
     it('shows only the latest six', async () => {

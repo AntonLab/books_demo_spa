@@ -97,6 +97,16 @@ describe('SearchPage', () => {
     ).toBeInTheDocument();
   });
 
+  it('asks the server to hide Not interested Books, keeping the flag out of the URL', async () => {
+    renderPage('/search?q=dragon');
+
+    await screen.findByRole('link', { name: 'A Tale of Dragons' });
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ q: 'dragon', hideNotInterested: 'true' })
+    );
+    expect(location()).toBe('/search?q=dragon');
+  });
+
   it('keeps the last count in the title while the next search runs', async () => {
     serve({ total: 45 });
     renderPage('/search?q=dragon');
