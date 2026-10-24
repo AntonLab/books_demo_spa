@@ -37,8 +37,8 @@ export interface LibraryRepository {
   // ForbiddenError, after that NotFoundError.
   addBook(bookId: number, account: Account): Promise<BookLibraryState>;
   // Not interested on or off: none or Plan to read becomes Not interested, a
-  // second press deletes the entry (status null); Reading and Read are a
-  // StateConflictError. Same refusals as `addBook`.
+  // second press deletes the entry (status null); Reading and Read, or a race
+  // lost three times, are a StateConflictError. Same refusals as `addBook`.
   toggleNotInterested(
     bookId: number,
     account: Account
@@ -77,6 +77,8 @@ export interface LibraryRepository {
     account: Account
   ): Promise<{ items: LibraryBook[]; total: number }>;
 }
+
+const TOGGLE_ATTEMPTS = 3;
 
 export function createSequelizeLibraryRepository(): LibraryRepository {
   // A Book the account may not read answers exactly as a missing one, so a
@@ -252,23 +254,25 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         account,
         'You cannot mark your own work as not interested'
       );
-      if (await insertIfAbsent(bookId, 'not_interested', account)) {
-        return { bookId, status: 'not_interested' };
+      // A lost race (the entry removed between two statements) tries again, a
+      // bounded number of times.
+      for (let attempt = 0; attempt < TOGGLE_ATTEMPTS; attempt += 1) {
+        if (await insertIfAbsent(bookId, 'not_interested', account)) {
+          return { bookId, status: 'not_interested' };
+        }
+        const [marked] = await LibraryEntry.update(
+          { status: 'not_interested', updatedAt: new Date() },
+          { where: { ...ownedBy(bookId, account), status: 'plan_to_read' } }
+        );
+        if (marked > 0) return { bookId, status: 'not_interested' };
+        const cleared = await LibraryEntry.destroy({
+          where: { ...ownedBy(bookId, account), status: 'not_interested' },
+        });
+        if (cleared > 0) return { bookId, status: null };
+        // Neither matched: Reading or Read, or the entry was removed meanwhile.
+        if (await held(bookId, account)) break;
       }
-      const [marked] = await LibraryEntry.update(
-        { status: 'not_interested', updatedAt: new Date() },
-        { where: { ...ownedBy(bookId, account), status: 'plan_to_read' } }
-      );
-      if (marked > 0) return { bookId, status: 'not_interested' };
-      const cleared = await LibraryEntry.destroy({
-        where: { ...ownedBy(bookId, account), status: 'not_interested' },
-      });
-      if (cleared > 0) return { bookId, status: null };
-      // Neither matched: Reading or Read, or the entry was removed meanwhile.
-      if (await held(bookId, account)) {
-        throw new StateConflictError('Remove it from your Library first');
-      }
-      return this.toggleNotInterested(bookId, account);
+      throw new StateConflictError('Remove it from your Library first');
     },
 
     async clear(bookId, account) {

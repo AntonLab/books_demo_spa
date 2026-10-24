@@ -17,7 +17,7 @@ import {
   createCreditedBook,
   createCreditedSeries,
 } from '../models/creditedBook.testkit.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { NotFoundError, StateConflictError } from '../types/errors.ts';
 import { createSequelizeLibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 import { libraryRepositoryContract } from './libraryRepository.contract.testkit.ts';
@@ -144,6 +144,23 @@ describe('libraryRepository against real MySQL', { skip }, () => {
       repository.addSeries(hidden.id, as(me)),
       new NotFoundError('Series', hidden.id)
     );
+  });
+
+  test('toggleNotInterested that keeps losing the race gives up with a StateConflictError after 3 attempts', async (t) => {
+    const { me, book } = await arrangeBooks();
+    // Every attempt finds no entry to create, mark or clear, and none held.
+    const create = t.mock.method(LibraryEntry, 'findOrCreate', async () => [
+      LibraryEntry.build(),
+      false,
+    ]);
+    t.mock.method(LibraryEntry, 'update', async () => [0]);
+    t.mock.method(LibraryEntry, 'destroy', async () => 0);
+    t.mock.method(LibraryEntry, 'findOne', async () => null);
+    await assert.rejects(
+      repository.toggleNotInterested(book.id, as(me)),
+      new StateConflictError('Remove it from your Library first')
+    );
+    assert.equal(create.mock.callCount(), 3);
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
