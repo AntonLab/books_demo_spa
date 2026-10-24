@@ -26,6 +26,8 @@ refuses it. A limited Account is not Blocked.
 | `POST/PATCH/DELETE` comments, likes, reports, chapters, reading progress | user id    | 60 per 15 min | every request that passes the permission check and `validate`        |
 
 - A malformed image spends upload budget; the upload DELETE routes are free.
+- Reading progress has no permission check: it counts every request that passes
+  `requireAuth` and `validate`.
 - **Login claims both budgets on arrival** (`hit`), or parallel attempts would
   all read the same unspent count while argon2 runs. A refusal releases
   **both** claims, or refused attempts would keep extending their own lockout.
