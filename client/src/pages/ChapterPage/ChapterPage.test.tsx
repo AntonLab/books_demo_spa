@@ -1,11 +1,20 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import userEvent from '@testing-library/user-event';
 import { ChapterPage } from './ChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import { createTestQueryClient } from '@/test/queryClient';
+import { seedSession } from '@/test/session';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as illustrationsApi from '@/api/illustrations';
+import * as libraryApi from '@/api/library';
 import { publicBook } from '@/test/works';
 import {
   initialDevicePreferences,
@@ -16,16 +25,73 @@ import type { ChapterSummary } from '@/types/chapter';
 import { Route, Routes, useLocation, useNavigationType } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BookPage } from '@/pages/BookPage/BookPage';
+import { StrictMode } from 'react';
 import type { FC } from 'react';
+import type { QueryClient } from '@tanstack/react-query';
+import type { PublicUser } from '@/types/api';
 import * as measurePages from './measurePages';
 
 jest.mock('@/api/books');
 jest.mock('@/api/chapters');
 jest.mock('@/api/illustrations');
+jest.mock('@/api/library');
 jest.mock('./measurePages');
 
 const measure = jest.mocked(measurePages);
 const mockedIllustrations = jest.mocked(illustrationsApi);
+const mockedLibrary = jest.mocked(libraryApi);
+
+// jsdom has no IntersectionObserver: a fake whose test reports the sentinel
+// coming into view.
+class FakeIntersectionObserver {
+  static instances: FakeIntersectionObserver[] = [];
+  private readonly callback: IntersectionObserverCallback;
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback;
+    FakeIntersectionObserver.instances.push(this);
+  }
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
+  takeRecords = () => [];
+  report(isIntersecting: boolean) {
+    this.callback(
+      [{ isIntersecting } as IntersectionObserverEntry],
+      this as unknown as IntersectionObserver
+    );
+  }
+}
+
+const sentinelComesIntoView = () => {
+  const { instances } = FakeIntersectionObserver;
+  const observer = instances[instances.length - 1]!;
+  act(() => {
+    observer.report(true);
+  });
+};
+
+const reader: PublicUser = {
+  id: 9,
+  login: 'Reader',
+  email: 'reader@example.com',
+  firstName: 'Read',
+  lastName: 'Er',
+  status: 'active',
+  role: 'user',
+  avatarUrl: null,
+  about: '',
+  showLastSeen: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+// The Book's only author, id 3.
+const coAuthor: PublicUser = { ...reader, id: 3, login: 'ann' };
+
+const signedIn = (user: PublicUser) => {
+  const queryClient = createTestQueryClient();
+  seedSession(queryClient, user);
+  return queryClient;
+};
 
 const mocked = jest.mocked(chaptersApi);
 const mockedBooks = jest.mocked(booksApi);
@@ -65,10 +131,11 @@ const summary = (id: number, title: string): ChapterSummary => ({
   updatedAt: '2026-09-01T00:00:00.000Z',
 });
 
-const renderAt = (chapterId: number) =>
+const renderAt = (chapterId: number, queryClient?: QueryClient) =>
   renderWithProviders(<ChapterPage />, {
     route: `/books/1/chapters/${chapterId}`,
     path: '/books/:bookId/chapters/:chapterId',
+    queryClient,
   });
 
 const Probe: FC = () => {
@@ -91,6 +158,10 @@ const renderWithRoutes = (chapterId: string, bookId = '1') =>
 
 beforeEach(() => {
   jest.resetAllMocks();
+  FakeIntersectionObserver.instances = [];
+  window.IntersectionObserver =
+    FakeIntersectionObserver as unknown as typeof IntersectionObserver;
+  mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
   mockedBooks.getBook.mockResolvedValue(book);
   mockedIllustrations.listIllustrations.mockResolvedValue({ items: [] });
   mocked.listChapters.mockResolvedValue({
@@ -368,7 +439,7 @@ const LocationState: FC = () => (
   </output>
 );
 
-const renderPagesAt = (chapterId: number) =>
+const renderPagesAt = (chapterId: number, queryClient?: QueryClient) =>
   renderWithProviders(
     <>
       <ChapterPage />
@@ -378,6 +449,7 @@ const renderPagesAt = (chapterId: number) =>
       route: `/books/1/chapters/${chapterId}`,
       path: '/books/:bookId/chapters/:chapterId',
       preloadedState: inPages,
+      queryClient,
     }
   );
 
@@ -690,6 +762,118 @@ describe('ChapterPage pages from a click on the text', () => {
     fireEvent.click(heading, { clientX: 850 });
 
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
+  });
+});
+
+describe('ChapterPage reading progress', () => {
+  const progress = mockedLibrary.postReadingProgress;
+  const strict = (chapterId: number) =>
+    renderWithProviders(
+      <StrictMode>
+        <ChapterPage />
+      </StrictMode>,
+      {
+        route: `/books/1/chapters/${chapterId}`,
+        path: '/books/:bookId/chapters/:chapterId',
+        queryClient: signedIn(reader),
+      }
+    );
+
+  it('opens send one opened event with the chapter id', async () => {
+    const view = strict(9);
+    await waitFor(() =>
+      expect(progress).toHaveBeenCalledWith(1, {
+        event: 'opened',
+        chapterId: 9,
+      })
+    );
+
+    view.rerender(
+      <StrictMode>
+        <ChapterPage />
+      </StrictMode>
+    );
+    await userEvent.click(
+      screen.getAllByRole('link', { name: 'Next chapter: Two' })[0]!
+    );
+    await screen.findByRole('heading', { name: 'Two' });
+
+    await waitFor(() =>
+      expect(progress).toHaveBeenLastCalledWith(1, {
+        event: 'opened',
+        chapterId: 10,
+      })
+    );
+    expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['a Guest', undefined],
+    ['a Co-author', coAuthor],
+  ])('%s sends nothing', async (_name, user) => {
+    const { store } = renderAt(9, user && signedIn(user));
+    await screen.findByRole('heading', { name: 'One' });
+    // The Book detail has loaded once the Book is recorded.
+    await waitFor(() =>
+      expect(store.getState().recentlyViewed.ids).toEqual([1])
+    );
+
+    sentinelComesIntoView();
+
+    expect(progress).not.toHaveBeenCalled();
+  });
+
+  it('Scroll sends finished once when the sentinel intersects, not before', async () => {
+    renderAt(9, signedIn(reader));
+    await waitFor(() => expect(progress).toHaveBeenCalledTimes(1));
+
+    expect(progress).not.toHaveBeenCalledWith(1, {
+      event: 'finished',
+      chapterId: 9,
+    });
+
+    sentinelComesIntoView();
+    sentinelComesIntoView();
+
+    await waitFor(() =>
+      expect(progress).toHaveBeenLastCalledWith(1, {
+        event: 'finished',
+        chapterId: 9,
+      })
+    );
+    expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  it('Pages sends finished on the last page only', async () => {
+    renderPagesAt(10, signedIn(reader));
+    await screen.findByText('Page 1 of 3');
+    await waitFor(() => expect(progress).toHaveBeenCalledTimes(1));
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByText('Page 2 of 3')).toBeInTheDocument();
+    expect(progress).toHaveBeenCalledTimes(1);
+
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByText('Page 3 of 3')).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(progress).toHaveBeenLastCalledWith(1, {
+        event: 'finished',
+        chapterId: 10,
+      })
+    );
+    expect(progress).toHaveBeenCalledTimes(2);
+  });
+
+  it('a one-page chapter in Pages sends opened and finished', async () => {
+    measure.countPages.mockReturnValue(1);
+    renderPagesAt(9, signedIn(reader));
+
+    await waitFor(() => expect(progress).toHaveBeenCalledTimes(2));
+    expect(progress.mock.calls.map(([, payload]) => payload)).toEqual([
+      { event: 'opened', chapterId: 9 },
+      { event: 'finished', chapterId: 9 },
+    ]);
   });
 });
 

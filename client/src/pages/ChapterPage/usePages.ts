@@ -29,6 +29,9 @@ export interface Pages {
   // The first page shown, 0-based.
   start: number;
   pageCount: number;
+  // The chapter's pages are counted: until then `pageCount` is a placeholder
+  // 1 and `hasPage` knows nothing of the real end.
+  ready: boolean;
   perView: PagesPerView;
   // Blank height under the text of the chapter's last page, in px.
   trailingSpace: number;
@@ -169,6 +172,7 @@ export const usePages = ({
     stripRef,
     start: view.start,
     pageCount: view.pageCount,
+    ready: view.openAt === 'anchor',
     // Zero unless the last page opens the view: on a spread the pulled-up
     // Illustrations would cover the page to its left.
     trailingSpace: view.start === view.pageCount - 1 ? view.trailingSpace : 0,

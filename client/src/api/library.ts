@@ -1,6 +1,7 @@
 import { request, toQueryString } from './client';
 import type {
   PagedResponse,
+  ReadingProgressPayload,
   ReadingStatus,
   SetReadingStatusPayload,
 } from 'shared';
@@ -51,6 +52,18 @@ export const toggleBookNotInterested = (
 // request() maps to undefined.
 export const clearReadingStatus = (bookId: number): Promise<void> => {
   return request<void>(`/library/${bookId}`, { method: 'DELETE' });
+};
+
+// The server answers 204. 401 for a Guest, 403 for a Co-author, 404 when the
+// viewer cannot read the Chapter.
+export const postReadingProgress = (
+  bookId: number,
+  payload: ReadingProgressPayload
+): Promise<void> => {
+  return request<void>(`/books/${bookId}/reading-progress`, {
+    method: 'POST',
+    body: payload,
+  });
 };
 
 // The Series calls act on every Published Book of the Series the viewer can

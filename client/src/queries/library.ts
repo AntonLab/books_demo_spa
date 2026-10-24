@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReadingStatus } from 'shared';
+import type { ReadingProgressPayload, ReadingStatus } from 'shared';
 import {
   addBookToLibrary,
   addSeriesToLibrary,
   clearReadingStatus,
   listLibrary,
+  postReadingProgress,
   removeSeriesFromLibrary,
   setReadingStatus,
   toggleBookNotInterested,
@@ -89,6 +90,26 @@ export const useSeriesLibraryActions = (seriesId: number) => {
     isPending:
       add.isPending || toggleNotInterested.isPending || remove.isPending,
   };
+};
+
+// The Chapter page's reading events. Failures are not shown: reading must not
+// be interrupted, and the next open or finish reports again. A success moves
+// the Book into Reading, so the Book and Library caches are refetched.
+export const useReadingProgressMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // Wrapped: useMutation hands mutationFn a second argument.
+    mutationFn: (variables: {
+      bookId: number;
+      payload: ReadingProgressPayload;
+    }) => postReadingProgress(variables.bookId, variables.payload),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
+      ]),
+  });
 };
 
 // One hook for set and clear: a null status removes the Book from the

@@ -3,6 +3,7 @@ import {
   addSeriesToLibrary,
   clearReadingStatus,
   listLibrary,
+  postReadingProgress,
   removeSeriesFromLibrary,
   setReadingStatus,
   toggleBookNotInterested,
@@ -58,6 +59,27 @@ describe('clearReadingStatus', () => {
 
     const [url, init] = callOf(fetchMock);
     expect([url, init.method]).toEqual(['/api/library/7', 'DELETE']);
+  });
+});
+
+describe('postReadingProgress', () => {
+  it('posts the payload to /books/5/reading-progress and resolves to undefined', async () => {
+    const fetchMock = mockFetch(emptyResponse(204));
+
+    await expect(
+      postReadingProgress(5, { event: 'opened', chapterId: 12 })
+    ).resolves.toBeUndefined();
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([
+      '/api/books/5/reading-progress',
+      'POST',
+    ]);
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'X-XSRF-Token': 'tok-123',
+    });
+    expect(init.body).toBe('{"event":"opened","chapterId":12}');
   });
 });
 
