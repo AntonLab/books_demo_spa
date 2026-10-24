@@ -99,20 +99,29 @@ const reader: PublicUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const SearchProbe = () => <p data-testid="search">{useLocation().search}</p>;
+
 const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
-  id = '1'
+  id = '1',
+  search = ''
 ) => {
   const queryClient = createTestQueryClient();
   if (session) seedSession(queryClient, session);
 
-  return renderWithProviders(<BookPage />, {
-    route: `/books/${id}`,
-    path: '/books/:id',
-    queryClient,
-    preloadedState,
-  });
+  return renderWithProviders(
+    <>
+      <BookPage />
+      <SearchProbe />
+    </>,
+    {
+      route: `/books/${id}${search}`,
+      path: '/books/:id',
+      queryClient,
+      preloadedState,
+    }
+  );
 };
 
 const Probe = () => {
@@ -499,9 +508,7 @@ describe('BookPage', () => {
     ).toBeInTheDocument();
     // The tab took the old section's place, heading and all.
     expect(screen.queryByRole('heading', { name: 'Chapters' })).toBeNull();
-    expect(
-      screen.getByRole('tab', { name: 'Comments (0)' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
     expect(mockedChapters.listChapters).toHaveBeenCalledWith(1);
     expect(mockedComments.listComments).toHaveBeenCalledWith(1, 0);
   });
@@ -569,12 +576,11 @@ describe('BookPage lower tabs', () => {
     pageSize: 10,
   });
 
-  it('counts the Comments from the Book and opens on them, the thread inside the tab', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 3 });
+  it('opens on the Comments tab, the thread inside it', async () => {
     renderPage();
 
     expect(
-      await screen.findByRole('tab', { name: 'Comments (3)', selected: true })
+      await screen.findByRole('tab', { name: 'Comments', selected: true })
     ).toBeInTheDocument();
     // The tab label names the region: no second "Comments" heading inside it.
     expect(screen.queryByRole('heading', { name: 'Comments' })).toBeNull();
@@ -624,18 +630,15 @@ describe('BookPage lower tabs', () => {
     expect(
       await screen.findByRole('tab', { name: 'Reading lists' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', { name: 'Comments (0)' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
   });
 
-  it('shows a Guest both lower tabs with their counts and no write controls', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
+  it('shows a Guest both lower tabs, the lists counted, and no write controls', async () => {
     mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
     renderPage();
 
     expect(
-      await screen.findByRole('tab', { name: 'Comments (2)' })
+      await screen.findByRole('tab', { name: 'Comments' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: 'Reading lists (1)' })
@@ -647,14 +650,13 @@ describe('BookPage lower tabs', () => {
   });
 
   it('names each lower tab by its label, for a regex lookup and for its panel', async () => {
-    mockedBooks.getBook.mockResolvedValue({ ...book, commentCount: 2 });
     mockedReadingLists.listReadingLists.mockResolvedValue(listsPage(1));
     renderPage();
 
     const comments = await screen.findByRole('tab', { name: /Comments/ });
-    expect(comments).toHaveAccessibleName('Comments (2)');
+    expect(comments).toHaveAccessibleName('Comments');
     expect(
-      screen.getByRole('tabpanel', { name: 'Comments (2)' })
+      screen.getByRole('tabpanel', { name: 'Comments' })
     ).toBeInTheDocument();
 
     const lists = await screen.findByRole('tab', { name: /Reading lists/ });
@@ -680,10 +682,7 @@ describe('BookPage lower tabs', () => {
     ).toBeInTheDocument();
   });
 
-  it('raises the Comments count when a Comment is posted and the Book refetches', async () => {
-    mockedBooks.getBook
-      .mockResolvedValueOnce({ ...book, commentCount: 0 })
-      .mockResolvedValue({ ...book, commentCount: 1 });
+  it('posts the typed Comment on the Book from the Comments tab', async () => {
     mockedComments.createComment.mockResolvedValue({} as never);
     renderPage(reader);
 
@@ -693,9 +692,13 @@ describe('BookPage lower tabs', () => {
     await userEvent.type(screen.getByRole('textbox'), 'Lovely');
     await userEvent.click(screen.getByRole('button', { name: 'Post' }));
 
-    expect(
-      await screen.findByRole('tab', { name: 'Comments (1)' })
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(mockedComments.createComment).toHaveBeenCalledWith({
+        bookId: 1,
+        parentId: null,
+        text: 'Lovely',
+      })
+    );
   });
 });
 
@@ -884,7 +887,7 @@ describe('BookPage on a draft', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
-      'Comments (0)',
+      'Comments',
       'Reading lists (0)',
     ]);
   });
@@ -901,6 +904,46 @@ describe('BookPage Edit button', () => {
     expect(
       within(await screen.findByRole('dialog')).getByText('Edit book')
     ).toBeInTheDocument();
+  });
+
+  it('opens the modal on load for /books/1?edit=1 for a co-author', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', '?edit=1');
+
+    expect(
+      within(await screen.findByRole('dialog')).getByText('Edit book')
+    ).toBeInTheDocument();
+  });
+
+  it.each(['?edit=0', '?edit=', '?edit=true'])('ignores %s', async (search) => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', search);
+
+    await screen.findByRole('button', { name: 'Edit' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('ignores ?edit=1 for a reader who may not edit, and for a Guest', async () => {
+    const { unmount } = renderPage(reader, undefined, '1', '?edit=1');
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    unmount();
+
+    renderPage(undefined, undefined, '1', '?edit=1');
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('sets the param on Edit and removes it on close, keeping other params', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', '?x=1');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await screen.findByRole('dialog');
+    expect(screen.getByTestId('search')).toHaveTextContent('?x=1&edit=1');
+
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/);
   });
 
   it('offers a Moderator the same Edit button, and a plain reader none', async () => {
@@ -1008,6 +1051,23 @@ describe('BookPage header and action row', () => {
     expect(screen.queryByRole('tab', { name: 'Description' })).toBeNull();
   });
 
+  it('shows no counts on Like, Favorite or the Comments tab', async () => {
+    mockedBooks.getBook.mockResolvedValue({
+      ...book,
+      likeCount: 4,
+      favoriteCount: 2,
+      commentCount: 7,
+    });
+    renderPage(reader);
+
+    const like = await screen.findByRole('button', { name: 'Like' });
+    expect(like).not.toHaveTextContent(/\d/);
+    expect(
+      screen.getByRole('button', { name: 'Add to favorites' })
+    ).not.toHaveTextContent(/\d/);
+    expect(screen.getByRole('tab', { name: 'Comments' })).toBeInTheDocument();
+  });
+
   it('lays the actions out as Like, Favorite, Library buttons, Add to reading list, Edit, then the library counts', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
     renderPage(moderator);
@@ -1091,7 +1151,7 @@ describe('BookPage tabs', () => {
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Chapters',
       'Statistics',
-      'Comments (0)',
+      'Comments',
       'Reading lists (0)',
     ]);
     expect(

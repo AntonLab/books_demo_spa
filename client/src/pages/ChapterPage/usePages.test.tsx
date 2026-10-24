@@ -249,6 +249,17 @@ describe('usePages', () => {
     expect(strip).toHaveAttribute('data-animate', 'false');
   });
 
+  it('measures again when the heading gains its chapter number', () => {
+    const { rerender } = render(
+      <Harness {...options({ heading: 'The Storm' })} />
+    );
+    measure.measureGeometry.mockClear();
+
+    rerender(<Harness {...options({ heading: 'Chapter 2. The Storm' })} />);
+
+    expect(measure.measureGeometry).toHaveBeenCalledTimes(1);
+  });
+
   it('measures again on a window resize', () => {
     render(<Harness {...options()} />);
     measure.measureGeometry.mockImplementation(() => ({

@@ -150,6 +150,23 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
   // A Chapter page opened without its Book page still counts for the Book.
   useRecordRecentlyViewed(chapter === undefined ? undefined : bookDetail);
 
+  // Navigation is derived from the chapter's position in the list rather than
+  // from an id arithmetic: chapter ids are not contiguous once one is deleted.
+  // Only chapters that are out count — a Co-author's list also carries drafts
+  // and scheduled ones, and a reader's previous/next must not lead to either.
+  const items = publishedChapters(list?.items ?? []);
+  const index = items.findIndex((item) => item.id === id);
+  const previous = index > 0 ? items[index - 1] : undefined;
+  const next =
+    index >= 0 && index < items.length - 1 ? items[index + 1] : undefined;
+  // The number appears once the list loads, which may be after the chapter.
+  const headingText =
+    chapter === undefined
+      ? undefined
+      : index >= 0
+        ? `Chapter ${index + 1}. ${chapter.title}`
+        : chapter.title;
+
   // Destructured: react-hooks/refs reads any property of an object holding
   // refs as a ref read during render.
   const {
@@ -169,6 +186,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
     enabled: pagesOn,
     chapterId: id,
     text: chapter?.text,
+    heading: headingText,
     reading,
     openOnLastPage,
   });
@@ -216,16 +234,6 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
       void navigate(location.pathname, { replace: true, state: null });
     }
   }, [openOnLastPage, location.pathname, navigate]);
-
-  // Navigation is derived from the chapter's position in the list rather than
-  // from an id arithmetic: chapter ids are not contiguous once one is deleted.
-  // Only chapters that are out count — a Co-author's list also carries drafts
-  // and scheduled ones, and a reader's previous/next must not lead to either.
-  const items = publishedChapters(list?.items ?? []);
-  const index = items.findIndex((item) => item.id === id);
-  const previous = index > 0 ? items[index - 1] : undefined;
-  const next =
-    index >= 0 && index < items.length - 1 ? items[index + 1] : undefined;
 
   // Pages: turn while a page is left, otherwise hand off to the neighbouring
   // chapter, the previous one opening on its last page.
@@ -296,6 +304,8 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
     );
   };
 
+  const heading = <Typography.Title level={2}>{headingText}</Typography.Title>;
+
   const toggleLabel = pagesOn ? 'Switch to scroll' : 'Switch to pages';
 
   return (
@@ -354,7 +364,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
                   className={`${styles.strip} ${animate ? styles.turning : ''}`}
                   style={stripStyle}
                 >
-                  <Typography.Title level={2}>{chapter.title}</Typography.Title>
+                  {heading}
                   {toParagraphs(chapter.text).map((paragraph, at) => (
                     <Typography.Paragraph key={at} className={styles.paragraph}>
                       {paragraph}
@@ -387,7 +397,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
                 lineHeight: reading.lineHeight,
               }}
             >
-              <Typography.Title level={2}>{chapter.title}</Typography.Title>
+              {heading}
 
               {/* The body is authored text, so its line breaks are content
                   rather than markup and are preserved instead of collapsed. */}

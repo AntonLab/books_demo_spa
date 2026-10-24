@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { FC } from 'react';
 import { BookReadingListsTab } from './BookReadingListsTab';
@@ -65,6 +65,30 @@ describe('BookReadingListsTab', () => {
       pageSize: 10,
     });
     expect(screen.queryByRole('list', { name: /pagination/i })).toBeNull();
+  });
+
+  it('lays the lists out as a focusable scrolling row, one slide per card', async () => {
+    mocked.listReadingLists.mockResolvedValue(
+      page([list(4, 'Cold nights'), list(5, 'Warm days')], 2)
+    );
+    renderWithProviders(<Probe />);
+
+    const row = await screen.findByRole('list', { name: 'reading lists' });
+    expect(row).toHaveAttribute('tabindex', '0');
+    expect(within(row).getAllByRole('listitem')).toHaveLength(2);
+    expect(
+      within(row).getByRole('link', { name: 'Warm days' })
+    ).toHaveAttribute('href', '/lists/5');
+  });
+
+  it('keeps pagination under the row when more lists than one page', async () => {
+    mocked.listReadingLists.mockResolvedValue(
+      page([list(4, 'Cold nights')], 25)
+    );
+    renderWithProviders(<Probe />);
+
+    await screen.findByRole('list', { name: 'reading lists' });
+    expect(await screen.findByTitle('2')).toBeInTheDocument();
   });
 
   it('says so when no list holds the Book', async () => {

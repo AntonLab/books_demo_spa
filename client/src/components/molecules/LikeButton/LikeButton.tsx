@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 
 interface LikeButtonProps {
-  count: number;
+  count?: number;
   // The viewer's own like row, straight from viewerLikeId: null means they have
   // not liked this. Passing it back out on click is what lets the caller delete
   // the right row without a second lookup.
@@ -30,7 +30,8 @@ export const LikeButton: FC<LikeButtonProps> = ({
     >
       {/* aria-pressed and the label carry the state for a screen reader, so
           the glyph is decorative. */}
-      <span aria-hidden="true">{liked ? '♥' : '♡'}</span> {count}
+      <span aria-hidden="true">{liked ? '♥' : '♡'}</span>
+      {count !== undefined && <> {count}</>}
     </IconButton>
   );
 };
