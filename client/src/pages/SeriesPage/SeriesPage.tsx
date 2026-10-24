@@ -68,7 +68,13 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   return (
     <>
       <SeriesCard series={series.data} />
-      <Flex justify="end" align="center" gap="middle" className={styles.bar}>
+      <Flex
+        justify="end"
+        align="center"
+        wrap
+        gap="middle"
+        className={styles.bar}
+      >
         {/* A series has no statistics tab, so the button is the only place
             its Favorites count shows. */}
         {mayFavorite && (
