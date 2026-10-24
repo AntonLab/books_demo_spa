@@ -4,6 +4,7 @@ import { libraryRepositoryContract } from './libraryRepository.contract.testkit.
 import {
   aLibraryBook,
   createFakeLibraryRepository,
+  type FakeLibraryRepositoryOptions,
 } from './libraryRepository.fake.testkit.ts';
 
 // The fake the route specs run on, held to the contract the MySQL spec runs
@@ -14,6 +15,7 @@ describe('the fake libraryRepository', () => {
     const books = new Map<number, PublicBook>();
 
     const series = new Map<number, { authorIds: number[] }>();
+    const chapters: NonNullable<FakeLibraryRepositoryOptions['chapters']> = [];
 
     const addBook = (
       authorIds: number[],
@@ -26,7 +28,26 @@ describe('the fake libraryRepository', () => {
     };
 
     return {
-      repository: createFakeLibraryRepository({ accounts, books, series }),
+      repository: createFakeLibraryRepository({
+        accounts,
+        books,
+        series,
+        chapters,
+      }),
+      async aChapter(bookId, { published }) {
+        const id = chapters.length + 1;
+        chapters.push({
+          id,
+          bookId,
+          position: chapters.filter((c) => c.bookId === bookId).length + 1,
+          publishedAt: published ? new Date(0) : null,
+        });
+        return id;
+      },
+      async setComplete(bookId) {
+        const book = books.get(bookId);
+        if (book) books.set(bookId, { ...book, status: 'complete' });
+      },
       async aSeries(coAuthorIds) {
         const id = series.size + 1;
         series.set(id, { authorIds: coAuthorIds });

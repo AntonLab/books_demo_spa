@@ -16,6 +16,13 @@ export interface FakeLibraryRepositoryOptions {
   // The Series that exist; a Book's `seriesId` links it. Every one is visible
   // here, as the fake knows no Series visibility rule.
   series?: Map<number, { authorIds: number[] }>;
+  // The Chapters that exist; a null `publishedAt` is not Published.
+  chapters?: Array<{
+    id: number;
+    bookId: number;
+    position: number;
+    publishedAt: Date | null;
+  }>;
   // Library entries already there, in insertion order.
   seed?: Array<{
     userId: number;
@@ -28,13 +35,23 @@ export interface FakeLibraryRepositoryOptions {
 // A minimal PublicBook for a fake's seeds, credited to `authorIds`.
 export function aLibraryBook(
   id: number,
-  options: { draft?: boolean; authorIds?: number[]; seriesId?: number } = {}
+  options: {
+    draft?: boolean;
+    complete?: boolean;
+    authorIds?: number[];
+    seriesId?: number;
+  } = {}
 ): PublicBook {
-  const { draft = false, authorIds = [], seriesId = null } = options;
+  const {
+    draft = false,
+    complete = false,
+    authorIds = [],
+    seriesId = null,
+  } = options;
   return {
     ...aPublicBook(id),
     seriesId,
-    status: draft ? 'draft' : 'in_progress',
+    status: draft ? 'draft' : complete ? 'complete' : 'in_progress',
     authors: authorIds.map((authorId) => ({
       id: authorId,
       login: `author${authorId}`,
@@ -55,6 +72,7 @@ export function createFakeLibraryRepository(
     accounts = new Set<number>(),
     books = new Map<number, PublicBook>(),
     series = new Map<number, { authorIds: number[] }>(),
+    chapters = [],
     seed = [],
   } = options;
   // Keyed by "userId:bookId"; a Map keeps insertion order for ties.
@@ -221,6 +239,43 @@ export function createFakeLibraryRepository(
       );
       drop(holdableIn(seriesId, account), account);
       return seriesStateOf(seriesId, account);
+    },
+
+    async recordProgress(bookId, input, account) {
+      assertMayHold(
+        bookId,
+        account,
+        'You cannot track reading progress on your own work'
+      );
+      const now = Date.now();
+      const published = chapters
+        .filter(
+          (chapter) =>
+            chapter.bookId === bookId &&
+            chapter.publishedAt !== null &&
+            chapter.publishedAt.getTime() <= now
+        )
+        .sort((a, b) => b.position - a.position || b.id - a.id);
+      if (!published.some((chapter) => chapter.id === input.chapterId)) {
+        throw new NotFoundError('Chapter', input.chapterId);
+      }
+      const status = statusOf(bookId, account);
+      if (input.event === 'opened') {
+        if (
+          status === undefined ||
+          status === 'plan_to_read' ||
+          status === 'not_interested'
+        ) {
+          save(bookId, 'reading', account);
+        }
+        return;
+      }
+      if (
+        books.get(bookId)?.status === 'complete' &&
+        published[0]?.id === input.chapterId
+      ) {
+        save(bookId, 'read', account);
+      }
     },
 
     async list(query, account) {

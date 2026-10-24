@@ -8,6 +8,7 @@ import type {
 } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { LibraryEntry, toPublicLibraryEntry } from '../models/LibraryEntry.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
@@ -16,7 +17,10 @@ import {
   NotFoundError,
   StateConflictError,
 } from '../types/errors.ts';
-import type { ListLibraryQuery } from '../types/library.ts';
+import type {
+  ListLibraryQuery,
+  ReadingProgressInput,
+} from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
 import { joined } from './joined.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
@@ -63,6 +67,16 @@ export interface LibraryRepository {
   ): Promise<SeriesLibraryState>;
   // Deletes the entries of all of them, whatever the status.
   clearSeries(seriesId: number, account: Account): Promise<SeriesLibraryState>;
+  // A reader opened or finished a Chapter. The Book is checked like `addBook`
+  // (404 Book, then 403 Co-author), then the Chapter must be a Published one of
+  // this Book (404 Chapter). opened: none, Plan to read and Not interested
+  // become Reading. finished: on the last Published Chapter of a Complete Book
+  // the status becomes Read, anywhere else nothing happens. Never lowers.
+  recordProgress(
+    bookId: number,
+    input: ReadingProgressInput,
+    account: Account
+  ): Promise<void>;
   // Newest change first, Published Books only; without a status filter, Not
   // interested entries are left out.
   list(
@@ -351,6 +365,52 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
           });
         }
       );
+    },
+
+    async recordProgress(bookId, input, account) {
+      await assertMayHold(
+        bookId,
+        account,
+        'You cannot track reading progress on your own work'
+      );
+      const published = {
+        bookId,
+        publishedAt: { [Op.lte]: new Date() },
+      };
+      const chapter = await Chapter.findOne({
+        where: { id: input.chapterId, ...published },
+        attributes: ['id'],
+      });
+      if (!chapter) throw new NotFoundError('Chapter', input.chapterId);
+
+      if (input.event === 'opened') {
+        // Conditional statements, as in `addBook`: a concurrent `set` or
+        // `finished` is never lowered to reading.
+        await insertIfAbsent(bookId, 'reading', account);
+        await LibraryEntry.update(
+          { status: 'reading', updatedAt: new Date() },
+          {
+            where: {
+              ...ownedBy(bookId, account),
+              status: { [Op.in]: ['plan_to_read', 'not_interested'] },
+            },
+          }
+        );
+        return;
+      }
+
+      const last = await Chapter.findOne({
+        where: published,
+        order: [
+          ['position', 'DESC'],
+          ['id', 'DESC'],
+        ],
+        attributes: ['id'],
+      });
+      const book = await Book.findByPk(bookId, { attributes: ['status'] });
+      if (book?.status === 'complete' && last?.id === input.chapterId) {
+        await save(bookId, 'read', account);
+      }
     },
 
     async list(query, account) {

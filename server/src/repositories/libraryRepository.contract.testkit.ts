@@ -32,6 +32,11 @@ export interface LibraryRepositoryContractWorld {
   aDraftBook(coAuthorIds: [number, ...number[]]): Promise<number>;
   // Turns a Book into a Draft, or back to Published.
   setDraft(bookId: number, draft: boolean): Promise<void>;
+  // A Chapter of the Book exists, Published or not; positions ascend in call
+  // order. Answers its id.
+  aChapter(bookId: number, options: { published: boolean }): Promise<number>;
+  // Turns a Book into a Complete one.
+  setComplete(bookId: number): Promise<void>;
   // A Series credited to these accounts exists; answers its id.
   aSeries(coAuthorIds: [number, ...number[]]): Promise<number>;
   // A Book filed in that Series, credited to these accounts; answers its id.
@@ -457,6 +462,141 @@ export function libraryRepositoryContract(
       repository.addSeries(seriesId, me),
     ]);
     assert.equal(await statusOf(repository, me, books[0]!), 'reading');
+  });
+
+  // A Complete Book with Published Chapters `first` and `last`, then an
+  // unpublished one.
+  async function arrangeProgress() {
+    const world = await arrange();
+    const book = world.books[0]!;
+    const first = await world.aChapter(book, { published: true });
+    const last = await world.aChapter(book, { published: true });
+    const hidden = await world.aChapter(book, { published: false });
+    await world.setComplete(book);
+    return { ...world, book, first, last, hidden };
+  }
+
+  test('contract: recordProgress opened moves none, plan_to_read and not_interested to reading, and leaves reading and read', async () => {
+    const world = await arrange(5);
+    const { repository, me, books } = world;
+    await repository.set(books[1]!, 'plan_to_read', me);
+    await repository.set(books[2]!, 'not_interested', me);
+    await repository.set(books[3]!, 'reading', me);
+    await repository.set(books[4]!, 'read', me);
+    for (const id of books) {
+      const chapterId = await world.aChapter(id, { published: true });
+      await repository.recordProgress(id, { event: 'opened', chapterId }, me);
+    }
+    const statuses = [];
+    for (const id of books) statuses.push(await statusOf(repository, me, id));
+    assert.deepEqual(statuses, [
+      'reading',
+      'reading',
+      'reading',
+      'reading',
+      'read',
+    ]);
+  });
+
+  test('contract: recordProgress finished sets read on the last Published Chapter of a Complete Book only', async () => {
+    const { repository, me, book, first, last, hidden } =
+      await arrangeProgress();
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: first },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), undefined);
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: last },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), 'read');
+    await assert.rejects(
+      repository.recordProgress(
+        book,
+        { event: 'finished', chapterId: hidden },
+        me
+      ),
+      new NotFoundError('Chapter', hidden)
+    );
+  });
+
+  test('contract: recordProgress finished does nothing on a Book that is not Complete', async () => {
+    const world = await arrange();
+    const book = world.books[0]!;
+    const chapterId = await world.aChapter(book, { published: true });
+    await world.repository.recordProgress(
+      book,
+      { event: 'finished', chapterId },
+      world.me
+    );
+    assert.equal(await statusOf(world.repository, world.me, book), undefined);
+  });
+
+  test('contract: recordProgress never lowers read', async () => {
+    const { repository, me, book, first } = await arrangeProgress();
+    await repository.set(book, 'read', me);
+    await repository.recordProgress(
+      book,
+      { event: 'opened', chapterId: first },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), 'read');
+  });
+
+  test('contract: recordProgress opened never lowers a status set at the same moment', async () => {
+    const { repository, me, book, first } = await arrangeProgress();
+    await Promise.all([
+      repository.set(book, 'read', me),
+      repository.recordProgress(
+        book,
+        { event: 'opened', chapterId: first },
+        me
+      ),
+    ]);
+    assert.equal(await statusOf(repository, me, book), 'read');
+  });
+
+  test('contract: recordProgress refuses a Chapter of another Book, the Co-author, a missing Book and a Draft', async () => {
+    const world = await arrangeProgress();
+    const { repository, me, author, book, first } = world;
+    const other = await world.aBook([author.id]);
+    const otherChapter = await world.aChapter(other, { published: true });
+    await assert.rejects(
+      repository.recordProgress(
+        book,
+        { event: 'opened', chapterId: otherChapter },
+        me
+      ),
+      new NotFoundError('Chapter', otherChapter)
+    );
+    await assert.rejects(
+      repository.recordProgress(
+        book,
+        { event: 'opened', chapterId: otherChapter },
+        author
+      ),
+      new ForbiddenError('You cannot track reading progress on your own work')
+    );
+    await assert.rejects(
+      repository.recordProgress(
+        MISSING_ID,
+        { event: 'opened', chapterId: first },
+        me
+      ),
+      new NotFoundError('Book', MISSING_ID)
+    );
+    const draft = await world.aDraftBook([author.id]);
+    await assert.rejects(
+      repository.recordProgress(
+        draft,
+        { event: 'opened', chapterId: first },
+        me
+      ),
+      new NotFoundError('Book', draft)
+    );
   });
 
   test('contract: a Book no longer Published leaves list and total, and returns with its status', async () => {

@@ -9,6 +9,7 @@ import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { User } from '../models/User.ts';
 import { Series } from '../models/Series.ts';
@@ -190,6 +191,23 @@ describe('libraryRepository against real MySQL', { skip }, () => {
         coAuthorIds
       );
       return book.id;
+    },
+    async aChapter(bookId, { published }) {
+      const position =
+        ((await Chapter.max<number, Chapter>('position', {
+          where: { bookId },
+        })) ?? 0) + 1;
+      const chapter = await Chapter.create({
+        bookId,
+        title: `Contract Chapter ${position}`,
+        text: 'x',
+        position,
+        publishedAt: published ? new Date(Date.now() - 1000) : null,
+      });
+      return chapter.id;
+    },
+    async setComplete(bookId) {
+      await Book.update({ status: 'complete' }, { where: { id: bookId } });
     },
     async setDraft(bookId, draft) {
       await Book.update(

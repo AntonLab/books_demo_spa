@@ -9,6 +9,17 @@ export const READING_STATUSES = [
 ] as const;
 export type ReadingStatus = (typeof READING_STATUSES)[number];
 
+// What a reader's client reports to POST /api/books/:id/reading-progress.
+export const READING_PROGRESS_EVENTS = ['opened', 'finished'] as const;
+export type ReadingProgressEvent = (typeof READING_PROGRESS_EVENTS)[number];
+
+// The body of POST /api/books/:id/reading-progress: `chapterId` is the Chapter
+// that was opened or finished.
+export interface ReadingProgressPayload {
+  event: ReadingProgressEvent;
+  chapterId: number;
+}
+
 // What PUT /api/library/:bookId returns: one Library entry (CONTEXT.md).
 export interface PublicLibraryEntry {
   bookId: number;

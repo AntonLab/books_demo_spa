@@ -8,6 +8,7 @@ import type { LibraryRepository } from '../repositories/libraryRepository.ts';
 import { actorOf } from '../repositories/visibility.ts';
 import type {
   ListLibraryQuery,
+  ReadingProgressInput,
   SetReadingStatusInput,
 } from '../types/library.ts';
 
@@ -51,6 +52,13 @@ export function createLibraryController(repository: LibraryRepository) {
     clearSeries: async (req, res) => {
       const { seriesId } = validatedParams<{ seriesId: number }>(req);
       res.json(await repository.clearSeries(seriesId, actorOf(req)));
+    },
+
+    recordProgress: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const input = validatedBody<ReadingProgressInput>(req);
+      await repository.recordProgress(id, input, actorOf(req));
+      res.status(204).end();
     },
 
     list: async (req, res) => {

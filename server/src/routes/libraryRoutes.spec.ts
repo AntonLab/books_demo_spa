@@ -607,6 +607,216 @@ test('a Co-author of the Series gets 403; a missing Series gets 404; a Guest 401
   );
 });
 
+const COMPLETE_ID = 60;
+const IN_PROGRESS_ID = 61;
+const CREDITED_ID = 62;
+const FIRST_CHAPTER = 601;
+const LAST_PUBLISHED_CHAPTER = 602;
+const UNPUBLISHED_CHAPTER = 603;
+const IN_PROGRESS_CHAPTER = 611;
+const CREDITED_CHAPTER = 621;
+
+// Book 60 is Complete: Chapters 601 and 602 are Published, 603 is not.
+function progressRepository(seed: ReadingSeed[] = []) {
+  const chapter = (
+    id: number,
+    bookId: number,
+    position: number,
+    published = true
+  ) => ({
+    id,
+    bookId,
+    position,
+    publishedAt: published ? new Date(0) : null,
+  });
+  return createFakeLibraryRepository({
+    accounts: new Set(Object.values(USER_IDS)),
+    books: new Map([
+      [COMPLETE_ID, aLibraryBook(COMPLETE_ID, { complete: true })],
+      [IN_PROGRESS_ID, aLibraryBook(IN_PROGRESS_ID)],
+      [
+        CREDITED_ID,
+        aLibraryBook(CREDITED_ID, { authorIds: [USER_IDS.author] }),
+      ],
+      [63, aLibraryBook(63)],
+      [64, aLibraryBook(64)],
+      [65, aLibraryBook(65)],
+    ]),
+    chapters: [
+      chapter(FIRST_CHAPTER, COMPLETE_ID, 1),
+      chapter(LAST_PUBLISHED_CHAPTER, COMPLETE_ID, 2),
+      chapter(UNPUBLISHED_CHAPTER, COMPLETE_ID, 3, false),
+      chapter(IN_PROGRESS_CHAPTER, IN_PROGRESS_ID, 1),
+      chapter(CREDITED_CHAPTER, CREDITED_ID, 1),
+      chapter(631, 63, 1),
+      chapter(641, 64, 1),
+      chapter(651, 65, 1),
+    ],
+    seed,
+  });
+}
+
+const progress = (
+  base: string,
+  cookie: string,
+  bookId: number | string,
+  body: unknown
+) =>
+  fetch(`${base}/api/books/${bookId}/reading-progress`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', cookie },
+    body: JSON.stringify(body),
+  });
+
+test('opened moves none, plan_to_read and not_interested to reading, and leaves reading and read', async () => {
+  await withAuthenticatedApp(
+    {
+      libraryRepository: progressRepository([
+        seedFor(63, 'plan_to_read'),
+        seedFor(64, 'not_interested'),
+        seedFor(65, 'read'),
+      ]),
+    },
+    async (base) => {
+      const cookie = ROLE_COOKIES.user;
+      for (const [bookId, chapterId] of [
+        [IN_PROGRESS_ID, IN_PROGRESS_CHAPTER],
+        [63, 631],
+        [64, 641],
+        [65, 651],
+      ] as const) {
+        const res = await progress(base, cookie, bookId, {
+          event: 'opened',
+          chapterId,
+        });
+        assert.equal(res.status, 204);
+      }
+      assert.deepEqual(await statusesOf(base, cookie), {
+        [IN_PROGRESS_ID]: 'reading',
+        63: 'reading',
+        64: 'reading',
+        65: 'read',
+      });
+    }
+  );
+});
+
+test('finished sets read only on the last Published Chapter of a Complete Book', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository() },
+    async (base) => {
+      const cookie = ROLE_COOKIES.user;
+      for (let i = 0; i < 2; i += 1) {
+        const res = await progress(base, cookie, COMPLETE_ID, {
+          event: 'finished',
+          chapterId: LAST_PUBLISHED_CHAPTER,
+        });
+        assert.equal(res.status, 204);
+        assert.deepEqual(await statusesOf(base, cookie), {
+          [COMPLETE_ID]: 'read',
+        });
+      }
+    }
+  );
+});
+
+test('finished is a no-op on a Chapter that is not the last Published one, and on a Book that is not Complete', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository() },
+    async (base) => {
+      const cookie = ROLE_COOKIES.user;
+      const first = await progress(base, cookie, COMPLETE_ID, {
+        event: 'finished',
+        chapterId: FIRST_CHAPTER,
+      });
+      const open = await progress(base, cookie, IN_PROGRESS_ID, {
+        event: 'finished',
+        chapterId: IN_PROGRESS_CHAPTER,
+      });
+      assert.deepEqual([first.status, open.status], [204, 204]);
+      assert.deepEqual(await statusesOf(base, cookie), {});
+    }
+  );
+});
+
+test('finished does not lower read to anything', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository([seedFor(COMPLETE_ID, 'read')]) },
+    async (base) => {
+      const res = await progress(base, ROLE_COOKIES.user, COMPLETE_ID, {
+        event: 'opened',
+        chapterId: FIRST_CHAPTER,
+      });
+      assert.equal(res.status, 204);
+      assert.deepEqual(await statusesOf(base, ROLE_COOKIES.user), {
+        [COMPLETE_ID]: 'read',
+      });
+    }
+  );
+});
+
+test('a Chapter of another Book, or an unpublished Chapter, is 404', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository() },
+    async (base) => {
+      for (const chapterId of [IN_PROGRESS_CHAPTER, UNPUBLISHED_CHAPTER]) {
+        const res = await progress(base, ROLE_COOKIES.user, COMPLETE_ID, {
+          event: 'opened',
+          chapterId,
+        });
+        assert.equal(res.status, 404);
+      }
+    }
+  );
+});
+
+test('reading progress: Guest 401, Co-author 403, unreadable Book 404, bad event or missing chapterId 400', async () => {
+  const body = { event: 'opened', chapterId: FIRST_CHAPTER };
+  await withApp({ libraryRepository: progressRepository() }, async (base) => {
+    assert.equal((await progress(base, '', COMPLETE_ID, body)).status, 401);
+  });
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository() },
+    async (base) => {
+      const as = (cookie: string, id: number | string, payload: unknown) =>
+        progress(base, cookie, id, payload).then((res) => res.status);
+      assert.equal(
+        await as(ROLE_COOKIES.author, CREDITED_ID, {
+          event: 'opened',
+          chapterId: CREDITED_CHAPTER,
+        }),
+        403
+      );
+      assert.equal(await as(ROLE_COOKIES.user, MISSING_ID, body), 404);
+      assert.equal(
+        await as(ROLE_COOKIES.user, COMPLETE_ID, {
+          event: 'closed',
+          chapterId: FIRST_CHAPTER,
+        }),
+        400
+      );
+      assert.equal(
+        await as(ROLE_COOKIES.user, COMPLETE_ID, { event: 'opened' }),
+        400
+      );
+      assert.equal(await as(ROLE_COOKIES.user, 'abc', body), 400);
+    }
+  );
+});
+
+test('the Co-author check runs before the Chapter check', async () => {
+  await withAuthenticatedApp(
+    { libraryRepository: progressRepository() },
+    async (base) => {
+      const res = await progress(base, ROLE_COOKIES.author, CREDITED_ID, {
+        event: 'opened',
+        chapterId: IN_PROGRESS_CHAPTER,
+      });
+      assert.equal(res.status, 403);
+    }
+  );
+});
+
 // The guard runs before validate, as for favorites: a Guest never gets a 400.
 test('every library route is a 401 without a session', async () => {
   await withApp({ libraryRepository: fakeRepository() }, async (base) => {
