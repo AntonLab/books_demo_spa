@@ -1,4 +1,5 @@
-import { act } from '@testing-library/react';
+import { act, waitFor } from '@testing-library/react';
+import { useQuery } from '@tanstack/react-query';
 import {
   useBookLibraryActions,
   useReadingProgressMutation,
@@ -40,12 +41,41 @@ describe('useSeriesLibraryActions', () => {
 });
 
 describe('useReadingProgressMutation', () => {
-  it('refreshes only the Book and the Library after an opened event', async () => {
+  it.each(['opened', 'finished'] as const)(
+    'refreshes the books, the Series and the Library after %s',
+    async (event) => {
+      mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
+      const { result, queryClient } = renderHookWithProviders(() =>
+        useReadingProgressMutation()
+      );
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+      await act(() =>
+        result.current.mutateAsync({
+          bookId: 7,
+          payload: { event, chapterId: 3 },
+        })
+      );
+
+      expect(invalidate).toHaveBeenCalledTimes(3);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allSeries,
+      });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allLibrary,
+      });
+    }
+  );
+
+  it('refetches a mounted book list after opened lifts a not_interested Book', async () => {
     mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
-    const { result, queryClient } = renderHookWithProviders(() =>
-      useReadingProgressMutation()
-    );
-    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+    const queryFn = jest.fn().mockResolvedValue([]);
+    const { result, queryClient } = renderHookWithProviders(() => {
+      useQuery({ queryKey: ['books', { sort: 'rating' }], queryFn });
+      return useReadingProgressMutation();
+    });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
 
     await act(() =>
       result.current.mutateAsync({
@@ -54,32 +84,8 @@ describe('useReadingProgressMutation', () => {
       })
     );
 
-    expect(invalidate).toHaveBeenCalledTimes(2);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.book(7) });
-    expect(invalidate).toHaveBeenCalledWith({
-      queryKey: queryKeys.allLibrary,
-    });
-  });
-
-  it('refreshes every book list and the Library after a finished event', async () => {
-    mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
-    const { result, queryClient } = renderHookWithProviders(() =>
-      useReadingProgressMutation()
-    );
-    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
-
-    await act(() =>
-      result.current.mutateAsync({
-        bookId: 7,
-        payload: { event: 'finished', chapterId: 3 },
-      })
-    );
-
-    expect(invalidate).toHaveBeenCalledTimes(2);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
-    expect(invalidate).toHaveBeenCalledWith({
-      queryKey: queryKeys.allLibrary,
-    });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
+    expect(queryClient.isFetching()).toBe(0);
   });
 });
 
