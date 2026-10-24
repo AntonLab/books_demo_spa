@@ -589,6 +589,6 @@ describe('App', () => {
     expect(
       await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Search books')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
   });
 });

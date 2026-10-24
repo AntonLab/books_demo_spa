@@ -117,14 +117,40 @@ describe('AppHeader navigation', () => {
     expect(screen.queryByRole('menuitem', { name: 'My works' })).toBeNull();
   });
 
-  it('shows a decorative header image before the navigation', async () => {
+  it('wraps the decorative logo in a Home link to /', async () => {
     const { container } = await renderHeader(<AppHeader />, withSession(null));
-    const image = container.querySelector('header img');
+    const link = screen.getByRole('link', { name: 'Home' });
+    expect(link).toHaveAttribute('href', '/');
+    const image = link.querySelector('img');
     expect(image).toHaveAttribute('alt', '');
     expect(image?.getAttribute('src')).toMatch(/header\.svg$/);
-    expect(image?.nextElementSibling).toBe(
+    expect(link.nextElementSibling).toBe(
       container.querySelector('header .ant-menu')
     );
+  });
+
+  it('keeps the Home menu item beside the logo link', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
+  });
+
+  it('shows a Search icon button, not the search field', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Search books')).toBeNull();
+    expect(screen.queryByRole('combobox')).toBeNull();
+  });
+
+  it('goes to /search when the Search button is clicked', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      { ...withSession(null), route: '/books/1' }
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/search$/);
   });
 });
 
@@ -925,6 +951,11 @@ describe('AppHeader on a phone', () => {
   });
   afterEach(() => {
     window.matchMedia = original;
+  });
+
+  it('keeps the Search button', async () => {
+    await renderHeader(<AppHeader />, withSession(null));
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
   });
 
   it('shows only the Avatar on the user button, named by the login', async () => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FC } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MenuOutlined } from '@ant-design/icons';
+import { MenuOutlined, SearchOutlined } from '@ant-design/icons';
 import { Button, Dropdown, Grid, Layout, Menu, Skeleton, Space } from 'antd';
 import { queryKeys } from '@/queries/keys';
 import type { LoginReturnState } from '@/hooks/usePageGuard';
@@ -16,7 +16,6 @@ import { buildGenreTree } from '@/types/genreTree';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { useSignOut } from '@/store/useUnsavedText';
-import { SearchBar } from '@/components/organisms/SearchBar/SearchBar';
 import { AccountAvatar } from '@/components/molecules/AccountAvatar/AccountAvatar';
 import { AuthModals } from '@/components/organisms/AuthModals/AuthModals';
 import type { AuthModalName } from '@/components/organisms/AuthModals/AuthModals';
@@ -154,7 +153,9 @@ export const AppHeader: FC = () => {
 
   return (
     <Layout.Header className={styles.header}>
-      <img src={headerImage} alt="" className={styles.logo} />
+      <Link to="/" aria-label="Home" className={styles.logoLink}>
+        <img src={headerImage} alt="" className={styles.logo} />
+      </Link>
       {/* Two props the submenu needs:
           - `disabledOverflow`: rc-menu puts every child past the first into an
             overflowDisabled context unless this is set, and such a SubMenu
@@ -197,9 +198,13 @@ export const AppHeader: FC = () => {
         />
       )}
 
-      <div className={styles.search}>
-        <SearchBar />
-      </div>
+      <IconButton
+        type="text"
+        className={`${styles.onDark} ${styles.searchButton}`}
+        label="Search"
+        icon={<SearchOutlined />}
+        onClick={() => void navigate('/search')}
+      />
 
       {/* Offered to everyone, Guests included: a Device preference belongs
           to the device, not to an Account. The header itself stays dark in
