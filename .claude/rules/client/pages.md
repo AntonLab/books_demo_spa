@@ -91,17 +91,18 @@ Routing and the App shell: `routing.md`.
   a fixed height (`appBookTabsHeight`, sized to Statistics at desktop width)
   and scrolls, so switching tabs never moves the comments; it is styled
   through Tabs' `classNames.body`, never a `:global` selector that would
-  reach a Tabs nested inside a panel. The public chapter list, its Statistics and the reader's previous/next show only
-  published chapters (`publishedChapters`), even to a Co-author. A chapter's
-  number is its place in that list, derived on the client; it shows in the
-  Chapters list, the reader's Contents drawer and `ChapterPage`'s heading
-  (`Chapter <n>. <title>`, bare title for a chapter outside the list), never
-  in the editor's `SortableList`. Statistics
-  takes Chapters, Release time and Last update from that same list (earliest
-  and latest Publication time, not first and last in Reading order) and
-  follows its pending and error states; Words, Likes, Favorites and Comments
-  come from `BookDetail`. Likes, Favorites and Comments counts show only
-  here: the Like and Favorite buttons and the Comments tab carry none.
+  reach a Tabs nested inside a panel. The public chapter list, its
+  Statistics and the reader's previous/next show only published chapters
+  (`publishedChapters`), even to a Co-author. A chapter's number is its place
+  in that list, derived on the client; it shows in the Chapters list, the
+  reader's Contents drawer and `ChapterPage`'s heading (`Chapter <n>. <title>`,
+  bare title for a chapter outside the list), never in the editor's
+  `SortableList`. Statistics takes Chapters, Release time and Last update from
+  that same list (earliest and latest Publication time, not first and last in
+  Reading order) and follows its pending and error states; Words, Likes,
+  Favorites and Comments come from `BookDetail`. Likes, Favorites and Comments
+  counts show only here: the Like and Favorite buttons and the Comments tab
+  carry none.
   The Edit modal's open state is the `?edit=1` param on `/books/:id` (a viewer
   without `mayEdit` ignores it); the profile works list's book Edit links there.
 - `usePageClamp` redirects a page past the end, with `replace`, to the last
