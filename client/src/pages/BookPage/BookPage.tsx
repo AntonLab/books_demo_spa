@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { FC } from 'react';
 import {
   CommentOutlined,
@@ -6,7 +5,7 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BOOK_GONE } from '@/constants/goneMessages';
 import { isId } from '@/types/id';
@@ -57,7 +56,19 @@ export const BookPage: FC = () => {
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState(false);
+  // The Edit modal's open state is the `?edit=1` param, so a link can open it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editing = searchParams.get('edit') === '1';
+  const setEditing = (open: boolean) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (open) next.set('edit', '1');
+        else next.delete('edit');
+        return next;
+      },
+      { replace: true }
+    );
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
@@ -239,7 +250,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         ]}
       />
 
-      {editing && (
+      {editing && mayEdit && (
         <BookEditDetailsModal
           bookId={bookId}
           onClose={() => setEditing(false)}

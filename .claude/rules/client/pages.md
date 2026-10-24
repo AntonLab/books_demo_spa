@@ -104,6 +104,8 @@ Routing and the App shell: `routing.md`.
   follows its pending and error states; Words, Likes, Favorites and Comments
   come from `BookDetail`. Likes, Favorites and Comments counts show only
   here: the Like and Favorite buttons and the Comments tab carry none.
+  The Edit modal's open state is the `?edit=1` param on `/books/:id` (a viewer
+  without `mayEdit` ignores it); the profile works list's book Edit links there.
 - `usePageClamp` redirects a page past the end, with `replace`, to the last
   page of the true `total`. A books page past the end is served as the last
   non-empty page and a series page comes back empty, both with the true

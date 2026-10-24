@@ -99,20 +99,29 @@ const reader: PublicUser = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+const SearchProbe = () => <p data-testid="search">{useLocation().search}</p>;
+
 const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
-  id = '1'
+  id = '1',
+  search = ''
 ) => {
   const queryClient = createTestQueryClient();
   if (session) seedSession(queryClient, session);
 
-  return renderWithProviders(<BookPage />, {
-    route: `/books/${id}`,
-    path: '/books/:id',
-    queryClient,
-    preloadedState,
-  });
+  return renderWithProviders(
+    <>
+      <BookPage />
+      <SearchProbe />
+    </>,
+    {
+      route: `/books/${id}${search}`,
+      path: '/books/:id',
+      queryClient,
+      preloadedState,
+    }
+  );
 };
 
 const Probe = () => {
@@ -897,6 +906,46 @@ describe('BookPage Edit button', () => {
     expect(
       within(await screen.findByRole('dialog')).getByText('Edit book')
     ).toBeInTheDocument();
+  });
+
+  it('opens the modal on load for /books/1?edit=1 for a co-author', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', '?edit=1');
+
+    expect(
+      within(await screen.findByRole('dialog')).getByText('Edit book')
+    ).toBeInTheDocument();
+  });
+
+  it.each(['?edit=0', '?edit=', '?edit=true'])('ignores %s', async (search) => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', search);
+
+    await screen.findByRole('button', { name: 'Edit' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('ignores ?edit=1 for a reader who may not edit, and for a Guest', async () => {
+    const { unmount } = renderPage(reader, undefined, '1', '?edit=1');
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    unmount();
+
+    renderPage(undefined, undefined, '1', '?edit=1');
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('sets the param on Edit and removes it on close, keeping other params', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' }, undefined, '1', '?x=1');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await screen.findByRole('dialog');
+    expect(screen.getByTestId('search')).toHaveTextContent('?x=1&edit=1');
+
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Close' })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/);
   });
 
   it('offers a Moderator the same Edit button, and a plain reader none', async () => {
