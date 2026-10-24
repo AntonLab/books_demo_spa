@@ -28,6 +28,7 @@ const Harness: FC<UsePagesOptions> = (options) => {
     pageCount,
     perView,
     trailingSpace,
+    ready,
     turn,
   } = usePages(options);
   return (
@@ -41,6 +42,7 @@ const Harness: FC<UsePagesOptions> = (options) => {
       />
       <p>{pageIndicator(start, pageCount, perView)}</p>
       <output>{trailingSpace}</output>
+      <p>{ready ? 'Counted' : 'Not counted'}</p>
       <button type="button" onClick={() => turn('previous')}>
         Back
       </button>
@@ -160,6 +162,29 @@ describe('usePages', () => {
     expect(screen.getByTestId('strip')).toHaveStyle({
       transform: 'translateX(-1064px)',
     });
+  });
+
+  it('is ready once the pages are counted', () => {
+    render(<Harness {...options()} />);
+
+    expect(screen.getByText('Counted')).toBeInTheDocument();
+  });
+
+  it('is not ready while nothing is measured', () => {
+    render(<Harness {...options({ enabled: false })} />);
+
+    expect(screen.getByText('Not counted')).toBeInTheDocument();
+  });
+
+  it('opens a spread on pages N-1 and N of an even count', () => {
+    measure.measureGeometry.mockImplementation(() => ({
+      ...GEOMETRY,
+      perView: 2,
+    }));
+    measure.countPages.mockReturnValue(4);
+    render(<Harness {...options({ openOnLastPage: true })} />);
+
+    expect(screen.getByText('Pages 3–4 of 4')).toBeInTheDocument();
   });
 
   it('opens on the last page, without sliding, when asked', () => {
