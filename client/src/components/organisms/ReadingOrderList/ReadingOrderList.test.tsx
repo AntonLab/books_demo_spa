@@ -6,7 +6,7 @@ import { createTestQueryClient } from '@/test/queryClient';
 import { editorAccount } from '@/test/editFixtures';
 import { seedSession } from '@/test/session';
 import type { RootState } from '@/store';
-import { formatDate } from '@/format/date';
+import { formatDate, formatDateTime } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as chaptersApi from '@/api/chapters';
@@ -36,6 +36,7 @@ const page = (items: ReturnType<typeof chapterNamed>[]) => ({
 });
 
 const OUT = '2026-09-02T00:00:00.000Z';
+const SOON = new Date(Date.now() + 86_400_000).toISOString();
 const one = chapterNamed(1, 'One', OUT);
 const two = chapterNamed(2, 'Two', OUT);
 const three = chapterNamed(3, 'Three', OUT);
@@ -83,11 +84,7 @@ describe('ReadingOrderList', () => {
       page([
         chapterNamed(9, 'Out', OUT),
         chapterNamed(10, 'Unwritten', null),
-        chapterNamed(
-          11,
-          'Coming',
-          new Date(Date.now() + 86_400_000).toISOString()
-        ),
+        chapterNamed(11, 'Coming', SOON),
       ])
     );
     renderList();
@@ -95,8 +92,14 @@ describe('ReadingOrderList', () => {
     expect(
       await screen.findByText('Draft', { selector: '.ant-tag' })
     ).toBeInTheDocument();
-    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(
+      screen.getByText('Scheduled', { selector: '.ant-tag' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Published', { selector: '.ant-tag' })
+    ).toBeInTheDocument();
     expect(screen.getByText(formatDate(OUT))).toBeInTheDocument();
+    expect(screen.getByText(formatDateTime(SOON))).toBeInTheDocument();
   });
 
   it('opens the Chapter editor from a row Edit button', async () => {
