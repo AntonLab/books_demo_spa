@@ -4,6 +4,7 @@ import type {
   PublicGenre,
   PublicSeries,
   SeriesDetail,
+  SeriesLibraryState,
 } from 'shared';
 import { missingGenre } from './genreRepository.ts';
 import type { Actor } from './notificationRepository.ts';
@@ -25,6 +26,9 @@ export interface FakeSeriesRepositoryOptions {
   // What a series' detail reports about its Favorites, which live in another
   // repository: the count, and the id of a signed-in viewer's own Favorite.
   favorites?: { count: number; viewerFavoriteId: number | null };
+  // What a series' detail reports about a signed-in viewer's Library, which
+  // lives in another repository.
+  library?: SeriesLibraryState;
 }
 
 // An in-memory SeriesRepository for the route specs, held to the real one by
@@ -42,6 +46,7 @@ export function createFakeSeriesRepository(
     genres = new Map(),
     actors = [],
     favorites = { count: 0, viewerFavoriteId: null },
+    library = { inLibrary: false, notInterested: false },
   } = options;
   const rows = new Map<number, PublicSeries>();
   // seriesId -> co-author ids, in credit order.
@@ -143,6 +148,7 @@ export function createFakeSeriesRepository(
         favoriteCount: favorites.count,
         // Only a signed-in caller can hold a Favorite of their own.
         viewerFavoriteId: viewer === null ? null : favorites.viewerFavoriteId,
+        viewerLibrary: viewer === null ? null : library,
       };
     },
 

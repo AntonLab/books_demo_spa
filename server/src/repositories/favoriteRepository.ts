@@ -2,7 +2,11 @@ import { Op, UniqueConstraintError } from 'sequelize';
 import { Book } from '../models/Book.ts';
 import { Favorite, toPublicFavorite } from '../models/Favorite.ts';
 import { Series } from '../models/Series.ts';
-import { ConflictError, NotFoundError } from '../types/errors.ts';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../types/errors.ts';
 import type {
   FavoriteBook,
   FavoriteSeries,
@@ -16,12 +20,14 @@ import type {
 import { publicBooksOf } from './bookRepository.ts';
 import { foreignKeyDetail } from './foreignKeyDetail.ts';
 import { joined } from './joined.ts';
-import { publicSeriesOf } from './seriesRepository.ts';
 import {
-  readableBookWhere,
-  visibleSeriesWhere,
-  type Account,
-} from './visibility.ts';
+  assertReadableBook,
+  assertVisibleSeries,
+  isCoAuthorOfBook,
+  isCoAuthorOfSeries,
+} from './holdGuards.ts';
+import { publicSeriesOf } from './seriesRepository.ts';
+import { visibleSeriesWhere, type Account } from './visibility.ts';
 
 type FavoriteBookListResult = Pick<
   ListResponse<FavoriteBook>,
@@ -54,29 +60,29 @@ export interface FavoriteRepository {
 
 // A work the account may not see answers exactly as a missing one, so a
 // refusal never reveals that a Draft exists. Safe as a check before the insert:
-// the race it leaves — a work turning Draft in between — at worst stores a
-// Favorite the lists already hide.
+// a work turning Draft in between at worst stores a Favorite the lists already
+// hide.
 async function assertVisibleTarget(
   input: CreateFavoriteInput,
   account: Account
 ): Promise<void> {
-  if (input.bookId !== null) {
-    const book = await Book.findOne({
-      where: {
-        [Op.and]: [{ id: input.bookId }, await readableBookWhere(account)],
-      },
-      attributes: ['id'],
-    });
-    if (!book) throw new NotFoundError('Book', input.bookId);
-  }
-  if (input.seriesId !== null) {
-    const series = await Series.findOne({
-      where: {
-        [Op.and]: [{ id: input.seriesId }, await visibleSeriesWhere(account)],
-      },
-      attributes: ['id'],
-    });
-    if (!series) throw new NotFoundError('Series', input.seriesId);
+  if (input.bookId !== null) await assertReadableBook(input.bookId, account);
+  if (input.seriesId !== null)
+    await assertVisibleSeries(input.seriesId, account);
+}
+
+// After the visibility check, so an unreadable work stays a 404 and the
+// refusal reveals nothing the account could not already see.
+async function assertNotOwnWork(
+  input: CreateFavoriteInput,
+  account: Account
+): Promise<void> {
+  const [asBookAuthor, asSeriesAuthor] = await Promise.all([
+    input.bookId !== null && isCoAuthorOfBook(input.bookId, account),
+    input.seriesId !== null && isCoAuthorOfSeries(input.seriesId, account),
+  ]);
+  if (asBookAuthor || asSeriesAuthor) {
+    throw new ForbiddenError('You cannot favorite your own work');
   }
 }
 
@@ -106,6 +112,7 @@ export function createSequelizeFavoriteRepository(): FavoriteRepository {
   return {
     async create(input, account) {
       await assertVisibleTarget(input, account);
+      await assertNotOwnWork(input, account);
 
       try {
         const favorite = await Favorite.create({

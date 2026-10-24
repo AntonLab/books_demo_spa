@@ -41,6 +41,7 @@ import type {
 } from '../types/series.ts';
 import { containsPattern } from './likePattern.ts';
 import { sequelizeOf } from './sequelizeOf.ts';
+import { seriesLibraryStateOf } from './seriesLibraryState.ts';
 import { deleterOf, notify, type Actor } from './notificationRepository.ts';
 import {
   publishedSeriesWhere,
@@ -378,21 +379,24 @@ export function createSequelizeSeriesRepository(): SeriesRepository {
       if (!series) return null;
 
       const viewerId = viewer?.id ?? null;
-      const [withCredits, favoriteCount, viewerFavorite] = await Promise.all([
-        publicSeriesRow(series),
-        Favorite.count({ where: { seriesId: id } }),
-        viewerId === null
-          ? null
-          : Favorite.findOne({
-              where: { seriesId: id, userId: viewerId },
-              attributes: ['id'],
-            }),
-      ]);
+      const [withCredits, favoriteCount, viewerFavorite, viewerLibrary] =
+        await Promise.all([
+          publicSeriesRow(series),
+          Favorite.count({ where: { seriesId: id } }),
+          viewerId === null
+            ? null
+            : Favorite.findOne({
+                where: { seriesId: id, userId: viewerId },
+                attributes: ['id'],
+              }),
+          viewerId === null ? null : seriesLibraryStateOf(id, viewerId),
+        ]);
 
       return {
         ...withCredits,
         favoriteCount,
         viewerFavoriteId: viewerFavorite?.id ?? null,
+        viewerLibrary,
       };
     },
 

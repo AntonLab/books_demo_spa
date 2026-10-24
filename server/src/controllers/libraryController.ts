@@ -8,21 +8,49 @@ import type { LibraryRepository } from '../repositories/libraryRepository.ts';
 import { actorOf } from '../repositories/visibility.ts';
 import type {
   ListLibraryQuery,
-  SetReadingStatusInput,
+  ReadingProgressInput,
 } from '../types/library.ts';
 
 // Whose Library this is comes from the session and nowhere else.
 export function createLibraryController(repository: LibraryRepository) {
   return {
-    set: async (req, res) => {
+    add: async (req, res) => {
       const { bookId } = validatedParams<{ bookId: number }>(req);
-      const { status } = validatedBody<SetReadingStatusInput>(req);
-      res.json(await repository.set(bookId, status, actorOf(req)));
+      res.json(await repository.addBook(bookId, actorOf(req)));
+    },
+
+    toggleNotInterested: async (req, res) => {
+      const { bookId } = validatedParams<{ bookId: number }>(req);
+      res.json(await repository.toggleNotInterested(bookId, actorOf(req)));
     },
 
     clear: async (req, res) => {
       const { bookId } = validatedParams<{ bookId: number }>(req);
-      await repository.clear(bookId, actorOf(req).id);
+      await repository.clear(bookId, actorOf(req));
+      res.status(204).end();
+    },
+
+    addSeries: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(await repository.addSeries(seriesId, actorOf(req)));
+    },
+
+    toggleSeriesNotInterested: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(
+        await repository.toggleSeriesNotInterested(seriesId, actorOf(req))
+      );
+    },
+
+    clearSeries: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(await repository.clearSeries(seriesId, actorOf(req)));
+    },
+
+    recordProgress: async (req, res) => {
+      const { id } = validatedParams<{ id: number }>(req);
+      const input = validatedBody<ReadingProgressInput>(req);
+      await repository.recordProgress(id, input, actorOf(req));
       res.status(204).end();
     },
 

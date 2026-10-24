@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   DatabaseError,
   ForeignKeyConstraintError,
+  Op,
   type Sequelize,
 } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -16,6 +17,7 @@ import { Book } from '../models/Book.ts';
 import { Chapter } from '../models/Chapter.ts';
 import { Favorite } from '../models/Favorite.ts';
 import { destroyAllGenres, Genre } from '../models/Genre.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { Like } from '../models/Like.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesCover } from '../models/SeriesCover.ts';
@@ -1001,6 +1003,55 @@ describe('seriesRepository against real MySQL', { skip }, () => {
       assert.deepEqual(
         asGuest?.authors.map((author) => author.id),
         [ownerId]
+      );
+    });
+
+    test('viewerLibrary reflects the viewer entries and is null for a Guest', async () => {
+      const series = await aPublishedSeries('Shelved Saga');
+      const reader = await aFan();
+      const second = await createCreditedBook(
+        { title: 'Second', description: 'x', tags: [], seriesId: series.id },
+        [ownerId]
+      );
+      const detailFor = async () =>
+        (
+          await repository.findDetailById(series.id, {
+            id: reader.id,
+            role: 'user',
+          })
+        )?.viewerLibrary;
+      const none = { inLibrary: false, notInterested: false };
+      assert.deepEqual(await detailFor(), none);
+
+      const first = await Book.findOne({
+        where: { seriesId: series.id, id: { [Op.ne]: second.id } },
+      });
+      await LibraryEntry.create({
+        userId: reader.id,
+        bookId: second.id,
+        status: 'not_interested',
+      });
+      assert.deepEqual(await detailFor(), none);
+      await LibraryEntry.create({
+        userId: reader.id,
+        bookId: first!.id,
+        status: 'not_interested',
+      });
+      assert.deepEqual(await detailFor(), {
+        inLibrary: false,
+        notInterested: true,
+      });
+      await LibraryEntry.update(
+        { status: 'reading' },
+        { where: { userId: reader.id, bookId: first!.id } }
+      );
+      assert.deepEqual(await detailFor(), {
+        inLibrary: true,
+        notInterested: false,
+      });
+      assert.equal(
+        (await repository.findDetailById(series.id, null))?.viewerLibrary,
+        null
       );
     });
 

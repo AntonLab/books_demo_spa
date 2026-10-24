@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes, useNavigationType } from 'react-router';
 import { SeriesPage } from './SeriesPage';
@@ -11,6 +11,7 @@ import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
 import * as favoritesApi from '@/api/favorites';
+import * as libraryApi from '@/api/library';
 import { ApiError } from '@/api/client';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
@@ -19,12 +20,14 @@ jest.mock('@/api/books');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 jest.mock('@/api/favorites');
+jest.mock('@/api/library');
 jest.mock('@/api/readingLists');
 
 const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 const mockedFavorites = jest.mocked(favoritesApi);
+const mockedLibrary = jest.mocked(libraryApi);
 
 const coAuthor = {
   id: 3,
@@ -46,6 +49,7 @@ const series: SeriesDetail = {
   }),
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerLibrary: null,
 };
 
 const book = publicBook({
@@ -316,7 +320,7 @@ describe('SeriesPage star', () => {
     });
   });
 
-  it('removes a co-author’s own Favorite by its id', async () => {
+  it('removes the reader’s own Favorite by its id', async () => {
     mockedSeries.getSeries.mockResolvedValue({
       ...series,
       favoriteCount: 1,
@@ -324,7 +328,7 @@ describe('SeriesPage star', () => {
     });
     mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
 
-    renderPage('/series/12', account());
+    renderPage('/series/12', account({ id: 9, role: 'user' }));
 
     await userEvent.click(
       await screen.findByRole('button', { name: 'Remove from favorites' })
@@ -333,33 +337,187 @@ describe('SeriesPage star', () => {
     expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(8);
   });
 
-  describe('Add to reading list', () => {
-    const addButton = { name: 'Add to reading list' };
+  it('hides the star from a Co-author', async () => {
+    mockedSeries.getSeries.mockResolvedValue(series);
 
-    it('is offered to a signed-in Account on a Series with a Published Book', async () => {
-      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+    renderPage('/series/12', account());
 
-      renderPage('/series/12', account({ id: 9, role: 'user' }));
+    await screen.findByRole('button', { name: 'Edit series' });
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
+  });
+});
 
-      expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
-    });
+describe('SeriesPage Library buttons', () => {
+  const reader = () => account({ id: 9, role: 'user' });
+  const withLibrary = (
+    viewerLibrary: SeriesDetail['viewerLibrary'],
+    overrides: Partial<SeriesDetail> = {}
+  ) => ({ ...series, bookCount: 2, viewerLibrary, ...overrides });
+  const state = { inLibrary: true, notInterested: false };
 
-    it('is not offered to a Guest', async () => {
-      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+  it('shows Add series to Library and Not interested when nothing is in the Library', async () => {
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: false })
+    );
 
-      renderPage();
+    renderPage('/series/12', reader());
 
-      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
-      expect(screen.queryByRole('button', addButton)).toBeNull();
-    });
+    expect(
+      await screen.findByRole('button', { name: 'Add series to Library' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Not interested' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Remove series from Library' })
+    ).toBeNull();
+  });
 
-    it('is not offered on a Series without a Published Book', async () => {
-      mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 0 });
+  it('shows the buttons for a Series with a single Published Book', async () => {
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: false }, { bookCount: 1 })
+    );
 
-      renderPage('/series/12', account({ id: 9, role: 'user' }));
+    renderPage('/series/12', reader());
 
-      await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
-      expect(screen.queryByRole('button', addButton)).toBeNull();
-    });
+    expect(
+      await screen.findByRole('button', { name: 'Add series to Library' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Not interested' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows Remove series from Library when inLibrary', async () => {
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: true, notInterested: false })
+    );
+
+    renderPage('/series/12', reader());
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Remove series from Library',
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add series to Library' })
+    ).toBeNull();
+  });
+
+  it('Not interested is pressed when notInterested is true', async () => {
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: true })
+    );
+
+    renderPage('/series/12', reader());
+
+    expect(
+      await screen.findByRole('button', { name: 'Not interested' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('pressing each button sends the matching request', async () => {
+    mockedLibrary.addSeriesToLibrary.mockResolvedValue(state);
+    mockedLibrary.toggleSeriesNotInterested.mockResolvedValue(state);
+    mockedLibrary.removeSeriesFromLibrary.mockResolvedValue(state);
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: false })
+    );
+    renderPage('/series/12', reader());
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add series to Library' })
+    );
+    await waitFor(() =>
+      expect(mockedLibrary.addSeriesToLibrary).toHaveBeenCalledWith(12)
+    );
+    // The refetch after the next request brings the Series with its state.
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: true, notInterested: false })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Not interested' })
+    );
+    await waitFor(() =>
+      expect(mockedLibrary.toggleSeriesNotInterested).toHaveBeenCalledWith(12)
+    );
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Remove series from Library',
+      })
+    );
+    await waitFor(() =>
+      expect(mockedLibrary.removeSeriesFromLibrary).toHaveBeenCalledWith(12)
+    );
+  });
+
+  it('buttons are disabled while a Library request is pending', async () => {
+    mockedLibrary.addSeriesToLibrary.mockReturnValue(new Promise(() => {}));
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: false })
+    );
+    renderPage('/series/12', reader());
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Add series to Library' })
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Add series to Library' })
+      ).toBeDisabled()
+    );
+    expect(
+      screen.getByRole('button', { name: 'Not interested' })
+    ).toBeDisabled();
+  });
+
+  it.each([
+    ['a Co-author', account(), 2],
+    ['a Guest', null, 2],
+    ['a Series with bookCount 0', account({ id: 9, role: 'user' }), 0],
+  ])('%s sees no Library buttons', async (_name, session, bookCount) => {
+    mockedSeries.getSeries.mockResolvedValue(
+      withLibrary({ inLibrary: false, notInterested: false }, { bookCount })
+    );
+
+    renderPage('/series/12', session);
+
+    await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+    expect(
+      screen.queryByRole('button', { name: 'Add series to Library' })
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Not interested' })).toBeNull();
+  });
+});
+
+describe('SeriesPage Add to reading list', () => {
+  const addButton = { name: 'Add to reading list' };
+
+  it('is offered to a signed-in Account on a Series with a Published Book', async () => {
+    mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+    renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+    expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+  });
+
+  it('is not offered to a Guest', async () => {
+    mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 2 });
+
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+    expect(screen.queryByRole('button', addButton)).toBeNull();
+  });
+
+  it('is not offered on a Series without a Published Book', async () => {
+    mockedSeries.getSeries.mockResolvedValue({ ...series, bookCount: 0 });
+
+    renderPage('/series/12', account({ id: 9, role: 'user' }));
+
+    await screen.findByRole('heading', { name: 'The Ashgrove Chronicles' });
+    expect(screen.queryByRole('button', addButton)).toBeNull();
   });
 });

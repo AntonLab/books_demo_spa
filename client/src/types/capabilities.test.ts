@@ -35,7 +35,7 @@ describe('bookCapabilities', () => {
     // viewer, status, isCoAuthor, mayEdit, mayLike, mayRead, mayFavorite
     ['a Guest', null, 'complete', false, false, false, true, false],
     ['a Guest', null, 'draft', false, false, false, false, false],
-    ['a Co-author', COAUTHOR, 'complete', true, true, false, true, true],
+    ['a Co-author', COAUTHOR, 'complete', true, true, false, true, false],
     ['a Co-author', COAUTHOR, 'draft', true, true, false, true, false],
     ['a stranger', STRANGER, 'in_progress', false, false, true, true, true],
     ['a stranger', STRANGER, 'draft', false, false, false, false, false],
@@ -74,7 +74,8 @@ describe('bookCapabilities mayKeepInLibrary', () => {
   it.each([
     ['a Guest', null, 'draft', false],
     ['a stranger on a complete book', STRANGER, 'complete', true],
-    ['a Co-author on a draft', COAUTHOR, 'draft', true],
+    ['a Co-author on a draft', COAUTHOR, 'draft', false],
+    ['a Co-author on a complete book', COAUTHOR, 'complete', false],
     ['an admin', ADMIN, 'complete', true],
   ] as const)('is as expected for %s', (_who, session, status, expected) => {
     expect(bookCapabilities(book(status), session).mayKeepInLibrary).toBe(
@@ -127,14 +128,16 @@ describe('seriesCapabilities', () => {
 
   it.each([
     ['a Guest', null, false, false, false],
-    ['a Co-author', COAUTHOR, true, true, true],
+    ['a Co-author', COAUTHOR, true, true, false],
     ['a stranger', STRANGER, false, false, true],
     ['an admin', ADMIN, false, true, true],
   ] as const)('%s', (_name, session, isCoAuthor, mayEdit, mayFavorite) => {
+    // The Library and the Favorite share one rule: no Co-author, a Guest none.
     expect(seriesCapabilities(series, session)).toEqual({
       isCoAuthor,
       mayEdit,
       mayFavorite,
+      mayKeepInLibrary: mayFavorite,
     });
   });
 });

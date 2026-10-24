@@ -63,6 +63,7 @@ const createFakeRepository = (
     books: new Map([[FILED_BOOK_ID, 1]]),
     genres: GENRES,
     favorites: { count: 3, viewerFavoriteId: VIEWER_FAVORITE_ID },
+    library: { inLibrary: true, notInterested: false },
     actors,
   });
 
@@ -401,6 +402,32 @@ test('GET by id reports the favorite count, and the viewer own favorite only whe
       assert.equal(
         (await json<Wire<SeriesDetail>>(signedIn)).viewerFavoriteId,
         VIEWER_FAVORITE_ID
+      );
+    }
+  );
+});
+
+test('detail carries viewerLibrary for a signed-in viewer and null for a Guest', async () => {
+  await withAuthenticatedApp(
+    { seriesRepository: createFakeRepository() },
+    async (base) => {
+      await post(base, valid);
+
+      const anonymous = await fetch(`${base}/api/series/1`);
+      const signedIn = await fetch(`${base}/api/series/1`, {
+        headers: { cookie: ROLE_COOKIES.user },
+      });
+
+      assert.equal(
+        (await json<Wire<SeriesDetail>>(anonymous)).viewerLibrary,
+        null
+      );
+      assert.deepEqual(
+        (await json<Wire<SeriesDetail>>(signedIn)).viewerLibrary,
+        {
+          inLibrary: true,
+          notInterested: false,
+        }
       );
     }
   );

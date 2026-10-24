@@ -69,6 +69,7 @@ describe('useSortedBooks', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'new',
       pageSize: 20,
+      hideNotInterested: 'true',
     });
   });
 
@@ -92,6 +93,7 @@ describe('useSortedBooks', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith({
       sort: 'popular',
       pageSize: 6,
+      hideNotInterested: 'true',
     });
     expect(client.getQueryCache().getAll()).toHaveLength(2);
   });

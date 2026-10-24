@@ -36,6 +36,7 @@ const series: SeriesDetail = {
   }),
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerLibrary: null,
 };
 
 const author: PublicUser = {

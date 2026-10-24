@@ -1,5 +1,10 @@
-import { act } from '@testing-library/react';
-import { useSetReadingStatus } from './library';
+import { act, waitFor } from '@testing-library/react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  useBookLibraryActions,
+  useReadingProgressMutation,
+  useSeriesLibraryActions,
+} from './library';
 import { queryKeys } from './keys';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import { ApiError } from '../api/client';
@@ -12,50 +17,129 @@ beforeEach(() => {
   jest.resetAllMocks();
 });
 
-describe('useSetReadingStatus', () => {
-  it('sets a status, then refreshes the books and the Library', async () => {
-    mockedLibrary.setReadingStatus.mockResolvedValue({
-      bookId: 7,
-      status: 'read',
-      updatedAt: '2026-10-02T10:00:00.000Z',
+describe('useSeriesLibraryActions', () => {
+  it('refreshes the Series, the books and the Library after a write succeeds', async () => {
+    mockedLibrary.addSeriesToLibrary.mockResolvedValue({
+      inLibrary: true,
+      notInterested: false,
     });
     const { result, queryClient } = renderHookWithProviders(() =>
-      useSetReadingStatus()
+      useSeriesLibraryActions(12)
     );
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await act(() => result.current.mutateAsync({ bookId: 7, status: 'read' }));
+    await act(() => result.current.add.mutateAsync());
 
-    expect(mockedLibrary.setReadingStatus).toHaveBeenCalledWith(7, 'read');
-    expect(mockedLibrary.clearReadingStatus).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: queryKeys.seriesDetail(12),
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: queryKeys.allLibrary,
+    });
+  });
+});
+
+describe('useReadingProgressMutation', () => {
+  it.each(['opened', 'finished'] as const)(
+    'refreshes the books, the Series and the Library after %s',
+    async (event) => {
+      mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
+      const { result, queryClient } = renderHookWithProviders(() =>
+        useReadingProgressMutation()
+      );
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+      await act(() =>
+        result.current.mutateAsync({
+          bookId: 7,
+          payload: { event, chapterId: 3 },
+        })
+      );
+
+      expect(invalidate).toHaveBeenCalledTimes(3);
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allSeries,
+      });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allLibrary,
+      });
+    }
+  );
+
+  it('refetches a mounted book list after opened lifts a not_interested Book', async () => {
+    mockedLibrary.postReadingProgress.mockResolvedValue(undefined);
+    const queryFn = jest.fn().mockResolvedValue([]);
+    const { result, queryClient } = renderHookWithProviders(() => {
+      useQuery({ queryKey: ['books', { sort: 'rating' }], queryFn });
+      return useReadingProgressMutation();
+    });
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(1));
+
+    await act(() =>
+      result.current.mutateAsync({
+        bookId: 7,
+        payload: { event: 'opened', chapterId: 3 },
+      })
+    );
+
+    await waitFor(() => expect(queryFn).toHaveBeenCalledTimes(2));
+    expect(queryClient.isFetching()).toBe(0);
+  });
+});
+
+describe('useBookLibraryActions', () => {
+  it('removes a Book, then refreshes the books and the Library', async () => {
+    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useBookLibraryActions()
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(() => result.current.remove.mutateAsync(7));
+
+    expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(7);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: queryKeys.allLibrary,
     });
   });
 
-  it('clears when the status is null', async () => {
-    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
-    const { result } = renderHookWithProviders(() => useSetReadingStatus());
+  it.each([
+    ['add', 'addBookToLibrary'],
+    ['toggleNotInterested', 'toggleBookNotInterested'],
+  ] as const)(
+    'refreshes the books and the Library after %s succeeds',
+    async (action, apiName) => {
+      mockedLibrary[apiName].mockResolvedValue({ bookId: 7, status: null });
+      const { result, queryClient } = renderHookWithProviders(() =>
+        useBookLibraryActions()
+      );
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await act(() => result.current.mutateAsync({ bookId: 7, status: null }));
+      await act(() => result.current[action].mutateAsync(7));
 
-    expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(7);
-  });
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allLibrary,
+      });
+    }
+  );
 
   it('refreshes even when the write fails, so the screen shows what exists', async () => {
-    mockedLibrary.setReadingStatus.mockRejectedValue(
+    mockedLibrary.clearReadingStatus.mockRejectedValue(
       new ApiError(404, 'Book 7 not found')
     );
     const { result, queryClient } = renderHookWithProviders(() =>
-      useSetReadingStatus()
+      useBookLibraryActions()
     );
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
     await act(async () => {
-      await expect(
-        result.current.mutateAsync({ bookId: 7, status: 'read' })
-      ).rejects.toMatchObject({ status: 404 });
+      await expect(result.current.remove.mutateAsync(7)).rejects.toMatchObject({
+        status: 404,
+      });
     });
 
     expect(invalidate).toHaveBeenCalledWith({

@@ -1,12 +1,11 @@
 import type { FC } from 'react';
-import { App, Flex, Select } from 'antd';
+import { App, Button, Flex, Select } from 'antd';
 import { READING_STATUSES } from 'shared';
 import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
-import { ReadingStatusSelect } from '@/components/molecules/ReadingStatusSelect/ReadingStatusSelect';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { RESULTS_COLUMNS } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
-import { useSetReadingStatus } from '@/queries/library';
+import { useBookLibraryActions } from '@/queries/library';
 import spacing from '@/theme/spacing.module.css';
 import { LIBRARY_FILTERS, type LibraryBook } from '@/types/library';
 import { useLibraryList } from './useLibraryList';
@@ -18,23 +17,23 @@ const emptyTextOf = (filtered: boolean): string =>
 // One hook per row, so only the row being changed is disabled.
 const LibraryRow: FC<{ row: LibraryBook }> = ({ row }) => {
   const { message } = App.useApp();
-  const setStatus = useSetReadingStatus();
+  const { remove } = useBookLibraryActions();
   return (
-    <Flex gap="small" align="flex-start">
+    <Flex gap="small" align="flex-start" wrap="wrap">
       <div className={styles.card}>
         <BookCard book={row} />
       </div>
-      <ReadingStatusSelect
-        id={`reading-status-${row.id}`}
-        value={row.readingStatus}
-        disabled={setStatus.isPending}
-        onChange={(status) =>
-          setStatus.mutate(
-            { bookId: row.id, status },
-            { onError: (error) => void message.error(error.message) }
-          )
+      <Button
+        aria-label={`Remove ${row.title} from Library`}
+        disabled={remove.isPending}
+        onClick={() =>
+          remove.mutate(row.id, {
+            onError: (error) => void message.error(error.message),
+          })
         }
-      />
+      >
+        Remove
+      </Button>
     </Flex>
   );
 };

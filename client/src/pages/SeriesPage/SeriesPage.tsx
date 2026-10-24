@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FC } from 'react';
-import { Alert, Button, Flex, Skeleton } from 'antd';
+import { Alert, App, Button, Flex, Skeleton } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
@@ -8,6 +8,7 @@ import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
+import { LibraryButtons } from '@/components/molecules/LibraryButtons/LibraryButtons';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
@@ -22,6 +23,7 @@ import {
 import { useBooksInSeries } from '@/queries/books';
 import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
+import { useSeriesLibraryActions } from '@/queries/library';
 import { useSeries } from '@/queries/series';
 import { useAppSelector } from '@/store/hooks';
 import { isId } from '@/types/id';
@@ -44,6 +46,9 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   const series = useSeries(seriesId);
   const { data: session } = useSession();
   const toggleFavorite = useToggleFavorite(queryKeys.seriesDetail(seriesId));
+  const libraryActions = useSeriesLibraryActions(seriesId);
+  const { message } = App.useApp();
+  const toastError = (error: Error) => void message.error(error.message);
   const [editing, setEditing] = useState(false);
 
   if (series.isError) {
@@ -57,15 +62,19 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
   if (series.isPending) return <Skeleton active paragraph={{ rows: 3 }} />;
 
   // Mirrors the server: its Co-authors and Moderators may edit a series.
-  const { isCoAuthor, mayEdit, mayFavorite } = seriesCapabilities(
-    series.data,
-    session
-  );
+  const { isCoAuthor, mayEdit, mayFavorite, mayKeepInLibrary } =
+    seriesCapabilities(series.data, session);
 
   return (
     <>
       <SeriesCard series={series.data} />
-      <Flex justify="end" align="center" gap="middle" className={styles.bar}>
+      <Flex
+        justify="end"
+        align="center"
+        wrap
+        gap="middle"
+        className={styles.bar}
+      >
         {/* A series has no statistics tab, so the button is the only place
             its Favorites count shows. */}
         {mayFavorite && (
@@ -81,6 +90,28 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
             }
           />
         )}
+        {mayKeepInLibrary &&
+          series.data.bookCount > 0 &&
+          series.data.viewerLibrary !== null && (
+            <LibraryButtons
+              inLibrary={series.data.viewerLibrary.inLibrary}
+              notInterested={series.data.viewerLibrary.notInterested}
+              disabled={libraryActions.isPending}
+              addLabel="Add series to Library"
+              removeLabel="Remove series from Library"
+              onAdd={() =>
+                libraryActions.add.mutate(undefined, { onError: toastError })
+              }
+              onRemove={() =>
+                libraryActions.remove.mutate(undefined, { onError: toastError })
+              }
+              onToggleNotInterested={() =>
+                libraryActions.toggleNotInterested.mutate(undefined, {
+                  onError: toastError,
+                })
+              }
+            />
+          )}
         {mayAddSeriesToReadingList(series.data, session) && (
           <AddToReadingList target={{ seriesId }} />
         )}

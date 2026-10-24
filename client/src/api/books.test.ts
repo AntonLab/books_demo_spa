@@ -65,6 +65,16 @@ describe('listBooks', () => {
     );
   });
 
+  it('encodes hideNotInterested', async () => {
+    const fetchMock = mockFetch(envelope);
+
+    await listBooks({ hideNotInterested: 'true' });
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/books?hideNotInterested=true'
+    );
+  });
+
   it('encodes ids as one comma-separated value', async () => {
     const fetchMock = mockFetch(envelope);
 

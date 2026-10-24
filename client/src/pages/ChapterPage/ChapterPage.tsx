@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { FC, MouseEvent, ReactNode } from 'react';
 import {
   Alert,
@@ -27,6 +27,7 @@ import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { ChapterIllustrations } from '@/components/organisms/ChapterIllustrations/ChapterIllustrations';
 import { ChapterContents } from '@/components/organisms/ChapterContents/ChapterContents';
 import { ReadingPreferences } from '@/components/organisms/ReadingPreferences/ReadingPreferences';
+import { useSession } from '@/queries/auth';
 import { useBook } from '@/queries/books';
 import { useChapter, useChapters } from '@/queries/chapters';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
@@ -34,6 +35,7 @@ import type { ReadingPreferences as Reading } from '@/store/devicePreferencesSli
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { useRecordRecentlyViewed } from '@/store/useRecentlyViewed';
 import { READING_PALETTES, READING_SERIF_FONT } from '@/theme/tokens';
+import { bookCapabilities } from '@/types/capabilities';
 import { publishedChapters, type ChapterSummary } from '@/types/chapter';
 import {
   arrowLabel,
@@ -46,6 +48,7 @@ import {
 } from './pagination';
 import type { Direction } from './pagination';
 import { usePages } from './usePages';
+import { useReadingProgress } from './useReadingProgress';
 import styles from './ChapterPage.module.css';
 
 // Tokens for a ConfigProvider around the text: `auto` keeps the app's colours,
@@ -160,6 +163,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
     windowStyle,
     stripStyle,
     hasPage,
+    ready,
     turn,
   } = usePages({
     enabled: pagesOn,
@@ -167,6 +171,42 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
     text: chapter?.text,
     reading,
     openOnLastPage,
+  });
+
+  // Scroll: the chapter whose end has come into view.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [scrolledToEnd, setScrolledToEnd] = useState<number>();
+  const loaded = chapter !== undefined;
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (pagesOn || !sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setScrolledToEnd(id);
+        observer.disconnect();
+      }
+    });
+    observer.observe(sentinel);
+    return () => {
+      observer.disconnect();
+      setScrolledToEnd(undefined);
+    };
+  }, [pagesOn, id, loaded]);
+
+  // Only a signed-in reader who is not a Co-author reports progress, and not
+  // before the Book's credits are known.
+  const { data: session } = useSession();
+  useReadingProgress({
+    bookId: book,
+    chapterId: id,
+    enabled:
+      loaded &&
+      session != null &&
+      bookDetail !== undefined &&
+      !bookCapabilities(bookDetail, session).isCoAuthor,
+    // A chapter that fits the viewport has no scroll to reach the end of, so
+    // its sentinel is in view at once and `finished` follows `opened`.
+    atEnd: pagesOn ? ready && !hasPage('next') : scrolledToEnd === id,
   });
 
   // Browser history keeps this state across a reload, which must open page 1:
@@ -354,6 +394,9 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
               <Typography.Paragraph className={styles.text}>
                 {chapter.text}
               </Typography.Paragraph>
+
+              {/* Zero height: reaching it is reaching the end of the text. */}
+              <div ref={sentinelRef} />
 
               <ChapterIllustrations chapterId={id} />
             </div>

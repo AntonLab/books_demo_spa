@@ -162,6 +162,7 @@ beforeEach(() => {
     }),
     favoriteCount: 0,
     viewerFavoriteId: null,
+    viewerLibrary: null,
   });
 });
 
@@ -205,6 +206,12 @@ describe('AppShell routing', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     });
+
+    // jsdom has none; the page watches the end of the text with it.
+    window.IntersectionObserver = class {
+      observe = jest.fn();
+      disconnect = jest.fn();
+    } as unknown as typeof IntersectionObserver;
 
     renderWithProviders(<AppShell />, { route: '/books/1/chapters/9' });
 

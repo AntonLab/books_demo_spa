@@ -63,7 +63,10 @@ export const useSearchPage = (): SearchPageState => {
       : genres.data?.items.find((entry) => String(entry.id) === search.genre);
   const genreBlocked = search.genre !== undefined && genre === undefined;
 
-  const books = useBookSearch(listParamsOf(search, genre?.id), !genreBlocked);
+  const books = useBookSearch(
+    { ...listParamsOf(search, genre?.id), hideNotInterested: 'true' },
+    !genreBlocked
+  );
   const fieldErrors = useMemo(
     () => fieldErrorsOf(genreBlocked ? null : books.error),
     [genreBlocked, books.error]

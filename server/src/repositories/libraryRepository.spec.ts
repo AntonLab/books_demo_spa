@@ -1,6 +1,13 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import {
+  after,
+  before,
+  beforeEach,
+  describe,
+  test,
+  type TestContext,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import { UniqueConstraintError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -9,9 +16,16 @@ import { testDbConfig } from '../db/testDb.testkit.ts';
 import { skipWithoutMysql } from '../db/mysqlProbe.testkit.ts';
 import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
+import { Chapter } from '../models/Chapter.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { User } from '../models/User.ts';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import { Series } from '../models/Series.ts';
+import {
+  createCreditedBook,
+  createCreditedSeries,
+} from '../models/creditedBook.testkit.ts';
+import { NotFoundError, StateConflictError } from '../types/errors.ts';
+import { REMOVE_FROM_LIBRARY_FIRST } from './libraryMessages.ts';
 import { createSequelizeLibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 import { libraryRepositoryContract } from './libraryRepository.contract.testkit.ts';
@@ -54,6 +68,7 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     // them.
     await LibraryEntry.destroy({ where: {}, truncate: false });
     await Book.destroy({ where: {}, truncate: false });
+    await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
   });
 
@@ -111,10 +126,156 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     assert.equal(await LibraryEntry.count(), 0);
   });
 
-  test('a Moderator may set a status on a Draft Book', async () => {
+  test('a Moderator may add a Draft Book to the Library', async () => {
     const { moderator, draft } = await arrangeBooks();
-    const entry = await repository.set(draft.id, 'plan_to_read', as(moderator));
-    assert.equal(entry.status, 'plan_to_read');
+    const state = await repository.addBook(draft.id, as(moderator));
+    assert.equal(state.status, 'plan_to_read');
+  });
+
+  test('a Series the Account may not see is a NotFoundError', async () => {
+    const { me, author } = await arrangeBooks();
+    const hidden = await createCreditedSeries(
+      { title: 'Unseen', description: 'x', tags: [] },
+      [author.id]
+    );
+    await createCreditedBook(
+      {
+        title: 'Hidden Draft',
+        description: 'x',
+        tags: [],
+        status: 'draft',
+        seriesId: hidden.id,
+      },
+      [author.id]
+    );
+    await assert.rejects(
+      repository.addSeries(hidden.id, as(me)),
+      new NotFoundError('Series', hidden.id)
+    );
+  });
+
+  test('a Series action for an Account deleted meanwhile is a NotFoundError, not a silent 200', async () => {
+    const { me, author } = await arrangeBooks();
+    const series = await createCreditedSeries(
+      { title: 'Shared', description: 'x', tags: [] },
+      [author.id]
+    );
+    await createCreditedBook(
+      { title: 'In Series', description: 'x', tags: [], seriesId: series.id },
+      [author.id]
+    );
+    const gone = as(me);
+    await User.destroy({ where: { id: me.id } });
+    for (const action of ['addSeries', 'toggleSeriesNotInterested'] as const) {
+      await assert.rejects(
+        repository[action](series.id, gone),
+        new NotFoundError('User', me.id)
+      );
+    }
+    assert.equal(await LibraryEntry.count(), 0);
+  });
+
+  test('toggleNotInterested that keeps losing the race gives up with a StateConflictError after 3 attempts', async (t) => {
+    const { me, book } = await arrangeBooks();
+    // Every attempt finds no entry to create, mark or clear, and none held.
+    const create = t.mock.method(LibraryEntry, 'bulkCreate', async () => []);
+    t.mock.method(LibraryEntry, 'update', async () => [0]);
+    t.mock.method(LibraryEntry, 'destroy', async () => 0);
+    t.mock.method(LibraryEntry, 'findOne', async () => null);
+    await assert.rejects(
+      repository.toggleNotInterested(book.id, as(me)),
+      new StateConflictError(REMOVE_FROM_LIBRARY_FIRST)
+    );
+    assert.equal(create.mock.callCount(), 3);
+  });
+
+  // INSERT IGNORE downgrades the foreign key error, so a Book deleted between
+  // the readability check and the insert must still answer 404.
+  function deleteBookBeforeInsert(t: TestContext, bookId: number) {
+    const original = LibraryEntry.bulkCreate.bind(LibraryEntry);
+    t.mock.method(
+      LibraryEntry,
+      'bulkCreate',
+      async (...args: Parameters<typeof original>) => {
+        await Book.destroy({ where: { id: bookId } });
+        return original(...args);
+      }
+    );
+  }
+
+  for (const action of ['addBook', 'toggleNotInterested'] as const) {
+    test(`${action} for a Book deleted before the insert is a NotFoundError`, async (t) => {
+      const { me, book } = await arrangeBooks();
+      deleteBookBeforeInsert(t, book.id);
+      await assert.rejects(
+        repository[action](book.id, as(me)),
+        new NotFoundError('Book', book.id)
+      );
+    });
+  }
+
+  test('recordProgress opened for a Book deleted before the insert is a NotFoundError', async (t) => {
+    const { me, book } = await arrangeBooks();
+    const chapter = await Chapter.create({
+      bookId: book.id,
+      title: 'One',
+      text: 'x',
+      position: 1,
+      publishedAt: new Date(Date.now() - 1000),
+    });
+    deleteBookBeforeInsert(t, book.id);
+    await assert.rejects(
+      repository.recordProgress(
+        book.id,
+        { chapterId: chapter.id, event: 'opened' },
+        as(me)
+      ),
+      new NotFoundError('Book', book.id)
+    );
+  });
+
+  test('toggleNotInterested sees a Plan to read entry after the insert, retries and marks it', async (t) => {
+    const { me, book } = await arrangeBooks();
+    t.mock.method(LibraryEntry, 'bulkCreate', async () => []);
+    const update = t.mock.method(LibraryEntry, 'update', async () => [0]);
+    update.mock.mockImplementationOnce(async () => [1], 1);
+    t.mock.method(LibraryEntry, 'destroy', async () => 0);
+    const find = t.mock.method(LibraryEntry, 'findOne', async () => null);
+    find.mock.mockImplementationOnce(
+      async () => ({ status: 'plan_to_read' }) as LibraryEntry,
+      0
+    );
+    const state = await repository.toggleNotInterested(book.id, as(me));
+    assert.deepEqual(state, { bookId: book.id, status: 'not_interested' });
+    assert.equal(update.mock.callCount(), 2);
+  });
+
+  test('concurrent presses on a missing entry finish without a lock wait', async () => {
+    const { me, book } = await arrangeBooks();
+    for (let round = 0; round < 40; round += 1) {
+      await LibraryEntry.destroy({ where: { userId: me.id } });
+      // A lock wait lasts ~50 s, so a round over 5 s is a stall.
+      const guard = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('lock wait')), 5000).unref();
+      });
+      await Promise.race([
+        Promise.allSettled([
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.addBook(book.id, as(me)),
+          repository.addBook(book.id, as(me)),
+        ]),
+        guard,
+      ]);
+      const row = await LibraryEntry.findOne({ where: { userId: me.id } });
+      assert.ok(
+        row === null ||
+          row.status === 'not_interested' ||
+          row.status === 'plan_to_read',
+        `unexpected status: ${row?.status}`
+      );
+    }
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
@@ -142,6 +303,54 @@ describe('libraryRepository against real MySQL', { skip }, () => {
         coAuthorIds
       );
       return book.id;
+    },
+    async aSeries(coAuthorIds) {
+      const series = await createCreditedSeries(
+        { title: 'Contract Series', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return series.id;
+    },
+    async aBookInSeries(seriesId, coAuthorIds, { draft = false } = {}) {
+      const book = await createCreditedBook(
+        {
+          title: 'Contract Series Book',
+          description: 'x',
+          tags: [],
+          seriesId,
+          ...(draft ? { status: 'draft' } : {}),
+        },
+        coAuthorIds
+      );
+      return book.id;
+    },
+    async aChapter(bookId, { published, publishedAt, position }) {
+      const next =
+        position ??
+        ((await Chapter.max<number, Chapter>('position', {
+          where: { bookId },
+        })) ?? 0) + 1;
+      const chapter = await Chapter.create({
+        bookId,
+        title: `Contract Chapter ${next}`,
+        text: 'x',
+        position: next,
+        publishedAt: published
+          ? (publishedAt ?? new Date(Date.now() - 1000))
+          : null,
+      });
+      return chapter.id;
+    },
+    async setComplete(bookId) {
+      await Book.update({ status: 'complete' }, { where: { id: bookId } });
+    },
+    async seedStatus(accountId, bookId, status) {
+      await LibraryEntry.upsert({
+        userId: accountId,
+        bookId,
+        status,
+        updatedAt: new Date(),
+      });
     },
     async setDraft(bookId, draft) {
       await Book.update(

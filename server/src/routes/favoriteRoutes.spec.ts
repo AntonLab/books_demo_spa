@@ -23,6 +23,8 @@ import {
 const BOOK_ID = 7;
 const OTHER_BOOK_ID = 8;
 const SERIES_ID = 3;
+const CREDITED_BOOK_ID = 9;
+const CREDITED_SERIES_ID = 4;
 const MISSING_ID = 999;
 
 // Every persona is an account, so the fake's userId foreign key passes for
@@ -33,8 +35,15 @@ function fakeRepository() {
     books: new Map([
       [BOOK_ID, aPublicBook(BOOK_ID)],
       [OTHER_BOOK_ID, aPublicBook(OTHER_BOOK_ID)],
+      [CREDITED_BOOK_ID, aPublicBook(CREDITED_BOOK_ID, [USER_IDS.author])],
     ]),
-    series: new Map([[SERIES_ID, aPublicSeries(SERIES_ID)]]),
+    series: new Map([
+      [SERIES_ID, aPublicSeries(SERIES_ID)],
+      [
+        CREDITED_SERIES_ID,
+        aPublicSeries(CREDITED_SERIES_ID, [USER_IDS.author]),
+      ],
+    ]),
   });
 }
 
@@ -136,6 +145,66 @@ test('favoriting a missing book or series is a 404', async () => {
         (await post(base, ROLE_COOKIES.user, { seriesId: MISSING_ID })).status,
         404
       );
+    }
+  );
+});
+
+test('a Co-author gets 403 when favoriting their own Book', async () => {
+  await withAuthenticatedApp(
+    { favoriteRepository: fakeRepository() },
+    async (base) => {
+      const response = await post(base, ROLE_COOKIES.author, {
+        bookId: CREDITED_BOOK_ID,
+      });
+
+      assert.equal(response.status, 403);
+      assert.equal(
+        (await json<{ error: string }>(response)).error,
+        'You cannot favorite your own work'
+      );
+    }
+  );
+});
+
+test('a Co-author gets 403 when favoriting their own Series', async () => {
+  await withAuthenticatedApp(
+    { favoriteRepository: fakeRepository() },
+    async (base) => {
+      const response = await post(base, ROLE_COOKIES.author, {
+        seriesId: CREDITED_SERIES_ID,
+      });
+
+      assert.equal(response.status, 403);
+      assert.equal(
+        (await json<{ error: string }>(response)).error,
+        'You cannot favorite your own work'
+      );
+    }
+  );
+});
+
+test('a Co-author may still favorite another Book', async () => {
+  await withAuthenticatedApp(
+    { favoriteRepository: fakeRepository() },
+    async (base) => {
+      const response = await post(base, ROLE_COOKIES.author, {
+        bookId: BOOK_ID,
+      });
+
+      assert.equal(response.status, 201);
+    }
+  );
+});
+
+test('a missing Book is 404 before the credit check', async () => {
+  await withAuthenticatedApp(
+    { favoriteRepository: fakeRepository() },
+    async (base) => {
+      const response = await post(base, ROLE_COOKIES.author, {
+        bookId: MISSING_ID,
+      });
+
+      assert.equal(response.status, 404);
     }
   );
 });

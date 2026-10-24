@@ -9,11 +9,31 @@ export const READING_STATUSES = [
 ] as const;
 export type ReadingStatus = (typeof READING_STATUSES)[number];
 
-// What PUT /api/library/:bookId returns: one Library entry (CONTEXT.md).
-export interface PublicLibraryEntry {
+// What a reader's client reports to POST /api/books/:id/reading-progress.
+export const READING_PROGRESS_EVENTS = ['opened', 'finished'] as const;
+export type ReadingProgressEvent = (typeof READING_PROGRESS_EVENTS)[number];
+
+// The body of POST /api/books/:id/reading-progress: `chapterId` is the Chapter
+// that was opened or finished.
+export interface ReadingProgressPayload {
+  event: ReadingProgressEvent;
+  chapterId: number;
+}
+
+// What POST /api/library/:bookId/add and /not-interested return: `status` is
+// null once the entry is gone.
+export interface BookLibraryState {
   bookId: number;
-  status: ReadingStatus;
-  updatedAt: Date;
+  status: ReadingStatus | null;
+}
+
+// A Series' Library state for the viewer, returned by the Series Library
+// actions and carried by a Series detail as `viewerLibrary`. `inLibrary`: a
+// Published Book has a status other than not_interested. `notInterested`: the
+// Series has Published Books and all are not_interested.
+export interface SeriesLibraryState {
+  inLibrary: boolean;
+  notInterested: boolean;
 }
 
 // One item of GET /api/library: a Book in the reader's Library (CONTEXT.md)
@@ -36,8 +56,3 @@ export const EMPTY_LIBRARY_COUNTS: LibraryCounts = {
   read: 0,
   inLibraries: 0,
 };
-
-// The body of PUT /api/library/:bookId: the Reading status to set.
-export interface SetReadingStatusPayload {
-  status: ReadingStatus;
-}

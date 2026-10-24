@@ -22,14 +22,14 @@ describe('the fake favoriteRepository', () => {
         accounts.add(id);
         return id;
       },
-      async aBook() {
+      async aBook(coAuthorIds) {
         const id = books.size + 1;
-        books.set(id, aPublicBook(id));
+        books.set(id, aPublicBook(id, coAuthorIds));
         return id;
       },
-      async aSeries() {
+      async aSeries(coAuthorIds) {
         const id = series.size + 1;
-        series.set(id, aPublicSeries(id));
+        series.set(id, aPublicSeries(id, coAuthorIds));
         return id;
       },
     };

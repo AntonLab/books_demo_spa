@@ -1,10 +1,14 @@
 import { request, toQueryString } from './client';
 import type {
   PagedResponse,
+  ReadingProgressPayload,
   ReadingStatus,
-  SetReadingStatusPayload,
 } from 'shared';
-import type { LibraryBook, PublicLibraryEntry } from '../types/library';
+import type {
+  BookLibraryState,
+  LibraryBook,
+  SeriesLibraryState,
+} from '../types/library';
 
 export interface ListLibraryParams {
   status?: ReadingStatus;
@@ -13,15 +17,20 @@ export interface ListLibraryParams {
   pageSize?: number;
 }
 
-// 404 when the viewer cannot see the book.
-export const setReadingStatus = (
-  bookId: number,
-  status: ReadingStatus
-): Promise<PublicLibraryEntry> => {
-  const payload: SetReadingStatusPayload = { status };
-  return request<PublicLibraryEntry>(`/library/${bookId}`, {
-    method: 'PUT',
-    body: payload,
+// Plan to read, unless the Book already has a status; 404 when the viewer
+// cannot see the book.
+export const addBookToLibrary = (bookId: number): Promise<BookLibraryState> => {
+  return request<BookLibraryState>(`/library/${bookId}/add`, {
+    method: 'POST',
+  });
+};
+
+// A toggle; the server answers 409 from reading or read.
+export const toggleBookNotInterested = (
+  bookId: number
+): Promise<BookLibraryState> => {
+  return request<BookLibraryState>(`/library/${bookId}/not-interested`, {
+    method: 'POST',
   });
 };
 
@@ -29,6 +38,45 @@ export const setReadingStatus = (
 // request() maps to undefined.
 export const clearReadingStatus = (bookId: number): Promise<void> => {
   return request<void>(`/library/${bookId}`, { method: 'DELETE' });
+};
+
+// The server answers 204. 401 for a Guest, 403 for a Co-author, 404 when the
+// viewer cannot read the Chapter.
+export const postReadingProgress = (
+  bookId: number,
+  payload: ReadingProgressPayload
+): Promise<void> => {
+  return request<void>(`/books/${bookId}/reading-progress`, {
+    method: 'POST',
+    body: payload,
+  });
+};
+
+// The Series calls act on every Published Book of the Series the viewer can
+// keep; 404 when the viewer cannot see the Series.
+export const addSeriesToLibrary = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(`/library/series/${seriesId}/add`, {
+    method: 'POST',
+  });
+};
+
+export const toggleSeriesNotInterested = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(
+    `/library/series/${seriesId}/not-interested`,
+    { method: 'POST' }
+  );
+};
+
+export const removeSeriesFromLibrary = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(`/library/series/${seriesId}`, {
+    method: 'DELETE',
+  });
 };
 
 // Undefined, null and empty-string params are left out, as listBooks does.

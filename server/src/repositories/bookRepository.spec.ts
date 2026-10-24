@@ -1311,6 +1311,131 @@ describe('bookRepository against real MySQL', { skip }, () => {
       );
     });
 
+    describe('hideNotInterested', () => {
+      const seedLibrary = async () => {
+        const hidden = await publishedBook('Hidden');
+        const reading = await publishedBook('Reading');
+        const plain = await publishedBook('Plain');
+        const others = await publishedBook('Others');
+        const viewer = await aFan();
+        const other = await aFan();
+        await LibraryEntry.create({
+          userId: viewer.id,
+          bookId: hidden.id,
+          status: 'not_interested',
+        });
+        await LibraryEntry.create({
+          userId: viewer.id,
+          bookId: reading.id,
+          status: 'reading',
+        });
+        await LibraryEntry.create({
+          userId: other.id,
+          bookId: plain.id,
+          status: 'not_interested',
+        });
+        return {
+          hidden,
+          reading,
+          plain,
+          others,
+          viewer: { id: viewer.id, role: 'user' } as const,
+        };
+      };
+      const flagged = {
+        current: 1,
+        pageSize: 20,
+        hideNotInterested: 'true',
+      } as const;
+
+      test("leaves out the viewer's not_interested Books only", async () => {
+        const { reading, plain, others, viewer } = await seedLibrary();
+
+        const page = await repository.list(flagged, viewer);
+
+        assert.deepEqual(
+          new Set(page.items.map((item) => item.id)),
+          new Set([reading.id, plain.id, others.id])
+        );
+        assert.equal(page.total, 3);
+      });
+
+      test('combines with another filter', async () => {
+        const { reading, plain, viewer } = await seedLibrary();
+
+        // 'n' is in Hidden, Reading and Plain, not in Others.
+        const page = await repository.list({ ...flagged, q: 'n' }, viewer);
+
+        assert.deepEqual(
+          new Set(page.items.map((item) => item.id)),
+          new Set([reading.id, plain.id])
+        );
+        assert.equal(page.total, 2);
+      });
+
+      test('is ignored for a Guest', async () => {
+        await seedLibrary();
+
+        const page = await repository.list(flagged, null);
+
+        assert.equal(page.items.length, 4);
+        assert.equal(page.total, 4);
+      });
+
+      test('without any not_interested entry changes nothing', async () => {
+        await publishedBook('One');
+        await publishedBook('Two');
+        const fan = await aFan();
+        const viewer = { id: fan.id, role: 'user' } as const;
+
+        const plain = await repository.list(
+          { current: 1, pageSize: 20 },
+          viewer
+        );
+        const page = await repository.list(flagged, viewer);
+
+        assert.equal(plain.total, 2);
+        assert.equal(page.total, 2);
+      });
+
+      test('keeps total and paging consistent', async () => {
+        const fan = await aFan();
+        for (const title of ['A', 'B', 'C']) await publishedBook(title);
+        for (const title of ['X', 'Y']) {
+          const book = await publishedBook(title);
+          await LibraryEntry.create({
+            userId: fan.id,
+            bookId: book.id,
+            status: 'not_interested',
+          });
+        }
+        const viewer = { id: fan.id, role: 'user' } as const;
+
+        const first = await repository.list(
+          { current: 1, pageSize: 2, hideNotInterested: 'true' },
+          viewer
+        );
+        const second = await repository.list(
+          { current: 2, pageSize: 2, hideNotInterested: 'true' },
+          viewer
+        );
+
+        assert.deepEqual([first.total, second.total], [3, 3]);
+        assert.deepEqual([first.items.length, second.items.length], [2, 1]);
+      });
+
+      test('without the flag a Not interested Book is still listed', async () => {
+        const { viewer } = await seedLibrary();
+
+        const page = await repository.list(
+          { current: 1, pageSize: 20 },
+          viewer
+        );
+
+        assert.equal(page.total, 4);
+      });
+    });
+
     test('a Draft book counts no favorites, yet names the viewer own, and republishing counts them again', async () => {
       const book = await publishedBook('Withdrawn');
       const fan = await aFan();

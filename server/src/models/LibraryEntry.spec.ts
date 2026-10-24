@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
 import { Book } from './Book.ts';
 import { initModels } from './index.ts';
-import { LibraryEntry, toPublicLibraryEntry } from './LibraryEntry.ts';
+import { LibraryEntry } from './LibraryEntry.ts';
 import { User } from './User.ts';
 
 // Sequelize's query generator is not part of the public typings, so it is
@@ -87,21 +87,4 @@ test('LibraryEntry belongs to a User and a Book, and each has many', () => {
   assert.equal(LibraryEntry.associations.book?.associationType, 'BelongsTo');
   assert.equal(User.associations.libraryEntries?.target.name, 'LibraryEntry');
   assert.equal(Book.associations.libraryEntries?.target.name, 'LibraryEntry');
-});
-
-test('toPublicLibraryEntry keeps bookId, status and updatedAt only', () => {
-  const updatedAt = new Date('2026-01-02T03:04:05Z');
-  const entry = LibraryEntry.build({
-    id: 1,
-    userId: 2,
-    bookId: 3,
-    status: 'read',
-    createdAt: updatedAt,
-    updatedAt,
-  });
-  assert.deepEqual(toPublicLibraryEntry(entry), {
-    bookId: 3,
-    status: 'read',
-    updatedAt,
-  });
 });

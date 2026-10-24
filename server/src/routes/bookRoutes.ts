@@ -1,7 +1,11 @@
 import express, { Router } from 'express';
 import { createBookController } from '../controllers/bookController.ts';
 import { createChapterController } from '../controllers/chapterController.ts';
-import { limitEveryRequestByUser } from '../middleware/authRateLimit.ts';
+import { createLibraryController } from '../controllers/libraryController.ts';
+import {
+  limitEveryRequestByUser,
+  limitUserWrites,
+} from '../middleware/authRateLimit.ts';
 import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { createRequirePermission } from '../middleware/requirePermission.ts';
 import { validate } from '../middleware/validate.ts';
@@ -11,6 +15,7 @@ import {
   updateBookSchema,
 } from '../types/book.ts';
 import { reorderChaptersSchema } from '../types/chapter.ts';
+import { readingProgressSchema } from '../types/library.ts';
 import {
   addCoAuthorSchema,
   coAuthorParamSchema,
@@ -119,6 +124,16 @@ export function createBookRoutes(deps: RouteDeps): Router {
     requirePermission('chapters', 'update'),
     validate({ params: idParamSchema, body: reorderChaptersSchema }),
     createChapterController(deps.chapterRepository).reorder
+  );
+
+  // Reading progress is the caller's own Library state, so requireAuth rather
+  // than the matrix; the Library repository owns the rules.
+  router.post(
+    '/:id/reading-progress',
+    requireAuth,
+    validate({ params: idParamSchema, body: readingProgressSchema }),
+    limitUserWrites(deps),
+    createLibraryController(deps.libraryRepository).recordProgress
   );
 
   return router;

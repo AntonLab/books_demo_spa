@@ -4,8 +4,9 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
 import * as booksApi from '@/api/books';
+import { queryKeys } from '@/queries/keys';
 import { publicBook } from '@/test/works';
-import type { BookSort } from 'shared';
+import type { BookSort, PagedResponse } from 'shared';
 import type { PublicBook } from '@/types/book';
 import type { PublicUser } from '@/types/api';
 
@@ -122,8 +123,44 @@ describe('MainPage', () => {
       within(section('New releases')).getByRole('link', { name: 'Fresh' })
     ).toBeInTheDocument();
     for (const sort of ['popular', 'new', 'updated']) {
-      expect(mockedBooks.listBooks).toHaveBeenCalledWith({ sort, pageSize: 6 });
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith({
+        sort,
+        pageSize: 6,
+        hideNotInterested: 'true',
+      });
     }
+  });
+
+  it('keeps the cache entry of a ranking without the flag apart from the section’s', async () => {
+    answerBySort({
+      popular: { titles: ['Loved'] },
+      new: { titles: [] },
+      updated: { titles: [] },
+    });
+    const queryClient = createTestQueryClient();
+    // The same ranking as another page asks for it, without the flag.
+    queryClient.setQueryData(
+      queryKeys.books({ sort: 'popular', pageSize: 6 }),
+      {
+        items: [{ ...book, id: 9, title: 'Unfiltered' }],
+        total: 1,
+        current: 1,
+        pageSize: 6,
+      }
+    );
+
+    renderWithProviders(<MainPage />, { queryClient });
+
+    expect(
+      await within(section('Popular')).findByRole('link', { name: 'Loved' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Unfiltered' })).toBeNull();
+    // A shared key would have had the fetch overwrite the unfiltered entry.
+    expect(
+      queryClient.getQueryData<PagedResponse<PublicBook>>(
+        queryKeys.books({ sort: 'popular', pageSize: 6 })
+      )?.items[0]?.title
+    ).toBe('Unfiltered');
   });
 
   it('links Show more to the full ranking only when a section holds more than six', async () => {

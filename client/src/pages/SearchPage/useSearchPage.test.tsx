@@ -88,6 +88,7 @@ describe('useSearchPage reading the URL', () => {
       sort: 'popular',
       current: 1,
       pageSize: 20,
+      hideNotInterested: 'true',
     });
     expect(page().filterCount).toBe(0);
     expect(page().form.initialValues).toMatchObject({
@@ -106,6 +107,7 @@ describe('useSearchPage reading the URL', () => {
       sort: 'popular',
       current: 1,
       pageSize: 50,
+      hideNotInterested: 'true',
     });
   });
 
@@ -116,6 +118,7 @@ describe('useSearchPage reading the URL', () => {
       sort: 'popular',
       current: 1,
       pageSize: 20,
+      hideNotInterested: 'true',
     });
   });
 
@@ -136,6 +139,7 @@ describe('useSearchPage reading the URL', () => {
       sort: 'new',
       current: 2,
       pageSize: 20,
+      hideNotInterested: 'true',
     });
     const values = page().form.initialValues;
     expect(values).toMatchObject({
@@ -161,6 +165,7 @@ describe('useSearchPage reading the URL', () => {
       sort: 'popular',
       current: 1,
       pageSize: 20,
+      hideNotInterested: 'true',
     });
     expect(page().form.initialValues).toMatchObject({
       author: 'annlee',

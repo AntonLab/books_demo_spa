@@ -1,4 +1,13 @@
-import { clearReadingStatus, listLibrary, setReadingStatus } from './library';
+import {
+  addBookToLibrary,
+  addSeriesToLibrary,
+  clearReadingStatus,
+  listLibrary,
+  postReadingProgress,
+  removeSeriesFromLibrary,
+  toggleBookNotInterested,
+  toggleSeriesNotInterested,
+} from './library';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
 const mockFetch = (response: Response): jest.Mock => {
@@ -19,28 +28,6 @@ afterEach(() => {
   document.cookie = 'xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 });
 
-describe('setReadingStatus', () => {
-  it('puts the status for a book, with the XSRF token', async () => {
-    const entry = {
-      bookId: 7,
-      status: 'reading',
-      updatedAt: '2026-10-02T10:00:00.000Z',
-    };
-    const fetchMock = mockFetch(jsonResponse(entry));
-
-    await expect(setReadingStatus(7, 'reading')).resolves.toEqual(entry);
-
-    const [url, init] = callOf(fetchMock);
-    expect(url).toBe('/api/library/7');
-    expect(init.method).toBe('PUT');
-    expect(init.headers).toEqual({
-      'Content-Type': 'application/json',
-      'X-XSRF-Token': 'tok-123',
-    });
-    expect(init.body).toBe('{"status":"reading"}');
-  });
-});
-
 describe('clearReadingStatus', () => {
   it('deletes the status for a book and resolves to undefined', async () => {
     const fetchMock = mockFetch(emptyResponse(204));
@@ -49,6 +36,86 @@ describe('clearReadingStatus', () => {
 
     const [url, init] = callOf(fetchMock);
     expect([url, init.method]).toEqual(['/api/library/7', 'DELETE']);
+  });
+});
+
+describe('postReadingProgress', () => {
+  it('posts the payload to /books/5/reading-progress and resolves to undefined', async () => {
+    const fetchMock = mockFetch(emptyResponse(204));
+
+    await expect(
+      postReadingProgress(5, { event: 'opened', chapterId: 12 })
+    ).resolves.toBeUndefined();
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([
+      '/api/books/5/reading-progress',
+      'POST',
+    ]);
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/json',
+      'X-XSRF-Token': 'tok-123',
+    });
+    expect(init.body).toBe('{"event":"opened","chapterId":12}');
+  });
+});
+
+describe('addBookToLibrary', () => {
+  it('posts /library/7/add and resolves to the state', async () => {
+    const state = { bookId: 7, status: 'plan_to_read' };
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(addBookToLibrary(7)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual(['/api/library/7/add', 'POST']);
+  });
+});
+
+describe('toggleBookNotInterested', () => {
+  it('posts /library/7/not-interested', async () => {
+    const state = { bookId: 7, status: null };
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(toggleBookNotInterested(7)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([
+      '/api/library/7/not-interested',
+      'POST',
+    ]);
+  });
+});
+
+describe('Series Library calls', () => {
+  const state = { inLibrary: true, notInterested: false };
+
+  it.each([
+    [
+      'addSeriesToLibrary',
+      addSeriesToLibrary,
+      '/api/library/series/5/add',
+      'POST',
+    ],
+    [
+      'toggleSeriesNotInterested',
+      toggleSeriesNotInterested,
+      '/api/library/series/5/not-interested',
+      'POST',
+    ],
+    [
+      'removeSeriesFromLibrary',
+      removeSeriesFromLibrary,
+      '/api/library/series/5',
+      'DELETE',
+    ],
+  ])('%s sends %s %s', async (_name, call, path, method) => {
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(call(5)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([path, method]);
   });
 });
 

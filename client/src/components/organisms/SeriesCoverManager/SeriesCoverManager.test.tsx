@@ -18,6 +18,7 @@ const series: SeriesDetail = {
   }),
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerLibrary: null,
 };
 
 // antd's Upload hides its real input; the page tests reach for it the same way.

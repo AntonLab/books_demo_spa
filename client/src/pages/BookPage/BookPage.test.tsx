@@ -414,12 +414,11 @@ describe('BookPage', () => {
     expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
   });
 
-  it('offers the star with its count to a co-author too', async () => {
+  it('hides the star from a co-author', async () => {
     renderPage({ ...reader, id: 4 });
 
-    expect(
-      await screen.findByRole('button', { name: 'Add to favorites' })
-    ).toHaveTextContent('2');
+    await screen.findByRole('button', { name: 'Edit' });
+    expect(screen.queryByRole('button', { name: /favorites/i })).toBeNull();
   });
 
   it('adds the book to the reader’s Favorites', async () => {
@@ -701,84 +700,154 @@ describe('BookPage lower tabs', () => {
 });
 
 describe('Library', () => {
-  it('shows the counts to a Guest, without the dropdown', async () => {
+  it('shows the counts to a Guest, without the Library buttons', async () => {
     mockedBooks.getBook.mockResolvedValue({
       ...book,
       libraryCounts: { reading: 1, planToRead: 1, read: 1, inLibraries: 3 },
     });
     renderPage();
     expect(await screen.findByText('In 3 libraries')).toBeInTheDocument();
-    expect(
-      screen.queryByRole('combobox', { name: 'Reading status' })
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add to Library' })).toBeNull();
   });
 
-  it('shows the reader’s own status in the dropdown', async () => {
-    mockedBooks.getBook.mockResolvedValue({
-      ...book,
-      viewerReadingStatus: 'reading',
-    });
+  const addButton = { name: 'Add to Library' };
+  const removeButton = { name: 'Remove from Library' };
+  const notInterestedButton = { name: 'Not interested' };
+  const withStatus = (viewerReadingStatus: BookDetail['viewerReadingStatus']) =>
+    mockedBooks.getBook.mockResolvedValue({ ...book, viewerReadingStatus });
+
+  it('no status shows Add to Library and an enabled Not interested', async () => {
     renderPage(reader);
-    const select = await screen.findByRole('combobox', {
-      name: 'Reading status',
-    });
-    expect(
-      within(select.closest('.ant-select') as HTMLElement).getByText('Reading')
-    ).toBeInTheDocument();
+
+    expect(await screen.findByRole('button', addButton)).toBeEnabled();
+    expect(screen.getByRole('button', notInterestedButton)).toBeEnabled();
+    expect(screen.queryByRole('button', removeButton)).toBeNull();
   });
 
-  it('sets a status and refetches the book', async () => {
-    mockedLibrary.setReadingStatus.mockResolvedValue({
-      bookId: 1,
-      status: 'reading',
-      updatedAt: '2026-10-02T10:00:00.000Z',
-    });
+  it('not_interested shows Add to Library and Not interested pressed', async () => {
+    withStatus('not_interested');
     renderPage(reader);
-    await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
+
+    expect(await screen.findByRole('button', addButton)).toBeInTheDocument();
+    expect(screen.getByRole('button', notInterestedButton)).toHaveAttribute(
+      'aria-pressed',
+      'true'
     );
-    await userEvent.click(screen.getByTitle('Reading'));
-    expect(mockedLibrary.setReadingStatus).toHaveBeenCalledWith(1, 'reading');
-    await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
   });
 
-  it('removes the book from the Library', async () => {
-    mockedBooks.getBook.mockResolvedValue({
-      ...book,
-      viewerReadingStatus: 'read',
+  it('plan_to_read shows Remove from Library and an enabled Not interested', async () => {
+    withStatus('plan_to_read');
+    renderPage(reader);
+
+    expect(await screen.findByRole('button', removeButton)).toBeInTheDocument();
+    expect(screen.queryByRole('button', addButton)).toBeNull();
+    expect(screen.getByRole('button', notInterestedButton)).toBeEnabled();
+    expect(screen.queryByText('Remove it from your Library first')).toBeNull();
+  });
+
+  it.each(['reading', 'read'] as const)(
+    '%s disables Not interested and shows the hint',
+    async (status) => {
+      withStatus(status);
+      renderPage(reader);
+
+      expect(
+        await screen.findByRole('button', notInterestedButton)
+      ).toBeDisabled();
+      expect(
+        screen.getByText('Remove it from your Library first')
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('pressing Add sends the add request for the book', async () => {
+    mockedLibrary.addBookToLibrary.mockResolvedValue({
+      bookId: 1,
+      status: 'plan_to_read',
     });
+    renderPage(reader);
+
+    await userEvent.click(await screen.findByRole('button', addButton));
+
+    expect(mockedLibrary.addBookToLibrary).toHaveBeenCalledWith(1);
+  });
+
+  it('pressing Not interested sends the toggle request for the book', async () => {
+    mockedLibrary.toggleBookNotInterested.mockResolvedValue({
+      bookId: 1,
+      status: 'not_interested',
+    });
+    renderPage(reader);
+
+    await userEvent.click(
+      await screen.findByRole('button', notInterestedButton)
+    );
+
+    expect(mockedLibrary.toggleBookNotInterested).toHaveBeenCalledWith(1);
+  });
+
+  it('pressing Remove sends the remove request for the book', async () => {
+    withStatus('plan_to_read');
     mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
     renderPage(reader);
-    await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
-    );
-    await userEvent.click(screen.getByTitle('Remove from library'));
+
+    await userEvent.click(await screen.findByRole('button', removeButton));
+
     expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(1);
   });
 
   it('toasts a failed change and refetches the book', async () => {
-    mockedLibrary.setReadingStatus.mockRejectedValue(
+    mockedLibrary.addBookToLibrary.mockRejectedValue(
       new ApiError(404, 'Book 1 not found')
     );
     renderPage(reader);
-    await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
-    );
-    await userEvent.click(screen.getByTitle('Read'));
+
+    await userEvent.click(await screen.findByRole('button', addButton));
+
     expect(await screen.findByText('Book 1 not found')).toBeInTheDocument();
     await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalledTimes(2));
   });
 
-  it('disables the dropdown while a change is in flight', async () => {
-    mockedLibrary.setReadingStatus.mockReturnValue(new Promise(() => {}));
+  it('buttons are disabled while a Library request is pending', async () => {
+    withStatus('plan_to_read');
+    mockedLibrary.clearReadingStatus.mockReturnValue(new Promise(() => {}));
     renderPage(reader);
-    await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
+
+    await userEvent.click(await screen.findByRole('button', removeButton));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', removeButton)).toBeDisabled()
     );
-    await userEvent.click(screen.getByTitle('Read'));
-    expect(
-      screen.getByRole('combobox', { name: 'Reading status' })
-    ).toBeDisabled();
+    expect(screen.getByRole('button', notInterestedButton)).toBeDisabled();
+  });
+
+  it('holds Add and Not interested while an add is pending', async () => {
+    mockedLibrary.addBookToLibrary.mockReturnValue(new Promise(() => {}));
+    renderPage(reader);
+
+    await userEvent.click(await screen.findByRole('button', addButton));
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', addButton)).toBeDisabled()
+    );
+    expect(screen.getByRole('button', notInterestedButton)).toBeDisabled();
+  });
+
+  it.each([
+    ['a Co-author', { ...reader, id: 4 }],
+    ['a Guest', undefined],
+  ])('%s sees neither Library buttons nor Favorite', async (_who, session) => {
+    renderPage(session);
+    await screen.findByText('In 0 libraries');
+
+    for (const name of [
+      'Add to Library',
+      'Remove from Library',
+      'Not interested',
+      'Add to favorites',
+    ]) {
+      expect(screen.queryByRole('button', { name })).toBeNull();
+    }
   });
 });
 
@@ -939,14 +1008,15 @@ describe('BookPage header and action row', () => {
     expect(screen.queryByRole('tab', { name: 'Description' })).toBeNull();
   });
 
-  it('lays the actions out as Like, Favorite, Library status, Add to reading list, Edit, then the library counts', async () => {
+  it('lays the actions out as Like, Favorite, Library buttons, Add to reading list, Edit, then the library counts', async () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'complete' });
     renderPage(moderator);
 
     const names = [
       await screen.findByRole('button', { name: 'Like' }),
       screen.getByRole('button', { name: 'Add to favorites' }),
-      screen.getByRole('combobox', { name: 'Reading status' }),
+      screen.getByRole('button', { name: 'Add to Library' }),
+      screen.getByRole('button', { name: 'Not interested' }),
       screen.getByRole('button', { name: 'Add to reading list' }),
       screen.getByRole('button', { name: 'Edit' }),
       screen.getByText('In 0 libraries'),
