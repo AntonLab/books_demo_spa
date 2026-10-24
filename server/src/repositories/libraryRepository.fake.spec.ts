@@ -39,13 +39,14 @@ describe('the fake libraryRepository', () => {
       async seedStatus(accountId, bookId, status) {
         repository.seedStatus(accountId, bookId, status);
       },
-      async aChapter(bookId, { published }) {
+      async aChapter(bookId, { published, publishedAt, position }) {
         const id = chapters.length + 1;
         chapters.push({
           id,
           bookId,
-          position: chapters.filter((c) => c.bookId === bookId).length + 1,
-          publishedAt: published ? new Date(0) : null,
+          position:
+            position ?? chapters.filter((c) => c.bookId === bookId).length + 1,
+          publishedAt: published ? (publishedAt ?? new Date(0)) : null,
         });
         return id;
       },

@@ -34,8 +34,12 @@ export interface LibraryRepositoryContractWorld {
   // Turns a Book into a Draft, or back to Published.
   setDraft(bookId: number, draft: boolean): Promise<void>;
   // A Chapter of the Book exists, Published or not; positions ascend in call
-  // order. Answers its id.
-  aChapter(bookId: number, options: { published: boolean }): Promise<number>;
+  // order unless `position` is given, and `publishedAt` (a Published one only)
+  // defaults to a moment in the past. Answers its id.
+  aChapter(
+    bookId: number,
+    options: { published: boolean; publishedAt?: Date; position?: number }
+  ): Promise<number>;
   // Turns a Book into a Complete one.
   setComplete(bookId: number): Promise<void>;
   // A Series credited to these accounts exists; answers its id.
@@ -352,6 +356,26 @@ export function libraryRepositoryContract(
     assert.equal(await statusOf(repository, me, none), 'not_interested');
   });
 
+  test('contract: toggleSeriesNotInterested with some Books already marked marks the rest; only all marked clears', async () => {
+    const { repository, seedStatus, me, seriesId, books } =
+      await arrangeSeries(2);
+    await seedStatus(me.id, books[0]!, 'not_interested');
+    assert.deepEqual(await repository.toggleSeriesNotInterested(seriesId, me), {
+      inLibrary: false,
+      notInterested: true,
+    });
+    for (const id of books) {
+      assert.equal(await statusOf(repository, me, id), 'not_interested');
+    }
+    assert.deepEqual(await repository.toggleSeriesNotInterested(seriesId, me), {
+      inLibrary: false,
+      notInterested: false,
+    });
+    for (const id of books) {
+      assert.equal(await statusOf(repository, me, id), undefined);
+    }
+  });
+
   test('contract: toggleSeriesNotInterested with a co-authored Book marks the free Books, and a second press clears them', async () => {
     const { repository, aBookInSeries, anAccount, seriesId, books } =
       await arrangeSeries(2);
@@ -529,6 +553,70 @@ export function libraryRepositoryContract(
       ),
       new NotFoundError('Chapter', hidden)
     );
+  });
+
+  test('contract: a Chapter published exactly now is Published, one a second later is not', async (t) => {
+    const world = await arrange();
+    const { repository, me } = world;
+    const book = world.books[0]!;
+    const now = Math.floor(Date.now() / 1000) * 1000;
+    const early = await world.aChapter(book, {
+      published: true,
+      publishedAt: new Date(now - 3_600_000),
+    });
+    const exact = await world.aChapter(book, {
+      published: true,
+      publishedAt: new Date(now),
+    });
+    const later = await world.aChapter(book, {
+      published: true,
+      publishedAt: new Date(now + 1000),
+    });
+    await world.setComplete(book);
+    t.mock.timers.enable({ apis: ['Date'], now });
+    await assert.rejects(
+      repository.recordProgress(
+        book,
+        { event: 'finished', chapterId: later },
+        me
+      ),
+      new NotFoundError('Chapter', later)
+    );
+    // `exact` is the last Published one: `later` does not count yet.
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: early },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), undefined);
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: exact },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), 'read');
+  });
+
+  test('contract: Chapters sharing a position: the higher id is the last one', async () => {
+    const world = await arrange();
+    const { repository, me } = world;
+    const book = world.books[0]!;
+    await world.aChapter(book, { published: true, position: 1 });
+    const lowId = await world.aChapter(book, { published: true, position: 2 });
+    const highId = await world.aChapter(book, { published: true, position: 2 });
+    await world.setComplete(book);
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: lowId },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), undefined);
+    await repository.recordProgress(
+      book,
+      { event: 'finished', chapterId: highId },
+      me
+    );
+    assert.equal(await statusOf(repository, me, book), 'read');
   });
 
   test('contract: recordProgress finished does nothing on a Book that is not Complete', async () => {

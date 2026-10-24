@@ -230,17 +230,20 @@ describe('libraryRepository against real MySQL', { skip }, () => {
       );
       return book.id;
     },
-    async aChapter(bookId, { published }) {
-      const position =
+    async aChapter(bookId, { published, publishedAt, position }) {
+      const next =
+        position ??
         ((await Chapter.max<number, Chapter>('position', {
           where: { bookId },
         })) ?? 0) + 1;
       const chapter = await Chapter.create({
         bookId,
-        title: `Contract Chapter ${position}`,
+        title: `Contract Chapter ${next}`,
         text: 'x',
-        position,
-        publishedAt: published ? new Date(Date.now() - 1000) : null,
+        position: next,
+        publishedAt: published
+          ? (publishedAt ?? new Date(Date.now() - 1000))
+          : null,
       });
       return chapter.id;
     },
