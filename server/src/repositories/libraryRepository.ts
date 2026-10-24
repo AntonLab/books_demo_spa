@@ -193,7 +193,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   // co-authors are left out.
   async function publishedBooksOf(
     seriesId: number,
-    accountId: number,
+    account: Account,
     withOwn: boolean
   ) {
     const books = await Book.findAll({
@@ -203,7 +203,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     const bookIds = books.map((book) => book.id);
     if (withOwn || bookIds.length === 0) return bookIds;
     const own = await BookAuthor.findAll({
-      where: { userId: accountId, bookId: bookIds },
+      where: { userId: account.id, bookId: bookIds },
       attributes: ['bookId'],
     });
     const ownIds = new Set(own.map((credit) => credit.bookId));
@@ -219,7 +219,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     write: (bookIds: number[], transaction: Transaction) => Promise<void>
   ) {
     await assertMayHoldSeries(seriesId, account, message);
-    const bookIds = await publishedBooksOf(seriesId, account.id, !message);
+    const bookIds = await publishedBooksOf(seriesId, account, !message);
     if (bookIds.length > 0) {
       await sequelizeOf(LibraryEntry).transaction((transaction) =>
         write(bookIds, transaction)

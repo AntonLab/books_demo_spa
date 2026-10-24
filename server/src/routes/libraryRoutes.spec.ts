@@ -472,20 +472,31 @@ test('series remove: clears every Published Book, answers 200 with both flags fa
   );
 });
 
-test('series with no Published Book: 200, both flags false, nothing written', async () => {
+test('series with no Published Book: 200 for a Moderator, both flags false, nothing written; 404 for a plain reader', async () => {
   await withAuthenticatedApp(
     { libraryRepository: fakeRepository() },
     async (base) => {
+      const cookie = ROLE_COOKIES.admin;
       for (const action of ['add', 'not-interested']) {
         assert.deepEqual(
-          await seriesPress(base, seriesPath(DRAFT_ONLY_SERIES_ID, action)),
+          await seriesPress(
+            base,
+            seriesPath(DRAFT_ONLY_SERIES_ID, action),
+            cookie
+          ),
           { inLibrary: false, notInterested: false }
         );
+        const res = await post(
+          base,
+          ROLE_COOKIES.user,
+          seriesPath(DRAFT_ONLY_SERIES_ID, action)
+        );
+        assert.equal(res.status, 404);
       }
       const hidden = await json<Wire<PagedResponse<LibraryBook>>>(
-        await list(base, ROLE_COOKIES.user, '?status=not_interested')
+        await list(base, cookie, '?status=not_interested')
       );
-      assert.deepEqual(await statusesOf(base, ROLE_COOKIES.user), {});
+      assert.deepEqual(await statusesOf(base, cookie), {});
       assert.equal(hidden.total, 0);
     }
   );

@@ -19,8 +19,8 @@ export interface FakeLibraryRepositoryOptions {
   accounts?: ReadonlySet<number>;
   // The books that exist, as a list row embeds them.
   books?: Map<number, PublicBook>;
-  // The Series that exist; a Book's `seriesId` links it. Every one is visible
-  // here, as the fake knows no Series visibility rule.
+  // The Series that exist; a Book's `seriesId` links it. One with no Published
+  // Book is visible only to its Co-authors and Moderators.
   series?: Map<number, { authorIds: number[] }>;
   // The Chapters that exist; a null `publishedAt` is not Published.
   chapters?: Array<{
@@ -120,16 +120,23 @@ export function createFakeLibraryRepository(
     message: string | null
   ) {
     const row = series.get(seriesId);
-    if (!row) throw new NotFoundError('Series', seriesId);
-    if (message && row.authorIds.includes(account.id)) {
-      throw new ForbiddenError(message);
-    }
+    const credited = row?.authorIds.includes(account.id) ?? false;
+    // The rule of visibleSeriesWhere: a Moderator, a Co-author, or any reader
+    // of a Series with a Published Book.
+    const mayRead =
+      row &&
+      (isModeratorRole(account.role) ||
+        credited ||
+        publishedIn(seriesId).length > 0);
+    if (!mayRead) throw new NotFoundError('Series', seriesId);
+    if (message && credited) throw new ForbiddenError(message);
   }
 
-  const publishedIn = (seriesId: number) =>
-    [...books.values()].filter(
+  function publishedIn(seriesId: number) {
+    return [...books.values()].filter(
       (book) => book.seriesId === seriesId && book.status !== 'draft'
     );
+  }
 
   // The Published Books of a Series the account does not co-author.
   const holdableIn = (seriesId: number, account: Account) =>

@@ -475,6 +475,26 @@ export function libraryRepositoryContract(
     assert.equal(await statusOf(repository, moderator, draft), undefined);
   });
 
+  test('contract: a Series with only a Draft Book is a NotFoundError for a plain reader, not for its Co-author or a Moderator', async () => {
+    const { repository, aBookInSeries, aSeries, anAccount, me, author } =
+      await arrange(0);
+    const seriesId = await aSeries([author.id]);
+    await aBookInSeries(seriesId, [author.id], { draft: true });
+    const moderator: Account = { id: await anAccount(), role: 'admin' };
+    for (const action of [
+      'addSeries',
+      'toggleSeriesNotInterested',
+      'clearSeries',
+    ] as const) {
+      await assert.rejects(
+        repository[action](seriesId, me),
+        new NotFoundError('Series', seriesId)
+      );
+    }
+    await repository.clearSeries(seriesId, author);
+    await repository.addSeries(seriesId, moderator);
+  });
+
   test('contract: Series actions refuse a missing Series, add and not-interested also a Co-author', async () => {
     const { repository, me, author, seriesId } = await arrangeSeries();
     const actions = [
