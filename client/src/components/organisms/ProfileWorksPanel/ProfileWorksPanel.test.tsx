@@ -5,6 +5,7 @@ import { ProfileWorksPanel } from './ProfileWorksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
@@ -155,8 +156,9 @@ describe('ProfileWorksPanel edit modals', () => {
     mockedBooks.updateBook.mockResolvedValue(bookDetail);
     renderPanel('mine');
 
+    await openWorkMenu('Out Now');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit Out Now' })
+      await screen.findByRole('menuitem', { name: 'Edit' })
     );
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Edit book')).toBeInTheDocument();
@@ -172,8 +174,9 @@ describe('ProfileWorksPanel edit modals', () => {
     mockedSeries.getSeries.mockResolvedValue(seriesDetail);
     renderPanel('mine', '/p?tab=series');
 
+    await openWorkMenu('The Scale Cycle');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit The Scale Cycle' })
+      await screen.findByRole('menuitem', { name: 'Edit' })
     );
 
     const dialog = await screen.findByRole('dialog');

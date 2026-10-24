@@ -7,6 +7,7 @@ import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
@@ -97,10 +98,13 @@ describe('ProfileBooksList in My works', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 3, current: 1, pageSize: 20 })
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Edit Out Now' }));
+    await openWorkMenu('Out Now');
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Edit' })
+    );
     expect(onEdit).toHaveBeenCalledWith(2);
     expect(
-      screen.getByRole('button', { name: 'Delete Out Now' })
+      screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
   });
 
@@ -175,9 +179,12 @@ describe('ProfileBooksList in Favorites', () => {
 
     await screen.findByRole('link', { name: 'Out Now' });
     expect(screen.getByLabelText('Author')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^(Edit|Delete)/ })).toBeNull();
+    await openWorkMenu('Out Now');
+    expect(
+      screen.queryByRole('menuitem', { name: /^(Edit|Delete)$/ })
+    ).toBeNull();
     await userEvent.click(
-      screen.getByRole('button', { name: 'Remove Out Now from favorites' })
+      await screen.findByRole('menuitem', { name: 'Remove from favorites' })
     );
 
     await waitFor(() =>
@@ -214,12 +221,13 @@ describe('ProfileSeriesList', () => {
       await screen.findByRole('link', { name: 'The Scale Cycle' })
     ).toHaveAttribute('href', '/series/12');
     expect(screen.getByText('1 book')).toBeInTheDocument();
+    await openWorkMenu('The Scale Cycle');
     await userEvent.click(
-      screen.getByRole('button', { name: 'Edit The Scale Cycle' })
+      await screen.findByRole('menuitem', { name: 'Edit' })
     );
     expect(onEdit).toHaveBeenCalledWith(12);
     expect(
-      screen.getByRole('button', { name: 'Delete The Scale Cycle' })
+      screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Tag')).toBeInTheDocument();
     for (const label of ['Author', 'Status'])
@@ -239,10 +247,10 @@ describe('ProfileSeriesList', () => {
       '/p?tab=series'
     );
 
+    await screen.findByRole('link', { name: 'The Scale Cycle' });
+    await openWorkMenu('The Scale Cycle');
     await userEvent.click(
-      await screen.findByRole('button', {
-        name: 'Remove The Scale Cycle from favorites',
-      })
+      await screen.findByRole('menuitem', { name: 'Remove from favorites' })
     );
 
     await waitFor(() =>
