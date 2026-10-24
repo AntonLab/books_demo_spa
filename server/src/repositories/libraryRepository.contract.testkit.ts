@@ -104,12 +104,13 @@ export function libraryRepositoryContract(
     await repository.clear(MISSING_ID, me);
   });
 
-  test('contract: clear refuses the Co-author', async () => {
-    const { repository, author, books } = await arrange();
-    await assert.rejects(
-      repository.clear(books[0]!, author),
-      new ForbiddenError('You cannot remove your own work from your Library')
-    );
+  test('contract: clear deletes a Co-author leftover entry, and resolves with none', async () => {
+    const { repository, seedStatus, author, books } = await arrange();
+    await repository.clear(books[0]!, author);
+    await seedStatus(author.id, books[0]!, 'read');
+    assert.equal((await repository.list(FIRST_PAGE, author)).total, 1);
+    await repository.clear(books[0]!, author);
+    assert.equal((await repository.list(FIRST_PAGE, author)).total, 0);
   });
 
   test('contract: addBook puts a Book in plan_to_read, and again keeps it', async () => {

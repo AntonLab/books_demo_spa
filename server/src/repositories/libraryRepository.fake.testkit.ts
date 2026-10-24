@@ -187,11 +187,6 @@ export function createFakeLibraryRepository(
     },
 
     async clear(bookId, account) {
-      if (isCoAuthor(bookId, account)) {
-        throw new ForbiddenError(
-          'You cannot remove your own work from your Library'
-        );
-      }
       entries.delete(`${account.id}:${bookId}`);
     },
 

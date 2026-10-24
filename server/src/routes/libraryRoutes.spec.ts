@@ -257,7 +257,7 @@ test('not-interested: none and plan_to_read become not_interested, a second pres
         return (await json<Wire<BookLibraryState>>(res)).status;
       };
       assert.equal(await press(FREE_BOOK_ID), 'not_interested');
-      await press(FREE_BOOK_ID);
+      assert.equal(await press(FREE_BOOK_ID), null);
       await post(base, ROLE_COOKIES.user, `${OTHER_BOOK_ID}/add`);
       assert.equal(await press(OTHER_BOOK_ID), 'not_interested');
       const cleared = await post(
@@ -305,7 +305,7 @@ test('not-interested: reading and read answer 409', async () => {
   );
 });
 
-test('a Co-author gets 403 on add, not-interested and remove of their own Book', async () => {
+test('a Co-author gets 403 on add and not-interested of their own Book', async () => {
   await withAuthenticatedApp(
     { libraryRepository: fakeRepository() },
     async (base) => {
@@ -315,7 +315,31 @@ test('a Co-author gets 403 on add, not-interested and remove of their own Book',
         (await post(base, cookie, `${BOOK_ID}/not-interested`)).status,
         403
       );
-      assert.equal((await clear(base, cookie, BOOK_ID)).status, 403);
+    }
+  );
+});
+
+test("a Co-author's remove deletes a leftover entry and answers 204, also with none", async () => {
+  const leftover = {
+    ...seedFor(BOOK_ID, 'read'),
+    userId: USER_IDS.author,
+  };
+  await withAuthenticatedApp(
+    { libraryRepository: fakeRepository([leftover]) },
+    async (base) => {
+      const cookie = ROLE_COOKIES.author;
+      assert.equal(
+        (await list(base, cookie).then(json<Wire<PagedResponse<LibraryBook>>>))
+          .total,
+        1
+      );
+      assert.equal((await clear(base, cookie, BOOK_ID)).status, 204);
+      assert.equal(
+        (await list(base, cookie).then(json<Wire<PagedResponse<LibraryBook>>>))
+          .total,
+        0
+      );
+      assert.equal((await clear(base, cookie, BOOK_ID)).status, 204);
     }
   );
 });
@@ -676,7 +700,7 @@ test('finished is a no-op on a Chapter that is not the last Published one, and o
   );
 });
 
-test('finished does not lower read to anything', async () => {
+test('opened does not lower read to reading', async () => {
   await withAuthenticatedApp(
     { libraryRepository: progressRepository([seedFor(COMPLETE_ID, 'read')]) },
     async (base) => {

@@ -43,8 +43,8 @@ export interface LibraryRepository {
     bookId: number,
     account: Account
   ): Promise<BookLibraryState>;
-  // Resolves for nothing to clear and for a missing Book; a Co-author is
-  // refused with ForbiddenError.
+  // Resolves for nothing to clear and for a missing Book; a Co-author may
+  // clear a leftover entry.
   clear(bookId: number, account: Account): Promise<void>;
   // The Series actions run over its Published Books, leaving out the ones the
   // account co-authors; a Co-author of the Series is refused with
@@ -252,7 +252,6 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         account,
         'You cannot mark your own work as not interested'
       );
-      // Conditional writes on the stored status, as in `addBook`.
       if (await insertIfAbsent(bookId, 'not_interested', account)) {
         return { bookId, status: 'not_interested' };
       }
@@ -273,11 +272,6 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     },
 
     async clear(bookId, account) {
-      await assertNotCoAuthor(
-        bookId,
-        account,
-        'You cannot remove your own work from your Library'
-      );
       await LibraryEntry.destroy({ where: { userId: account.id, bookId } });
     },
 
@@ -371,8 +365,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       if (!chapter) throw new NotFoundError('Chapter', input.chapterId);
 
       if (input.event === 'opened') {
-        // Conditional statements, as in `addBook`: a concurrent write or
-        // `finished` is never lowered to reading.
+        // Guarded by the stored status: a concurrent finished is never lowered.
         await insertIfAbsent(bookId, 'reading', account);
         await LibraryEntry.update(
           { status: 'reading', updatedAt: new Date() },
