@@ -1,10 +1,10 @@
 import { useState, type FC } from 'react';
 import { Button, Tabs } from 'antd';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { BookCreateModal } from '@/components/organisms/BookCreateModal/BookCreateModal';
 import { SeriesCreateModal } from '@/components/organisms/SeriesCreateModal/SeriesCreateModal';
-import { BookEditDetailsModal } from '@/components/organisms/BookEditDetailsModal/BookEditDetailsModal';
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
+import { EDIT_PARAM, EDIT_PARAM_OPEN } from '@/constants/editParam';
 import type { ProfileScope } from '@/types/profileScope';
 import { ProfileBooksList } from './ProfileBooksList';
 import { ProfileSeriesList } from './ProfileSeriesList';
@@ -20,10 +20,8 @@ interface Props {
 export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [creating, setCreating] = useState<'book' | 'series' | null>(null);
-  const [editing, setEditing] = useState<{
-    kind: 'book' | 'series';
-    id: number;
-  } | null>(null);
+  const [editingSeriesId, setEditingSeriesId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   // The inner tab lives in the URL (`?tab=series`) because each list keeps its
   // filters there too; this supersedes ADR-0010 for these two panels. Replacing
@@ -58,7 +56,9 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
               <ProfileBooksList
                 scope={scope}
                 viewerId={viewerId}
-                onEdit={(id) => setEditing({ kind: 'book', id })}
+                onEdit={(id) =>
+                  void navigate(`/books/${id}?${EDIT_PARAM}=${EDIT_PARAM_OPEN}`)
+                }
               />
             ),
           },
@@ -69,7 +69,7 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
               <ProfileSeriesList
                 scope={scope}
                 viewerId={viewerId}
-                onEdit={(id) => setEditing({ kind: 'series', id })}
+                onEdit={setEditingSeriesId}
               />
             ),
           },
@@ -84,16 +84,10 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
       {creating === 'series' && (
         <SeriesCreateModal onClose={() => setCreating(null)} />
       )}
-      {editing?.kind === 'book' && (
-        <BookEditDetailsModal
-          bookId={editing.id}
-          onClose={() => setEditing(null)}
-        />
-      )}
-      {editing?.kind === 'series' && (
+      {editingSeriesId !== null && (
         <SeriesEditDetailsModal
-          seriesId={editing.id}
-          onClose={() => setEditing(null)}
+          seriesId={editingSeriesId}
+          onClose={() => setEditingSeriesId(null)}
         />
       )}
     </>

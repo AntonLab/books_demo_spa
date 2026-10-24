@@ -2,7 +2,6 @@ import type { FC } from 'react';
 import { Pagination } from 'antd';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { ReadingListCard } from '@/components/organisms/ReadingListCard/ReadingListCard';
-import { RESULTS_COLUMNS } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import type { BookReadingLists } from './useBookReadingLists';
 import styles from './BookReadingListsTab.module.css';
 
@@ -16,7 +15,7 @@ export const BookReadingListsTab: FC<{ list: BookReadingLists }> = ({
       renderItem={(item) => (
         <ReadingListCard list={item} href={'/lists/' + item.id} />
       )}
-      columns={RESULTS_COLUMNS.list}
+      carousel
       isPending={list.isPending}
       isError={list.error !== null}
       error={list.error}

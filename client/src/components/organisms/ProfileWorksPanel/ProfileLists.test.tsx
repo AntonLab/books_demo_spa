@@ -7,7 +7,7 @@ import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
-import { clickWorkMenuItem } from '@/test/workMenu';
+import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
@@ -83,17 +83,60 @@ describe('ProfileBooksList in My works', () => {
     );
   });
 
-  it('lists the viewer’s books, Drafts included, full width even when the layout switch says grid', async () => {
-    const onEdit = jest.fn();
+  it('shows the viewer’s Books as tiles in grid layout, with Edit and Delete still reachable', async () => {
     const { store } = renderAs(
-      <ProfileBooksList scope="mine" viewerId={3} onEdit={onEdit} />
+      <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
     );
-
     const link = await screen.findByRole('link', { name: 'Private Draft' });
     act(() => {
       store.dispatch(devicePreferences.resultsLayoutChanged('grid'));
     });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
+    expect(screen.queryByText('D.')).toBeNull();
+    await openWorkMenu('Out Now');
+    expect(screen.getByRole('menuitem', { name: 'Edit' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Delete' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the viewer’s Books full width in list layout', async () => {
+    const { store } = renderAs(
+      <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
+    );
+    const link = await screen.findByRole('link', { name: 'Private Draft' });
+    act(() => {
+      store.dispatch(devicePreferences.resultsLayoutChanged('list'));
+    });
     expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    expect(screen.getAllByText('D.').length).toBeGreaterThan(0);
+  });
+
+  it('has the layout switch, and a pick changes the Device preference', async () => {
+    const { store } = renderAs(
+      <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
+    );
+    await screen.findByRole('link', { name: 'Out Now' });
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+  });
+
+  it('keeps the switch when the list is empty', async () => {
+    mockedBooks.listBooks.mockResolvedValue(page([]));
+    renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />);
+    expect(
+      await screen.findByText('You have not written a book yet.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('lists the viewer’s books, Drafts included, and wires Edit', async () => {
+    const onEdit = jest.fn();
+    renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={onEdit} />);
+
+    await screen.findByRole('link', { name: 'Private Draft' });
     expect(screen.getByText('Draft')).toBeInTheDocument();
     expect(mockedBooks.listBooks).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 3, current: 1, pageSize: 20 })
@@ -221,6 +264,20 @@ describe('ProfileSeriesList', () => {
     for (const label of ['Author', 'Status'])
       expect(screen.queryByLabelText(label)).toBeNull();
     expect(screen.queryByRole('radiogroup', { name: 'Sort by' })).toBeNull();
+  });
+
+  it('stays full width without the layout switch even when the preference says grid', async () => {
+    mockedSeries.listSeries.mockResolvedValue(seriesPage([series]));
+    const { store } = renderAs(
+      <ProfileSeriesList scope="mine" viewerId={3} onEdit={jest.fn()} />,
+      '/p?tab=series'
+    );
+    const link = await screen.findByRole('link', { name: 'The Scale Cycle' });
+    act(() => {
+      store.dispatch(devicePreferences.resultsLayoutChanged('grid'));
+    });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    expect(screen.queryByRole('group', { name: 'Results layout' })).toBeNull();
   });
 
   it('Favorites: removes by favorite id', async () => {

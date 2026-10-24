@@ -198,7 +198,7 @@ describe('ChapterPage', () => {
   it('fetches the chapter named in the route', async () => {
     renderAt(9);
 
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     expect(mocked.getChapter).toHaveBeenCalledWith(9);
   });
@@ -207,14 +207,67 @@ describe('ChapterPage', () => {
     renderAt(9);
 
     expect(
-      await screen.findByRole('heading', { name: 'One' })
+      await screen.findByRole('heading', { name: 'Chapter 1. One' })
     ).toBeInTheDocument();
     expect(screen.getByText('It was a dark night.')).toBeInTheDocument();
   });
 
+  it('numbers the heading by place in Reading order', async () => {
+    renderAt(10);
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Chapter 2. Two' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows the bare title for a chapter outside the Published list', async () => {
+    mocked.listChapters.mockResolvedValue({
+      items: [
+        summary(9, 'One'),
+        { ...summary(10, 'Two'), publishedAt: null },
+        summary(11, 'Three'),
+      ],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+    renderAt(10);
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Two' })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Chapter \d+\./)).toBeNull();
+  });
+
+  it('numbers by Published place, skipping a Draft', async () => {
+    mocked.listChapters.mockResolvedValue({
+      items: [
+        summary(9, 'One'),
+        { ...summary(10, 'Two'), publishedAt: null },
+        summary(11, 'Three'),
+      ],
+      total: 3,
+      limit: 100,
+      offset: 0,
+    });
+    renderAt(11);
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Chapter 2. Three' })
+    ).toBeInTheDocument();
+  });
+
+  it('numbers the heading in the Pages layout too', async () => {
+    renderPagesAt(10);
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Chapter 2. Two' })
+    ).toBeInTheDocument();
+  });
+
   it('opens the contents: the book and its chapters, this one marked', async () => {
     renderAt(10);
-    await screen.findByRole('heading', { name: 'Two' });
+    await screen.findByRole('heading', { name: 'Chapter 2. Two' });
 
     await userEvent.click(screen.getByRole('button', { name: 'Contents' }));
 
@@ -229,7 +282,7 @@ describe('ChapterPage', () => {
 
   it('offers the next chapter, and a disabled previous, on the first', async () => {
     renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     for (const link of screen.getAllByRole('link', {
       name: 'Next chapter: Two',
@@ -245,7 +298,7 @@ describe('ChapterPage', () => {
 
   it('offers both around a middle chapter', async () => {
     renderAt(10);
-    await screen.findByRole('heading', { name: 'Two' });
+    await screen.findByRole('heading', { name: 'Chapter 2. Two' });
 
     expect(
       screen.getAllByRole('link', { name: 'Previous chapter: One' })[0]
@@ -257,20 +310,20 @@ describe('ChapterPage', () => {
 
   it('moves to the chapter an arrow names', async () => {
     renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     await userEvent.click(
       screen.getAllByRole('link', { name: 'Next chapter: Two' })[0]!
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'Two' })
+      await screen.findByRole('heading', { name: 'Chapter 2. Two' })
     ).toBeInTheDocument();
   });
 
   it('offers a disabled next on the last chapter', async () => {
     renderAt(11);
-    await screen.findByRole('heading', { name: 'Three' });
+    await screen.findByRole('heading', { name: 'Chapter 3. Three' });
 
     expect(
       screen.getAllByRole('link', { name: 'Previous chapter: Two' })[0]
@@ -328,7 +381,7 @@ describe('ChapterPage', () => {
   it("records the chapter's Book once the chapter has loaded", async () => {
     const { store } = renderAt(9);
 
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     await waitFor(() =>
       expect(store.getState().recentlyViewed.ids).toEqual([1])
@@ -339,7 +392,7 @@ describe('ChapterPage', () => {
     mockedBooks.getBook.mockResolvedValue({ ...book, status: 'draft' });
 
     const { store } = renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
     await waitFor(() => expect(mockedBooks.getBook).toHaveBeenCalled());
 
     expect(store.getState().recentlyViewed.ids).toEqual([]);
@@ -418,7 +471,7 @@ describe('ChapterPage navigation around chapters not yet out', () => {
     });
 
     renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     expect(
       screen.getAllByRole('link', { name: 'Next chapter: Three' })[0]
@@ -458,7 +511,7 @@ const arrows = (name: string) => screen.getAllByRole('button', { name });
 describe('ChapterPage layout toggle', () => {
   it('switches from scroll to pages and back, naming the layout it goes to', async () => {
     const { store } = renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Switch to pages' })
@@ -477,7 +530,7 @@ describe('ChapterPage layout toggle', () => {
 
   it('shows the same words in a tooltip', async () => {
     renderAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     await userEvent.hover(
       screen.getByRole('button', { name: 'Switch to pages' })
@@ -501,7 +554,7 @@ describe('ChapterPage in pages', () => {
       updatedAt: '2026-09-01T00:00:00.000Z',
     });
     renderPagesAt(9);
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
 
     expect(screen.getByText('It was a dark night.')).toBeInTheDocument();
     expect(screen.getByText('The wind rose.')).toBeInTheDocument();
@@ -546,7 +599,7 @@ describe('ChapterPage in pages', () => {
     await userEvent.click(arrows('Next chapter: Three')[1]!);
 
     expect(
-      await screen.findByRole('heading', { name: 'Three' })
+      await screen.findByRole('heading', { name: 'Chapter 3. Three' })
     ).toBeInTheDocument();
     expect(await screen.findByText('Page 1 of 3')).toBeInTheDocument();
   });
@@ -558,7 +611,7 @@ describe('ChapterPage in pages', () => {
     await userEvent.click(arrows('Previous chapter: One')[0]!);
 
     expect(
-      await screen.findByRole('heading', { name: 'One' })
+      await screen.findByRole('heading', { name: 'Chapter 1. One' })
     ).toBeInTheDocument();
     expect(await screen.findByText('Page 3 of 3')).toBeInTheDocument();
     // A reload keeps history state; replaced, it opens page 1 again.
@@ -601,7 +654,7 @@ describe('ChapterPage in pages', () => {
 
   it('leaves the arrows as chapter links in scroll', async () => {
     renderAt(10);
-    await screen.findByRole('heading', { name: 'Two' });
+    await screen.findByRole('heading', { name: 'Chapter 2. Two' });
 
     expect(
       screen.getAllByRole('link', { name: 'Next chapter: Three' })[0]
@@ -636,7 +689,7 @@ describe('ChapterPage pages from the keyboard', () => {
     await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
 
     expect(
-      await screen.findByRole('heading', { name: 'Three' })
+      await screen.findByRole('heading', { name: 'Chapter 3. Three' })
     ).toBeInTheDocument();
   });
 
@@ -648,7 +701,9 @@ describe('ChapterPage pages from the keyboard', () => {
     await userEvent.keyboard('{Alt>}{ArrowLeft}{/Alt}');
 
     expect(screen.getByText('Page 1 of 3')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Two' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Chapter 2. Two' })
+    ).toBeInTheDocument();
   });
 
   it('leaves the keys to a field being typed in', async () => {
@@ -709,11 +764,13 @@ describe('ChapterPage pages from the keyboard', () => {
 
   it('leaves the keys alone in scroll', async () => {
     renderAt(10);
-    await screen.findByRole('heading', { name: 'Two' });
+    await screen.findByRole('heading', { name: 'Chapter 2. Two' });
 
     await userEvent.keyboard('{ArrowRight}{PageDown} ');
 
-    expect(screen.getByRole('heading', { name: 'Two' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Chapter 2. Two' })
+    ).toBeInTheDocument();
     expect(screen.queryByText(/^Page /)).not.toBeInTheDocument();
   });
 });
@@ -722,7 +779,9 @@ describe('ChapterPage pages from a click on the text', () => {
   // jsdom lays nothing out, so the window is given a 900px-wide box.
   const renderWithWindow = async () => {
     renderPagesAt(10);
-    const heading = await screen.findByRole('heading', { name: 'Two' });
+    const heading = await screen.findByRole('heading', {
+      name: 'Chapter 2. Two',
+    });
     const pageWindow = heading.parentElement!.parentElement!;
     jest.spyOn(pageWindow, 'getBoundingClientRect').mockReturnValue({
       left: 0,
@@ -796,7 +855,7 @@ describe('ChapterPage reading progress', () => {
     await userEvent.click(
       screen.getAllByRole('link', { name: 'Next chapter: Two' })[0]!
     );
-    await screen.findByRole('heading', { name: 'Two' });
+    await screen.findByRole('heading', { name: 'Chapter 2. Two' });
 
     await waitFor(() =>
       expect(progress).toHaveBeenLastCalledWith(1, {
@@ -812,7 +871,7 @@ describe('ChapterPage reading progress', () => {
     ['a Co-author', coAuthor],
   ])('%s sends nothing', async (_name, user) => {
     const { store } = renderAt(9, user && signedIn(user));
-    await screen.findByRole('heading', { name: 'One' });
+    await screen.findByRole('heading', { name: 'Chapter 1. One' });
     // The Book detail has loaded once the Book is recorded.
     await waitFor(() =>
       expect(store.getState().recentlyViewed.ids).toEqual([1])

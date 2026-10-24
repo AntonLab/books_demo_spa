@@ -11,6 +11,14 @@ describe('FavoriteButton', () => {
     expect(button).toHaveTextContent('3');
   });
 
+  it('shows no number when no count is given', () => {
+    render(<FavoriteButton favoriteId={null} onToggle={jest.fn()} />);
+
+    expect(
+      screen.getByRole('button', { name: 'Add to favorites' })
+    ).not.toHaveTextContent(/\d/);
+  });
+
   it('offers to remove, pressed, once the work is a Favorite', () => {
     render(<FavoriteButton count={4} favoriteId={12} onToggle={jest.fn()} />);
 

@@ -25,7 +25,7 @@ import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
 import { useSeriesLibraryActions } from '@/queries/library';
 import { useSeries } from '@/queries/series';
-import { useAppSelector } from '@/store/hooks';
+import { useResultsLayout } from '@/store/hooks';
 import { isId } from '@/types/id';
 import styles from './SeriesPage.module.css';
 
@@ -136,9 +136,7 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
 
 const SeriesBooks: FC<{ seriesId: number }> = ({ seriesId }) => {
   const books = useBooksInSeries(seriesId);
-  const layout = useAppSelector(
-    (state) => state.devicePreferences.resultsLayout
-  );
+  const layout = useResultsLayout();
 
   return (
     <CardList

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { FC } from 'react';
 import {
   CommentOutlined,
@@ -6,8 +5,9 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
+import { EDIT_PARAM, EDIT_PARAM_OPEN } from '@/constants/editParam';
 import { BOOK_GONE } from '@/constants/goneMessages';
 import { isId } from '@/types/id';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
@@ -57,7 +57,19 @@ export const BookPage: FC = () => {
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState(false);
+  // `?edit=1` lets a link open the Edit modal.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editing = searchParams.get(EDIT_PARAM) === EDIT_PARAM_OPEN;
+  const setEditing = (open: boolean) =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (open) next.set(EDIT_PARAM, EDIT_PARAM_OPEN);
+        else next.delete(EDIT_PARAM);
+        return next;
+      },
+      { replace: true }
+    );
 
   const { data: session } = useSession();
   const { data: book, isPending, isError, error } = useBook(bookId);
@@ -122,7 +134,6 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       <Space size={token.marginSM} wrap>
         {mayLike && (
           <LikeButton
-            count={book.likeCount}
             likedId={book.viewerLikeId}
             onToggle={(existingId) =>
               toggleLike.mutate({
@@ -134,7 +145,6 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         )}
         {mayFavorite && (
           <FavoriteButton
-            count={book.favoriteCount}
             favoriteId={book.viewerFavoriteId}
             // A second click before the refetch lands would send the
             // same add twice and meet a 409.
@@ -229,7 +239,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           {
             key: 'comments',
             icon: <CommentOutlined aria-hidden />,
-            label: `Comments (${book.commentCount})`,
+            label: 'Comments',
             children: <CommentSection bookId={bookId} closed={isDraft} />,
           },
           {
@@ -241,7 +251,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         ]}
       />
 
-      {editing && (
+      {editing && mayEdit && (
         <BookEditDetailsModal
           bookId={bookId}
           onClose={() => setEditing(false)}

@@ -19,6 +19,8 @@ export interface UsePagesOptions {
   chapterId: number;
   // `undefined` while the chapter loads: nothing to lay out yet.
   text: string | undefined;
+  // The strip's heading, which wraps differently once it gains a number.
+  heading?: string;
   reading: ReadingPreferences;
   openOnLastPage: boolean;
 }
@@ -74,6 +76,7 @@ export const usePages = ({
   enabled,
   chapterId,
   text,
+  heading,
   reading,
   openOnLastPage,
 }: UsePagesOptions): Pages => {
@@ -101,7 +104,7 @@ export const usePages = ({
     token.controlHeightLG + 2 * token.margin + 2 * token.paddingLG;
   const minHeight = fontSize * lineHeight * 4;
 
-  // `text` and `font` are not read here, but either one reflows the strip,
+  // `text`, `heading` and `font` are not read here, but each reflows the strip,
   // and a fresh geometry object is what makes phase B count the pages again.
   // A resize reflows nothing unless a page size changed, and a settle there
   // would step back to where the carried-over paragraph begins.
@@ -122,6 +125,7 @@ export const usePages = ({
   }, [
     enabled,
     text,
+    heading,
     font,
     fontSize,
     lineHeight,

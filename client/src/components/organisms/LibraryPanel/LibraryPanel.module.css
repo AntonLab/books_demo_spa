@@ -6,6 +6,12 @@
   min-width: 0;
 }
 
+/* In a vertical stack the card's 20rem basis would become a height, so the
+   tile drops it; the Flex's stretch alignment gives it the column's width. */
+.tile {
+  min-width: 0;
+}
+
 .pagination {
   margin-top: var(--ant-margin-lg);
 }

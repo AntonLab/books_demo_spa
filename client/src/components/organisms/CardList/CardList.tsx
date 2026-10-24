@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Alert, Col, Empty, Row, Skeleton } from 'antd';
 import type { ColProps } from 'antd';
+import styles from './CardList.module.css';
 
 interface CardListProps<T extends { id: number }> {
   items: T[];
@@ -12,8 +13,10 @@ interface CardListProps<T extends { id: number }> {
   isError: boolean;
   error: Error | null;
   emptyText?: string;
-  // Each item's `Col` spans; SearchPage's results layout sets them.
+  // Each item's `Col` spans; the results layout of the Book lists sets them.
   columns?: ColProps;
+  // A horizontally scrolling, scroll-snap row instead of the grid; `columns` is ignored.
+  carousel?: boolean;
 }
 
 const CARD_COLUMNS: ColProps = { xs: 24, sm: 12, lg: 8 };
@@ -38,6 +41,7 @@ export const CardList = <T extends { id: number }>({
   error,
   emptyText = `No ${noun} yet.`,
   columns = CARD_COLUMNS,
+  carousel = false,
 }: CardListProps<T>) => {
   if (isError) {
     return (
@@ -57,6 +61,20 @@ export const CardList = <T extends { id: number }>({
 
   if (items.length === 0) {
     return <Empty description={emptyText} />;
+  }
+
+  if (carousel) {
+    return (
+      // A scroll container must take focus, or keyboard users cannot scroll it.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      <ul aria-label={noun} tabIndex={0} className={styles.carousel}>
+        {items.map((item) => (
+          <li key={item.id} className={styles.slide}>
+            {renderItem(item)}
+          </li>
+        ))}
+      </ul>
+    );
   }
 
   return (

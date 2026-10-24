@@ -9,6 +9,14 @@ describe('LikeButton', () => {
     expect(screen.getByRole('button')).toHaveTextContent('4');
   });
 
+  it('shows no number when no count is given', () => {
+    render(<LikeButton likedId={null} onToggle={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Like' })).not.toHaveTextContent(
+      /\d/
+    );
+  });
+
   it('reads as not pressed when the viewer has not liked', () => {
     render(<LikeButton count={0} likedId={null} onToggle={jest.fn()} />);
 

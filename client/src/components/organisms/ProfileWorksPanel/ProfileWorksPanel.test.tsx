@@ -11,7 +11,7 @@ import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
-import type { BookDetail, PublicBook } from '@/types/book';
+import type { PublicBook } from '@/types/book';
 import type { PublicSeries, PublicUser, SeriesDetail } from '@/types/api';
 import type { ProfileScope } from '@/types/profileScope';
 
@@ -51,16 +51,6 @@ const series = publicSeries({
   authors: [ann],
   description: 'Dragons.',
 });
-const bookDetail = {
-  ...book,
-  series: null,
-  likeCount: 0,
-  commentCount: 0,
-  wordCount: 0,
-  favoriteCount: 0,
-  viewerFavoriteId: null,
-  viewerLikeId: null,
-} as BookDetail;
 const seriesDetail = {
   ...series,
   favoriteCount: 0,
@@ -79,7 +69,15 @@ const seriesPage = (items: PublicSeries[]) => ({
   offset: 0,
 });
 
-const Probe = () => <div data-testid="search">{useLocation().search}</div>;
+const Probe = () => {
+  const { pathname, search } = useLocation();
+  return (
+    <>
+      <div data-testid="search">{search}</div>
+      <div data-testid="location">{pathname + search}</div>
+    </>
+  );
+};
 const renderPanel = (scope: ProfileScope, route = '/p') => {
   const queryClient = createTestQueryClient();
   seedSession(queryClient, author);
@@ -151,20 +149,13 @@ describe('ProfileWorksPanel inner tabs', () => {
 // stub it shares its id with the modal title, so the dialog loses its
 // accessible name. The only dialog is found by role and its title read as text.
 describe('ProfileWorksPanel edit modals', () => {
-  it('opens the book edit-details modal from a row and saves in place', async () => {
-    mockedBooks.getBook.mockResolvedValue(bookDetail);
-    mockedBooks.updateBook.mockResolvedValue(bookDetail);
+  it('sends a book row Edit to the Book page with the edit link', async () => {
     renderPanel('mine');
 
     await clickWorkMenuItem('Out Now', 'Edit');
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText('Edit book')).toBeInTheDocument();
-    expect(await within(dialog).findByLabelText('Title')).toHaveValue(
-      'Out Now'
-    );
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText('Book saved.')).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/books/2?edit=1');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('opens the series edit-details modal from a row', async () => {

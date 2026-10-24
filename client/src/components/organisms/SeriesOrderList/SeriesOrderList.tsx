@@ -2,6 +2,7 @@ import type { FC } from 'react';
 import { Alert, Button, Flex, Popconfirm, Space, Tag, Typography } from 'antd';
 import { Link } from 'react-router';
 import { SortableList } from '@/components/organisms/SortableList/SortableList';
+import { AddBookToSeries } from './AddBookToSeries';
 import { ApiError } from '@/api/client';
 import {
   useRemoveBookFromSeries,
@@ -97,6 +98,7 @@ export const SeriesOrderList: FC<SeriesOrderListProps> = ({
           className={spacing.gapBelow}
         />
       )}
+      {mayEdit && <AddBookToSeries seriesId={seriesId} session={session} />}
       <SortableList
         items={(books.data?.items ?? []).map((book) => ({
           id: book.id,
