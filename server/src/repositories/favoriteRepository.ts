@@ -60,8 +60,8 @@ export interface FavoriteRepository {
 
 // A work the account may not see answers exactly as a missing one, so a
 // refusal never reveals that a Draft exists. Safe as a check before the insert:
-// the race it leaves — a work turning Draft in between — at worst stores a
-// Favorite the lists already hide.
+// a work turning Draft in between at worst stores a Favorite the lists already
+// hide.
 async function assertVisibleTarget(
   input: CreateFavoriteInput,
   account: Account

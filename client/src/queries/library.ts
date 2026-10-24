@@ -21,29 +21,34 @@ export const useLibrary = (params: ListLibraryParams, enabled = true) => {
   });
 };
 
-// The Book page's Library buttons. Responses are ignored: the Book detail
-// refetch carries the status. onSettled, as in useToggleFavorite: a 404 means
-// the Book is gone and only the refetch fixes the screen. isPending covers all
-// three, so one request is in flight.
-export const useBookLibraryActions = () => {
-  const queryClient = useQueryClient();
-  const onSettled = () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
-    ]);
+type LibraryActionFns<V> = {
+  addFn: (variables: V) => Promise<unknown>;
+  toggleFn: (variables: V) => Promise<unknown>;
+  removeFn: (variables: V) => Promise<unknown>;
+  onSettled: () => Promise<unknown>;
+};
 
+// The three Library buttons of a Book or Series page. Responses are ignored:
+// the detail refetch carries the status. onSettled, as in useToggleFavorite: a
+// 404 means the work is gone and only the refetch fixes the screen. isPending
+// covers all three, so one request is in flight.
+const useLibraryActions = <V>({
+  addFn,
+  toggleFn,
+  removeFn,
+  onSettled,
+}: LibraryActionFns<V>) => {
   // Wrapped: useMutation hands mutationFn a second argument.
   const add = useMutation({
-    mutationFn: (bookId: number) => addBookToLibrary(bookId),
+    mutationFn: (variables: V) => addFn(variables),
     onSettled,
   });
   const toggleNotInterested = useMutation({
-    mutationFn: (bookId: number) => toggleBookNotInterested(bookId),
+    mutationFn: (variables: V) => toggleFn(variables),
     onSettled,
   });
   const remove = useMutation({
-    mutationFn: (bookId: number) => clearReadingStatus(bookId),
+    mutationFn: (variables: V) => removeFn(variables),
     onSettled,
   });
 
@@ -56,52 +61,49 @@ export const useBookLibraryActions = () => {
   };
 };
 
-// The Series page's Library buttons; same shape as useBookLibraryActions. The
-// Series detail carries viewerLibrary, so it is refetched with the Books.
+export const useBookLibraryActions = () => {
+  const queryClient = useQueryClient();
+
+  return useLibraryActions<number>({
+    addFn: addBookToLibrary,
+    toggleFn: toggleBookNotInterested,
+    removeFn: clearReadingStatus,
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
+      ]),
+  });
+};
+
+// The Series detail carries viewerLibrary, so it is refetched with the Books.
 export const useSeriesLibraryActions = (seriesId: number) => {
   const queryClient = useQueryClient();
-  const onSettled = () =>
-    Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.seriesDetail(seriesId),
-      }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
-    ]);
 
-  const add = useMutation({
-    mutationFn: () => addSeriesToLibrary(seriesId),
-    onSettled,
+  return useLibraryActions<void>({
+    addFn: () => addSeriesToLibrary(seriesId),
+    toggleFn: () => toggleSeriesNotInterested(seriesId),
+    removeFn: () => removeSeriesFromLibrary(seriesId),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.seriesDetail(seriesId),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
+      ]),
   });
-  const toggleNotInterested = useMutation({
-    mutationFn: () => toggleSeriesNotInterested(seriesId),
-    onSettled,
-  });
-  const remove = useMutation({
-    mutationFn: () => removeSeriesFromLibrary(seriesId),
-    onSettled,
-  });
-
-  return {
-    add,
-    toggleNotInterested,
-    remove,
-    isPending:
-      add.isPending || toggleNotInterested.isPending || remove.isPending,
-  };
 };
 
-// The Chapter page's reading events. Failures are not shown: reading must not
-// be interrupted, and the next open or finish reports again. The answer is a
-// 204, so the change cannot be read from it. `opened` can lift a not_interested
-// Book into Reading and the ranked lists use hideNotInterested; `finished`
-// moves it on. Either way the book lists, the Series (viewerLibrary derives
-// from Book statuses) and the Library are refetched.
+// The Chapter page's reading events. Failures stay silent: reading must not be
+// interrupted, and the next event reports again. The answer is a 204, so
+// refetch from the server. opened can lift not_interested to Reading and
+// finished advances it, so refetch the book lists, the Series (viewerLibrary
+// derives from Book statuses) and the Library.
 export const useReadingProgressMutation = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    // Wrapped: useMutation hands mutationFn a second argument.
     mutationFn: (variables: {
       bookId: number;
       payload: ReadingProgressPayload;
