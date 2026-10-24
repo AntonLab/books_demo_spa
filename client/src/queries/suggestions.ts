@@ -52,7 +52,7 @@ const matchingAuthors = (
   ).values(),
 ];
 
-// The header search and the search form label an author the same way.
+// The search form labels an author this way.
 export const authorLabelOf = (author: AuthorSummary): string =>
   `${author.firstName} ${author.lastName} (${author.login})`;
 
