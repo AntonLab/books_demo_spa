@@ -21,11 +21,10 @@ export const useLibrary = (params: ListLibraryParams, enabled = true) => {
   });
 };
 
-// The Book page's Library buttons. The responses are ignored: the refetch of
-// the Book detail carries the viewer's status. onSettled, not onSuccess, for
-// the reason useToggleFavorite gives: a 404 means the screen shows a Book that
-// is gone, and only the refetch puts it right. isPending covers all three, so one request is
-// in flight at a time.
+// The Book page's Library buttons. Responses are ignored: the Book detail
+// refetch carries the status. onSettled, as in useToggleFavorite: a 404 means
+// the Book is gone and only the refetch fixes the screen. isPending covers all
+// three, so one request is in flight.
 export const useBookLibraryActions = () => {
   const queryClient = useQueryClient();
   const onSettled = () =>

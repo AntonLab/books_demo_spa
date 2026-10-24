@@ -27,11 +27,10 @@ export interface BookLibraryState {
   status: ReadingStatus | null;
 }
 
-// What POST /api/library/series/:seriesId/add and /not-interested, and DELETE
-// /api/library/series/:seriesId, return, and what a Series detail carries as
-// `viewerLibrary`. `inLibrary`: some Published Book of the Series has a status
-// other than not_interested. `notInterested`: the Series has a Published Book
-// and every one is not_interested.
+// A Series' Library state for the viewer, returned by the Series Library
+// actions and carried by a Series detail as `viewerLibrary`. `inLibrary`: a
+// Published Book has a status other than not_interested. `notInterested`: the
+// Series has Published Books and all are not_interested.
 export interface SeriesLibraryState {
   inLibrary: boolean;
   notInterested: boolean;

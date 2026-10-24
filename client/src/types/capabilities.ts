@@ -20,15 +20,15 @@ export const seriesCapabilities = (series: Credited, session: Session) => {
   const isCoAuthor =
     session != null &&
     series.authors.some((author) => author.id === session.id);
+  // A Co-author keeps no own Work as a Favorite or in a Library: the server
+  // refuses.
+  const mayHoldAsReader = session != null && !isCoAuthor;
   return {
     isCoAuthor,
     // A Co-author or a Moderator: the form, the order, the delete.
     mayEdit: isCoAuthor || isModeratorRole(session?.role),
-    // Any signed-in Account but a Co-author: the server refuses a Favorite on
-    // a Work the Account co-authors.
-    mayFavorite: session != null && !isCoAuthor,
-    // Same rule as the Favorite: a Co-author keeps no own Work in a Library.
-    mayKeepInLibrary: session != null && !isCoAuthor,
+    mayFavorite: mayHoldAsReader,
+    mayKeepInLibrary: mayHoldAsReader,
   };
 };
 
@@ -73,7 +73,6 @@ export const bookCapabilities = (
     // The server keeps a Draft's Favorites but counts and lists none of
     // them, so a star on a Draft would show a count that means nothing.
     // Not for a Co-author either, as for a Series.
-    mayFavorite: session != null && !isDraft && !shared.isCoAuthor,
-    mayKeepInLibrary: session != null && !shared.isCoAuthor,
+    mayFavorite: shared.mayFavorite && !isDraft,
   };
 };
