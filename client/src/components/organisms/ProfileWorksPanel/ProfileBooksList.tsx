@@ -33,7 +33,7 @@ export const ProfileBooksList: FC<ProfileBooksListProps> = ({
           onChange={(next) => formRef.current?.searchWith(next)}
         />
       }
-      renderCard={(row) => <BookCard book={row} />}
+      renderCard={(row, tile) => <BookCard book={row} tile={tile} />}
       renderActions={(row) => (
         <BookRowActions
           scope={scope}
