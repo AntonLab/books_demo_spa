@@ -177,6 +177,16 @@ export const ChapterForm: FC<ChapterFormProps> = ({
           </>
         ) : (
           <>
+            {state === 'draft' && (
+              <Typography.Paragraph type="secondary">
+                Draft: not visible to readers
+              </Typography.Paragraph>
+            )}
+            {state === 'scheduled' && publishedAt !== null && (
+              <Typography.Paragraph type="secondary">
+                {`Scheduled for ${formatDateTime(publishedAt)}`}
+              </Typography.Paragraph>
+            )}
             <PublicationTimeFields
               form={form}
               defaultImmediately={scheduledFor === null}

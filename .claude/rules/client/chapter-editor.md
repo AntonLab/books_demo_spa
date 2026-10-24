@@ -24,6 +24,8 @@ paths:
 - The Illustrations section writes through its own endpoints, never through
   the chapter form's save, so it neither touches the Unsaved text nor sends
   `expectedUpdatedAt`.
+- The chapter form's status text shows the chapter's saved state from
+  `chapterStateOf`, not what the checkbox would make it.
 - `onSaved` runs after the `saved` dispatch and never on a 409.
 - A mask click, Escape or the close icon closes only the Chapter modal,
   silently, and keeps its Unsaved text. It has no `usePageGuard` and no
