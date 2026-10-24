@@ -296,6 +296,12 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
     );
   };
 
+  const heading = (
+    <Typography.Title level={2}>
+      {index >= 0 ? `Chapter ${index + 1}. ${chapter.title}` : chapter.title}
+    </Typography.Title>
+  );
+
   const toggleLabel = pagesOn ? 'Switch to scroll' : 'Switch to pages';
 
   return (
@@ -354,7 +360,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
                   className={`${styles.strip} ${animate ? styles.turning : ''}`}
                   style={stripStyle}
                 >
-                  <Typography.Title level={2}>{chapter.title}</Typography.Title>
+                  {heading}
                   {toParagraphs(chapter.text).map((paragraph, at) => (
                     <Typography.Paragraph key={at} className={styles.paragraph}>
                       {paragraph}
@@ -387,7 +393,7 @@ const ChapterView: FC<{ book: number; id: number }> = ({ book, id }) => {
                 lineHeight: reading.lineHeight,
               }}
             >
-              <Typography.Title level={2}>{chapter.title}</Typography.Title>
+              {heading}
 
               {/* The body is authored text, so its line breaks are content
                   rather than markup and are preserved instead of collapsed. */}

@@ -85,17 +85,20 @@ Routing and the App shell: `routing.md`.
   `UnsavedTextNotice`; only Discard removes it.
 - `BookPage` hides the like button from every Co-author and from everyone on a
   Draft book; the Favorites star shows to Co-authors too, but not on a Draft.
-  Below the Cover row sit three tabs, Description, Chapters and
-  Statistics, on every book, a Draft included; the open tab is antd's own
-  state (ADR-0010), never the URL, so a reload opens Description. The panel
+  Below the Cover row sit two tabs, Chapters and Statistics, above the
+  Comments and Reading lists tabs, on every book, a Draft included; the open
+  tab is antd's own state (ADR-0010), never the URL, so a reload opens
+  Chapters. The panel
   has a fixed height (`appBookTabsHeight`, sized to Statistics at desktop
   width) and scrolls, so switching tabs never moves the comments; it is
   styled through Tabs' `classNames.body`, never a `:global` selector that
   would reach a Tabs nested inside a panel. The public
   chapter list, its Statistics and the reader's previous/next show only
-  published chapters (`publishedChapters`), even to a Co-author. A row's
-  number is its place in that list, derived on the client and shown nowhere
-  else (not on `ChapterPage`, not in the editor's `SortableList`). Statistics
+  published chapters (`publishedChapters`), even to a Co-author. A chapter's
+  number is its place in that list, derived on the client; it shows in the
+  Chapters list, the reader's Contents drawer and `ChapterPage`'s heading
+  (`Chapter <n>. <title>`, bare title for a chapter outside the list), never
+  in the editor's `SortableList`. Statistics
   takes Chapters, Release time and Last update from that same list (earliest
   and latest Publication time, not first and last in Reading order) and
   follows its pending and error states; Words, Likes, Favorites and Comments
