@@ -90,8 +90,7 @@ export const useBooksInSeries = (seriesId: number) => {
   });
 };
 
-// The viewer's own books that sit in no series: what the Books tab of Edit
-// series can file. The server filters by author only, so `select` drops the rest.
+// The viewer's own books in no series: what the Edit series Books tab can file. The server filters by author only; `select` drops books already in a series.
 // ponytail: one page at the server's cap, as useBooksInSeries.
 export const useOwnBooksWithoutSeries = (userId: number, enabled: boolean) => {
   return useQuery({

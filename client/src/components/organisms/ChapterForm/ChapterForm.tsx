@@ -55,6 +55,10 @@ export const ChapterForm: FC<ChapterFormProps> = ({
   const [form] = Form.useForm<FieldValues>();
   const state = chapterStateOf({ publishedAt });
   const scheduledFor = state === 'scheduled' ? dayjs(publishedAt) : null;
+  let statusNote: string | null = null;
+  if (state === 'draft') statusNote = 'Draft: not visible to readers';
+  else if (state === 'scheduled' && publishedAt !== null)
+    statusNote = `Scheduled for ${formatDateTime(publishedAt)}`;
 
   const submitWith = async (
     mode: 'publish' | 'draft' | 'keep'
@@ -177,14 +181,9 @@ export const ChapterForm: FC<ChapterFormProps> = ({
           </>
         ) : (
           <>
-            {state === 'draft' && (
+            {statusNote !== null && (
               <Typography.Paragraph type="secondary">
-                Draft: not visible to readers
-              </Typography.Paragraph>
-            )}
-            {state === 'scheduled' && publishedAt !== null && (
-              <Typography.Paragraph type="secondary">
-                {`Scheduled for ${formatDateTime(publishedAt)}`}
+                {statusNote}
               </Typography.Paragraph>
             )}
             <PublicationTimeFields
