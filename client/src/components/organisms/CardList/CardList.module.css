@@ -9,6 +9,6 @@
 }
 
 .slide {
-  flex: 0 0 40%;
+  flex: 0 0 max(40%, var(--ant-app-carousel-slide-min-width));
   scroll-snap-align: start;
 }
