@@ -1,6 +1,13 @@
 process.env.NODE_ENV ??= 'test';
 
-import { after, before, beforeEach, describe, test } from 'node:test';
+import {
+  after,
+  before,
+  beforeEach,
+  describe,
+  test,
+  type TestContext,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import { UniqueConstraintError, type Sequelize } from 'sequelize';
 import { createSequelize } from '../db/sequelize.ts';
@@ -182,6 +189,68 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     assert.equal(create.mock.callCount(), 3);
   });
 
+  // INSERT IGNORE downgrades the foreign key error, so a Book deleted between
+  // the readability check and the insert must still answer 404.
+  function deleteBookBeforeInsert(t: TestContext, bookId: number) {
+    const original = LibraryEntry.bulkCreate.bind(LibraryEntry);
+    t.mock.method(
+      LibraryEntry,
+      'bulkCreate',
+      async (...args: Parameters<typeof original>) => {
+        await Book.destroy({ where: { id: bookId } });
+        return original(...args);
+      }
+    );
+  }
+
+  for (const action of ['addBook', 'toggleNotInterested'] as const) {
+    test(`${action} for a Book deleted before the insert is a NotFoundError`, async (t) => {
+      const { me, book } = await arrangeBooks();
+      deleteBookBeforeInsert(t, book.id);
+      await assert.rejects(
+        repository[action](book.id, as(me)),
+        new NotFoundError('Book', book.id)
+      );
+    });
+  }
+
+  test('recordProgress opened for a Book deleted before the insert is a NotFoundError', async (t) => {
+    const { me, book } = await arrangeBooks();
+    const chapter = await Chapter.create({
+      bookId: book.id,
+      title: 'One',
+      text: 'x',
+      position: 1,
+      publishedAt: new Date(Date.now() - 1000),
+    });
+    deleteBookBeforeInsert(t, book.id);
+    await assert.rejects(
+      repository.recordProgress(
+        book.id,
+        { chapterId: chapter.id, event: 'opened' },
+        as(me)
+      ),
+      new NotFoundError('Book', book.id)
+    );
+  });
+
+  test('toggleNotInterested sees a Plan to read entry after the insert, retries and marks it', async (t) => {
+    const { me, book } = await arrangeBooks();
+    t.mock.method(LibraryEntry, 'bulkCreate', async () => []);
+    const update = t.mock.method(LibraryEntry, 'update', async () => [0]);
+    update.mock.mockImplementationOnce(async () => [0], 0);
+    update.mock.mockImplementationOnce(async () => [1], 1);
+    t.mock.method(LibraryEntry, 'destroy', async () => 0);
+    const find = t.mock.method(LibraryEntry, 'findOne', async () => null);
+    find.mock.mockImplementationOnce(
+      async () => ({ status: 'plan_to_read' }) as LibraryEntry,
+      0
+    );
+    const state = await repository.toggleNotInterested(book.id, as(me));
+    assert.deepEqual(state, { bookId: book.id, status: 'not_interested' });
+    assert.equal(update.mock.callCount(), 2);
+  });
+
   test('concurrent presses on a missing entry finish without a lock wait', async () => {
     const { me, book } = await arrangeBooks();
     for (let round = 0; round < 40; round += 1) {
@@ -200,6 +269,12 @@ describe('libraryRepository against real MySQL', { skip }, () => {
         ]),
         guard,
       ]);
+      const row = await LibraryEntry.findOne({ where: { userId: me.id } });
+      assert.ok(
+        row === null ||
+          row.status === 'not_interested' ||
+          row.status === 'plan_to_read'
+      );
     }
   });
 

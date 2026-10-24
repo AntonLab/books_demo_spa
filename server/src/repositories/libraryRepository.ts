@@ -23,8 +23,8 @@ import { publicBooksOf } from './bookRepository.ts';
 import {
   assertReadableBook,
   assertVisibleSeries,
-  coAuthorsBook,
-  coAuthorsSeries,
+  isCoAuthorOfBook,
+  isCoAuthorOfSeries,
 } from './holdGuards.ts';
 import { joined } from './joined.ts';
 import {
@@ -95,7 +95,9 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     message: string
   ) {
     await assertReadableBook(bookId, account);
-    if (await coAuthorsBook(bookId, account)) throw new ForbiddenError(message);
+    if (await isCoAuthorOfBook(bookId, account)) {
+      throw new ForbiddenError(message);
+    }
   }
 
   async function save(bookId: number, status: ReadingStatus, account: Account) {
@@ -139,6 +141,14 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     );
   }
 
+  // The entry after an insert. None means the insert was ignored because the
+  // Book went away (INSERT IGNORE downgrades the foreign key error): a 404.
+  async function heldAfterInsert(bookId: number, account: Account) {
+    const entry = await held(bookId, account);
+    if (!entry) await assertReadableBook(bookId, account);
+    return entry;
+  }
+
   async function assertMayHoldSeries(
     seriesId: number,
     account: Account,
@@ -146,7 +156,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     message?: string
   ) {
     await assertVisibleSeries(seriesId, account);
-    if (message && (await coAuthorsSeries(seriesId, account))) {
+    if (message && (await isCoAuthorOfSeries(seriesId, account))) {
       throw new ForbiddenError(message);
     }
   }
@@ -230,7 +240,8 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         { status: 'plan_to_read', updatedAt: new Date() },
         { where: { ...ownedBy(bookId, account), status: 'not_interested' } }
       );
-      const status = (await held(bookId, account))?.status ?? 'plan_to_read';
+      const status =
+        (await heldAfterInsert(bookId, account))?.status ?? 'plan_to_read';
       return { bookId, status };
     },
 
@@ -256,6 +267,8 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         }
         if (entry && entry.status !== 'plan_to_read') break;
       }
+      // A Book deleted meanwhile is a 404, not a conflict.
+      await assertReadableBook(bookId, account);
       throw new StateConflictError(REMOVE_FROM_LIBRARY_FIRST);
     },
 
@@ -360,6 +373,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
             },
           }
         );
+        await heldAfterInsert(bookId, account);
         return;
       }
 

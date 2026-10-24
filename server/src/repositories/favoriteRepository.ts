@@ -23,8 +23,8 @@ import { joined } from './joined.ts';
 import {
   assertReadableBook,
   assertVisibleSeries,
-  coAuthorsBook,
-  coAuthorsSeries,
+  isCoAuthorOfBook,
+  isCoAuthorOfSeries,
 } from './holdGuards.ts';
 import { publicSeriesOf } from './seriesRepository.ts';
 import { visibleSeriesWhere, type Account } from './visibility.ts';
@@ -78,8 +78,8 @@ async function assertNotOwnWork(
   account: Account
 ): Promise<void> {
   const [asBookAuthor, asSeriesAuthor] = await Promise.all([
-    input.bookId !== null && coAuthorsBook(input.bookId, account),
-    input.seriesId !== null && coAuthorsSeries(input.seriesId, account),
+    input.bookId !== null && isCoAuthorOfBook(input.bookId, account),
+    input.seriesId !== null && isCoAuthorOfSeries(input.seriesId, account),
   ]);
   if (asBookAuthor || asSeriesAuthor) {
     throw new ForbiddenError('You cannot favorite your own work');

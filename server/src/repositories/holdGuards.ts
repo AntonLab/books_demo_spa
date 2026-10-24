@@ -13,7 +13,10 @@ import {
 // The checks the Library and the Favorites share before an account holds a Book
 // or a Series. A work the account may not see answers exactly as a missing one,
 // so a refusal never reveals that a Draft exists.
-export async function assertReadableBook(bookId: number, account: Account) {
+export async function assertReadableBook(
+  bookId: number,
+  account: Account
+): Promise<void> {
   const book = await Book.findOne({
     where: { [Op.and]: [{ id: bookId }, await readableBookWhere(account)] },
     attributes: ['id'],
@@ -21,7 +24,10 @@ export async function assertReadableBook(bookId: number, account: Account) {
   if (!book) throw new NotFoundError('Book', bookId);
 }
 
-export async function assertVisibleSeries(seriesId: number, account: Account) {
+export async function assertVisibleSeries(
+  seriesId: number,
+  account: Account
+): Promise<void> {
   const series = await Series.findOne({
     where: { [Op.and]: [{ id: seriesId }, await visibleSeriesWhere(account)] },
     attributes: ['id'],
@@ -29,13 +35,19 @@ export async function assertVisibleSeries(seriesId: number, account: Account) {
   if (!series) throw new NotFoundError('Series', seriesId);
 }
 
-export async function coAuthorsBook(bookId: number, account: Account) {
+export async function isCoAuthorOfBook(
+  bookId: number,
+  account: Account
+): Promise<boolean> {
   return (
     (await BookAuthor.count({ where: { bookId, userId: account.id } })) > 0
   );
 }
 
-export async function coAuthorsSeries(seriesId: number, account: Account) {
+export async function isCoAuthorOfSeries(
+  seriesId: number,
+  account: Account
+): Promise<boolean> {
   return (
     (await SeriesAuthor.count({ where: { seriesId, userId: account.id } })) > 0
   );
