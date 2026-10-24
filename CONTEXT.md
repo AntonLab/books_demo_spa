@@ -366,6 +366,20 @@ _Avoid_: Favorites, bookshelf
 Where an Account stands with a Book in its Library: **Reading**, **Plan to
 read**, **Read** or **Not interested**. A Book with any status but Not
 interested counts as in that Account's Library.
+
+- Add sets Plan to read on a Book with no status or Not interested; any other
+  status stays. Remove clears the status.
+- Opening a Chapter sets Reading on a Book with no status, Plan to read or Not
+  interested. Reaching the end of the last Published Chapter of a Complete Book
+  sets Read. Read is never lowered, and a Book returning to In progress does
+  not undo it.
+- Not interested can be set only on a Book with no status or Plan to read. It
+  hides the Book from that Account's search results and the Main page sections,
+  nowhere else.
+- A Co-author has no Reading status on its own Work, and cannot Favorite it.
+- A Series has no status of its own: acting on it acts on its Published Books
+  as above. It counts as in the Library when any of those Books is.
+
 _Avoid_: Shelf
 
 **Reading list**:
@@ -381,7 +395,8 @@ _Avoid_: Collection (that is not a Series either), selection, shelf
 The last six Books whose page or Chapter was opened on one device. Like a
 Device preference, the server keeps no copy of it. A Guest's views carry over to the
 Account that signs in; it is cleared only when a different Account from the
-last one signs in on that device.
+last one signs in on that device. On first load, Books the Account can no
+longer see are dropped from it.
 
 ### Discovery
 
