@@ -146,6 +146,27 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     );
   });
 
+  test('a Series action for an Account deleted meanwhile is a NotFoundError, not a silent 200', async () => {
+    const { me, author } = await arrangeBooks();
+    const series = await createCreditedSeries(
+      { title: 'Shared', description: 'x', tags: [] },
+      [author.id]
+    );
+    await createCreditedBook(
+      { title: 'In Series', description: 'x', tags: [], seriesId: series.id },
+      [author.id]
+    );
+    const gone = as(me);
+    await User.destroy({ where: { id: me.id } });
+    for (const action of ['addSeries', 'toggleSeriesNotInterested'] as const) {
+      await assert.rejects(
+        repository[action](series.id, gone),
+        new NotFoundError('User', me.id)
+      );
+    }
+    assert.equal(await LibraryEntry.count(), 0);
+  });
+
   test('toggleNotInterested that keeps losing the race gives up with a StateConflictError after 3 attempts', async (t) => {
     const { me, book } = await arrangeBooks();
     // Every attempt finds no entry to create, mark or clear, and none held.

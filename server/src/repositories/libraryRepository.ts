@@ -11,6 +11,7 @@ import { Chapter } from '../models/Chapter.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import { User } from '../models/User.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -222,13 +223,21 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   }
 
   // Inserts the rows missing; an existing entry keeps its status.
-  const insertMissing = (
+  async function insertMissing(
     bookIds: number[],
     status: ReadingStatus,
     account: Account,
     transaction: Transaction
-  ) =>
-    LibraryEntry.bulkCreate(
+  ) {
+    // INSERT IGNORE also swallows a foreign key failure, so the Account is
+    // checked, and held against deletion until commit, first.
+    const holder = await User.findByPk(account.id, {
+      attributes: ['id'],
+      lock: transaction.LOCK.SHARE,
+      transaction,
+    });
+    if (!holder) throw new NotFoundError('User', account.id);
+    await LibraryEntry.bulkCreate(
       bookIds.map((bookId) => ({
         ...ownedBy(bookId, account),
         status,
@@ -236,6 +245,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       })),
       { ignoreDuplicates: true, transaction }
     );
+  }
 
   return {
     async addBook(bookId, account) {
