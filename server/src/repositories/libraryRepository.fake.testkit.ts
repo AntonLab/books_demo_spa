@@ -239,14 +239,22 @@ export function createFakeLibraryRepository(
     async recordProgress(bookId, input, account) {
       assertMayHold(bookId, account, PROGRESS_OWN_WORK);
       const now = Date.now();
-      const published = chapters
-        .filter(
-          (chapter) =>
-            chapter.bookId === bookId &&
-            chapter.publishedAt !== null &&
-            chapter.publishedAt.getTime() <= now
-        )
-        .sort((a, b) => b.position - a.position || b.id - a.id);
+      const published = chapters.filter(
+        (chapter) =>
+          chapter.bookId === bookId &&
+          chapter.publishedAt !== null &&
+          chapter.publishedAt.getTime() <= now
+      );
+      // The last Chapter: highest position, the higher id on a tie.
+      const last = published.reduce<(typeof published)[number] | undefined>(
+        (best, chapter) =>
+          !best ||
+          chapter.position > best.position ||
+          (chapter.position === best.position && chapter.id > best.id)
+            ? chapter
+            : best,
+        undefined
+      );
       if (!published.some((chapter) => chapter.id === input.chapterId)) {
         throw new NotFoundError('Chapter', input.chapterId);
       }
@@ -263,7 +271,7 @@ export function createFakeLibraryRepository(
       }
       if (
         books.get(bookId)?.status === 'complete' &&
-        published[0]?.id === input.chapterId
+        last?.id === input.chapterId
       ) {
         save(bookId, 'read', account);
       }

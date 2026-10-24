@@ -394,6 +394,8 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         return;
       }
 
+      // Benign without a transaction: a Chapter published or a Book completed
+      // between these reads only moves "last" to what a retry would see.
       const last = await Chapter.findOne({
         where: published,
         order: [
