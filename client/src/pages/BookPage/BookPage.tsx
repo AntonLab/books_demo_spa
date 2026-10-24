@@ -7,6 +7,7 @@ import {
 import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '@/api/client';
+import { EDIT_PARAM, EDIT_PARAM_OPEN } from '@/constants/editParam';
 import { BOOK_GONE } from '@/constants/goneMessages';
 import { isId } from '@/types/id';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
@@ -56,15 +57,15 @@ export const BookPage: FC = () => {
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
   const navigate = useNavigate();
-  // The Edit modal's open state is the `?edit=1` param, so a link can open it.
+  // `?edit=1` lets a link open the Edit modal.
   const [searchParams, setSearchParams] = useSearchParams();
-  const editing = searchParams.get('edit') === '1';
+  const editing = searchParams.get(EDIT_PARAM) === EDIT_PARAM_OPEN;
   const setEditing = (open: boolean) =>
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (open) next.set('edit', '1');
-        else next.delete('edit');
+        if (open) next.set(EDIT_PARAM, EDIT_PARAM_OPEN);
+        else next.delete(EDIT_PARAM);
         return next;
       },
       { replace: true }

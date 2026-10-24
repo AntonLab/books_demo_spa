@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { BookCreateModal } from '@/components/organisms/BookCreateModal/BookCreateModal';
 import { SeriesCreateModal } from '@/components/organisms/SeriesCreateModal/SeriesCreateModal';
 import { SeriesEditDetailsModal } from '@/components/organisms/SeriesEditDetailsModal/SeriesEditDetailsModal';
+import { EDIT_PARAM, EDIT_PARAM_OPEN } from '@/constants/editParam';
 import type { ProfileScope } from '@/types/profileScope';
 import { ProfileBooksList } from './ProfileBooksList';
 import { ProfileSeriesList } from './ProfileSeriesList';
@@ -55,7 +56,9 @@ export const ProfileWorksPanel: FC<Props> = ({ scope, viewerId }) => {
               <ProfileBooksList
                 scope={scope}
                 viewerId={viewerId}
-                onEdit={(id) => void navigate(`/books/${id}?edit=1`)}
+                onEdit={(id) =>
+                  void navigate(`/books/${id}?${EDIT_PARAM}=${EDIT_PARAM_OPEN}`)
+                }
               />
             ),
           },

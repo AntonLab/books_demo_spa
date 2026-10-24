@@ -85,15 +85,13 @@ Routing and the App shell: `routing.md`.
   `UnsavedTextNotice`; only Discard removes it.
 - `BookPage` hides the like button from every Co-author and from everyone on a
   Draft book; the Favorites star shows to Co-authors too, but not on a Draft.
-  Below the Cover row sit two tabs, Chapters and Statistics, above the
-  Comments and Reading lists tabs, on every book, a Draft included; the open
-  tab is antd's own state (ADR-0010), never the URL, so a reload opens
-  Chapters. The panel
-  has a fixed height (`appBookTabsHeight`, sized to Statistics at desktop
-  width) and scrolls, so switching tabs never moves the comments; it is
-  styled through Tabs' `classNames.body`, never a `:global` selector that
-  would reach a Tabs nested inside a panel. The public
-  chapter list, its Statistics and the reader's previous/next show only
+  Below the Cover row sit four tabs: Chapters, Statistics, Comments and
+  Reading lists, on every book, a Draft included. The open tab is antd's own
+  state (ADR-0010), never the URL, so a reload opens Chapters. The panel has
+  a fixed height (`appBookTabsHeight`, sized to Statistics at desktop width)
+  and scrolls, so switching tabs never moves the comments; it is styled
+  through Tabs' `classNames.body`, never a `:global` selector that would
+  reach a Tabs nested inside a panel. The public chapter list, its Statistics and the reader's previous/next show only
   published chapters (`publishedChapters`), even to a Co-author. A chapter's
   number is its place in that list, derived on the client; it shows in the
   Chapters list, the reader's Contents drawer and `ChapterPage`'s heading
