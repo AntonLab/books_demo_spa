@@ -24,6 +24,7 @@ const LibraryRow: FC<{ row: LibraryBook }> = ({ row }) => {
         <BookCard book={row} />
       </div>
       <Button
+        aria-label={`Remove ${row.title} from Library`}
         disabled={remove.isPending}
         onClick={() =>
           remove.mutate(row.id, {

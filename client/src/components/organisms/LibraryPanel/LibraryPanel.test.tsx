@@ -124,7 +124,12 @@ describe('LibraryPanel', () => {
     );
     renderPanel();
     await titleLink('Dragons');
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+    expect(
+      screen.getByRole('button', { name: 'Remove Dragons from Library' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Remove Tides from Library' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('combobox', { name: 'Reading status' })
     ).not.toBeInTheDocument();
@@ -137,9 +142,12 @@ describe('LibraryPanel', () => {
     mockedLibrary.clearReadingStatus.mockReturnValue(new Promise(() => {}));
     renderPanel();
     await titleLink('Dragons');
-    const [first, second] = screen.getAllByRole('button', {
-      name: 'Remove',
-    }) as [HTMLElement, HTMLElement];
+    const first = screen.getByRole('button', {
+      name: 'Remove Dragons from Library',
+    });
+    const second = screen.getByRole('button', {
+      name: 'Remove Tides from Library',
+    });
     await userEvent.click(second);
     expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(2);
     await waitFor(() => expect(second).toBeDisabled());
@@ -153,7 +161,7 @@ describe('LibraryPanel', () => {
     mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
     renderPanel('/profile/library?status=not_interested');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Remove' })
+      await screen.findByRole('button', { name: 'Remove Dragons from Library' })
     );
     expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(1);
   });
@@ -165,7 +173,7 @@ describe('LibraryPanel', () => {
     mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
     renderPanel();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Remove' })
+      await screen.findByRole('button', { name: 'Remove Dragons from Library' })
     );
     await waitFor(() =>
       expect(mockedLibrary.listLibrary).toHaveBeenCalledTimes(2)
@@ -181,7 +189,7 @@ describe('LibraryPanel', () => {
     );
     renderPanel();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Remove' })
+      await screen.findByRole('button', { name: 'Remove Dragons from Library' })
     );
     expect(await screen.findByText('Book 1 not found')).toBeInTheDocument();
   });
