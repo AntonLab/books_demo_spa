@@ -95,7 +95,7 @@ export function createFakeLibraryRepository(
   function assertMayHold(bookId: number, account: Account, message: string) {
     const book = books.get(bookId);
     const mayRead =
-      book &&
+      book !== undefined &&
       (book.status !== 'draft' ||
         isModeratorRole(account.role) ||
         isCoAuthor(bookId, account));
@@ -124,7 +124,7 @@ export function createFakeLibraryRepository(
     // The rule of visibleSeriesWhere: a Moderator, a Co-author, or any reader
     // of a Series with a Published Book.
     const mayRead =
-      row &&
+      row !== undefined &&
       (isModeratorRole(account.role) ||
         credited ||
         publishedIn(seriesId).length > 0);

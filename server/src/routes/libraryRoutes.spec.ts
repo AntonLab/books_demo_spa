@@ -492,6 +492,10 @@ test('series with no Published Book: 200 for a Moderator, both flags false, noth
           seriesPath(DRAFT_ONLY_SERIES_ID, action)
         );
         assert.equal(res.status, 404);
+        assert.equal(
+          (await json<{ error: string }>(res)).error,
+          `Series ${DRAFT_ONLY_SERIES_ID} not found`
+        );
       }
       const hidden = await json<Wire<PagedResponse<LibraryBook>>>(
         await list(base, cookie, '?status=not_interested')
