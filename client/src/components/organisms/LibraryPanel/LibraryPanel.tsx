@@ -19,7 +19,7 @@ const LibraryRow: FC<{ row: LibraryBook }> = ({ row }) => {
   const { message } = App.useApp();
   const { remove } = useBookLibraryActions();
   return (
-    <Flex gap="small" align="flex-start">
+    <Flex gap="small" align="flex-start" wrap="wrap">
       <div className={styles.card}>
         <BookCard book={row} />
       </div>

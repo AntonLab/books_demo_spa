@@ -1,7 +1,8 @@
-/* A full-width card beside its status select must shrink with the row; a
-   flex item defaults to min-width: auto and would widen the page on a phone. */
+/* The card grows beside its Remove button but wraps it onto its own line below
+   20rem, so a phone keeps the card full width; min-width: 0 stops a flex item
+   from widening the page. */
 .card {
-  flex: 1;
+  flex: 1 1 20rem;
   min-width: 0;
 }
 
