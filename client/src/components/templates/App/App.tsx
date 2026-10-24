@@ -78,6 +78,13 @@ const BookRedirect: FC = () => {
   return <Navigate to={`/books/${bookId}`} replace />;
 };
 
+// matchPath reads `new` as a chapter id, but that route redirects to the Book
+// page; `/edit` does not match since `end` defaults to true.
+export const isChapterPath = (pathname: string): boolean => {
+  const match = matchPath('/books/:bookId/chapters/:chapterId', pathname);
+  return !!match && match.params.chapterId !== 'new';
+};
+
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
 // test cannot point at an arbitrary path. Route tests wrap this in
 // MemoryRouter instead.
@@ -93,13 +100,7 @@ export const AppShell: FC = () => {
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
   // The Chapter page is bare: no header, no footer, so no AuthModals either.
-  // matchPath reads `new` as a chapter id, but that route redirects to the
-  // Book page; `/edit` does not match since `end` defaults to true.
-  const chapterMatch = matchPath(
-    '/books/:bookId/chapters/:chapterId',
-    pathname
-  );
-  const isChapter = !!chapterMatch && chapterMatch.params.chapterId !== 'new';
+  const isChapter = isChapterPath(pathname);
 
   return (
     <Layout className={styles.layout}>

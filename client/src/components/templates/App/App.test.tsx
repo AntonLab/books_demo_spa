@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation, useNavigationType } from 'react-router';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
-import { App, AppShell } from './App';
+import { App, AppShell, isChapterPath } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { sessionOf } from '@/test/session';
 import { publicBook, publicSeries } from '@/test/works';
@@ -307,6 +307,18 @@ describe('AppShell routing', () => {
 
   it('sends a deep unknown route with a query Home with a message', async () => {
     await expectGoneHome('/nowhere/deeper?x=1');
+  });
+});
+
+describe('isChapterPath', () => {
+  it.each([
+    ['/books/1/chapters/9', true],
+    ['/books/1/chapters/9/', true],
+    ['/books/1/chapters/new', false],
+    ['/books/1/chapters/9/edit', false],
+    ['/books/1', false],
+  ])('%s -> %s', (pathname, expected) => {
+    expect(isChapterPath(pathname)).toBe(expected);
   });
 });
 
