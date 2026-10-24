@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { ListBooksQuery } from '../types/book.ts';
 import { StateConflictError } from '../types/errors.ts';
 import type { BookRepository } from '../repositories/bookRepository.ts';
 import {
@@ -451,7 +452,7 @@ test('GET list with favoritedBy=me is 401 for a Guest and 400 for another value'
 
 test('GET list passes hideNotInterested=true to the repository and answers 400 for false', async () => {
   const fake = createFakeRepository();
-  const queries: unknown[] = [];
+  const queries: ListBooksQuery[] = [];
   const bookRepository: BookRepository = {
     ...fake,
     list: (query, viewer) => {
@@ -466,10 +467,7 @@ test('GET list passes hideNotInterested=true to the repository and answers 400 f
     assert.equal(hidden.status, 200);
     assert.equal(bad.status, 400);
     assert.equal(queries.length, 1);
-    assert.equal(
-      (queries[0] as { hideNotInterested?: string }).hideNotInterested,
-      'true'
-    );
+    assert.equal(queries[0]?.hideNotInterested, 'true');
   });
 });
 

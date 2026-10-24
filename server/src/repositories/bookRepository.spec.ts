@@ -1351,10 +1351,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
       test("leaves out the viewer's not_interested Books only", async () => {
         const { reading, plain, others, viewer } = await seedLibrary();
 
-        const page = await repository.list(
-          { ...flagged, hideNotInterested: 'true' },
-          viewer
-        );
+        const page = await repository.list(flagged, viewer);
 
         assert.deepEqual(
           new Set(page.items.map((item) => item.id)),
@@ -1363,13 +1360,23 @@ describe('bookRepository against real MySQL', { skip }, () => {
         assert.equal(page.total, 3);
       });
 
+      test('combines with another filter', async () => {
+        const { reading, plain, viewer } = await seedLibrary();
+
+        // 'n' is in Hidden, Reading and Plain, not in Others.
+        const page = await repository.list({ ...flagged, q: 'n' }, viewer);
+
+        assert.deepEqual(
+          new Set(page.items.map((item) => item.id)),
+          new Set([reading.id, plain.id])
+        );
+        assert.equal(page.total, 2);
+      });
+
       test('is ignored for a Guest', async () => {
         await seedLibrary();
 
-        const page = await repository.list(
-          { ...flagged, hideNotInterested: 'true' },
-          null
-        );
+        const page = await repository.list(flagged, null);
 
         assert.equal(page.items.length, 4);
         assert.equal(page.total, 4);
@@ -1385,10 +1392,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
           { current: 1, pageSize: 20 },
           viewer
         );
-        const page = await repository.list(
-          { ...flagged, hideNotInterested: 'true' },
-          viewer
-        );
+        const page = await repository.list(flagged, viewer);
 
         assert.equal(plain.total, 2);
         assert.equal(page.total, 2);
