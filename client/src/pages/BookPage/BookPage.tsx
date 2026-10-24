@@ -5,17 +5,7 @@ import {
   EditOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
-import {
-  Alert,
-  App,
-  Button,
-  Divider,
-  Skeleton,
-  Space,
-  Tabs,
-  Typography,
-  theme,
-} from 'antd';
+import { Alert, App, Divider, Skeleton, Space, Tabs, theme } from 'antd';
 import { useNavigate, useParams } from 'react-router';
 import { ApiError } from '@/api/client';
 import { BOOK_GONE } from '@/constants/goneMessages';
@@ -24,6 +14,7 @@ import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import { BookLibraryCounts } from '@/components/molecules/BookLibraryCounts/BookLibraryCounts';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
+import { LibraryButtons } from '@/components/molecules/LibraryButtons/LibraryButtons';
 import { LikeButton } from '@/components/molecules/LikeButton/LikeButton';
 import { AddToReadingList } from '@/components/organisms/AddToReadingList/AddToReadingList';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
@@ -157,45 +148,25 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
           />
         )}
         {mayKeepInLibrary && (
-          <>
-            {/* One request at a time: a second click before the refetch
-                lands would act on a stale status. */}
-            {inLibrary ? (
-              <Button
-                disabled={libraryActions.isPending}
-                onClick={() =>
-                  libraryActions.remove.mutate(book.id, { onError: toastError })
-                }
-              >
-                Remove from Library
-              </Button>
-            ) : (
-              <Button
-                disabled={libraryActions.isPending}
-                onClick={() =>
-                  libraryActions.add.mutate(book.id, { onError: toastError })
-                }
-              >
-                Add to Library
-              </Button>
-            )}
-            <Button
-              aria-pressed={status === 'not_interested'}
-              disabled={libraryActions.isPending || keptAsReader}
-              onClick={() =>
-                libraryActions.toggleNotInterested.mutate(book.id, {
-                  onError: toastError,
-                })
-              }
-            >
-              Not interested
-            </Button>
-            {keptAsReader && (
-              <Typography.Text type="secondary">
-                Remove it from your Library first
-              </Typography.Text>
-            )}
-          </>
+          <LibraryButtons
+            inLibrary={inLibrary}
+            notInterested={status === 'not_interested'}
+            disabled={libraryActions.isPending}
+            keptAsReader={keptAsReader}
+            addLabel="Add to Library"
+            removeLabel="Remove from Library"
+            onAdd={() =>
+              libraryActions.add.mutate(book.id, { onError: toastError })
+            }
+            onRemove={() =>
+              libraryActions.remove.mutate(book.id, { onError: toastError })
+            }
+            onToggleNotInterested={() =>
+              libraryActions.toggleNotInterested.mutate(book.id, {
+                onError: toastError,
+              })
+            }
+          />
         )}
         {mayAddBookToReadingList(book, session) && (
           <AddToReadingList target={{ bookId: book.id }} />

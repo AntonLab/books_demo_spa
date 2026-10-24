@@ -8,6 +8,7 @@ import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
 import { GoneRedirect } from '@/components/molecules/GoneRedirect/GoneRedirect';
 import { FavoriteButton } from '@/components/molecules/FavoriteButton/FavoriteButton';
+import { LibraryButtons } from '@/components/molecules/LibraryButtons/LibraryButtons';
 import {
   RESULTS_COLUMNS,
   ResultsLayoutSwitch,
@@ -86,43 +87,24 @@ const SeriesView: FC<{ seriesId: number }> = ({ seriesId }) => {
         {mayKeepInLibrary &&
           series.data.bookCount > 0 &&
           series.data.viewerLibrary !== null && (
-            <>
-              {/* One request at a time, as on the Book page. */}
-              {series.data.viewerLibrary.inLibrary ? (
-                <Button
-                  disabled={libraryActions.isPending}
-                  onClick={() =>
-                    libraryActions.remove.mutate(undefined, {
-                      onError: toastError,
-                    })
-                  }
-                >
-                  Remove series from Library
-                </Button>
-              ) : (
-                <Button
-                  disabled={libraryActions.isPending}
-                  onClick={() =>
-                    libraryActions.add.mutate(undefined, {
-                      onError: toastError,
-                    })
-                  }
-                >
-                  Add series to Library
-                </Button>
-              )}
-              <Button
-                aria-pressed={series.data.viewerLibrary.notInterested}
-                disabled={libraryActions.isPending}
-                onClick={() =>
-                  libraryActions.toggleNotInterested.mutate(undefined, {
-                    onError: toastError,
-                  })
-                }
-              >
-                Not interested
-              </Button>
-            </>
+            <LibraryButtons
+              inLibrary={series.data.viewerLibrary.inLibrary}
+              notInterested={series.data.viewerLibrary.notInterested}
+              disabled={libraryActions.isPending}
+              addLabel="Add series to Library"
+              removeLabel="Remove series from Library"
+              onAdd={() =>
+                libraryActions.add.mutate(undefined, { onError: toastError })
+              }
+              onRemove={() =>
+                libraryActions.remove.mutate(undefined, { onError: toastError })
+              }
+              onToggleNotInterested={() =>
+                libraryActions.toggleNotInterested.mutate(undefined, {
+                  onError: toastError,
+                })
+              }
+            />
           )}
         {mayAddSeriesToReadingList(series.data, session) && (
           <AddToReadingList target={{ seriesId }} />
