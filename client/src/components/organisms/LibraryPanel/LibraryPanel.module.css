@@ -6,6 +6,13 @@
   min-width: 0;
 }
 
+/* In a vertical stack the tile takes the column's width; the card's 20rem
+   basis would become a height there. */
+.tile {
+  align-self: stretch;
+  min-width: 0;
+}
+
 .pagination {
   margin-top: var(--ant-margin-lg);
 }

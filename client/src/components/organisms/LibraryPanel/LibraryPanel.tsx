@@ -4,8 +4,12 @@ import { READING_STATUSES } from 'shared';
 import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
-import { RESULTS_COLUMNS } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
+import {
+  RESULTS_COLUMNS,
+  ResultsLayoutSwitch,
+} from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import { useBookLibraryActions } from '@/queries/library';
+import { useResultsLayout } from '@/store/hooks';
 import spacing from '@/theme/spacing.module.css';
 import { LIBRARY_FILTERS, type LibraryBook } from '@/types/library';
 import { useLibraryList } from './useLibraryList';
@@ -15,13 +19,18 @@ const emptyTextOf = (filtered: boolean): string =>
   filtered ? 'No books with this status.' : 'Your Library is empty.';
 
 // One hook per row, so only the row being changed is disabled.
-const LibraryRow: FC<{ row: LibraryBook }> = ({ row }) => {
+const LibraryRow: FC<{ row: LibraryBook; tile: boolean }> = ({ row, tile }) => {
   const { message } = App.useApp();
   const { remove } = useBookLibraryActions();
   return (
-    <Flex gap="small" align="flex-start" wrap="wrap">
-      <div className={styles.card}>
-        <BookCard book={row} />
+    <Flex
+      vertical={tile}
+      gap="small"
+      align="flex-start"
+      wrap={tile ? undefined : 'wrap'}
+    >
+      <div className={tile ? styles.tile : styles.card}>
+        <BookCard book={row} tile={tile} />
       </div>
       <Button
         aria-label={`Remove ${row.title} from Library`}
@@ -40,10 +49,11 @@ const LibraryRow: FC<{ row: LibraryBook }> = ({ row }) => {
 
 export const LibraryPanel: FC = () => {
   const list = useLibraryList();
+  const layout = useResultsLayout();
 
   return (
     <>
-      <Flex className={spacing.gapBelow}>
+      <Flex justify="space-between" align="center" className={spacing.gapBelow}>
         <Select
           aria-label="Filter by reading status"
           value={list.status ?? 'all'}
@@ -53,12 +63,13 @@ export const LibraryPanel: FC = () => {
             list.setStatus(READING_STATUSES.find((status) => status === value))
           }
         />
+        <ResultsLayoutSwitch />
       </Flex>
       <CardList
         noun="books"
         items={list.items}
-        renderItem={(row) => <LibraryRow row={row} />}
-        columns={RESULTS_COLUMNS.list}
+        renderItem={(row) => <LibraryRow row={row} tile={layout === 'grid'} />}
+        columns={RESULTS_COLUMNS[layout]}
         isPending={list.isPending}
         isError={list.error !== null}
         error={list.error}

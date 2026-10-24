@@ -13,7 +13,7 @@ import {
   SearchForm,
   type SearchFormHandle,
 } from '@/components/organisms/SearchForm/SearchForm';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useResultsLayout } from '@/store/hooks';
 import spacing from '@/theme/spacing.module.css';
 import styles from './SearchPage.module.css';
 import { useSearchPage, type SearchBooks } from './useSearchPage';
@@ -44,9 +44,7 @@ export const SearchPage: FC = () => {
   if (total !== undefined && total !== lastTotal) setLastTotal(total);
   // React warns when `key` arrives inside a spread, so it goes on its own.
   const { key: formKey, ...formProps } = form;
-  const layout = useAppSelector(
-    (state) => state.devicePreferences.resultsLayout
-  );
+  const layout = useResultsLayout();
   const filtersExpanded = useAppSelector(
     (state) => state.devicePreferences.searchFormExpanded
   );
