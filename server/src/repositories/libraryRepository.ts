@@ -125,28 +125,18 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
   const held = (bookId: number, account: Account) =>
     LibraryEntry.findOne({ where: ownedBy(bookId, account) });
 
-  // Creates the entry unless one exists; true when it created it.
+  // Creates the entry unless one exists. A single autocommit INSERT IGNORE:
+  // findOrCreate's SELECT then INSERT in one transaction takes gap locks that
+  // concurrent presses on a missing entry waited on until the lock timeout.
   async function insertIfAbsent(
     bookId: number,
     status: ReadingStatus,
     account: Account
   ) {
-    try {
-      const [, created] = await LibraryEntry.findOrCreate({
-        where: ownedBy(bookId, account),
-        defaults: {
-          ...ownedBy(bookId, account),
-          status,
-          updatedAt: new Date(),
-        },
-      });
-      return created;
-    } catch (error) {
-      if (error instanceof ForeignKeyConstraintError) {
-        throw new NotFoundError('Book', bookId);
-      }
-      throw error;
-    }
+    await LibraryEntry.bulkCreate(
+      [{ ...ownedBy(bookId, account), status, updatedAt: new Date() }],
+      { ignoreDuplicates: true }
+    );
   }
 
   async function assertMayHoldSeries(
@@ -249,9 +239,6 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       // A lost race (the entry removed between two statements) tries again, a
       // bounded number of times.
       for (let attempt = 0; attempt < TOGGLE_ATTEMPTS; attempt += 1) {
-        if (await insertIfAbsent(bookId, 'not_interested', account)) {
-          return { bookId, status: 'not_interested' };
-        }
         const [marked] = await LibraryEntry.update(
           { status: 'not_interested', updatedAt: new Date() },
           { where: { ...ownedBy(bookId, account), status: 'plan_to_read' } }
@@ -261,8 +248,13 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
           where: { ...ownedBy(bookId, account), status: 'not_interested' },
         });
         if (cleared > 0) return { bookId, status: null };
-        // Neither matched: Reading or Read, or the entry was removed meanwhile.
-        if (await held(bookId, account)) break;
+        // Neither matched: the entry is missing, or Reading or Read.
+        await insertIfAbsent(bookId, 'not_interested', account);
+        const entry = await held(bookId, account);
+        if (entry?.status === 'not_interested') {
+          return { bookId, status: 'not_interested' };
+        }
+        if (entry && entry.status !== 'plan_to_read') break;
       }
       throw new StateConflictError(REMOVE_FROM_LIBRARY_FIRST);
     },

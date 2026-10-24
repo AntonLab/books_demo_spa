@@ -171,10 +171,7 @@ describe('libraryRepository against real MySQL', { skip }, () => {
   test('toggleNotInterested that keeps losing the race gives up with a StateConflictError after 3 attempts', async (t) => {
     const { me, book } = await arrangeBooks();
     // Every attempt finds no entry to create, mark or clear, and none held.
-    const create = t.mock.method(LibraryEntry, 'findOrCreate', async () => [
-      LibraryEntry.build(),
-      false,
-    ]);
+    const create = t.mock.method(LibraryEntry, 'bulkCreate', async () => []);
     t.mock.method(LibraryEntry, 'update', async () => [0]);
     t.mock.method(LibraryEntry, 'destroy', async () => 0);
     t.mock.method(LibraryEntry, 'findOne', async () => null);
@@ -183,6 +180,27 @@ describe('libraryRepository against real MySQL', { skip }, () => {
       new StateConflictError(REMOVE_FROM_LIBRARY_FIRST)
     );
     assert.equal(create.mock.callCount(), 3);
+  });
+
+  test('concurrent presses on a missing entry finish without a lock wait', async () => {
+    const { me, book } = await arrangeBooks();
+    for (let round = 0; round < 40; round += 1) {
+      await LibraryEntry.destroy({ where: { userId: me.id } });
+      // A lock wait lasts ~50 s, so a round over 5 s is a stall.
+      const guard = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('lock wait')), 5000).unref();
+      });
+      await Promise.race([
+        Promise.allSettled([
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.toggleNotInterested(book.id, as(me)),
+          repository.addBook(book.id, as(me)),
+          repository.addBook(book.id, as(me)),
+        ]),
+        guard,
+      ]);
+    }
   });
 
   // --- The contract the route specs' fake is held to, run here for real. ---
