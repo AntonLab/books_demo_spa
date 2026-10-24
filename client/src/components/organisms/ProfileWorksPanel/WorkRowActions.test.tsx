@@ -5,6 +5,7 @@ import { BookRowActions, SeriesRowActions } from './WorkRowActions';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
 import * as favoritesApi from '@/api/favorites';
@@ -101,14 +102,11 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
     const onEdit = jest.fn();
     renderAs(author, kind.ui('mine', onEdit));
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: `Edit ${kind.title}` })
-    );
+    await clickWorkMenuItem(kind.title, 'Edit');
     expect(onEdit).toHaveBeenCalledTimes(1);
-    await userEvent.click(
-      screen.getByRole('button', { name: `Delete ${kind.title}` })
-    );
-    expect(await screen.findByText(kind.confirm[0])).toBeInTheDocument();
+    await clickWorkMenuItem(kind.title, 'Delete');
+    // modal.confirm renders its title twice (dialog label and body).
+    expect(await screen.findAllByText(kind.confirm[0])).not.toHaveLength(0);
     expect(screen.getByText(kind.confirm[1])).toBeInTheDocument();
     expect(kind.remove).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
@@ -119,10 +117,34 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
     ).toBeInTheDocument();
   });
 
+  it('deletes nothing when the confirmation is cancelled', async () => {
+    renderAs(author, kind.ui('mine'));
+
+    await clickWorkMenuItem(kind.title, 'Delete');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Cancel' })
+    );
+
+    expect(kind.remove).not.toHaveBeenCalled();
+  });
+
   it('shows a viewer who may not edit nothing', () => {
     renderAs(viewer(9, 'author'), kind.ui('mine'));
 
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('offers one More actions button and no separate Edit or Delete button', async () => {
+    renderAs(author, kind.ui('mine'));
+
+    expect(
+      await screen.findByRole('button', {
+        name: `More actions for ${kind.title}`,
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^(Edit|Delete) / })
+    ).toBeNull();
   });
 
   it('toasts the server message when the delete fails, and refetches the lists', async () => {
@@ -130,9 +152,7 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
     const { queryClient } = renderAs(author, kind.ui('mine'));
     const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: `Delete ${kind.title}` })
-    );
+    await clickWorkMenuItem(kind.title, 'Delete');
     await userEvent.click(
       await screen.findByRole('button', { name: 'Delete' })
     );
@@ -160,14 +180,13 @@ it('does not let one row block another row from removing its favorite', async ()
     </>
   );
 
-  await userEvent.click(
-    screen.getByRole('button', { name: `Remove ${book.title} from favorites` })
-  );
-  await userEvent.click(
-    screen.getByRole('button', {
-      name: `Remove ${series.title} from favorites`,
-    })
-  );
+  await clickWorkMenuItem(book.title, 'Remove from favorites');
+  await openWorkMenu(series.title);
+  // The first, closed menu stays in the DOM (zeroRuntime); the open one is last.
+  const items = await screen.findAllByRole('menuitem', {
+    name: 'Remove from favorites',
+  });
+  await userEvent.click(items[items.length - 1]!);
 
   expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2);
   expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41);
@@ -175,25 +194,30 @@ it('does not let one row block another row from removing its favorite', async ()
 });
 
 describe.each(kinds)('$noun row actions in Favorites', (kind) => {
-  const removeLabel = `Remove ${kind.title} from favorites`;
+  const removeItem = () =>
+    screen.findByRole('menuitem', { name: 'Remove from favorites' });
 
-  it('removes by favorite id with no confirmation and no Edit or Delete', async () => {
+  it('removes by favorite id with no confirmation and no Edit or Delete menu item', async () => {
     mockedFavorites.deleteFavorite.mockResolvedValue(undefined);
     renderAs(author, kind.ui('favorites', jest.fn(), 41));
 
-    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+    await openWorkMenu(kind.title);
+    expect(
+      screen.queryByRole('menuitem', { name: /^(Edit|Delete)$/ })
+    ).toBeNull();
+    await userEvent.click(await removeItem());
 
     await waitFor(() =>
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41)
     );
-    expect(screen.queryByRole('button', { name: /^(Edit|Delete)/ })).toBeNull();
   });
 
   it('sends one removal for a double click', async () => {
     mockedFavorites.deleteFavorite.mockReturnValue(new Promise(() => {}));
     renderAs(author, kind.ui('favorites', jest.fn(), 41));
 
-    await userEvent.dblClick(screen.getByRole('button', { name: removeLabel }));
+    await openWorkMenu(kind.title);
+    await userEvent.dblClick(await removeItem());
 
     expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(1);
     expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41);
@@ -205,9 +229,9 @@ describe.each(kinds)('$noun row actions in Favorites', (kind) => {
       .mockResolvedValueOnce(undefined);
     renderAs(author, kind.ui('favorites', jest.fn(), 43));
 
-    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
     expect(await screen.findByText('Favorite not found')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
 
     await waitFor(() =>
       expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2)
@@ -220,12 +244,12 @@ describe.each(kinds)('$noun row actions in Favorites', (kind) => {
     );
     renderAs(author, kind.ui('favorites', jest.fn(), 42));
 
-    await userEvent.click(screen.getByRole('button', { name: removeLabel }));
+    await clickWorkMenuItem(kind.title, 'Remove from favorites');
 
     expect(await screen.findByText('Favorite not found')).toBeInTheDocument();
   });
 
-  it('shows no Remove for a row without a favorite id', () => {
+  it('shows no More actions button for a row without a favorite id', () => {
     renderAs(author, kind.ui('favorites'));
 
     expect(screen.queryByRole('button')).toBeNull();

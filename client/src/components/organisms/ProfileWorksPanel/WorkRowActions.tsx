@@ -1,7 +1,12 @@
-import { useState } from 'react';
-import type { FC, ReactNode } from 'react';
-import { App, Flex, Popconfirm } from 'antd';
-import { DeleteOutlined, EditOutlined, StarFilled } from '@ant-design/icons';
+import type { FC } from 'react';
+import { App, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  EllipsisOutlined,
+  StarFilled,
+} from '@ant-design/icons';
 import { IconButton } from '@/components/molecules/IconButton/IconButton';
 import {
   DELETE_BOOK_CONFIRM,
@@ -43,9 +48,8 @@ const RowButtons: FC<RowButtonsProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const removeFavorite = useRemoveFavorite();
-  const [confirming, setConfirming] = useState(false);
   const toastError = (error: Error) => void message.error(error.message);
   const guardedRemove = useSingleFlight(async (id: number) => {
     try {
@@ -55,53 +59,62 @@ const RowButtons: FC<RowButtonsProps> = ({
     }
   });
 
-  let buttons: ReactNode = null;
+  let items: MenuProps['items'] = [];
   if (scope === 'favorites') {
     if (favoriteId !== undefined) {
-      buttons = (
-        <IconButton
-          size="small"
-          type="text"
-          icon={<StarFilled />}
-          label={`Remove ${title} from favorites`}
-          onClick={() => void guardedRemove(favoriteId)}
-        />
-      );
+      items = [
+        {
+          key: 'unfavorite',
+          label: 'Remove from favorites',
+          icon: <StarFilled aria-hidden />,
+        },
+      ];
     }
   } else if (mayEdit) {
-    buttons = (
-      <>
-        <IconButton
-          size="small"
-          type="text"
-          icon={<EditOutlined />}
-          label={`Edit ${title}`}
-          onClick={onEdit}
-        />
-        <Popconfirm
-          {...confirm}
-          okButtonProps={{ danger: true }}
-          onConfirm={() =>
-            onDelete({
-              onSuccess: () => void message.success(deleted),
-              onError: toastError,
-            })
-          }
-          onOpenChange={setConfirming}
-        >
-          <IconButton
-            size="small"
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            tooltipHidden={confirming}
-            label={`Delete ${title}`}
-          />
-        </Popconfirm>
-      </>
-    );
+    items = [
+      { key: 'edit', label: 'Edit', icon: <EditOutlined aria-hidden /> },
+      {
+        key: 'delete',
+        label: 'Delete',
+        icon: <DeleteOutlined aria-hidden />,
+        danger: true,
+      },
+    ];
   }
-  return buttons === null ? null : <Flex vertical>{buttons}</Flex>;
+  if (items.length === 0) return null;
+
+  const handleClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'edit') onEdit();
+    else if (key === 'unfavorite' && favoriteId !== undefined)
+      void guardedRemove(favoriteId);
+    else if (key === 'delete')
+      modal.confirm({
+        title: confirm.title,
+        content: confirm.description,
+        okText: confirm.okText,
+        okButtonProps: { danger: true },
+        onOk: () =>
+          onDelete({
+            onSuccess: () => void message.success(deleted),
+            onError: toastError,
+          }),
+      });
+  };
+
+  return (
+    <Dropdown
+      menu={{ items, onClick: handleClick }}
+      trigger={['click']}
+      placement="bottomRight"
+    >
+      <IconButton
+        size="small"
+        type="text"
+        icon={<EllipsisOutlined />}
+        label={`More actions for ${title}`}
+      />
+    </Dropdown>
+  );
 };
 
 interface BookRowActionsProps {

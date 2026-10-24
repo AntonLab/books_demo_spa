@@ -5,6 +5,7 @@ import { ProfileWorksPanel } from './ProfileWorksPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { clickWorkMenuItem } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { ApiError } from '@/api/client';
 import * as booksApi from '@/api/books';
@@ -151,9 +152,7 @@ describe('ProfileWorksPanel edit modals', () => {
   it('sends a book row Edit to the Book page with the edit link', async () => {
     renderPanel('mine');
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit Out Now' })
-    );
+    await clickWorkMenuItem('Out Now', 'Edit');
 
     expect(screen.getByTestId('location')).toHaveTextContent('/books/2?edit=1');
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -163,9 +162,7 @@ describe('ProfileWorksPanel edit modals', () => {
     mockedSeries.getSeries.mockResolvedValue(seriesDetail);
     renderPanel('mine', '/p?tab=series');
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Edit The Scale Cycle' })
-    );
+    await clickWorkMenuItem('The Scale Cycle', 'Edit');
 
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('Edit series')).toBeInTheDocument();
