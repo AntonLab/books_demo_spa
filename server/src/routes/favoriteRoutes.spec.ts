@@ -158,6 +158,10 @@ test('a Co-author gets 403 when favoriting their own Book', async () => {
       });
 
       assert.equal(response.status, 403);
+      assert.equal(
+        (await json<{ error: string }>(response)).error,
+        'You cannot favorite your own work'
+      );
     }
   );
 });
@@ -171,6 +175,10 @@ test('a Co-author gets 403 when favoriting their own Series', async () => {
       });
 
       assert.equal(response.status, 403);
+      assert.equal(
+        (await json<{ error: string }>(response)).error,
+        'You cannot favorite your own work'
+      );
     }
   );
 });

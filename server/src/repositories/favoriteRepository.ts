@@ -92,18 +92,19 @@ async function assertNotOwnWork(
   input: CreateFavoriteInput,
   account: Account
 ): Promise<void> {
-  let credited = 0;
-  if (input.bookId !== null) {
-    credited = await BookAuthor.count({
-      where: { bookId: input.bookId, userId: account.id },
-    });
-  }
-  if (input.seriesId !== null) {
-    credited = await SeriesAuthor.count({
-      where: { seriesId: input.seriesId, userId: account.id },
-    });
-  }
-  if (credited > 0) {
+  const [asBookAuthor, asSeriesAuthor] = await Promise.all([
+    input.bookId === null
+      ? 0
+      : BookAuthor.count({
+          where: { bookId: input.bookId, userId: account.id },
+        }),
+    input.seriesId === null
+      ? 0
+      : SeriesAuthor.count({
+          where: { seriesId: input.seriesId, userId: account.id },
+        }),
+  ]);
+  if (asBookAuthor + asSeriesAuthor > 0) {
     throw new ForbiddenError('You cannot favorite your own work');
   }
 }

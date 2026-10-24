@@ -104,12 +104,13 @@ export function createFakeFavoriteRepository(
       if (input.seriesId !== null && !series.has(input.seriesId)) {
         throw new NotFoundError('Series', input.seriesId);
       }
-      const credited = (work?: PublicBook | PublicSeries) =>
-        work?.authors.some((author) => author.id === account.id);
+      const targets: Array<PublicBook | PublicSeries | null | undefined> = [
+        input.bookId === null ? null : books.get(input.bookId),
+        input.seriesId === null ? null : series.get(input.seriesId),
+      ];
       if (
-        credited(input.bookId === null ? undefined : books.get(input.bookId)) ||
-        credited(
-          input.seriesId === null ? undefined : series.get(input.seriesId)
+        targets.some((work) =>
+          work?.authors.some((author) => author.id === account.id)
         )
       ) {
         throw new ForbiddenError('You cannot favorite your own work');
