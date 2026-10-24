@@ -93,7 +93,10 @@ export const useSeriesLibraryActions = (seriesId: number) => {
 
 // The Chapter page's reading events. Failures are not shown: reading must not
 // be interrupted, and the next open or finish reports again. A success moves
-// the Book into Reading, so the Book and Library caches are refetched.
+// the Book into Reading, so the Book and Library caches are refetched. The
+// answer is a 204, so the change cannot be read from it: `opened` only moves a
+// Book to Reading, which the Book detail and the Library show; `finished` can
+// also change what the book lists show.
 export const useReadingProgressMutation = () => {
   const queryClient = useQueryClient();
 
@@ -103,9 +106,14 @@ export const useReadingProgressMutation = () => {
       bookId: number;
       payload: ReadingProgressPayload;
     }) => postReadingProgress(variables.bookId, variables.payload),
-    onSuccess: () =>
+    onSuccess: (_data, { bookId, payload }) =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+        queryClient.invalidateQueries({
+          queryKey:
+            payload.event === 'finished'
+              ? queryKeys.allBooks
+              : queryKeys.book(bookId),
+        }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
       ]),
   });
