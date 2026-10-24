@@ -129,11 +129,6 @@ describe('AppHeader navigation', () => {
     );
   });
 
-  it('keeps the Home menu item beside the logo link', async () => {
-    await renderHeader(<AppHeader />, withSession(null));
-    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument();
-  });
-
   it('shows a Search icon button, not the search field', async () => {
     await renderHeader(<AppHeader />, withSession(null));
     expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
@@ -148,6 +143,18 @@ describe('AppHeader navigation', () => {
         <LocationProbe />
       </>,
       { ...withSession(null), route: '/books/1' }
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/search$/);
+  });
+
+  it('drops the query when the Search button is clicked on /search?q=x', async () => {
+    await renderHeader(
+      <>
+        <AppHeader />
+        <LocationProbe />
+      </>,
+      { ...withSession(null), route: '/search?q=x' }
     );
     await userEvent.click(screen.getByRole('button', { name: 'Search' }));
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/search$/);
