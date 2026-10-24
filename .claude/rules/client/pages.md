@@ -129,4 +129,5 @@ Routing and the App shell: `routing.md`.
   redirect with `replace` to the Book page. `BookPage` (a 404 or a bad id,
   unless the Book has Unsaved text), `SeriesPage` and `ChapterPage` (to the
   Book page) redirect with their own messages through `GoneRedirect`, which
-  wraps `usePageGuard`'s denied path. `AppShell` renders a footer.
+  wraps `usePageGuard`'s denied path. `AppShell` renders a footer except on the
+  Chapter page.

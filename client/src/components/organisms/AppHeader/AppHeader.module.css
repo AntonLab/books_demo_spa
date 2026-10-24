@@ -15,10 +15,13 @@
   flex: none;
 }
 
-.search {
-  width: 100%;
-  max-width: var(--ant-app-search-bar-max-width);
-  min-width: 0;
+.logoLink {
+  display: flex;
+  flex: none;
+}
+
+.searchButton {
+  margin-inline-start: auto;
 }
 
 @media (max-width: 575px) {

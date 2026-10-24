@@ -16,8 +16,6 @@ import type { ThemeConfig } from 'antd';
 // one a future antd version adds.
 declare module 'antd/es/theme/interface' {
   interface AliasToken {
-    /** Widest the header's search field is allowed to grow. */
-    appSearchBarMaxWidth: number;
     /** Width of the notification bell's panel. */
     appNotificationPanelWidth: number;
     /** Width of a BookCover frame; its height is 1.5x this (a 2:3 ratio). */
@@ -53,7 +51,6 @@ export const READING_SERIF_FONT = "Georgia, 'Times New Roman', Times, serif";
 
 export const appTheme: ThemeConfig = {
   token: {
-    appSearchBarMaxWidth: 400,
     appNotificationPanelWidth: 360,
     appBookCoverWidth: 96,
     appBookTabsHeight: 257,

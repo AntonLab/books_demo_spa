@@ -8,6 +8,7 @@ import { Provider } from 'react-redux';
 import {
   BrowserRouter,
   Link,
+  matchPath,
   Navigate,
   Route,
   Routes,
@@ -77,6 +78,13 @@ const BookRedirect: FC = () => {
   return <Navigate to={`/books/${bookId}`} replace />;
 };
 
+// matchPath reads `new` as a chapter id, but that route redirects to the Book
+// page. `/edit` fails the match because `end` defaults to true.
+export const isChapterPath = (pathname: string): boolean => {
+  const match = matchPath('/books/:bookId/chapters/:chapterId', pathname);
+  return !!match && match.params.chapterId !== 'new';
+};
+
 // Exported separately from `App` because `App` mounts BrowserRouter, which a
 // test cannot point at an arbitrary path. Route tests wrap this in
 // MemoryRouter instead.
@@ -91,15 +99,18 @@ export const AppShell: FC = () => {
   const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
+  // No header, footer or AuthModals on the Chapter page (routing.md).
+  const isChapter = isChapterPath(pathname);
 
   return (
     <Layout className={styles.layout}>
-      <AppHeader />
+      {!isChapter && <AppHeader />}
       <Layout.Content className={styles.content}>
         {/* One boundary and one fallback for every route, both inside the
-            content area so the header and the auth modals survive a page
-            that throws or a chunk still in flight. Keyed by pathname so a
-            caught error clears on the next navigation. */}
+            content area so the header and the auth modals (absent on the
+            Chapter page) survive a page that throws or a chunk still in
+            flight. Keyed by pathname so a caught error clears on the next
+            navigation. */}
         <ErrorBoundary key={boundaryKey}>
           <Suspense fallback={<PageSpinner />}>
             <Routes>
@@ -155,10 +166,12 @@ export const AppShell: FC = () => {
           </Suspense>
         </ErrorBoundary>
       </Layout.Content>
-      <Layout.Footer className={styles.footer}>
-        <span>© 2026 Books Demo</span>
-        <Link to="/search">Search</Link>
-      </Layout.Footer>
+      {!isChapter && (
+        <Layout.Footer className={styles.footer}>
+          <span>© 2026 Books Demo</span>
+          <Link to="/search">Search</Link>
+        </Layout.Footer>
+      )}
     </Layout>
   );
 };

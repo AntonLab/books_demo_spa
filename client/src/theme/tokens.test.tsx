@@ -8,7 +8,9 @@ const TokenProbe: FC = () => {
   const { token } = theme.useToken();
   return (
     <>
-      <span data-testid="custom">{String(token.appSearchBarMaxWidth)}</span>
+      <span data-testid="custom">
+        {String(token.appNotificationPanelWidth)}
+      </span>
       <span data-testid="builtin">{String(token.margin)}</span>
     </>
   );
@@ -25,7 +27,7 @@ describe('appTheme', () => {
       </ConfigProvider>
     );
 
-    expect(screen.getByTestId('custom')).toHaveTextContent('400');
+    expect(screen.getByTestId('custom')).toHaveTextContent('360');
   });
 
   it('leaves antd’s own tokens intact alongside it', () => {

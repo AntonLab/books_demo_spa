@@ -60,7 +60,7 @@ const wrapper = (client = createTestQueryClient()) => {
   return Wrapper;
 };
 
-// All three kinds for one text, as the header search asks for them.
+// All three kinds for one text.
 const renderAll = (text: string) =>
   renderHook(
     () => ({

@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation, useNavigationType } from 'react-router';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
-import { App, AppShell } from './App';
+import { App, AppShell, isChapterPath } from './App';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { sessionOf } from '@/test/session';
 import { publicBook, publicSeries } from '@/test/works';
@@ -310,16 +310,85 @@ describe('AppShell routing', () => {
   });
 });
 
-describe('AppShell footer', () => {
-  it.each(['/', '/search'])('shows the footer at %s', async (route) => {
-    renderWithProviders(<AppShell />, { route });
-
-    const footer = await screen.findByRole('contentinfo');
-    expect(footer).toHaveTextContent('© 2026 Books Demo');
-    expect(
-      within(footer).getByRole('link', { name: 'Search' })
-    ).toHaveAttribute('href', '/search');
+describe('isChapterPath', () => {
+  it.each([
+    ['/books/1/chapters/9', true],
+    ['/books/1/chapters/9/', true],
+    ['/books/1/chapters/new', false],
+    ['/books/1/chapters/9/edit', false],
+    ['/books/1', false],
+  ])('%s -> %s', (pathname, expected) => {
+    expect(isChapterPath(pathname)).toBe(expected);
   });
+});
+
+describe('AppShell on the Chapter page', () => {
+  beforeEach(() => {
+    mockedChapters.getChapter.mockResolvedValue({
+      id: 9,
+      bookId: 1,
+      title: 'Chapter One',
+      text: 'It was a dark night.',
+      publishedAt: '2026-09-01T00:00:00.000Z',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+    });
+  });
+
+  it.each([
+    '/books/1/chapters/9',
+    '/books/1/chapters/9/',
+    '/books/1/chapters/9?x=1',
+  ])('renders neither header nor footer at %s', async (route) => {
+    renderWithProviders(<AppShell />, { route });
+    await screen.findByRole('heading', { name: 'Chapter One' });
+    expect(screen.queryByRole('banner')).toBeNull();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Log in' })).toBeNull();
+  });
+
+  it.each(['/books/1/chapters/new', '/books/1/chapters/9/edit'])(
+    'keeps header and footer at the redirecting %s',
+    async (route) => {
+      renderWithProviders(<AppShell />, { route });
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      expect(screen.getByRole('banner')).toBeInTheDocument();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    }
+  );
+
+  it('brings header and footer back on the Book page', async () => {
+    renderWithProviders(<AppShell />, { route: '/books/1/chapters/9' });
+    await screen.findByRole('heading', { name: 'Chapter One' });
+    expect(screen.queryByRole('banner')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Contents' }));
+    await userEvent.click(
+      await screen.findByRole('link', { name: 'A Tale of Dragons' })
+    );
+
+    expect(await screen.findByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log in' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Log in' })
+    ).toBeInTheDocument();
+  });
+});
+
+describe('AppShell footer', () => {
+  it.each(['/', '/search', '/books/1'])(
+    'shows the footer at %s',
+    async (route) => {
+      renderWithProviders(<AppShell />, { route });
+
+      const footer = await screen.findByRole('contentinfo');
+      expect(footer).toHaveTextContent('© 2026 Books Demo');
+      expect(
+        within(footer).getByRole('link', { name: 'Search' })
+      ).toHaveAttribute('href', '/search');
+    }
+  );
 });
 
 describe('removed Chapter pages', () => {
@@ -589,6 +658,6 @@ describe('App', () => {
     expect(
       await screen.findByRole('menuitem', { name: 'Log in' })
     ).toBeInTheDocument();
-    expect(screen.getByLabelText('Search books')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
   });
 });

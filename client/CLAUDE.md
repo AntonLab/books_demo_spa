@@ -19,7 +19,7 @@ Rules live in `.claude/rules/client/`:
 | `store.md`             | the three slices, persistence, binding to the Account    |
 | `components.md`        | menus, comments, cards, images, icons, sortable lists    |
 | `chapter-editor.md`    | the Chapter editor modal: saving, conflicts              |
-| `components-search.md` | search suggestions: `SearchBar`, `SearchForm`            |
+| `components-search.md` | search suggestions: `SearchForm`                         |
 | `pages.md`             | page-level rules                                         |
 | `chapter-page.md`      | `ChapterPage`: reading preferences, Pages layout         |
 | `routing.md`           | lazy loading, `Suspense`/`ErrorBoundary`, providers      |
