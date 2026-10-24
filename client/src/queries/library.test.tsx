@@ -1,5 +1,9 @@
 import { act } from '@testing-library/react';
-import { useBookLibraryActions, useReadingProgressMutation } from './library';
+import {
+  useBookLibraryActions,
+  useReadingProgressMutation,
+  useSeriesLibraryActions,
+} from './library';
 import { queryKeys } from './keys';
 import { renderHookWithProviders } from '../test/renderWithProviders';
 import { ApiError } from '../api/client';
@@ -10,6 +14,29 @@ const mockedLibrary = jest.mocked(libraryApi);
 
 beforeEach(() => {
   jest.resetAllMocks();
+});
+
+describe('useSeriesLibraryActions', () => {
+  it('refreshes the Series, the books and the Library after a write succeeds', async () => {
+    mockedLibrary.addSeriesToLibrary.mockResolvedValue({
+      inLibrary: true,
+      notInterested: false,
+    });
+    const { result, queryClient } = renderHookWithProviders(() =>
+      useSeriesLibraryActions(12)
+    );
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(() => result.current.add.mutateAsync());
+
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: queryKeys.seriesDetail(12),
+    });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.allBooks });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: queryKeys.allLibrary,
+    });
+  });
 });
 
 describe('useReadingProgressMutation', () => {
@@ -72,6 +99,27 @@ describe('useBookLibraryActions', () => {
       queryKey: queryKeys.allLibrary,
     });
   });
+
+  it.each([
+    ['add', 'addBookToLibrary'],
+    ['toggleNotInterested', 'toggleBookNotInterested'],
+  ] as const)(
+    'refreshes the books and the Library after %s succeeds',
+    async (action, apiName) => {
+      mockedLibrary[apiName].mockResolvedValue({ bookId: 7, status: null });
+      const { result, queryClient } = renderHookWithProviders(() =>
+        useBookLibraryActions()
+      );
+      const invalidate = jest.spyOn(queryClient, 'invalidateQueries');
+
+      await act(() => result.current[action].mutateAsync(7));
+
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['books'] });
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: queryKeys.allLibrary,
+      });
+    }
+  );
 
   it('refreshes even when the write fails, so the screen shows what exists', async () => {
     mockedLibrary.clearReadingStatus.mockRejectedValue(
