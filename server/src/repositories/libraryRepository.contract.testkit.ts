@@ -32,6 +32,14 @@ export interface LibraryRepositoryContractWorld {
   aDraftBook(coAuthorIds: [number, ...number[]]): Promise<number>;
   // Turns a Book into a Draft, or back to Published.
   setDraft(bookId: number, draft: boolean): Promise<void>;
+  // A Series credited to these accounts exists; answers its id.
+  aSeries(coAuthorIds: [number, ...number[]]): Promise<number>;
+  // A Book filed in that Series, credited to these accounts; answers its id.
+  aBookInSeries(
+    seriesId: number,
+    coAuthorIds: [number, ...number[]],
+    options?: { draft?: boolean }
+  ): Promise<number>;
 }
 
 const ids = (page: { items: { id: number }[] }) =>
@@ -289,6 +297,150 @@ export function libraryRepositoryContract(
       [2, 1, 0]
     );
     assert.deepEqual([first.total, second.total, beyond.total], [3, 3, 3]);
+  });
+
+  // `me`, an author crediting a Series, and `count` Published Books in it.
+  async function arrangeSeries(count = 3) {
+    const world = await arrange(0);
+    const seriesId = await world.aSeries([world.author.id]);
+    const books: number[] = [];
+    for (let i = 0; i < count; i += 1) {
+      books.push(await world.aBookInSeries(seriesId, [world.author.id]));
+    }
+    return { ...world, seriesId, books };
+  }
+
+  const statusOf = async (
+    repository: LibraryRepository,
+    account: Account,
+    bookId: number
+  ) => {
+    const page = await repository.list(
+      { ...FIRST_PAGE, pageSize: 100 },
+      account
+    );
+    const hidden = await repository.list(
+      { ...FIRST_PAGE, pageSize: 100, status: 'not_interested' },
+      account
+    );
+    return [...page.items, ...hidden.items].find((item) => item.id === bookId)
+      ?.readingStatus;
+  };
+
+  test('contract: addSeries promotes none and not_interested, leaves reading, skips Drafts', async () => {
+    const { repository, aBookInSeries, me, author, seriesId, books } =
+      await arrangeSeries();
+    const [none, ignored, reading] = [books[0]!, books[1]!, books[2]!];
+    const draft = await aBookInSeries(seriesId, [author.id], { draft: true });
+    await repository.set(ignored, 'not_interested', me);
+    await repository.set(reading, 'reading', me);
+    assert.deepEqual(await repository.addSeries(seriesId, me), {
+      inLibrary: true,
+      notInterested: false,
+    });
+    assert.equal(await statusOf(repository, me, none), 'plan_to_read');
+    assert.equal(await statusOf(repository, me, ignored), 'plan_to_read');
+    assert.equal(await statusOf(repository, me, reading), 'reading');
+    assert.equal(await statusOf(repository, me, draft), undefined);
+  });
+
+  test('contract: toggleSeriesNotInterested sets none only, and a second press clears', async () => {
+    const { repository, me, seriesId, books } = await arrangeSeries(2);
+    assert.deepEqual(await repository.toggleSeriesNotInterested(seriesId, me), {
+      inLibrary: false,
+      notInterested: true,
+    });
+    assert.deepEqual(await repository.toggleSeriesNotInterested(seriesId, me), {
+      inLibrary: false,
+      notInterested: false,
+    });
+    for (const id of books) {
+      assert.equal(await statusOf(repository, me, id), undefined);
+    }
+  });
+
+  test('contract: toggleSeriesNotInterested leaves reading and plan_to_read as they are', async () => {
+    const { repository, me, seriesId, books } = await arrangeSeries();
+    const [planned, reading, none] = [books[0]!, books[1]!, books[2]!];
+    await repository.set(planned, 'plan_to_read', me);
+    await repository.set(reading, 'reading', me);
+    assert.deepEqual(await repository.toggleSeriesNotInterested(seriesId, me), {
+      inLibrary: true,
+      notInterested: false,
+    });
+    assert.equal(await statusOf(repository, me, planned), 'plan_to_read');
+    assert.equal(await statusOf(repository, me, reading), 'reading');
+    assert.equal(await statusOf(repository, me, none), 'not_interested');
+  });
+
+  test('contract: clearSeries deletes the entries of every Published Book', async () => {
+    const { repository, me, seriesId, books } = await arrangeSeries();
+    await repository.set(books[0]!, 'read', me);
+    await repository.set(books[1]!, 'not_interested', me);
+    assert.deepEqual(await repository.clearSeries(seriesId, me), {
+      inLibrary: false,
+      notInterested: false,
+    });
+    for (const id of books) {
+      assert.equal(await statusOf(repository, me, id), undefined);
+    }
+  });
+
+  test('contract: a Series action skips a Book the Account co-authors', async () => {
+    const { repository, aBookInSeries, anAccount, seriesId, books } =
+      await arrangeSeries(1);
+    const both = reader(await anAccount());
+    const own = await aBookInSeries(seriesId, [both.id]);
+    await repository.addSeries(seriesId, both);
+    assert.equal(await statusOf(repository, both, books[0]!), 'plan_to_read');
+    assert.equal(await statusOf(repository, both, own), undefined);
+  });
+
+  test('contract: a Series with no Published Book writes nothing and answers both flags false', async () => {
+    const { repository, aBookInSeries, aSeries, anAccount, author } =
+      await arrange(0);
+    const seriesId = await aSeries([author.id]);
+    const draft = await aBookInSeries(seriesId, [author.id], { draft: true });
+    const moderator: Account = { id: await anAccount(), role: 'admin' };
+    const none = { inLibrary: false, notInterested: false };
+    assert.deepEqual(await repository.addSeries(seriesId, moderator), none);
+    assert.deepEqual(
+      await repository.toggleSeriesNotInterested(seriesId, moderator),
+      none
+    );
+    assert.deepEqual(await repository.clearSeries(seriesId, moderator), none);
+    assert.equal(await statusOf(repository, moderator, draft), undefined);
+  });
+
+  test('contract: Series actions refuse a Co-author and a missing Series', async () => {
+    const { repository, me, author, seriesId } = await arrangeSeries();
+    const actions = [
+      ['addSeries', 'You cannot add your own work to your Library'],
+      [
+        'toggleSeriesNotInterested',
+        'You cannot mark your own work as not interested',
+      ],
+      ['clearSeries', 'You cannot remove your own work from your Library'],
+    ] as const;
+    for (const [action, message] of actions) {
+      await assert.rejects(
+        repository[action](seriesId, author),
+        new ForbiddenError(message)
+      );
+      await assert.rejects(
+        repository[action](MISSING_ID, me),
+        new NotFoundError('Series', MISSING_ID)
+      );
+    }
+  });
+
+  test('contract: addSeries never lowers a status set at the same moment', async () => {
+    const { repository, me, seriesId, books } = await arrangeSeries(1);
+    await Promise.all([
+      repository.set(books[0]!, 'reading', me),
+      repository.addSeries(seriesId, me),
+    ]);
+    assert.equal(await statusOf(repository, me, books[0]!), 'reading');
   });
 
   test('contract: a Book no longer Published leaves list and total, and returns with its status', async () => {

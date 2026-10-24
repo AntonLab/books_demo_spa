@@ -9,6 +9,8 @@ export const setReadingStatusSchema = z.object({
 
 export const libraryParamSchema = z.object({ bookId: idSchema });
 
+export const librarySeriesParamSchema = z.object({ seriesId: idSchema });
+
 export const listLibraryQuerySchema = z.object({
   status: z.enum(READING_STATUSES).optional(),
   ...pageShape,

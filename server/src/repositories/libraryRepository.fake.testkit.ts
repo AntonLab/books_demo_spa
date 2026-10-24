@@ -13,6 +13,9 @@ export interface FakeLibraryRepositoryOptions {
   accounts?: ReadonlySet<number>;
   // The books that exist, as a list row embeds them.
   books?: Map<number, PublicBook>;
+  // The Series that exist; a Book's `seriesId` links it. Every one is visible
+  // here, as the fake knows no Series visibility rule.
+  series?: Map<number, { authorIds: number[] }>;
   // Library entries already there, in insertion order.
   seed?: Array<{
     userId: number;
@@ -25,11 +28,12 @@ export interface FakeLibraryRepositoryOptions {
 // A minimal PublicBook for a fake's seeds, credited to `authorIds`.
 export function aLibraryBook(
   id: number,
-  options: { draft?: boolean; authorIds?: number[] } = {}
+  options: { draft?: boolean; authorIds?: number[]; seriesId?: number } = {}
 ): PublicBook {
-  const { draft = false, authorIds = [] } = options;
+  const { draft = false, authorIds = [], seriesId = null } = options;
   return {
     ...aPublicBook(id),
+    seriesId,
     status: draft ? 'draft' : 'in_progress',
     authors: authorIds.map((authorId) => ({
       id: authorId,
@@ -50,6 +54,7 @@ export function createFakeLibraryRepository(
   const {
     accounts = new Set<number>(),
     books = new Map<number, PublicBook>(),
+    series = new Map<number, { authorIds: number[] }>(),
     seed = [],
   } = options;
   // Keyed by "userId:bookId"; a Map keeps insertion order for ties.
@@ -81,6 +86,46 @@ export function createFakeLibraryRepository(
     entries.set(`${account.id}:${bookId}`, entry);
     return { bookId, status, updatedAt: entry.updatedAt };
   }
+
+  function assertMayHoldSeries(
+    seriesId: number,
+    account: Account,
+    message: string
+  ) {
+    const row = series.get(seriesId);
+    if (!row) throw new NotFoundError('Series', seriesId);
+    if (row.authorIds.includes(account.id)) throw new ForbiddenError(message);
+  }
+
+  const publishedIn = (seriesId: number) =>
+    [...books.values()].filter(
+      (book) => book.seriesId === seriesId && book.status !== 'draft'
+    );
+
+  // The Published Books of a Series the account does not co-author.
+  const holdableIn = (seriesId: number, account: Account) =>
+    publishedIn(seriesId)
+      .map((book) => book.id)
+      .filter((id) => !isCoAuthor(id, account));
+
+  const statusOf = (bookId: number, account: Account) =>
+    entries.get(`${account.id}:${bookId}`)?.status;
+
+  function seriesStateOf(seriesId: number, account: Account) {
+    const statuses = publishedIn(seriesId).map((book) =>
+      statusOf(book.id, account)
+    );
+    return {
+      inLibrary: statuses.some(
+        (s) => s !== undefined && s !== 'not_interested'
+      ),
+      notInterested:
+        statuses.length > 0 && statuses.every((s) => s === 'not_interested'),
+    };
+  }
+
+  const drop = (bookIds: number[], account: Account) =>
+    bookIds.forEach((id) => entries.delete(`${account.id}:${id}`));
 
   return {
     async set(bookId, status, account) {
@@ -129,6 +174,50 @@ export function createFakeLibraryRepository(
         );
       }
       entries.delete(`${account.id}:${bookId}`);
+    },
+
+    async addSeries(seriesId, account) {
+      assertMayHoldSeries(
+        seriesId,
+        account,
+        'You cannot add your own work to your Library'
+      );
+      for (const id of holdableIn(seriesId, account)) {
+        const status = statusOf(id, account);
+        if (status === undefined || status === 'not_interested') {
+          save(id, 'plan_to_read', account);
+        }
+      }
+      return seriesStateOf(seriesId, account);
+    },
+
+    async toggleSeriesNotInterested(seriesId, account) {
+      assertMayHoldSeries(
+        seriesId,
+        account,
+        'You cannot mark your own work as not interested'
+      );
+      const ids = holdableIn(seriesId, account);
+      if (seriesStateOf(seriesId, account).notInterested) {
+        drop(ids, account);
+      } else {
+        for (const id of ids) {
+          if (statusOf(id, account) === undefined) {
+            save(id, 'not_interested', account);
+          }
+        }
+      }
+      return seriesStateOf(seriesId, account);
+    },
+
+    async clearSeries(seriesId, account) {
+      assertMayHoldSeries(
+        seriesId,
+        account,
+        'You cannot remove your own work from your Library'
+      );
+      drop(holdableIn(seriesId, account), account);
+      return seriesStateOf(seriesId, account);
     },
 
     async list(query, account) {

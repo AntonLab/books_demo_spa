@@ -13,14 +13,28 @@ describe('the fake libraryRepository', () => {
     const accounts = new Set<number>();
     const books = new Map<number, PublicBook>();
 
-    const addBook = (authorIds: number[], draft: boolean) => {
+    const series = new Map<number, { authorIds: number[] }>();
+
+    const addBook = (
+      authorIds: number[],
+      draft: boolean,
+      seriesId?: number
+    ) => {
       const id = books.size + 1;
-      books.set(id, aLibraryBook(id, { authorIds, draft }));
+      books.set(id, aLibraryBook(id, { authorIds, draft, seriesId }));
       return id;
     };
 
     return {
-      repository: createFakeLibraryRepository({ accounts, books }),
+      repository: createFakeLibraryRepository({ accounts, books, series }),
+      async aSeries(coAuthorIds) {
+        const id = series.size + 1;
+        series.set(id, { authorIds: coAuthorIds });
+        return id;
+      },
+      async aBookInSeries(seriesId, coAuthorIds, { draft = false } = {}) {
+        return addBook(coAuthorIds, draft, seriesId);
+      },
       async anAccount() {
         const id = accounts.size + 1;
         accounts.add(id);

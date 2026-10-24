@@ -162,6 +162,7 @@ beforeEach(() => {
     }),
     favoriteCount: 0,
     viewerFavoriteId: null,
+    viewerLibrary: null,
   });
 });
 

@@ -4,6 +4,7 @@ import { createRequireAuth } from '../middleware/requireAuth.ts';
 import { validate } from '../middleware/validate.ts';
 import {
   libraryParamSchema,
+  librarySeriesParamSchema,
   listLibraryQuerySchema,
   setReadingStatusSchema,
 } from '../types/library.ts';
@@ -33,6 +34,24 @@ export function createLibraryRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ params: libraryParamSchema }),
     controller.toggleNotInterested
+  );
+  router.post(
+    '/series/:seriesId/add',
+    requireAuth,
+    validate({ params: librarySeriesParamSchema }),
+    controller.addSeries
+  );
+  router.post(
+    '/series/:seriesId/not-interested',
+    requireAuth,
+    validate({ params: librarySeriesParamSchema }),
+    controller.toggleSeriesNotInterested
+  );
+  router.delete(
+    '/series/:seriesId',
+    requireAuth,
+    validate({ params: librarySeriesParamSchema }),
+    controller.clearSeries
   );
   router.put(
     '/:bookId',

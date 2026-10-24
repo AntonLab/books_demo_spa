@@ -46,6 +46,7 @@ const series: SeriesDetail = {
   }),
   favoriteCount: 0,
   viewerFavoriteId: null,
+  viewerLibrary: null,
 };
 
 const book = publicBook({

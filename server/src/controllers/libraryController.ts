@@ -36,6 +36,23 @@ export function createLibraryController(repository: LibraryRepository) {
       res.status(204).end();
     },
 
+    addSeries: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(await repository.addSeries(seriesId, actorOf(req)));
+    },
+
+    toggleSeriesNotInterested: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(
+        await repository.toggleSeriesNotInterested(seriesId, actorOf(req))
+      );
+    },
+
+    clearSeries: async (req, res) => {
+      const { seriesId } = validatedParams<{ seriesId: number }>(req);
+      res.json(await repository.clearSeries(seriesId, actorOf(req)));
+    },
+
     list: async (req, res) => {
       const query = validatedQuery<ListLibraryQuery>(req);
       const { items, total } = await repository.list(query, actorOf(req));

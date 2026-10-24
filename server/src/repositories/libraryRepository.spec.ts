@@ -11,7 +11,12 @@ import { initModels } from '../models/index.ts';
 import { Book } from '../models/Book.ts';
 import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { User } from '../models/User.ts';
-import { createCreditedBook } from '../models/creditedBook.testkit.ts';
+import { Series } from '../models/Series.ts';
+import {
+  createCreditedBook,
+  createCreditedSeries,
+} from '../models/creditedBook.testkit.ts';
+import { NotFoundError } from '../types/errors.ts';
 import { createSequelizeLibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 import { libraryRepositoryContract } from './libraryRepository.contract.testkit.ts';
@@ -54,6 +59,7 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     // them.
     await LibraryEntry.destroy({ where: {}, truncate: false });
     await Book.destroy({ where: {}, truncate: false });
+    await Series.destroy({ where: {}, truncate: false });
     await User.destroy({ where: {}, truncate: false });
   });
 
@@ -117,6 +123,28 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     assert.equal(entry.status, 'plan_to_read');
   });
 
+  test('a Series the Account may not see is a NotFoundError', async () => {
+    const { me, author } = await arrangeBooks();
+    const hidden = await createCreditedSeries(
+      { title: 'Unseen', description: 'x', tags: [] },
+      [author.id]
+    );
+    await createCreditedBook(
+      {
+        title: 'Hidden Draft',
+        description: 'x',
+        tags: [],
+        status: 'draft',
+        seriesId: hidden.id,
+      },
+      [author.id]
+    );
+    await assert.rejects(
+      repository.addSeries(hidden.id, as(me)),
+      new NotFoundError('Series', hidden.id)
+    );
+  });
+
   // --- The contract the route specs' fake is held to, run here for real. ---
 
   libraryRepositoryContract(async () => ({
@@ -138,6 +166,26 @@ describe('libraryRepository against real MySQL', { skip }, () => {
           description: 'x',
           tags: [],
           status: 'draft',
+        },
+        coAuthorIds
+      );
+      return book.id;
+    },
+    async aSeries(coAuthorIds) {
+      const series = await createCreditedSeries(
+        { title: 'Contract Series', description: 'x', tags: [] },
+        coAuthorIds
+      );
+      return series.id;
+    },
+    async aBookInSeries(seriesId, coAuthorIds, { draft = false } = {}) {
+      const book = await createCreditedBook(
+        {
+          title: 'Contract Series Book',
+          description: 'x',
+          tags: [],
+          seriesId,
+          ...(draft ? { status: 'draft' } : {}),
         },
         coAuthorIds
       );

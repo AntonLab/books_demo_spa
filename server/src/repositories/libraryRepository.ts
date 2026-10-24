@@ -1,13 +1,16 @@
-import { ForeignKeyConstraintError, Op } from 'sequelize';
+import { ForeignKeyConstraintError, Op, type Transaction } from 'sequelize';
 import type {
   BookLibraryState,
   LibraryBook,
   PublicLibraryEntry,
   ReadingStatus,
+  SeriesLibraryState,
 } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { LibraryEntry, toPublicLibraryEntry } from '../models/LibraryEntry.ts';
+import { Series } from '../models/Series.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import {
   ForbiddenError,
   NotFoundError,
@@ -16,7 +19,13 @@ import {
 import type { ListLibraryQuery } from '../types/library.ts';
 import { publicBooksOf } from './bookRepository.ts';
 import { joined } from './joined.ts';
-import { readableBookWhere, type Account } from './visibility.ts';
+import { sequelizeOf } from './sequelizeOf.ts';
+import { seriesLibraryStateOf } from './seriesLibraryState.ts';
+import {
+  readableBookWhere,
+  visibleSeriesWhere,
+  type Account,
+} from './visibility.ts';
 
 export interface LibraryRepository {
   // A Book the account may not read is the same NotFoundError('Book', id) as a
@@ -40,6 +49,20 @@ export interface LibraryRepository {
   // Resolves for nothing to clear and for a missing Book; a Co-author is
   // refused with ForbiddenError.
   clear(bookId: number, account: Account): Promise<void>;
+  // The Series actions run over its Published Books, leaving out the ones the
+  // account co-authors; a Co-author of the Series is refused with
+  // ForbiddenError, and a Series the account may not see is a NotFoundError.
+  // addSeries lifts none and Not interested to Plan to read and keeps every
+  // other status.
+  addSeries(seriesId: number, account: Account): Promise<SeriesLibraryState>;
+  // Not interested on or off: once every Book is Not interested a press
+  // deletes those entries; otherwise it marks the Books with no status.
+  toggleSeriesNotInterested(
+    seriesId: number,
+    account: Account
+  ): Promise<SeriesLibraryState>;
+  // Deletes the entries of all of them, whatever the status.
+  clearSeries(seriesId: number, account: Account): Promise<SeriesLibraryState>;
   // Newest change first, Published Books only; without a status filter, Not
   // interested entries are left out.
   list(
@@ -131,6 +154,74 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     }
   }
 
+  async function assertMayHoldSeries(
+    seriesId: number,
+    account: Account,
+    message: string
+  ) {
+    const series = await Series.findOne({
+      where: {
+        [Op.and]: [{ id: seriesId }, await visibleSeriesWhere(account)],
+      },
+      attributes: ['id'],
+    });
+    if (!series) throw new NotFoundError('Series', seriesId);
+    const credited = await SeriesAuthor.count({
+      where: { seriesId, userId: account.id },
+    });
+    if (credited > 0) throw new ForbiddenError(message);
+  }
+
+  // The Published Books of the Series the account does not co-author.
+  async function publishedBooksOf(seriesId: number, accountId: number) {
+    const books = await Book.findAll({
+      where: { seriesId, status: { [Op.ne]: 'draft' } },
+      attributes: ['id'],
+    });
+    const bookIds = books.map((book) => book.id);
+    if (bookIds.length === 0) return [];
+    const own = await BookAuthor.findAll({
+      where: { userId: accountId, bookId: bookIds },
+      attributes: ['bookId'],
+    });
+    const ownIds = new Set(own.map((credit) => credit.bookId));
+    return bookIds.filter((id) => !ownIds.has(id));
+  }
+
+  // A Series action: the writes run in one transaction over the Books it
+  // reaches, and are conditional on the stored status like the Book actions.
+  async function actOnSeries(
+    seriesId: number,
+    account: Account,
+    message: string,
+    write: (bookIds: number[], transaction: Transaction) => Promise<void>
+  ) {
+    await assertMayHoldSeries(seriesId, account, message);
+    const bookIds = await publishedBooksOf(seriesId, account.id);
+    if (bookIds.length > 0) {
+      await sequelizeOf(LibraryEntry).transaction((transaction) =>
+        write(bookIds, transaction)
+      );
+    }
+    return seriesLibraryStateOf(seriesId, account.id);
+  }
+
+  // Inserts the rows missing; an existing entry keeps its status.
+  const insertMissing = (
+    bookIds: number[],
+    status: ReadingStatus,
+    account: Account,
+    transaction: Transaction
+  ) =>
+    LibraryEntry.bulkCreate(
+      bookIds.map((bookId) => ({
+        ...ownedBy(bookId, account),
+        status,
+        updatedAt: new Date(),
+      })),
+      { ignoreDuplicates: true, transaction }
+    );
+
   return {
     async set(bookId, status, account) {
       await assertReadable(bookId, account);
@@ -187,6 +278,73 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         'You cannot remove your own work from your Library'
       );
       await LibraryEntry.destroy({ where: { userId: account.id, bookId } });
+    },
+
+    addSeries(seriesId, account) {
+      return actOnSeries(
+        seriesId,
+        account,
+        'You cannot add your own work to your Library',
+        async (bookIds, transaction) => {
+          await insertMissing(bookIds, 'plan_to_read', account, transaction);
+          await LibraryEntry.update(
+            { status: 'plan_to_read', updatedAt: new Date() },
+            {
+              where: {
+                userId: account.id,
+                bookId: bookIds,
+                status: 'not_interested',
+              },
+              transaction,
+            }
+          );
+        }
+      );
+    },
+
+    toggleSeriesNotInterested(seriesId, account) {
+      return actOnSeries(
+        seriesId,
+        account,
+        'You cannot mark your own work as not interested',
+        async (bookIds, transaction) => {
+          const { notInterested } = await seriesLibraryStateOf(
+            seriesId,
+            account.id
+          );
+          if (!notInterested) {
+            await insertMissing(
+              bookIds,
+              'not_interested',
+              account,
+              transaction
+            );
+            return;
+          }
+          await LibraryEntry.destroy({
+            where: {
+              userId: account.id,
+              bookId: bookIds,
+              status: 'not_interested',
+            },
+            transaction,
+          });
+        }
+      );
+    },
+
+    clearSeries(seriesId, account) {
+      return actOnSeries(
+        seriesId,
+        account,
+        'You cannot remove your own work from your Library',
+        async (bookIds, transaction) => {
+          await LibraryEntry.destroy({
+            where: { userId: account.id, bookId: bookIds },
+            transaction,
+          });
+        }
+      );
     },
 
     async list(query, account) {

@@ -1,4 +1,5 @@
 import type { PublicGenre } from './genre.ts';
+import type { SeriesLibraryState } from './library.ts';
 import type { AuthorSummary } from './user.ts';
 
 // No userId: a series has no single owner (ADR-0005).
@@ -31,6 +32,8 @@ export interface SeriesDetail extends PublicSeries {
   // The id of the viewer's own Favorite, for DELETE /api/favorites/:id; null
   // for a Guest and for an account without one.
   viewerFavoriteId: number | null;
+  // The viewer's Library state for this Series' Books; null for a Guest.
+  viewerLibrary: SeriesLibraryState | null;
 }
 
 // The body of POST /api/series; PATCH takes a Partial of it. No userId, as on
