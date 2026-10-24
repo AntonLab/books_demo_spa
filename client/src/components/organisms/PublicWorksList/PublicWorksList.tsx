@@ -1,14 +1,19 @@
+import { Flex } from 'antd';
 import { useCallback, type FC, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { ListPagination } from '@/components/molecules/ListPagination/ListPagination';
 import { SortOrderSwitch } from '@/components/molecules/SortOrderSwitch/SortOrderSwitch';
 import { BookCard } from '@/components/organisms/BookCard/BookCard';
 import { CardList } from '@/components/organisms/CardList/CardList';
-import { RESULTS_COLUMNS } from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
+import {
+  RESULTS_COLUMNS,
+  ResultsLayoutSwitch,
+} from '@/components/organisms/ResultsLayoutSwitch/ResultsLayoutSwitch';
 import { SeriesCard } from '@/components/organisms/SeriesCard/SeriesCard';
 import { usePageClamp } from '@/components/organisms/ProfileWorksPanel/useProfileLists';
 import { useBookSearch } from '@/queries/books';
 import { useSeriesList } from '@/queries/series';
+import { useResultsLayout } from '@/store/hooks';
 import spacing from '@/theme/spacing.module.css';
 import {
   parsePublicList,
@@ -28,7 +33,8 @@ interface ShellProps<T extends { id: number }> {
   emptyText: string;
   state: PublicListState;
   query: Query<T>;
-  renderCard: (row: T) => ReactNode;
+  renderCard: (row: T, tile: boolean) => ReactNode;
+  layoutAware: boolean;
 }
 
 // Never writes anything: only Published works are asked for, so the viewer's
@@ -39,8 +45,12 @@ const PublicListShell = <T extends { id: number }>({
   state,
   query,
   renderCard,
+  layoutAware,
 }: ShellProps<T>) => {
   const [, setSearchParams] = useSearchParams();
+  const layout = useResultsLayout();
+  const columns = layoutAware ? RESULTS_COLUMNS[layout] : RESULTS_COLUMNS.list;
+  const tile = layoutAware && layout === 'grid';
   const { sort, page, pageSize } = state;
 
   const moveTo = useCallback(
@@ -58,7 +68,7 @@ const PublicListShell = <T extends { id: number }>({
 
   return (
     <>
-      <div className={spacing.gapBelow}>
+      <Flex align="center" gap="middle" wrap className={spacing.gapBelow}>
         <SortOrderSwitch
           value={sort}
           onChange={(next) =>
@@ -67,14 +77,19 @@ const PublicListShell = <T extends { id: number }>({
             )
           }
         />
-      </div>
+        {layoutAware && (
+          <div className={styles.toolbarEnd}>
+            <ResultsLayoutSwitch />
+          </div>
+        )}
+      </Flex>
       <CardList
         noun={noun}
         items={query.data?.items ?? []}
         renderItem={(row) => (
-          <div className={styles.card}>{renderCard(row)}</div>
+          <div className={styles.card}>{renderCard(row, tile)}</div>
         )}
-        columns={RESULTS_COLUMNS.list}
+        columns={columns}
         isPending={isPending}
         isError={query.error !== null}
         error={query.error}
@@ -120,7 +135,8 @@ const PublicBooksView: FC<{ userId: number }> = ({ userId }) => {
       emptyText="No books yet."
       state={state}
       query={query}
-      renderCard={(row) => <BookCard book={row} />}
+      renderCard={(row, tile) => <BookCard book={row} tile={tile} />}
+      layoutAware
     />
   );
 };
@@ -147,6 +163,7 @@ const PublicSeriesView: FC<{ userId: number }> = ({ userId }) => {
       renderCard={(row) => (
         <SeriesCard series={row} href={`/series/${row.id}`} />
       )}
+      layoutAware={false}
     />
   );
 };
