@@ -9,7 +9,7 @@ import {
   type Sequelize,
 } from 'sequelize';
 import { READING_STATUSES } from 'shared';
-import type { PublicLibraryEntry, ReadingStatus } from 'shared';
+import type { ReadingStatus } from 'shared';
 import type { Book } from './Book.ts';
 import type { User } from './User.ts';
 
@@ -77,12 +77,4 @@ export function initLibraryEntryModel(
   );
 
   return LibraryEntry;
-}
-
-export function toPublicLibraryEntry(entry: LibraryEntry): PublicLibraryEntry {
-  return {
-    bookId: entry.bookId,
-    status: entry.status,
-    updatedAt: entry.updatedAt,
-  };
 }

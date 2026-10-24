@@ -5,7 +5,6 @@ import {
   listLibrary,
   postReadingProgress,
   removeSeriesFromLibrary,
-  setReadingStatus,
   toggleBookNotInterested,
   toggleSeriesNotInterested,
 } from './library';
@@ -27,28 +26,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   document.cookie = 'xsrfToken=; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-});
-
-describe('setReadingStatus', () => {
-  it('puts the status for a book, with the XSRF token', async () => {
-    const entry = {
-      bookId: 7,
-      status: 'reading',
-      updatedAt: '2026-10-02T10:00:00.000Z',
-    };
-    const fetchMock = mockFetch(jsonResponse(entry));
-
-    await expect(setReadingStatus(7, 'reading')).resolves.toEqual(entry);
-
-    const [url, init] = callOf(fetchMock);
-    expect(url).toBe('/api/library/7');
-    expect(init.method).toBe('PUT');
-    expect(init.headers).toEqual({
-      'Content-Type': 'application/json',
-      'X-XSRF-Token': 'tok-123',
-    });
-    expect(init.body).toBe('{"status":"reading"}');
-  });
 });
 
 describe('clearReadingStatus', () => {

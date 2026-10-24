@@ -1,31 +1,8 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  libraryParamSchema,
-  listLibraryQuerySchema,
-  setReadingStatusSchema,
-} from './library.ts';
+import { libraryParamSchema, listLibraryQuerySchema } from './library.ts';
 
 describe('library schemas', () => {
-  test('setReadingStatusSchema accepts each of the four statuses', () => {
-    for (const status of [
-      'reading',
-      'plan_to_read',
-      'read',
-      'not_interested',
-    ]) {
-      assert.deepEqual(setReadingStatusSchema.parse({ status }), { status });
-    }
-  });
-
-  test('setReadingStatusSchema rejects an unknown or missing status', () => {
-    assert.equal(
-      setReadingStatusSchema.safeParse({ status: 'owned' }).success,
-      false
-    );
-    assert.equal(setReadingStatusSchema.safeParse({}).success, false);
-  });
-
   test('listLibraryQuerySchema defaults to page 1 of 20 with no status', () => {
     assert.deepEqual(listLibraryQuerySchema.parse({}), {
       current: 1,

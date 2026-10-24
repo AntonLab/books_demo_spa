@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReadingProgressPayload, ReadingStatus } from 'shared';
+import type { ReadingProgressPayload } from 'shared';
 import {
   addBookToLibrary,
   addSeriesToLibrary,
@@ -7,7 +7,6 @@ import {
   listLibrary,
   postReadingProgress,
   removeSeriesFromLibrary,
-  setReadingStatus,
   toggleBookNotInterested,
   toggleSeriesNotInterested,
   type ListLibraryParams,
@@ -23,8 +22,9 @@ export const useLibrary = (params: ListLibraryParams, enabled = true) => {
 };
 
 // The Book page's Library buttons. The responses are ignored: the refetch of
-// the Book detail carries the viewer's status. onSettled for the reason
-// useSetReadingStatus gives. isPending covers all three, so one request is
+// the Book detail carries the viewer's status. onSettled, not onSuccess, for
+// the reason useToggleFavorite gives: a 404 means the screen shows a Book that
+// is gone, and only the refetch puts it right. isPending covers all three, so one request is
 // in flight at a time.
 export const useBookLibraryActions = () => {
   const queryClient = useQueryClient();
@@ -105,32 +105,6 @@ export const useReadingProgressMutation = () => {
       payload: ReadingProgressPayload;
     }) => postReadingProgress(variables.bookId, variables.payload),
     onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
-      ]),
-  });
-};
-
-// One hook for set and clear: a null status removes the Book from the
-// Library. onSettled, not onSuccess, for the reason useToggleFavorite gives:
-// a 404 means the screen shows a Book that is gone, and only the refetch
-// puts it right. Every book detail carries the viewer's status and the counts.
-export const useSetReadingStatus = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (variables: {
-      bookId: number;
-      status: ReadingStatus | null;
-    }): Promise<void> => {
-      if (variables.status === null) {
-        await clearReadingStatus(variables.bookId);
-        return;
-      }
-      await setReadingStatus(variables.bookId, variables.status);
-    },
-    onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),

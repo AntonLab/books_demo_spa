@@ -6,7 +6,6 @@ import {
   libraryParamSchema,
   librarySeriesParamSchema,
   listLibraryQuerySchema,
-  setReadingStatusSchema,
 } from '../types/library.ts';
 import type { RouteDeps } from './index.ts';
 
@@ -52,12 +51,6 @@ export function createLibraryRoutes(deps: RouteDeps): Router {
     requireAuth,
     validate({ params: librarySeriesParamSchema }),
     controller.clearSeries
-  );
-  router.put(
-    '/:bookId',
-    requireAuth,
-    validate({ params: libraryParamSchema, body: setReadingStatusSchema }),
-    controller.set
   );
   router.delete(
     '/:bookId',

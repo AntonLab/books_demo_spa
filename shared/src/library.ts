@@ -20,13 +20,6 @@ export interface ReadingProgressPayload {
   chapterId: number;
 }
 
-// What PUT /api/library/:bookId returns: one Library entry (CONTEXT.md).
-export interface PublicLibraryEntry {
-  bookId: number;
-  status: ReadingStatus;
-  updatedAt: Date;
-}
-
 // What POST /api/library/:bookId/add and /not-interested return: `status` is
 // null once the entry is gone.
 export interface BookLibraryState {
@@ -64,8 +57,3 @@ export const EMPTY_LIBRARY_COUNTS: LibraryCounts = {
   read: 0,
   inLibraries: 0,
 };
-
-// The body of PUT /api/library/:bookId: the Reading status to set.
-export interface SetReadingStatusPayload {
-  status: ReadingStatus;
-}

@@ -5,7 +5,6 @@ import type {
   PagedResponse,
   BookLibraryState,
   PublicBook,
-  PublicLibraryEntry,
   ReadingStatus,
   SeriesLibraryState,
   Wire,
@@ -113,12 +112,6 @@ const SERIES_SEED = [
 const post = (base: string, cookie: string, path: string) =>
   fetch(`${base}/api/library/${path}`, { method: 'POST', headers: { cookie } });
 
-const put = (base: string, cookie: string, bookId: number, body: unknown) =>
-  fetch(`${base}/api/library/${bookId}`, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json', cookie },
-    body: JSON.stringify(body),
-  });
 const clear = (base: string, cookie: string, bookId: number) =>
   fetch(`${base}/api/library/${bookId}`, {
     method: 'DELETE',
@@ -127,42 +120,11 @@ const clear = (base: string, cookie: string, bookId: number) =>
 const list = (base: string, cookie: string, query = '') =>
   fetch(`${base}/api/library${query}`, { headers: { cookie } });
 
-test('setting a status answers 200 with the status, and again with another replaces it', async () => {
+test('PUT /api/library/:bookId answers 404 now that no route serves it', async () => {
   await withAuthenticatedApp(
     { libraryRepository: fakeRepository() },
     async (base) => {
-      const first = await put(base, ROLE_COOKIES.user, BOOK_ID, {
-        status: 'reading',
-      });
-      assert.equal(first.status, 200);
-      const entry = await json<Wire<PublicLibraryEntry>>(first);
-      assert.deepEqual([entry.bookId, entry.status], [BOOK_ID, 'reading']);
-      await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'read' });
-      const page = await json<Wire<PagedResponse<LibraryBook>>>(
-        await list(base, ROLE_COOKIES.user)
-      );
-      assert.deepEqual(
-        page.items.map((item) => [item.id, item.readingStatus]),
-        [[BOOK_ID, 'read']]
-      );
-    }
-  );
-});
-
-test('a bad status or a non-numeric id is a 400', async () => {
-  await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
-    async (base) => {
-      assert.equal(
-        (await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'owned' }))
-          .status,
-        400
-      );
-      assert.equal(
-        (await put(base, ROLE_COOKIES.user, BOOK_ID, {})).status,
-        400
-      );
-      const badId = await fetch(`${base}/api/library/abc`, {
+      const res = await fetch(`${base}/api/library/${BOOK_ID}`, {
         method: 'PUT',
         headers: {
           'content-type': 'application/json',
@@ -170,39 +132,15 @@ test('a bad status or a non-numeric id is a 400', async () => {
         },
         body: JSON.stringify({ status: 'read' }),
       });
-      assert.equal(badId.status, 400);
-    }
-  );
-});
-
-test('a missing Book, or a Draft the caller may not read, is a 404', async () => {
-  await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
-    async (base) => {
-      assert.equal(
-        (await put(base, ROLE_COOKIES.user, MISSING_ID, { status: 'read' }))
-          .status,
-        404
-      );
-      assert.equal(
-        (await put(base, ROLE_COOKIES.user, DRAFT_ID, { status: 'read' }))
-          .status,
-        404
-      );
-      assert.equal(
-        (await put(base, ROLE_COOKIES.author, DRAFT_ID, { status: 'read' }))
-          .status,
-        200
-      );
+      assert.equal(res.status, 404);
     }
   );
 });
 
 test('clearing answers 204 whether or not a status was set', async () => {
   await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
+    { libraryRepository: fakeRepository([seedFor(BOOK_ID, 'read')]) },
     async (base) => {
-      await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'read' });
       assert.equal((await clear(base, ROLE_COOKIES.user, BOOK_ID)).status, 204);
       assert.equal((await clear(base, ROLE_COOKIES.user, BOOK_ID)).status, 204);
       assert.equal(
@@ -215,12 +153,13 @@ test('clearing answers 204 whether or not a status was set', async () => {
 
 test('the list defaults to every status but Not interested and filters by status', async () => {
   await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
+    {
+      libraryRepository: fakeRepository([
+        seedFor(BOOK_ID, 'read'),
+        seedFor(OTHER_BOOK_ID, 'not_interested'),
+      ]),
+    },
     async (base) => {
-      await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'read' });
-      await put(base, ROLE_COOKIES.user, OTHER_BOOK_ID, {
-        status: 'not_interested',
-      });
       const all = await json<Wire<PagedResponse<LibraryBook>>>(
         await list(base, ROLE_COOKIES.user)
       );
@@ -246,9 +185,8 @@ test('the list defaults to every status but Not interested and filters by status
 
 test('a page past the end is 200 with no items and the real total', async () => {
   await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
+    { libraryRepository: fakeRepository([seedFor(BOOK_ID, 'read')]) },
     async (base) => {
-      await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'read' });
       const page = await json<Wire<PagedResponse<LibraryBook>>>(
         await list(base, ROLE_COOKIES.user, '?current=9&pageSize=5')
       );
@@ -262,9 +200,8 @@ test('a page past the end is 200 with no items and the real total', async () => 
 
 test('another account never sees the caller entries', async () => {
   await withAuthenticatedApp(
-    { libraryRepository: fakeRepository() },
+    { libraryRepository: fakeRepository([seedFor(BOOK_ID, 'read')]) },
     async (base) => {
-      await put(base, ROLE_COOKIES.user, BOOK_ID, { status: 'read' });
       const page = await json<Wire<PagedResponse<LibraryBook>>>(
         await list(base, ROLE_COOKIES.admin)
       );
@@ -823,10 +760,9 @@ test('every library route is a 401 without a session', async () => {
     const statuses = [
       (await fetch(`${base}/api/library`)).status,
       (await fetch(`${base}/api/library?current=0`)).status,
-      (await fetch(`${base}/api/library/${BOOK_ID}`, { method: 'PUT' })).status,
       (await fetch(`${base}/api/library/${BOOK_ID}`, { method: 'DELETE' }))
         .status,
     ];
-    assert.deepEqual(statuses, [401, 401, 401, 401]);
+    assert.deepEqual(statuses, [401, 401, 401]);
   });
 });

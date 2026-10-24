@@ -17,6 +17,13 @@ describe('the fake libraryRepository', () => {
     const series = new Map<number, { authorIds: number[] }>();
     const chapters: NonNullable<FakeLibraryRepositoryOptions['chapters']> = [];
 
+    const repository = createFakeLibraryRepository({
+      accounts,
+      books,
+      series,
+      chapters,
+    });
+
     const addBook = (
       authorIds: number[],
       draft: boolean,
@@ -28,12 +35,10 @@ describe('the fake libraryRepository', () => {
     };
 
     return {
-      repository: createFakeLibraryRepository({
-        accounts,
-        books,
-        series,
-        chapters,
-      }),
+      repository,
+      async seedStatus(accountId, bookId, status) {
+        repository.seedStatus(accountId, bookId, status);
+      },
       async aChapter(bookId, { published }) {
         const id = chapters.length + 1;
         chapters.push({

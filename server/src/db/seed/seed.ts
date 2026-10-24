@@ -40,7 +40,6 @@ import { createChapterSchema } from '../../types/chapter.ts';
 import { createCommentSchema } from '../../types/comment.ts';
 import { createFavoriteSchema } from '../../types/favorite.ts';
 import { createLikeSchema } from '../../types/like.ts';
-import { setReadingStatusSchema } from '../../types/library.ts';
 import { createReadingListSchema } from '../../types/readingList.ts';
 import { createReportSchema } from '../../types/report.ts';
 import { createSeriesSchema } from '../../types/series.ts';
@@ -623,7 +622,7 @@ async function writeLibrary(
   transaction: Transaction
 ): Promise<number> {
   const rows = plan.library.map((entry) => ({
-    ...setReadingStatusSchema.parse({ status: entry.status }),
+    status: entry.status,
     userId: itemAt(accountIds, entry.accountIndex, 'account id'),
     bookId: workIdOf(bookIds, entry.book),
     createdAt: entry.updatedAt,

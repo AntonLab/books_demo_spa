@@ -3,12 +3,10 @@ import type {
   PagedResponse,
   ReadingProgressPayload,
   ReadingStatus,
-  SetReadingStatusPayload,
 } from 'shared';
 import type {
   BookLibraryState,
   LibraryBook,
-  PublicLibraryEntry,
   SeriesLibraryState,
 } from '../types/library';
 
@@ -18,18 +16,6 @@ export interface ListLibraryParams {
   current?: number;
   pageSize?: number;
 }
-
-// 404 when the viewer cannot see the book.
-export const setReadingStatus = (
-  bookId: number,
-  status: ReadingStatus
-): Promise<PublicLibraryEntry> => {
-  const payload: SetReadingStatusPayload = { status };
-  return request<PublicLibraryEntry>(`/library/${bookId}`, {
-    method: 'PUT',
-    body: payload,
-  });
-};
 
 // Plan to read, unless the Book already has a status; 404 when the viewer
 // cannot see the book.

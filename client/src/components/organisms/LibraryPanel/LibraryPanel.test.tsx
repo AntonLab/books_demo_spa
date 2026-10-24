@@ -73,9 +73,6 @@ describe('LibraryPanel', () => {
       current: 1,
       pageSize: 20,
     });
-    expect(
-      screen.getAllByRole('combobox', { name: 'Reading status' })
-    ).toHaveLength(2);
   });
 
   it('filters by a status and resets to page 1', async () => {
@@ -121,64 +118,71 @@ describe('LibraryPanel', () => {
     );
   });
 
-  it('changes a row’s status, and removes a row from the Library', async () => {
+  it('offers Remove on each row, and no status select', async () => {
     mockedLibrary.listLibrary.mockResolvedValue(
       page([entry(1, 'Dragons', 'reading'), entry(2, 'Tides', 'read')])
     );
-    mockedLibrary.setReadingStatus.mockResolvedValue({
-      bookId: 2,
-      status: 'reading',
-      updatedAt: '2026-10-02T10:00:00.000Z',
-    });
-    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
     renderPanel();
     await titleLink('Dragons');
-    const [first, second] = screen.getAllByRole('combobox', {
-      name: 'Reading status',
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+    expect(
+      screen.queryByRole('combobox', { name: 'Reading status' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('removes a row by its book id, and disables only that row while pending', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading'), entry(2, 'Tides', 'read')])
+    );
+    mockedLibrary.clearReadingStatus.mockReturnValue(new Promise(() => {}));
+    renderPanel();
+    await titleLink('Dragons');
+    const [first, second] = screen.getAllByRole('button', {
+      name: 'Remove',
     }) as [HTMLElement, HTMLElement];
     await userEvent.click(second);
-    await userEvent.click(screen.getByRole('option', { name: 'Reading' }));
-    expect(mockedLibrary.setReadingStatus).toHaveBeenCalledWith(2, 'reading');
-    await userEvent.click(first);
-    // The first row's list is the one whose option ids carry that row's id.
-    const removeOptions = screen.getAllByRole('option', {
-      name: 'Remove from library',
-    });
+    expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(2);
+    await waitFor(() => expect(second).toBeDisabled());
+    expect(first).toBeEnabled();
+  });
+
+  it('offers Remove on a Not interested row', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'not_interested')])
+    );
+    mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
+    renderPanel('/profile/library?status=not_interested');
     await userEvent.click(
-      removeOptions.find((option) =>
-        option.id.startsWith('reading-status-1_')
-      ) as HTMLElement
+      await screen.findByRole('button', { name: 'Remove' })
     );
     expect(mockedLibrary.clearReadingStatus).toHaveBeenCalledWith(1);
   });
 
-  it('refetches the list after a change', async () => {
+  it('refetches the list after a removal', async () => {
     mockedLibrary.listLibrary.mockResolvedValue(
       page([entry(1, 'Dragons', 'reading')])
     );
     mockedLibrary.clearReadingStatus.mockResolvedValue(undefined);
     renderPanel();
     await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
+      await screen.findByRole('button', { name: 'Remove' })
     );
-    await userEvent.click(screen.getByTitle('Remove from library'));
     await waitFor(() =>
       expect(mockedLibrary.listLibrary).toHaveBeenCalledTimes(2)
     );
   });
 
-  it('toasts a failed row change', async () => {
+  it('toasts a failed removal', async () => {
     mockedLibrary.listLibrary.mockResolvedValue(
       page([entry(1, 'Dragons', 'reading')])
     );
-    mockedLibrary.setReadingStatus.mockRejectedValue(
+    mockedLibrary.clearReadingStatus.mockRejectedValue(
       new ApiError(404, 'Book 1 not found')
     );
     renderPanel();
     await userEvent.click(
-      await screen.findByRole('combobox', { name: 'Reading status' })
+      await screen.findByRole('button', { name: 'Remove' })
     );
-    await userEvent.click(screen.getByTitle('Read'));
     expect(await screen.findByText('Book 1 not found')).toBeInTheDocument();
   });
 

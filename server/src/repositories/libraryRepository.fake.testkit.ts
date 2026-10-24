@@ -67,7 +67,9 @@ export function aLibraryBook(
 // libraryRepository.contract.testkit.ts.
 export function createFakeLibraryRepository(
   options: FakeLibraryRepositoryOptions = {}
-): LibraryRepository {
+): LibraryRepository & {
+  seedStatus(accountId: number, bookId: number, status: ReadingStatus): void;
+} {
   const {
     accounts = new Set<number>(),
     books = new Map<number, PublicBook>(),
@@ -146,15 +148,14 @@ export function createFakeLibraryRepository(
     bookIds.forEach((id) => entries.delete(`${account.id}:${id}`));
 
   return {
-    async set(bookId, status, account) {
-      const book = books.get(bookId);
-      const mayRead =
-        book &&
-        (book.status !== 'draft' ||
-          isModeratorRole(account.role) ||
-          isCoAuthor(bookId, account));
-      if (!mayRead) throw new NotFoundError('Book', bookId);
-      return save(bookId, status, account);
+    // Arranges a held Book for the contract, bypassing every rule.
+    seedStatus(accountId: number, bookId: number, status: ReadingStatus) {
+      entries.set(`${accountId}:${bookId}`, {
+        userId: accountId,
+        bookId,
+        status,
+        updatedAt: new Date(),
+      });
     },
 
     async addBook(bookId, account) {

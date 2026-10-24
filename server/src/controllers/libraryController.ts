@@ -9,18 +9,11 @@ import { actorOf } from '../repositories/visibility.ts';
 import type {
   ListLibraryQuery,
   ReadingProgressInput,
-  SetReadingStatusInput,
 } from '../types/library.ts';
 
 // Whose Library this is comes from the session and nowhere else.
 export function createLibraryController(repository: LibraryRepository) {
   return {
-    set: async (req, res) => {
-      const { bookId } = validatedParams<{ bookId: number }>(req);
-      const { status } = validatedBody<SetReadingStatusInput>(req);
-      res.json(await repository.set(bookId, status, actorOf(req)));
-    },
-
     add: async (req, res) => {
       const { bookId } = validatedParams<{ bookId: number }>(req);
       res.json(await repository.addBook(bookId, actorOf(req)));

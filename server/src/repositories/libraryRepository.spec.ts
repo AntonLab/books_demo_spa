@@ -118,10 +118,10 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     assert.equal(await LibraryEntry.count(), 0);
   });
 
-  test('a Moderator may set a status on a Draft Book', async () => {
+  test('a Moderator may add a Draft Book to the Library', async () => {
     const { moderator, draft } = await arrangeBooks();
-    const entry = await repository.set(draft.id, 'plan_to_read', as(moderator));
-    assert.equal(entry.status, 'plan_to_read');
+    const state = await repository.addBook(draft.id, as(moderator));
+    assert.equal(state.status, 'plan_to_read');
   });
 
   test('a Series the Account may not see is a NotFoundError', async () => {
@@ -208,6 +208,14 @@ describe('libraryRepository against real MySQL', { skip }, () => {
     },
     async setComplete(bookId) {
       await Book.update({ status: 'complete' }, { where: { id: bookId } });
+    },
+    async seedStatus(accountId, bookId, status) {
+      await LibraryEntry.upsert({
+        userId: accountId,
+        bookId,
+        status,
+        updatedAt: new Date(),
+      });
     },
     async setDraft(bookId, draft) {
       await Book.update(

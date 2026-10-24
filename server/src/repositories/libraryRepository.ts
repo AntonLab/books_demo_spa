@@ -2,14 +2,13 @@ import { ForeignKeyConstraintError, Op, type Transaction } from 'sequelize';
 import type {
   BookLibraryState,
   LibraryBook,
-  PublicLibraryEntry,
   ReadingStatus,
   SeriesLibraryState,
 } from 'shared';
 import { Book } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
-import { LibraryEntry, toPublicLibraryEntry } from '../models/LibraryEntry.ts';
+import { LibraryEntry } from '../models/LibraryEntry.ts';
 import { Series } from '../models/Series.ts';
 import { SeriesAuthor } from '../models/SeriesAuthor.ts';
 import {
@@ -32,16 +31,10 @@ import {
 } from './visibility.ts';
 
 export interface LibraryRepository {
-  // A Book the account may not read is the same NotFoundError('Book', id) as a
-  // missing one. Setting again replaces the status and refreshes updatedAt.
-  set(
-    bookId: number,
-    status: ReadingStatus,
-    account: Account
-  ): Promise<PublicLibraryEntry>;
   // Add to the Library: none or Not interested becomes Plan to read, any other
-  // status stays. A Co-author is refused with ForbiddenError, after the same
-  // NotFoundError rule as `set`.
+  // status stays. A Book the account may not read is the same
+  // NotFoundError('Book', id) as a missing one. A Co-author is refused with
+  // ForbiddenError, after that NotFoundError.
   addBook(bookId: number, account: Account): Promise<BookLibraryState>;
   // Not interested on or off: none or Plan to read becomes Not interested, a
   // second press deletes the entry (status null); Reading and Read are a
@@ -120,13 +113,12 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     try {
       // An upsert on the unique (userId, bookId) index: never a conflict, and
       // updatedAt moves even when the status is unchanged.
-      const [entry] = await LibraryEntry.upsert({
+      await LibraryEntry.upsert({
         userId: account.id,
         bookId,
         status,
         updatedAt: new Date(),
       });
-      return toPublicLibraryEntry(entry);
     } catch (error) {
       // The Book went away after the check.
       if (error instanceof ForeignKeyConstraintError) {
@@ -237,11 +229,6 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
     );
 
   return {
-    async set(bookId, status, account) {
-      await assertReadable(bookId, account);
-      return save(bookId, status, account);
-    },
-
     async addBook(bookId, account) {
       await assertMayHold(
         bookId,
@@ -249,7 +236,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
         'You cannot add your own work to your Library'
       );
       // Each step is one statement guarded by the stored status, so a
-      // concurrent `set` to Reading or Read is never lowered.
+      // concurrent write of Reading or Read is never lowered.
       await insertIfAbsent(bookId, 'plan_to_read', account);
       await LibraryEntry.update(
         { status: 'plan_to_read', updatedAt: new Date() },
@@ -384,7 +371,7 @@ export function createSequelizeLibraryRepository(): LibraryRepository {
       if (!chapter) throw new NotFoundError('Chapter', input.chapterId);
 
       if (input.event === 'opened') {
-        // Conditional statements, as in `addBook`: a concurrent `set` or
+        // Conditional statements, as in `addBook`: a concurrent write or
         // `finished` is never lowered to reading.
         await insertIfAbsent(bookId, 'reading', account);
         await LibraryEntry.update(
