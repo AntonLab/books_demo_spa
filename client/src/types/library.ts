@@ -4,6 +4,7 @@ import type { ReadingStatus, Wire } from 'shared';
 export type LibraryBook = Wire<Shared.LibraryBook>;
 export type PublicLibraryEntry = Wire<Shared.PublicLibraryEntry>;
 export type BookLibraryState = Wire<Shared.BookLibraryState>;
+export type SeriesLibraryState = Wire<Shared.SeriesLibraryState>;
 export type LibraryCounts = Shared.LibraryCounts;
 
 // What a reader sees for each Reading status, so every place that shows one

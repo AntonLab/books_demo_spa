@@ -8,6 +8,7 @@ import type {
   BookLibraryState,
   LibraryBook,
   PublicLibraryEntry,
+  SeriesLibraryState,
 } from '../types/library';
 
 export interface ListLibraryParams {
@@ -50,6 +51,33 @@ export const toggleBookNotInterested = (
 // request() maps to undefined.
 export const clearReadingStatus = (bookId: number): Promise<void> => {
   return request<void>(`/library/${bookId}`, { method: 'DELETE' });
+};
+
+// The Series calls act on every Published Book of the Series the viewer can
+// keep; 404 when the viewer cannot see the Series.
+export const addSeriesToLibrary = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(`/library/series/${seriesId}/add`, {
+    method: 'POST',
+  });
+};
+
+export const toggleSeriesNotInterested = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(
+    `/library/series/${seriesId}/not-interested`,
+    { method: 'POST' }
+  );
+};
+
+export const removeSeriesFromLibrary = (
+  seriesId: number
+): Promise<SeriesLibraryState> => {
+  return request<SeriesLibraryState>(`/library/series/${seriesId}`, {
+    method: 'DELETE',
+  });
 };
 
 // Undefined, null and empty-string params are left out, as listBooks does.

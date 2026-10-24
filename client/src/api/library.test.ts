@@ -1,9 +1,12 @@
 import {
   addBookToLibrary,
+  addSeriesToLibrary,
   clearReadingStatus,
   listLibrary,
+  removeSeriesFromLibrary,
   setReadingStatus,
   toggleBookNotInterested,
+  toggleSeriesNotInterested,
 } from './library';
 import { emptyResponse, jsonResponse } from '../test/httpFixtures';
 
@@ -82,6 +85,38 @@ describe('toggleBookNotInterested', () => {
       '/api/library/7/not-interested',
       'POST',
     ]);
+  });
+});
+
+describe('Series Library calls', () => {
+  const state = { inLibrary: true, notInterested: false };
+
+  it.each([
+    [
+      'addSeriesToLibrary',
+      addSeriesToLibrary,
+      '/api/library/series/5/add',
+      'POST',
+    ],
+    [
+      'toggleSeriesNotInterested',
+      toggleSeriesNotInterested,
+      '/api/library/series/5/not-interested',
+      'POST',
+    ],
+    [
+      'removeSeriesFromLibrary',
+      removeSeriesFromLibrary,
+      '/api/library/series/5',
+      'DELETE',
+    ],
+  ])('%s sends %s %s', async (_name, call, path, method) => {
+    const fetchMock = mockFetch(jsonResponse(state));
+
+    await expect(call(5)).resolves.toEqual(state);
+
+    const [url, init] = callOf(fetchMock);
+    expect([url, init.method]).toEqual([path, method]);
   });
 });
 

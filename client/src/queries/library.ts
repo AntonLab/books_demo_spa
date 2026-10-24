@@ -2,10 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReadingStatus } from 'shared';
 import {
   addBookToLibrary,
+  addSeriesToLibrary,
   clearReadingStatus,
   listLibrary,
+  removeSeriesFromLibrary,
   setReadingStatus,
   toggleBookNotInterested,
+  toggleSeriesNotInterested,
   type ListLibraryParams,
 } from '../api/library';
 import { queryKeys } from './keys';
@@ -41,6 +44,41 @@ export const useBookLibraryActions = () => {
   });
   const remove = useMutation({
     mutationFn: (bookId: number) => clearReadingStatus(bookId),
+    onSettled,
+  });
+
+  return {
+    add,
+    toggleNotInterested,
+    remove,
+    isPending:
+      add.isPending || toggleNotInterested.isPending || remove.isPending,
+  };
+};
+
+// The Series page's Library buttons; same shape as useBookLibraryActions. The
+// Series detail carries viewerLibrary, so it is refetched with the Books.
+export const useSeriesLibraryActions = (seriesId: number) => {
+  const queryClient = useQueryClient();
+  const onSettled = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.seriesDetail(seriesId),
+      }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBooks }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allLibrary }),
+    ]);
+
+  const add = useMutation({
+    mutationFn: () => addSeriesToLibrary(seriesId),
+    onSettled,
+  });
+  const toggleNotInterested = useMutation({
+    mutationFn: () => toggleSeriesNotInterested(seriesId),
+    onSettled,
+  });
+  const remove = useMutation({
+    mutationFn: () => removeSeriesFromLibrary(seriesId),
     onSettled,
   });
 
