@@ -7,6 +7,6 @@ import type { AppDispatch, RootState } from './index';
 export const useAppDispatch = useDispatch.withTypes<AppDispatch>();
 export const useAppSelector = useSelector.withTypes<RootState>();
 
-// The Device preference every results list follows.
+// The Device preference that Book lists follow.
 export const useResultsLayout = (): ResultsLayout =>
   useAppSelector((state) => state.devicePreferences.resultsLayout);

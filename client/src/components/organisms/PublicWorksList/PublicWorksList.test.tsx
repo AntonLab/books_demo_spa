@@ -1,11 +1,11 @@
 import { act, screen, waitFor } from '@testing-library/react';
-import { devicePreferences } from '@/store/devicePreferencesSlice';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router';
 import { PublicWorksList } from './PublicWorksList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
 import * as seriesApi from '@/api/series';
+import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { publicBook, publicSeries } from '@/test/works';
 
 jest.mock('@/api/books');

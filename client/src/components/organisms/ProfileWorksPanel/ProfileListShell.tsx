@@ -63,7 +63,8 @@ export const ProfileListShell = <T extends { id: number }>({
     (state) => state.devicePreferences.searchFormExpanded
   );
   const layout = useResultsLayout();
-  const tiles = kind === 'books' && layout === 'grid';
+  const isBooks = kind === 'books';
+  const tiles = isBooks && layout === 'grid';
   // React warns when `key` arrives inside a spread, so it goes on its own.
   const { key: formKey, ...formProps } = filters.form;
 
@@ -76,7 +77,7 @@ export const ProfileListShell = <T extends { id: number }>({
             controls={FORM_ID}
             filterCount={filters.filterCount}
           />
-          {kind === 'books' && <ResultsLayoutSwitch />}
+          {isBooks && <ResultsLayoutSwitch />}
         </Flex>
       </Flex>
       <div hidden={!filtersExpanded}>
@@ -103,7 +104,7 @@ export const ProfileListShell = <T extends { id: number }>({
             {renderActions(row)}
           </Flex>
         )}
-        columns={RESULTS_COLUMNS[kind === 'books' ? layout : 'list']}
+        columns={RESULTS_COLUMNS[isBooks ? layout : 'list']}
         isPending={list.isPending}
         isError={list.error !== null}
         error={list.error}

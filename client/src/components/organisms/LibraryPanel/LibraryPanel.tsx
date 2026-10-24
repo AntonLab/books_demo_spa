@@ -26,7 +26,7 @@ const LibraryRow: FC<{ row: LibraryBook; tile: boolean }> = ({ row, tile }) => {
     <Flex
       vertical={tile}
       gap="small"
-      align="flex-start"
+      align={tile ? 'stretch' : 'flex-start'}
       wrap={tile ? undefined : 'wrap'}
     >
       <div className={tile ? styles.tile : styles.card}>

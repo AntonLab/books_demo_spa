@@ -6,10 +6,9 @@
   min-width: 0;
 }
 
-/* In a vertical stack the tile takes the column's width; the card's 20rem
-   basis would become a height there. */
+/* In a vertical stack the card's 20rem basis would become a height, so the
+   tile drops it; the Flex's stretch alignment gives it the column's width. */
 .tile {
-  align-self: stretch;
   min-width: 0;
 }
 
