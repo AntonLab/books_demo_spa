@@ -22,6 +22,18 @@ export function createLibraryRoutes(deps: RouteDeps): Router {
     validate({ query: listLibraryQuerySchema }),
     controller.list
   );
+  router.post(
+    '/:bookId/add',
+    requireAuth,
+    validate({ params: libraryParamSchema }),
+    controller.add
+  );
+  router.post(
+    '/:bookId/not-interested',
+    requireAuth,
+    validate({ params: libraryParamSchema }),
+    controller.toggleNotInterested
+  );
   router.put(
     '/:bookId',
     requireAuth,

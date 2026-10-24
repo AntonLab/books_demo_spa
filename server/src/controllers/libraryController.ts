@@ -20,9 +20,19 @@ export function createLibraryController(repository: LibraryRepository) {
       res.json(await repository.set(bookId, status, actorOf(req)));
     },
 
+    add: async (req, res) => {
+      const { bookId } = validatedParams<{ bookId: number }>(req);
+      res.json(await repository.addBook(bookId, actorOf(req)));
+    },
+
+    toggleNotInterested: async (req, res) => {
+      const { bookId } = validatedParams<{ bookId: number }>(req);
+      res.json(await repository.toggleNotInterested(bookId, actorOf(req)));
+    },
+
     clear: async (req, res) => {
       const { bookId } = validatedParams<{ bookId: number }>(req);
-      await repository.clear(bookId, actorOf(req).id);
+      await repository.clear(bookId, actorOf(req));
       res.status(204).end();
     },
 

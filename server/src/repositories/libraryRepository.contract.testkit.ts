@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NotFoundError } from '../types/errors.ts';
+import {
+  ForbiddenError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import type { LibraryRepository } from './libraryRepository.ts';
 import type { Account } from './visibility.ts';
 
@@ -116,10 +120,110 @@ export function libraryRepositoryContract(
   test('contract: clear removes the status; clearing nothing or a missing Book resolves', async () => {
     const { repository, me, books } = await arrange();
     await repository.set(books[0]!, 'read', me);
-    await repository.clear(books[0]!, me.id);
+    await repository.clear(books[0]!, me);
     assert.equal((await repository.list(FIRST_PAGE, me)).total, 0);
-    await repository.clear(books[0]!, me.id);
-    await repository.clear(MISSING_ID, me.id);
+    await repository.clear(books[0]!, me);
+    await repository.clear(MISSING_ID, me);
+  });
+
+  test('contract: clear refuses the Co-author', async () => {
+    const { repository, author, books } = await arrange();
+    await assert.rejects(
+      repository.clear(books[0]!, author),
+      new ForbiddenError('You cannot remove your own work from your Library')
+    );
+  });
+
+  test('contract: addBook puts a Book in plan_to_read, and again keeps it', async () => {
+    const { repository, me, books } = await arrange();
+    const expected = { bookId: books[0], status: 'plan_to_read' };
+    assert.deepEqual(await repository.addBook(books[0]!, me), expected);
+    assert.deepEqual(await repository.addBook(books[0]!, me), expected);
+    assert.equal((await repository.list(FIRST_PAGE, me)).total, 1);
+  });
+
+  test('contract: addBook turns not_interested into plan_to_read and leaves reading and read', async () => {
+    const { repository, me, books } = await arrange(3);
+    const [a, b, c] = [books[0]!, books[1]!, books[2]!];
+    await repository.set(a, 'not_interested', me);
+    await repository.set(b, 'reading', me);
+    await repository.set(c, 'read', me);
+    const statuses = [];
+    for (const id of [a, b, c]) {
+      statuses.push((await repository.addBook(id, me)).status);
+    }
+    assert.deepEqual(statuses, ['plan_to_read', 'reading', 'read']);
+  });
+
+  test('contract: addBook refuses the Co-author, a missing Book and a Draft', async () => {
+    const { repository, aDraftBook, me, author, books } = await arrange();
+    await assert.rejects(
+      repository.addBook(books[0]!, author),
+      new ForbiddenError('You cannot add your own work to your Library')
+    );
+    await assert.rejects(
+      repository.addBook(MISSING_ID, me),
+      new NotFoundError('Book', MISSING_ID)
+    );
+    const draft = await aDraftBook([author.id]);
+    await assert.rejects(
+      repository.addBook(draft, me),
+      new NotFoundError('Book', draft)
+    );
+  });
+
+  test('contract: toggleNotInterested marks none and plan_to_read, a second press clears it', async () => {
+    const { repository, me, books } = await arrange(2);
+    const [a, b] = [books[0]!, books[1]!];
+    assert.equal(
+      (await repository.toggleNotInterested(a, me)).status,
+      'not_interested'
+    );
+    await repository.addBook(b, me);
+    assert.equal(
+      (await repository.toggleNotInterested(b, me)).status,
+      'not_interested'
+    );
+    assert.deepEqual(await repository.toggleNotInterested(a, me), {
+      bookId: a,
+      status: null,
+    });
+    assert.deepEqual(
+      ids(
+        await repository.list({ ...FIRST_PAGE, status: 'not_interested' }, me)
+      ),
+      [b]
+    );
+  });
+
+  test('contract: toggleNotInterested on reading or read is a StateConflictError', async () => {
+    const { repository, me, books } = await arrange(2);
+    await repository.set(books[0]!, 'reading', me);
+    await repository.set(books[1]!, 'read', me);
+    for (const id of books) {
+      await assert.rejects(
+        repository.toggleNotInterested(id, me),
+        new StateConflictError('Remove it from your Library first')
+      );
+    }
+    assert.equal((await repository.list(FIRST_PAGE, me)).total, 2);
+  });
+
+  test('contract: toggleNotInterested refuses the Co-author, a missing Book and a Draft', async () => {
+    const { repository, aDraftBook, me, author, books } = await arrange();
+    await assert.rejects(
+      repository.toggleNotInterested(books[0]!, author),
+      new ForbiddenError('You cannot mark your own work as not interested')
+    );
+    await assert.rejects(
+      repository.toggleNotInterested(MISSING_ID, me),
+      new NotFoundError('Book', MISSING_ID)
+    );
+    const draft = await aDraftBook([author.id]);
+    await assert.rejects(
+      repository.toggleNotInterested(draft, me),
+      new NotFoundError('Book', draft)
+    );
   });
 
   test('contract: the default list leaves out Not interested, and status filters to one', async () => {

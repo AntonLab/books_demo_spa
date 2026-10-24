@@ -1,7 +1,12 @@
-import { NotFoundError } from '../types/errors.ts';
+import {
+  ForbiddenError,
+  NotFoundError,
+  StateConflictError,
+} from '../types/errors.ts';
 import { isModeratorRole, type PublicBook, type ReadingStatus } from 'shared';
 import { aPublicBook } from './favoriteRepository.fake.testkit.ts';
 import type { LibraryRepository } from './libraryRepository.ts';
+import type { Account } from './visibility.ts';
 
 export interface FakeLibraryRepositoryOptions {
   // The accounts that exist. Stands in for users.id.
@@ -52,6 +57,31 @@ export function createFakeLibraryRepository(
     seed.map((row) => [`${row.userId}:${row.bookId}`, row])
   );
 
+  const isCoAuthor = (bookId: number, account: Account) =>
+    books.get(bookId)?.authors.some((author) => author.id === account.id) ??
+    false;
+
+  function assertMayHold(bookId: number, account: Account, message: string) {
+    const book = books.get(bookId);
+    const mayRead =
+      book &&
+      (book.status !== 'draft' ||
+        isModeratorRole(account.role) ||
+        isCoAuthor(bookId, account));
+    if (!mayRead) throw new NotFoundError('Book', bookId);
+    if (isCoAuthor(bookId, account)) throw new ForbiddenError(message);
+  }
+
+  function save(bookId: number, status: ReadingStatus, account: Account) {
+    // Stands in for the foreign key on userId.
+    if (!accounts.has(account.id)) {
+      throw new NotFoundError('User', account.id);
+    }
+    const entry = { userId: account.id, bookId, status, updatedAt: new Date() };
+    entries.set(`${account.id}:${bookId}`, entry);
+    return { bookId, status, updatedAt: entry.updatedAt };
+  }
+
   return {
     async set(bookId, status, account) {
       const book = books.get(bookId);
@@ -59,24 +89,46 @@ export function createFakeLibraryRepository(
         book &&
         (book.status !== 'draft' ||
           isModeratorRole(account.role) ||
-          book.authors.some((author) => author.id === account.id));
+          isCoAuthor(bookId, account));
       if (!mayRead) throw new NotFoundError('Book', bookId);
-      // Stands in for the foreign key on userId.
-      if (!accounts.has(account.id)) {
-        throw new NotFoundError('User', account.id);
-      }
-      const entry = {
-        userId: account.id,
-        bookId,
-        status,
-        updatedAt: new Date(),
-      };
-      entries.set(`${account.id}:${bookId}`, entry);
-      return { bookId, status, updatedAt: entry.updatedAt };
+      return save(bookId, status, account);
     },
 
-    async clear(bookId, accountId) {
-      entries.delete(`${accountId}:${bookId}`);
+    async addBook(bookId, account) {
+      assertMayHold(
+        bookId,
+        account,
+        'You cannot add your own work to your Library'
+      );
+      const status = entries.get(`${account.id}:${bookId}`)?.status;
+      if (status && status !== 'not_interested') return { bookId, status };
+      return { bookId, status: save(bookId, 'plan_to_read', account).status };
+    },
+
+    async toggleNotInterested(bookId, account) {
+      assertMayHold(
+        bookId,
+        account,
+        'You cannot mark your own work as not interested'
+      );
+      const status = entries.get(`${account.id}:${bookId}`)?.status;
+      if (status === 'reading' || status === 'read') {
+        throw new StateConflictError('Remove it from your Library first');
+      }
+      if (status === 'not_interested') {
+        entries.delete(`${account.id}:${bookId}`);
+        return { bookId, status: null };
+      }
+      return { bookId, status: save(bookId, 'not_interested', account).status };
+    },
+
+    async clear(bookId, account) {
+      if (isCoAuthor(bookId, account)) {
+        throw new ForbiddenError(
+          'You cannot remove your own work from your Library'
+        );
+      }
+      entries.delete(`${account.id}:${bookId}`);
     },
 
     async list(query, account) {

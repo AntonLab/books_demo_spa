@@ -16,6 +16,13 @@ export interface PublicLibraryEntry {
   updatedAt: Date;
 }
 
+// What POST /api/library/:bookId/add and /not-interested return: `status` is
+// null once the entry is gone.
+export interface BookLibraryState {
+  bookId: number;
+  status: ReadingStatus | null;
+}
+
 // One item of GET /api/library: a Book in the reader's Library (CONTEXT.md)
 // with its Reading status.
 export type LibraryBook = PublicBook & { readingStatus: ReadingStatus };
