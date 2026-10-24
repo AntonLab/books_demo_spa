@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ConflictError, NotFoundError } from '../types/errors.ts';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../types/errors.ts';
 import type { FavoriteRepository } from './favoriteRepository.ts';
 import type { Account } from './visibility.ts';
 
@@ -104,16 +108,36 @@ export function favoriteRepositoryContract(
     );
   });
 
-  test('contract: two accounts may favorite the same work, a Co-author included', async () => {
-    const { repository, authorId, holderId, bookId } = await withWorks();
+  test('contract: two accounts may favorite the same work', async () => {
+    const world = await withWorks();
+    const { repository, holderId, bookId } = world;
+    const otherId = await world.anAccount();
 
     await repository.create({ bookId, seriesId: null }, reader(holderId));
-    const byCoAuthor = await repository.create(
+    const byOther = await repository.create(
       { bookId, seriesId: null },
-      reader(authorId)
+      reader(otherId)
     );
 
-    assert.equal(byCoAuthor.userId, authorId);
+    assert.equal(byOther.userId, otherId);
+  });
+
+  test('contract: create refuses a Co-author of the Book', async () => {
+    const { repository, authorId, bookId } = await withWorks();
+
+    await assert.rejects(
+      repository.create({ bookId, seriesId: null }, reader(authorId)),
+      new ForbiddenError('You cannot favorite your own work')
+    );
+  });
+
+  test('contract: create refuses a Co-author of the Series', async () => {
+    const { repository, authorId, seriesId } = await withWorks();
+
+    await assert.rejects(
+      repository.create({ bookId: null, seriesId }, reader(authorId)),
+      new ForbiddenError('You cannot favorite your own work')
+    );
   });
 
   test("contract: each list holds the account's own favorites of its kind, newest first, with the work embedded", async () => {
@@ -133,7 +157,10 @@ export function favoriteRepositoryContract(
       reader(holderId)
     );
     // Someone else's favorite on the same book stays out of the holder's list.
-    await repository.create({ bookId, seriesId: null }, reader(authorId));
+    await repository.create(
+      { bookId, seriesId: null },
+      reader(await world.anAccount())
+    );
 
     const books = await repository.listBooks(FIRST_PAGE, reader(holderId));
     const series = await repository.listSeries(FIRST_PAGE, reader(holderId));

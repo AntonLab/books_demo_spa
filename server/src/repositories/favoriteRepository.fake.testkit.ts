@@ -1,5 +1,14 @@
-import { ConflictError, NotFoundError } from '../types/errors.ts';
-import type { PublicBook, PublicFavorite, PublicSeries } from 'shared';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../types/errors.ts';
+import type {
+  AuthorSummary,
+  PublicBook,
+  PublicFavorite,
+  PublicSeries,
+} from 'shared';
 import type { FavoriteRepository } from './favoriteRepository.ts';
 
 export interface FakeFavoriteRepositoryOptions {
@@ -15,11 +24,22 @@ export interface FakeFavoriteRepositoryOptions {
 
 const FIXTURE_TIME = new Date('2026-01-01T00:00:00Z');
 
-// A minimal PublicBook for a fake's seeds; only the id matters to a contract.
-export function aPublicBook(id: number): PublicBook {
+function anAuthor(id: number): AuthorSummary {
   return {
     id,
-    authors: [],
+    login: `author${id}`,
+    firstName: 'Author',
+    lastName: `${id}`,
+    status: 'active',
+    avatarUrl: null,
+  };
+}
+
+// A minimal PublicBook for a fake's seeds, credited to `authorIds`.
+export function aPublicBook(id: number, authorIds: number[] = []): PublicBook {
+  return {
+    id,
+    authors: authorIds.map(anAuthor),
     seriesId: null,
     series: null,
     title: `Book ${id}`,
@@ -34,10 +54,13 @@ export function aPublicBook(id: number): PublicBook {
 }
 
 // A minimal PublicSeries, on the same terms.
-export function aPublicSeries(id: number): PublicSeries {
+export function aPublicSeries(
+  id: number,
+  authorIds: number[] = []
+): PublicSeries {
   return {
     id,
-    authors: [],
+    authors: authorIds.map(anAuthor),
     title: `Series ${id}`,
     coverUrl: null,
     bookCount: 0,
@@ -80,6 +103,16 @@ export function createFakeFavoriteRepository(
       }
       if (input.seriesId !== null && !series.has(input.seriesId)) {
         throw new NotFoundError('Series', input.seriesId);
+      }
+      const credited = (work?: PublicBook | PublicSeries) =>
+        work?.authors.some((author) => author.id === account.id);
+      if (
+        credited(input.bookId === null ? undefined : books.get(input.bookId)) ||
+        credited(
+          input.seriesId === null ? undefined : series.get(input.seriesId)
+        )
+      ) {
+        throw new ForbiddenError('You cannot favorite your own work');
       }
       // Stand in for the foreign key on userId and the two unique indexes.
       if (!accounts.has(account.id)) {

@@ -1,8 +1,14 @@
 import { Op, UniqueConstraintError } from 'sequelize';
 import { Book } from '../models/Book.ts';
+import { BookAuthor } from '../models/BookAuthor.ts';
 import { Favorite, toPublicFavorite } from '../models/Favorite.ts';
 import { Series } from '../models/Series.ts';
-import { ConflictError, NotFoundError } from '../types/errors.ts';
+import { SeriesAuthor } from '../models/SeriesAuthor.ts';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from '../types/errors.ts';
 import type {
   FavoriteBook,
   FavoriteSeries,
@@ -80,6 +86,28 @@ async function assertVisibleTarget(
   }
 }
 
+// After the visibility check, so an unreadable work stays a 404 and the
+// refusal reveals nothing the account could not already see.
+async function assertNotOwnWork(
+  input: CreateFavoriteInput,
+  account: Account
+): Promise<void> {
+  let credited = 0;
+  if (input.bookId !== null) {
+    credited = await BookAuthor.count({
+      where: { bookId: input.bookId, userId: account.id },
+    });
+  }
+  if (input.seriesId !== null) {
+    credited = await SeriesAuthor.count({
+      where: { seriesId: input.seriesId, userId: account.id },
+    });
+  }
+  if (credited > 0) {
+    throw new ForbiddenError('You cannot favorite your own work');
+  }
+}
+
 // A rejected foreign key means the row went away after the check above, or
 // the account did. MySQL names the column in the constraint text, the only
 // place the three are distinguishable; userId is the fallback, being the one
@@ -106,6 +134,7 @@ export function createSequelizeFavoriteRepository(): FavoriteRepository {
   return {
     async create(input, account) {
       await assertVisibleTarget(input, account);
+      await assertNotOwnWork(input, account);
 
       try {
         const favorite = await Favorite.create({

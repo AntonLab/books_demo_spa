@@ -16,7 +16,7 @@ import {
   createCreditedBook,
   createCreditedSeries,
 } from '../models/creditedBook.testkit.ts';
-import { NotFoundError } from '../types/errors.ts';
+import { ForbiddenError, NotFoundError } from '../types/errors.ts';
 import { createSequelizeFavoriteRepository } from './favoriteRepository.ts';
 import type { Account } from './visibility.ts';
 import { favoriteRepositoryContract } from './favoriteRepository.contract.testkit.ts';
@@ -80,7 +80,7 @@ describe('favoriteRepository against real MySQL', { skip }, () => {
     assert.equal(await Favorite.count(), 0);
   });
 
-  test('its Co-author and a Moderator may favorite a Draft book they can read', async () => {
+  test('a Moderator may favorite a Draft book they can read, its Co-author may not', async () => {
     const author = await anAccount('author');
     const moderator = await anAccount('admin');
     const draft = await createCreditedBook(
@@ -88,21 +88,21 @@ describe('favoriteRepository against real MySQL', { skip }, () => {
       [author.id]
     );
 
-    const byAuthor = await repository.create(
-      { bookId: draft.id, seriesId: null },
-      as(author)
-    );
     const byModerator = await repository.create(
       { bookId: draft.id, seriesId: null },
       as(moderator)
     );
 
-    assert.equal(byAuthor.bookId, draft.id);
     assert.equal(byModerator.bookId, draft.id);
+    await assert.rejects(
+      repository.create({ bookId: draft.id, seriesId: null }, as(author)),
+      ForbiddenError
+    );
   });
 
   test('a series holding only Draft books is the same 404 as a missing one to a reader', async () => {
     const author = await anAccount('author');
+    const moderator = await anAccount('admin');
     const reader = await anAccount();
     const series = await createCreditedSeries(
       { title: 'Hidden Saga', description: 'x', tags: [] },
@@ -127,7 +127,7 @@ describe('favoriteRepository against real MySQL', { skip }, () => {
       (
         await repository.create(
           { bookId: null, seriesId: series.id },
-          as(author)
+          as(moderator)
         )
       ).seriesId,
       series.id
@@ -173,7 +173,8 @@ describe('favoriteRepository against real MySQL', { skip }, () => {
       { title: 'Mine', description: 'x', tags: [], status: 'draft' },
       [author.id]
     );
-    await repository.create({ bookId: draft.id, seriesId: null }, as(author));
+    // The API refuses this Favorite now; the row stands for one made before.
+    await Favorite.create({ userId: author.id, bookId: draft.id });
 
     assert.deepEqual(await repository.listBooks(FIRST_PAGE, as(author)), {
       items: [],
