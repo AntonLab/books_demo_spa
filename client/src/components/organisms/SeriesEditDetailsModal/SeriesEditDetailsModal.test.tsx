@@ -6,14 +6,19 @@ import { genreItem, publicGenre } from '@/test/genres';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
 import { publicSeries } from '@/test/works';
+import { ApiError } from '@/api/client';
+import * as booksApi from '@/api/books';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
+import { editorBook } from '@/test/editFixtures';
 import type { PublicUser, SeriesDetail } from '@/types/api';
 
 jest.mock('@/api/authors');
+jest.mock('@/api/books');
 jest.mock('@/api/genres');
 jest.mock('@/api/series');
 
+const mockedBooks = jest.mocked(booksApi);
 const mockedGenres = jest.mocked(genresApi);
 const mockedSeries = jest.mocked(seriesApi);
 
@@ -72,6 +77,12 @@ beforeEach(() => {
     items: [genreItem(4, 'Gothic')],
   });
   mockedSeries.listSeriesBooks.mockResolvedValue({ items: [] });
+  mockedBooks.listBooks.mockResolvedValue({
+    items: [],
+    total: 0,
+    current: 1,
+    pageSize: 100,
+  });
 });
 
 describe('SeriesEditDetailsModal', () => {
@@ -295,5 +306,103 @@ describe('SeriesEditDetailsModal tabs', () => {
     ).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
     expect(onGone).not.toHaveBeenCalled();
+  });
+});
+
+describe('Books tab, adding a book', () => {
+  const ownBooks = [
+    { ...editorBook, id: 8, title: 'Unfiled One', seriesId: null },
+    { ...editorBook, id: 9, title: 'Other Series Book', seriesId: 5 },
+    { ...editorBook, id: 10, title: 'Already Here', seriesId: 12 },
+  ];
+
+  const openBooksTab = async () => {
+    await userEvent.click(await screen.findByRole('tab', { name: 'Books' }));
+  };
+  const openPicker = async () => {
+    await userEvent.click(
+      await screen.findByRole('combobox', { name: 'Add a book' })
+    );
+  };
+
+  beforeEach(() => {
+    mockedSeries.getSeries.mockResolvedValue(series);
+    mockedBooks.listBooks.mockResolvedValue({
+      items: ownBooks,
+      total: 3,
+      current: 1,
+      pageSize: 100,
+    });
+  });
+
+  it("asks for the viewer's own books and offers only the unfiled ones", async () => {
+    renderModal();
+    await openBooksTab();
+    await openPicker();
+
+    expect(await screen.findByTitle('Unfiled One')).toBeInTheDocument();
+    expect(screen.queryByTitle('Other Series Book')).toBeNull();
+    expect(screen.queryByTitle('Already Here')).toBeNull();
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 3 })
+    );
+  });
+
+  it('files the picked book into this series', async () => {
+    mockedBooks.updateBook.mockResolvedValue({
+      ...editorBook,
+      id: 8,
+      title: 'Unfiled One',
+    });
+    renderModal();
+    await openBooksTab();
+    await openPicker();
+    await userEvent.click(await screen.findByTitle('Unfiled One'));
+
+    await waitFor(() =>
+      expect(mockedBooks.updateBook).toHaveBeenCalledWith(8, { seriesId: 12 })
+    );
+    await waitFor(() =>
+      expect(mockedSeries.listSeriesBooks).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('shows the server message and keeps the list when the add fails', async () => {
+    mockedBooks.updateBook.mockRejectedValue(
+      new ApiError(403, 'You may only add books to series you co-author')
+    );
+    renderModal();
+    await openBooksTab();
+    await openPicker();
+    await userEvent.click(await screen.findByTitle('Unfiled One'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'You may only add books to series you co-author'
+    );
+    expect(mockedSeries.listSeriesBooks).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables the picker when there is nothing to add', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [],
+      total: 0,
+      current: 1,
+      pageSize: 100,
+    });
+    renderModal();
+    await openBooksTab();
+
+    expect(await screen.findByText('No books to add')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Add a book' })).toBeDisabled();
+  });
+
+  it('offers no picker to a viewer who may not edit the series', async () => {
+    renderModal({ ...author, id: 99 });
+
+    expect(
+      await screen.findByText('Only its co-authors can edit this series.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Add a book' })).toBeNull();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 });

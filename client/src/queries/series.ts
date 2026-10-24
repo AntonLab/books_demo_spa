@@ -18,6 +18,7 @@ import {
   uploadSeriesCover,
   type ListSeriesParams,
 } from '../api/series';
+import { updateBook } from '../api/books';
 import type { SeriesPayload } from 'shared';
 import type { SeriesBookSummary } from '../types/api';
 import { queryKeys } from './keys';
@@ -135,6 +136,9 @@ export const useDeleteSeriesCover = (id: number) =>
 
 export const useRemoveBookFromSeries = (seriesId: number) =>
   useSeriesMutation((bookId: number) => removeBookFromSeries(seriesId, bookId));
+
+export const useAddBookToSeries = (seriesId: number) =>
+  useSeriesMutation((bookId: number) => updateBook(bookId, { seriesId }));
 
 // Saves the Series order on drop; see useOptimisticReorder. allBooks refreshes
 // useBooksInSeries, which feeds the Series page grid.
