@@ -6,7 +6,9 @@ paths:
 # Loading and errors (`App.tsx`)
 
 1. **Lazy-load every page, and only pages.** `AppHeader` and the `AuthModals`
-   it holds render on every route and stay static.
+   it holds render on every route and stay static, except the Chapter route,
+   which renders without `AppHeader` and the Footer, and so without
+   `AuthModals`.
 2. **Remap the named export**:
    `lazy(() => import('@/pages/MainPage/MainPage').then((m) => ({ default: m.MainPage })))`.
    Pages keep named exports; do not add a default to shorten this.

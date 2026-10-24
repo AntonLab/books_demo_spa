@@ -8,6 +8,7 @@ import { Provider } from 'react-redux';
 import {
   BrowserRouter,
   Link,
+  matchPath,
   Navigate,
   Route,
   Routes,
@@ -91,10 +92,18 @@ export const AppShell: FC = () => {
   const isProfile = pathname === '/profile' || pathname.startsWith('/profile/');
   const isAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
   const boundaryKey = isProfile ? '/profile' : isAdmin ? '/admin' : pathname;
+  // The Chapter page is bare: no header, no footer, so no AuthModals either.
+  // matchPath reads `new` as a chapter id, but that route redirects to the
+  // Book page; `/edit` does not match since `end` defaults to true.
+  const chapterMatch = matchPath(
+    '/books/:bookId/chapters/:chapterId',
+    pathname
+  );
+  const isChapter = !!chapterMatch && chapterMatch.params.chapterId !== 'new';
 
   return (
     <Layout className={styles.layout}>
-      <AppHeader />
+      {!isChapter && <AppHeader />}
       <Layout.Content className={styles.content}>
         {/* One boundary and one fallback for every route, both inside the
             content area so the header and the auth modals survive a page
@@ -155,10 +164,12 @@ export const AppShell: FC = () => {
           </Suspense>
         </ErrorBoundary>
       </Layout.Content>
-      <Layout.Footer className={styles.footer}>
-        <span>© 2026 Books Demo</span>
-        <Link to="/search">Search</Link>
-      </Layout.Footer>
+      {!isChapter && (
+        <Layout.Footer className={styles.footer}>
+          <span>© 2026 Books Demo</span>
+          <Link to="/search">Search</Link>
+        </Layout.Footer>
+      )}
     </Layout>
   );
 };
