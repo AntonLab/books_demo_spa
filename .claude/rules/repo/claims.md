@@ -25,7 +25,8 @@ the gates", "every result arrives twice".
   brief passed a path-and-name check and still had 2 of 7 items false (`inScroller`
   already existed; a named selector was absent from the source) and 3 wrong
   paths. Run `git grep` for each identifier the item says is missing
-  or present, and quote the hit count.
+  or present, and quote the hit count. `npm run brief:check -- <brief.md>`
+  prints the count for every backticked name and path, and exits 1 on a 0.
 - **A brief item that names an API or a method** ("use `removeQueries`", "use
   `refetchPage`", "move X onto hook Y") gets a command that shows it works
   here: `git grep` in the installed package (`node_modules/<pkg>/src`), `ctx7`
