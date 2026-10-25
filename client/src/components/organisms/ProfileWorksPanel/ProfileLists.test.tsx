@@ -11,6 +11,7 @@ import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
+import { ApiError } from '@/api/client';
 import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
@@ -130,6 +131,32 @@ describe('ProfileBooksList in My works', () => {
     expect(
       screen.getByRole('group', { name: 'Results layout' })
     ).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch while the books load', async () => {
+    mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
+    renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />);
+    expect(
+      await screen.findByRole('status', { name: 'Loading books' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedBooks.listBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderAs(
+      <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
   });
 
   it('lists the viewer’s books, Drafts included, and wires Edit', async () => {

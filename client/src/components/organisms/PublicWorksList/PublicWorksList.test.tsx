@@ -4,6 +4,7 @@ import { useLocation } from 'react-router';
 import { PublicWorksList } from './PublicWorksList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
+import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import { publicBook, publicSeries } from '@/test/works';
@@ -200,6 +201,35 @@ describe('PublicWorksList', () => {
     expect(
       screen.getByRole('group', { name: 'Results layout' })
     ).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch while the books load', async () => {
+    mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<PublicWorksList kind="books" userId={7} />, {
+      route: '/accounts/7',
+    });
+    expect(
+      await screen.findByRole('status', { name: 'Loading books' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedBooks.listBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="books" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
+    expect(
+      screen.getByRole('group', { name: 'Results layout' })
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
   });
 
   it('keeps Series as a list with no switch even when the layout is grid', async () => {
