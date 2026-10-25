@@ -1,6 +1,7 @@
 ---
 paths:
   - 'client/src/components/organisms/ChapterEditorModal/**'
+  - 'client/src/components/organisms/ChapterForm/**'
 ---
 
 # Chapter editor modal
