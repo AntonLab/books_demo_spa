@@ -100,7 +100,8 @@ reviewers read it; implementers do not, so a rule there costs no context.
 3. Conventional commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
    `test:`, `ci:`).
 4. Branch from `dev` and open the PR against `dev`; `main` only receives `dev`.
-   Run `npm run branch:check` before starting work and before opening a PR.
+   Run `npm run branch:check` before starting work, before opening a PR and
+   before pushing another commit to an open PR's branch.
 
 ## Agent skills
 

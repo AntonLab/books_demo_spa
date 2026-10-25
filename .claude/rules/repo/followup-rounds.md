@@ -33,7 +33,9 @@ brief file. It runs the same chain as a plan task: `sdd-implementer`, then
   `perf:` or `wip:`); `.superpowers/` is git-ignored, so never `git add` the
   ledger; `sdd-step next` after the last task errors; `ls server/.env.local`
   hits a deny rule; write files with `Write`/`Edit`, since `cp`, `sed -i` and
-  redirects are blocked.
+  redirects are blocked. Give each item its focused test command (client
+  `npm test -w client -- <path>`, scripts `node --test <path>`): an implementer
+  without one tried `jest` through `npm exec` first.
 - **`ui-checker`:** a follow-up round whose diff touches `client/src` is not
   checked again by default, since the plan's own run covered the behaviour.
   Ask the user, and run it when the round changed what a page shows or sends.
