@@ -10,8 +10,10 @@ import { useToggleFavorite } from '@/queries/favorites';
 import { queryKeys } from '@/queries/keys';
 import { useBookLibraryActions } from '@/queries/library';
 import { useToggleLike } from '@/queries/likes';
-import type { bookCapabilities } from '@/types/capabilities';
-import { mayAddBookToReadingList } from '@/types/capabilities';
+import {
+  mayAddBookToReadingList,
+  type bookCapabilities,
+} from '@/types/capabilities';
 import type { BookDetail } from '@/types/book';
 import type { PublicUser } from '@/types/api';
 
