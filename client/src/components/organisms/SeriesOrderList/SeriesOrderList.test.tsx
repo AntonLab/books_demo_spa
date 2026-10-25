@@ -228,6 +228,20 @@ describe('SeriesOrderList', () => {
     expect(picker).toBeEnabled();
   });
 
+  it('hints to type a title when the first page has no free book and nothing is typed', async () => {
+    serveBooks(makeBooks(101, (i) => (i < 100 ? 9 : null)));
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await waitFor(() => expect(mockedBooks.listBooks).toHaveBeenCalled());
+    await userEvent.click(picker);
+
+    expect(
+      await screen.findByText('Type a title to find a book')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('No books found')).toBeNull();
+  });
+
   it('disables the picker with "No books to add" when there are no candidates at all', async () => {
     renderList(); // default mock: empty page
 

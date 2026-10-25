@@ -59,7 +59,13 @@ export const AddBookToSeries: FC<AddBookToSeriesProps> = ({
           // 400, which would read here as "No books found".
           searchValue={term}
           onSearch={(value) => setTerm(value.slice(0, SEARCH_TEXT_MAX_LENGTH))}
-          notFoundContent={searching ? null : 'No books found'}
+          notFoundContent={
+            searching
+              ? null
+              : term === ''
+                ? 'Type a title to find a book'
+                : 'No books found'
+          }
           style={{ minWidth: 240 }}
           options={(pending ? [] : (candidates.data?.books ?? [])).map(
             (book) => ({
