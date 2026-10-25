@@ -13,6 +13,14 @@ describe('BookCover', () => {
     expect(img).toHaveAttribute('alt', '');
   });
 
+  it('loads the cover image lazily', () => {
+    const { container } = renderWithProviders(
+      <BookCover coverUrl="/api/books/1/cover?v=1" title="A Tale of Dragons" />
+    );
+
+    expect(container.querySelector('img')).toHaveAttribute('loading', 'lazy');
+  });
+
   it('shows a placeholder bearing the title when there is no cover', () => {
     const { container } = renderWithProviders(
       <BookCover coverUrl={null} title="A Tale of Dragons" />

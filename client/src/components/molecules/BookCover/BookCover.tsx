@@ -33,6 +33,7 @@ export const BookCover: FC<BookCoverProps> = ({
         <img
           src={coverUrl}
           alt=""
+          loading="lazy"
           onError={() => setFailedUrl(coverUrl)}
           className={styles.image}
         />
