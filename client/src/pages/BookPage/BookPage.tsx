@@ -64,6 +64,28 @@ const useEditParam = () => {
   return { editing, setEditing };
 };
 
+const BookLoadError: FC<{ bookId: number; error: Error }> = ({
+  bookId,
+  error,
+}) => {
+  const unsavedEntries = useOwnUnsavedEntries();
+  const hasUnsavedText = entriesOfBook(unsavedEntries, bookId).length > 0;
+  const isGone = error instanceof ApiError && error.status === 404;
+  // Its Unsaved text keeps the page open: the notices are the only way to
+  // copy it out.
+  if (isGone && !hasUnsavedText) return <GoneRedirect message={BOOK_GONE} />;
+  return (
+    <>
+      <Alert
+        type="error"
+        title="Could not load this book."
+        className={spacing.gapBelow}
+      />
+      {isGone && <BookUnsavedTextNotices bookId={bookId} />}
+    </>
+  );
+};
+
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const navigate = useNavigate();
   const { editing, setEditing } = useEditParam();
@@ -76,28 +98,11 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const chapters = useChapters(bookId);
   const readingLists = useBookReadingLists(bookId);
 
-  const unsavedEntries = useOwnUnsavedEntries();
-  const hasUnsavedText = entriesOfBook(unsavedEntries, bookId).length > 0;
-
-  if (isError) {
-    const isGone = error instanceof ApiError && error.status === 404;
-    // Its Unsaved text keeps the page open: the notices are the only way to
-    // copy it out.
-    if (isGone && !hasUnsavedText) return <GoneRedirect message={BOOK_GONE} />;
-    return (
-      <>
-        <Alert
-          type="error"
-          title="Could not load this book."
-          className={spacing.gapBelow}
-        />
-        {isGone && <BookUnsavedTextNotices bookId={bookId} />}
-      </>
-    );
-  }
+  if (isError) return <BookLoadError bookId={bookId} error={error} />;
   if (isPending) return <Skeleton active paragraph={{ rows: 6 }} />;
 
-  const { isCoAuthor, mayEdit } = bookCapabilities(book, session);
+  const capabilities = bookCapabilities(book, session);
+  const { isCoAuthor, mayEdit } = capabilities;
 
   return (
     <article>
@@ -109,6 +114,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
       <BookActions
         book={book}
         session={session}
+        capabilities={capabilities}
         onEdit={() => setEditing(true)}
       />
 

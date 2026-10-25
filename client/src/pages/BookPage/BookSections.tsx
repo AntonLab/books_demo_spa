@@ -13,7 +13,10 @@ import styles from './BookPage.module.css';
 
 interface BookSectionsProps {
   book: BookDetail;
-  chapters: ReturnType<typeof useChapters>;
+  chapters: Pick<
+    ReturnType<typeof useChapters>,
+    'data' | 'isPending' | 'isError'
+  >;
   readingLists: BookReadingLists;
 }
 
