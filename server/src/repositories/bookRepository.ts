@@ -6,7 +6,7 @@ import {
   Op,
   where as sequelizeWhere,
 } from 'sequelize';
-import type { Transaction, Utils, WhereOptions } from 'sequelize';
+import type { Order, Transaction, Utils, WhereOptions } from 'sequelize';
 import { Book, toPublicBook } from '../models/Book.ts';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { BookCover } from '../models/BookCover.ts';
@@ -482,7 +482,8 @@ function buildWhere(
     // Searches the title as well as the description, so `?q=` finds a book by
     // its name. Both sides are a leading-wildcard LIKE and therefore a full
     // scan — unavoidable for substring search, and the cost the description
-    // side already paid.
+    // side already paid. The scan runs once per search (the page query also
+    // carries the total), not twice.
     const pattern = containsPattern(query.q);
     clauses.push({
       [Op.or]: [
@@ -573,33 +574,46 @@ export function createSequelizeBookRepository(): BookRepository {
           ? undefined
           : await genreFamilyIds(query.genreId);
       const where = buildWhere(query, lookups, viewer, genreIds);
-      // Counted first, so a page past the end can be served as the last
-      // non-empty one (page 1 when nothing matches) rather than as an empty
-      // page the client would have to page back from.
-      const total = await Book.count({ where });
-      const current = Math.min(
-        query.current,
-        Math.max(1, Math.ceil(total / query.pageSize))
-      );
-      const rows = await Book.findAll({
+      // A ranked list goes best first, ties to the newer book; otherwise a
+      // series' books come in Series order and every other list by id.
+      const order: Order =
+        rank !== undefined
+          ? [
+              [rank, 'DESC'],
+              ['id', 'DESC'],
+            ]
+          : query.seriesId === undefined
+            ? [['id', 'ASC']]
+            : [
+                ['seriesPosition', 'ASC'],
+                ['id', 'ASC'],
+              ];
+      // The page query carries the filtered total, so a page in range costs
+      // one query. Only a page past the end counts separately, to be served as
+      // the last non-empty one (page 1 when nothing matches) rather than as an
+      // empty page the client would have to page back from.
+      let rows = await Book.findAll({
         where,
+        attributes: { include: [[literal('COUNT(*) OVER()'), 'total']] },
         limit: query.pageSize,
-        offset: (current - 1) * query.pageSize,
-        // A ranked list goes best first, ties to the newer book; otherwise a
-        // series' books come in Series order and every other list by id.
-        order:
-          rank !== undefined
-            ? [
-                [rank, 'DESC'],
-                ['id', 'DESC'],
-              ]
-            : query.seriesId === undefined
-              ? [['id', 'ASC']]
-              : [
-                  ['seriesPosition', 'ASC'],
-                  ['id', 'ASC'],
-                ],
+        offset: (query.current - 1) * query.pageSize,
+        order,
       });
+      let total = Number(rows[0]?.get('total') ?? 0);
+      let current = query.current;
+      if (rows.length === 0 && query.current > 1) {
+        total = await Book.count({ where });
+        current = Math.min(
+          query.current,
+          Math.max(1, Math.ceil(total / query.pageSize))
+        );
+        rows = await Book.findAll({
+          where,
+          limit: query.pageSize,
+          offset: (current - 1) * query.pageSize,
+          order,
+        });
+      }
 
       const items = await publicBooksOf(rows);
       const { favorites } = lookups;

@@ -918,6 +918,107 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.match(matches.items[0]?.description ?? '', /100% real/);
   });
 
+  test('the search finds a book by a substring of its title', async () => {
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Rings',
+      description: 'x',
+      tags: [],
+    });
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Other',
+      description: 'y',
+      tags: [],
+    });
+
+    const page = await listAsGuest({ current: 1, pageSize: 20, q: 'ring' });
+
+    assert.deepEqual(
+      page.items.map((item) => item.title),
+      ['Rings']
+    );
+    assert.equal(page.total, 1);
+  });
+
+  test('a page past the end with q set serves the last non-empty page', async () => {
+    for (const title of ['Ring A', 'Ring B', 'Ring C']) {
+      await createPublished({
+        userId: ownerId,
+        seriesId: null,
+        title,
+        description: 'x',
+        tags: [],
+      });
+    }
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Other',
+      description: 'y',
+      tags: [],
+    });
+
+    const page = await listAsGuest({ current: 9, pageSize: 2, q: 'ring' });
+
+    assert.equal(page.current, 2);
+    assert.equal(page.total, 3);
+    assert.deepEqual(
+      page.items.map((item) => item.title),
+      ['Ring C']
+    );
+  });
+
+  test('nothing matching serves page 1, empty, even when a later page is asked', async () => {
+    await createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Other',
+      description: 'y',
+      tags: [],
+    });
+
+    for (const current of [1, 2, 5]) {
+      const page = await listAsGuest({ current, pageSize: 2, q: 'zzz' });
+      assert.deepEqual(
+        { items: page.items, total: page.total, current: page.current },
+        { items: [], total: 0, current: 1 }
+      );
+    }
+  });
+
+  test('a page in range costs one books query, and no item carries the window total', async () => {
+    for (const title of ['Ring A', 'Ring B', 'Ring C']) {
+      await createPublished({
+        userId: ownerId,
+        seriesId: null,
+        title,
+        description: 'x',
+        tags: [],
+      });
+    }
+    const bookSelects: string[] = [];
+    const hook = (_options: unknown, query: { sql?: string }) => {
+      if (/^SELECT .* FROM `books` AS `Book`/s.test(query.sql ?? '')) {
+        bookSelects.push(query.sql ?? '');
+      }
+    };
+    // afterQuery: Sequelize 6 sets `query.sql` only inside `query.run`.
+    sequelize.addHook('afterQuery', 'countBookSelects', hook);
+    try {
+      const page = await listAsGuest({ current: 1, pageSize: 2, q: 'ring' });
+      assert.equal(typeof page.total, 'number');
+      assert.equal(page.total, 3);
+      assert.equal(page.items.length, 2);
+      assert.ok(page.items.every((item) => !('total' in item)));
+      assert.equal(bookSelects.length, 1, bookSelects.join('\n'));
+    } finally {
+      sequelize.removeHook('afterQuery', 'countBookSelects');
+    }
+  });
+
   const DAY = 24 * 60 * 60 * 1000;
   const daysFromNow = (days: number) => new Date(Date.now() + days * DAY);
 
