@@ -24,6 +24,16 @@ brief file. It runs the same chain as a plan task: `sdd-implementer`, then
   `npm run baseline -- <client test path> [text]`. It builds a proper task
   worktree for the dev side; a bare `git worktree add` shares `shared` with the
   checkout it came from, so its result proves nothing.
+- **Which lines to fix.** Offer "fix now" for a line with a real defect or a
+  RED test. Recommend "drop" for a Minor line (naming, comment wording, a
+  cosmetic merge): in the queue-b round seven such lines cost 18.46M tokens,
+  37% of the chain.
+- **Brief preamble for `sdd-implementer`.** Name the traps that cost calls:
+  commit types are `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `ci` (no
+  `perf:` or `wip:`); `.superpowers/` is git-ignored, so never `git add` the
+  ledger; `sdd-step next` after the last task errors; `ls server/.env.local`
+  hits a deny rule; write files with `Write`/`Edit`, since `cp`, `sed -i` and
+  redirects are blocked.
 - **`ui-checker`:** a follow-up round whose diff touches `client/src` is not
   checked again by default, since the plan's own run covered the behaviour.
   Ask the user, and run it when the round changed what a page shows or sends.

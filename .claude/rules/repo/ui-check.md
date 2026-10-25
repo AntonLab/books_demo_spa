@@ -19,6 +19,10 @@ says why the change moves them. Build each item from what the seeded data can
 reach: roles are `user`, `author`, `admin` and `superadmin` (check `USER_ROLES`
 in `shared/`). Fix all FAIL items first, then send one recheck run with only
 those items. Skip it in a follow-up round that changes no rendered output (its
-cost grows with every call: 32% of workers in PR #251). Save each run's
+cost grows with every call: 32% of workers in PR #251). Before the dispatch, confirm the seed reaches every item (an empty picker the
+seed never produces left one item UNVERIFIED in 3.73M tokens), and tell it to
+run each breakpoint pass in one `browser_run_code_unsafe` call: that run took
+21 calls and 1.20M, against about 90 calls and 3.73M without it. Skip items a
+jsdom test or `npm run layout-lint` already settles. Save each run's
 returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md` under a
 `## <sha>` heading; `/swarm:ship` builds the test plan from it.
