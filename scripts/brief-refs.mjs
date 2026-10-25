@@ -1,0 +1,46 @@
+/**
+ * Counts how often each backticked identifier or file name of a brief appears
+ * in the tracked code. A brief item that says a name exists, or is missing,
+ * gets the number a `git grep` found, so a false claim shows up before the
+ * dispatch. A name with 0 hits is not wrong by itself ("X is absent" is a
+ * valid claim); it is the line the writer has to look at.
+ */
+import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { extractTokens } from './doc-refs.mjs';
+
+const FILE_NAME = /\.(ts|tsx|mjs|md|json)$/;
+
+const git = (root, args) => {
+  const { status, stdout, stderr } = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (status > 1) throw new Error(`git ${args[0]} failed: ${stderr}`);
+  return stdout;
+};
+
+// Matching lines in tracked files, or tracked paths ending in the token.
+const countHits = (root, token, files) => {
+  if (FILE_NAME.test(token)) {
+    if (existsSync(join(root, token))) return 1;
+    return files.filter((file) => file === token || file.endsWith(`/${token}`))
+      .length;
+  }
+  return git(root, ['grep', '-F', '-c', '-e', token, '--', '.'])
+    .split('\n')
+    .filter(Boolean)
+    .reduce((sum, row) => sum + Number(row.slice(row.lastIndexOf(':') + 1)), 0);
+};
+
+export const checkBrief = ({ root, briefPath }) => {
+  const files = git(root, ['ls-files', '-z']).split('\0');
+  const cache = new Map();
+  const text = readFileSync(briefPath, 'utf8');
+  return extractTokens(text).map(({ line, token }) => {
+    if (!cache.has(token)) cache.set(token, countHits(root, token, files));
+    return { line, token, hits: cache.get(token) };
+  });
+};
