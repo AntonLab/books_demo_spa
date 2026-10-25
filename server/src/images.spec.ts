@@ -192,7 +192,7 @@ test('an Illustration keeps its aspect inside 1600x1600, WebP, no crop (wide)', 
   const output = await processIllustrationImage(
     await solid(3200, 800, '#336699')
   );
-  const metadata = await sharp(output).metadata();
+  const metadata = await sharp(output.data).metadata();
   assert.equal(metadata.format, 'webp');
   assert.equal(metadata.width, 1600);
   assert.equal(metadata.height, 400);
@@ -200,7 +200,7 @@ test('an Illustration keeps its aspect inside 1600x1600, WebP, no crop (wide)', 
 
 test('an Illustration keeps its aspect inside 1600x1600 (tall)', async () => {
   const metadata = await sharp(
-    await processIllustrationImage(await solid(800, 3200, '#336699'))
+    (await processIllustrationImage(await solid(800, 3200, '#336699'))).data
   ).metadata();
   assert.equal(metadata.width, 400);
   assert.equal(metadata.height, 1600);
@@ -208,10 +208,40 @@ test('an Illustration keeps its aspect inside 1600x1600 (tall)', async () => {
 
 test('an Illustration smaller than the box is not enlarged', async () => {
   const metadata = await sharp(
-    await processIllustrationImage(await solid(100, 60, '#336699'))
+    (await processIllustrationImage(await solid(100, 60, '#336699'))).data
   ).metadata();
   assert.equal(metadata.width, 100);
   assert.equal(metadata.height, 60);
+});
+
+test('an Illustration result carries the size of its stored bytes', async () => {
+  const inputs: [number, number][] = [
+    [3200, 800],
+    [800, 3200],
+    [100, 60],
+    [1600, 1600],
+    [1601, 1],
+    [1, 1],
+  ];
+  for (const [w, h] of inputs) {
+    const result = await processIllustrationImage(await solid(w, h, '#336699'));
+    const meta = await sharp(result.data).metadata();
+    assert.equal(result.width, meta.width, `${w}x${h} width`);
+    assert.equal(result.height, meta.height, `${w}x${h} height`);
+  }
+});
+
+test('an Illustration result is 1600x400, 400x1600 and 100x60 for the spec inputs', async () => {
+  const wide = await processIllustrationImage(
+    await solid(3200, 800, '#336699')
+  );
+  const tall = await processIllustrationImage(
+    await solid(800, 3200, '#336699')
+  );
+  const small = await processIllustrationImage(await solid(100, 60, '#336699'));
+  assert.deepEqual([wide.width, wide.height], [1600, 400]);
+  assert.deepEqual([tall.width, tall.height], [400, 1600]);
+  assert.deepEqual([small.width, small.height], [100, 60]);
 });
 
 test('an Illustration refuses bytes that are not an image', async () => {

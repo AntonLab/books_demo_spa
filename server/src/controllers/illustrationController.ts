@@ -57,8 +57,8 @@ export function createIllustrationController(
         throw new StateConflictError(ILLUSTRATION_CAP_MESSAGE);
       }
 
-      const processed = await processIllustrationImage(req.body);
-      res.status(201).json(await repository.create(id, processed));
+      const image = await processIllustrationImage(req.body);
+      res.status(201).json(await repository.create(id, image));
     },
 
     update: async (req, res) => {

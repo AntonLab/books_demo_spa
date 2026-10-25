@@ -2,6 +2,7 @@ import { col, fn, Op } from 'sequelize';
 import { ILLUSTRATIONS_PER_CHAPTER_MAX, type PublicIllustration } from 'shared';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
+import type { ProcessedIllustration } from '../images.ts';
 import { Illustration, toPublicIllustration } from '../models/Illustration.ts';
 import { IllustrationImage } from '../models/IllustrationImage.ts';
 import { NotFoundError, StateConflictError } from '../types/errors.ts';
@@ -21,7 +22,10 @@ export interface IllustrationRepository {
   // is decoded. Unlocked; create() rechecks under the chapter lock.
   isFull(chapterId: number): Promise<boolean>;
   // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
-  create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
+  create(
+    chapterId: number,
+    image: ProcessedIllustration
+  ): Promise<PublicIllustration>;
   // null when the illustration is missing.
   updateCaption(
     id: number,
@@ -121,7 +125,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
 
     // The chapter row is locked so two uploads cannot both pass the cap or
     // share a position.
-    async create(chapterId, data) {
+    async create(chapterId, image) {
       return sequelizeOf(Illustration).transaction(async (transaction) => {
         const chapter = await Chapter.findByPk(chapterId, {
           attributes: ['id'],
@@ -146,7 +150,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
           { transaction }
         );
         await IllustrationImage.create(
-          { illustrationId: row.id, data },
+          { illustrationId: row.id, data: image.data },
           { transaction }
         );
         return toPublicIllustration(row);
