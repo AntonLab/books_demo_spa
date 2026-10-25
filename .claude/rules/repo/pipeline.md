@@ -49,8 +49,8 @@ per-call values.
   review costs about 0.08M tokens, and skipping it let defects through. Do not run
   `superpowers:executing-plans` inline: the Opus session pays about as much as
   all the implementers together and compacts more often.
-- **Light mode** is for a spec that touches no `client/src` and names at most
-  three files to change. Skip `code-mapper`; plan-writer reads those files
+- **Light mode** is for a spec that touches no `client/src` (or only tests and
+  docs there) and names at most three files to change. Skip `code-mapper`; plan-writer reads those files
   itself. When the plan has one task, skip `sdd-final-reviewer`: the task
   review already covered the whole diff. The changed-files audit and
   `gate-runner` still run, audit first, so the gates run once. A plan that
@@ -111,7 +111,8 @@ per-call values.
   whose owner copy lies outside the diff is fixed only inside the diff; any
   other out-of-diff finding goes to the follow-ups file.
 - **Pass `model` on every dispatch:** `sdd-implementer` haiku when the brief
-  holds the exact code for a mechanical change (a move, a rename), sonnet
+  holds the exact code or text for a mechanical change (a move, a rename, a
+  docs edit), sonnet
   otherwise; `sdd-task-reviewer` the implementer's model (haiku or sonnet,
   never opus); `gate-runner` haiku; `code-mapper`, `sdd-re-reviewer`,
   `plan-writer` and `sdd-final-reviewer` sonnet, because haiku took 2–3 times
