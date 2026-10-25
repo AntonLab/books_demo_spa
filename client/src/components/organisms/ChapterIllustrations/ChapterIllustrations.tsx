@@ -25,6 +25,9 @@ export const ChapterIllustrations: FC<ChapterIllustrationsProps> = ({
             src={illustrationImageUrl(item)}
             alt={`Illustration ${at + 1}`}
             loading="lazy"
+            {...(item.width !== null && item.height !== null
+              ? { width: item.width, height: item.height }
+              : {})}
           />
           {item.caption !== null && (
             <figcaption>

@@ -48,6 +48,53 @@ it('shows the pictures in list order with their captions below, and no empty cap
   expect(mocked.listIllustrations).toHaveBeenCalledWith(9);
 });
 
+it('sets width and height on the img when the item has both', async () => {
+  mocked.listIllustrations.mockResolvedValue({
+    items: [{ ...row(7, 1, null), width: 400, height: 1600 }],
+  });
+  const { container } = renderWithProviders(
+    <ChapterIllustrations chapterId={9} />
+  );
+  await waitFor(() =>
+    expect(container.querySelector('img')).toBeInTheDocument()
+  );
+  const img = container.querySelector('img')!;
+  expect(img.getAttribute('width')).toBe('400');
+  expect(img.getAttribute('height')).toBe('1600');
+});
+
+it('sets neither attribute for a null size or a half-known one', async () => {
+  mocked.listIllustrations.mockResolvedValue({
+    items: [
+      row(7, 1, null),
+      { ...row(8, 2, null), width: 400, height: null },
+      { ...row(9, 3, null), width: null, height: 1600 },
+    ],
+  });
+  const { container } = renderWithProviders(
+    <ChapterIllustrations chapterId={9} />
+  );
+  await waitFor(() =>
+    expect(container.querySelectorAll('img')).toHaveLength(3)
+  );
+  for (const img of container.querySelectorAll('img')) {
+    expect(img.hasAttribute('width')).toBe(false);
+    expect(img.hasAttribute('height')).toBe(false);
+  }
+});
+
+it('keeps a 1x1 size (no falsy check)', async () => {
+  mocked.listIllustrations.mockResolvedValue({
+    items: [{ ...row(7, 1, null), width: 1, height: 1 }],
+  });
+  const { container } = renderWithProviders(
+    <ChapterIllustrations chapterId={9} />
+  );
+  await waitFor(() =>
+    expect(container.querySelector('img')?.getAttribute('width')).toBe('1')
+  );
+});
+
 it('renders nothing for an empty list', async () => {
   mocked.listIllustrations.mockResolvedValue({ items: [] });
   const { container } = renderWithProviders(
