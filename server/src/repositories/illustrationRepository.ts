@@ -165,8 +165,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
 
     async updateCaption(id, caption) {
       return sequelizeOf(Illustration).transaction(async (transaction) => {
-        // Locked so a delete between the read and the write cannot leave us
-        // answering a row that is gone.
+        // Row lock: a concurrent delete waits for this transaction.
         const locked = await Illustration.findByPk(id, {
           attributes: ['id'],
           transaction,
