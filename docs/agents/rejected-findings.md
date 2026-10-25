@@ -9,3 +9,4 @@ gets a line too, and the audit dispatch lists the dropped items.
 Format: `- YYYY-MM-DD · path[:line] · tag · finding — reason`
 
 - 2026-10-23 · server/src/repositories/{comment,like,favorite,readingList}Repository.ts · dup · share the column-to-error mapping of `asMissingReference` — the #234 spec keeps each repository's own mapping
+- 2026-10-25 · client/src/components/organisms/SeriesOrderList/AddBookToSeries.tsx · ux · confirm before filing a picked Book into the series — a pick in the picker is the explicit action and the move is undoable (#272)
