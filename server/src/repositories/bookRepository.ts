@@ -482,8 +482,8 @@ function buildWhere(
     // Searches the title as well as the description, so `?q=` finds a book by
     // its name. Both sides are a leading-wildcard LIKE and therefore a full
     // scan — unavoidable for substring search, and the cost the description
-    // side already paid. The scan runs once per search (the page query also
-    // carries the total), not twice.
+    // side already paid. The scan runs once per search, twice only for a page
+    // past the end.
     const pattern = containsPattern(query.q);
     clauses.push({
       [Op.or]: [
@@ -588,10 +588,9 @@ export function createSequelizeBookRepository(): BookRepository {
                 ['seriesPosition', 'ASC'],
                 ['id', 'ASC'],
               ];
-      // The page query carries the filtered total, so a page in range costs
-      // one query. Only a page past the end counts separately, to be served as
-      // the last non-empty one (page 1 when nothing matches) rather than as an
-      // empty page the client would have to page back from.
+      // A page in range costs one query: the page query carries the filtered
+      // total. A page past the end recounts and refetches; the rule is in
+      // `.claude/rules/server/api.md`.
       let rows = await Book.findAll({
         where,
         attributes: { include: [[literal('COUNT(*) OVER()'), 'total']] },

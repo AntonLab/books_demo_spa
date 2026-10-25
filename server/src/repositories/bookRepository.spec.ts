@@ -918,21 +918,24 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.match(matches.items[0]?.description ?? '', /100% real/);
   });
 
+  const publish = (title: string, description = 'x') =>
+    createPublished({
+      userId: ownerId,
+      seriesId: null,
+      title,
+      description,
+      tags: [],
+    });
+
+  const seedRings = async () => {
+    for (const title of ['Ring A', 'Ring B', 'Ring C']) {
+      await publish(title);
+    }
+  };
+
   test('the search finds a book by a substring of its title', async () => {
-    await createPublished({
-      userId: ownerId,
-      seriesId: null,
-      title: 'Rings',
-      description: 'x',
-      tags: [],
-    });
-    await createPublished({
-      userId: ownerId,
-      seriesId: null,
-      title: 'Other',
-      description: 'y',
-      tags: [],
-    });
+    await publish('Rings');
+    await publish('Other', 'y');
 
     const page = await listAsGuest({ current: 1, pageSize: 20, q: 'ring' });
 
@@ -944,22 +947,8 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('a page past the end with q set serves the last non-empty page', async () => {
-    for (const title of ['Ring A', 'Ring B', 'Ring C']) {
-      await createPublished({
-        userId: ownerId,
-        seriesId: null,
-        title,
-        description: 'x',
-        tags: [],
-      });
-    }
-    await createPublished({
-      userId: ownerId,
-      seriesId: null,
-      title: 'Other',
-      description: 'y',
-      tags: [],
-    });
+    await seedRings();
+    await publish('Other', 'y');
 
     const page = await listAsGuest({ current: 9, pageSize: 2, q: 'ring' });
 
@@ -972,13 +961,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('nothing matching serves page 1, empty, even when a later page is asked', async () => {
-    await createPublished({
-      userId: ownerId,
-      seriesId: null,
-      title: 'Other',
-      description: 'y',
-      tags: [],
-    });
+    await publish('Other', 'y');
 
     for (const current of [1, 2, 5]) {
       const page = await listAsGuest({ current, pageSize: 2, q: 'zzz' });
@@ -990,15 +973,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
   });
 
   test('a page in range costs one books query, and no item carries the window total', async () => {
-    for (const title of ['Ring A', 'Ring B', 'Ring C']) {
-      await createPublished({
-        userId: ownerId,
-        seriesId: null,
-        title,
-        description: 'x',
-        tags: [],
-      });
-    }
+    await seedRings();
     const bookSelects: string[] = [];
     const hook = (_options: unknown, query: { sql?: string }) => {
       if (/^SELECT .* FROM `books` AS `Book`/s.test(query.sql ?? '')) {
