@@ -1,6 +1,6 @@
-// @ts-expect-error - this project ships no @types/node (browser-only
-// tsconfig, no "node" lib); the specifier still resolves fine at runtime
-// under Jest's Node process.
+// @ts-expect-error - the browser tsconfig loads no ambient types (TS 6
+// defaults `types` to []), so node:util is undeclared here; it resolves at
+// runtime under Jest's Node process.
 import { TextDecoder, TextEncoder } from 'node:util';
 import '@testing-library/jest-dom';
 import { FakeEventSource } from './eventSource';

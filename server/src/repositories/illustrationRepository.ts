@@ -2,6 +2,7 @@ import { col, fn, Op } from 'sequelize';
 import { ILLUSTRATIONS_PER_CHAPTER_MAX, type PublicIllustration } from 'shared';
 import { BookAuthor } from '../models/BookAuthor.ts';
 import { Chapter } from '../models/Chapter.ts';
+import type { ProcessedIllustration } from '../images.ts';
 import { Illustration, toPublicIllustration } from '../models/Illustration.ts';
 import { IllustrationImage } from '../models/IllustrationImage.ts';
 import { NotFoundError, StateConflictError } from '../types/errors.ts';
@@ -21,7 +22,10 @@ export interface IllustrationRepository {
   // is decoded. Unlocked; create() rechecks under the chapter lock.
   isFull(chapterId: number): Promise<boolean>;
   // Appends at the end of the chapter; 409 at ILLUSTRATIONS_PER_CHAPTER_MAX.
-  create(chapterId: number, data: Buffer): Promise<PublicIllustration>;
+  create(
+    chapterId: number,
+    image: ProcessedIllustration
+  ): Promise<PublicIllustration>;
   // null when the illustration is missing.
   updateCaption(
     id: number,
@@ -121,7 +125,7 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
 
     // The chapter row is locked so two uploads cannot both pass the cap or
     // share a position.
-    async create(chapterId, data) {
+    async create(chapterId, image) {
       return sequelizeOf(Illustration).transaction(async (transaction) => {
         const chapter = await Chapter.findByPk(chapterId, {
           attributes: ['id'],
@@ -142,11 +146,17 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
           { where, transaction }
         );
         const row = await Illustration.create(
-          { chapterId, position: (last ?? 0) + 1, caption: null },
+          {
+            chapterId,
+            position: (last ?? 0) + 1,
+            caption: null,
+            width: image.width,
+            height: image.height,
+          },
           { transaction }
         );
         await IllustrationImage.create(
-          { illustrationId: row.id, data },
+          { illustrationId: row.id, data: image.data },
           { transaction }
         );
         return toPublicIllustration(row);
@@ -154,10 +164,19 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
     },
 
     async updateCaption(id, caption) {
-      const row = await Illustration.findByPk(id);
-      if (!row) return null;
-      await row.update({ caption });
-      return toPublicIllustration(row);
+      return sequelizeOf(Illustration).transaction(async (transaction) => {
+        // Row lock: a concurrent delete waits for this transaction.
+        const locked = await Illustration.findByPk(id, {
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!locked) return null;
+
+        await Illustration.update({ caption }, { where: { id }, transaction });
+        const row = await Illustration.findByPk(id, { transaction });
+        return row ? toPublicIllustration(row) : null;
+      });
     },
 
     async reorder(chapterId, illustrationIds) {

@@ -1,5 +1,11 @@
 import type { AuthorSummary } from './user.ts';
 
+// `text` is a TEXT column: 65,535 *bytes*, as few as ~16k characters under
+// utf8mb4. The bound sits well inside that, or MySQL truncates the write
+// (rejects it in strict mode). Chapters take the same care at a far larger
+// bound: see `CHAPTER_TEXT_MAX_LENGTH` in `chapter.ts`.
+export const COMMENT_TEXT_MAX_LENGTH = 10_000;
+
 // The two ways a comment becomes a tombstone. `deleted`: its owner deleted it,
 // or the owner's account was deleted. `removed`: a moderator deleted someone
 // else's comment — the only kind that can be restored. See CONTEXT.md.

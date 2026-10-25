@@ -14,6 +14,8 @@ const rowAt = (index: number) => ({
   id: 7 + index,
   position: index + 1,
   caption: index === 0 ? 'Cap 7' : null,
+  width: null,
+  height: null,
   updatedAt: '2026-10-17T10:00:00.000Z',
 });
 const rowsOf = (n: number) => ({

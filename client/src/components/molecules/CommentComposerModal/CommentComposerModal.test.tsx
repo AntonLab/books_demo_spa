@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { COMMENT_TEXT_MAX_LENGTH } from 'shared';
 import { CommentComposerModal } from './CommentComposerModal';
 import { renderWithProviders as render } from '@/test/renderWithProviders';
 import type { CommentWithAuthor } from '@/types/api';
@@ -58,6 +59,15 @@ describe('CommentComposerModal', () => {
     expect(
       within(dialog).getByRole('textbox', { name: 'Write a comment' })
     ).toHaveValue('Hello');
+  });
+
+  it('caps the field at the shared comment length limit', () => {
+    renderModal();
+
+    const dialog = screen.getByRole('dialog', { name: 'New comment' });
+    expect(
+      within(dialog).getByRole('textbox', { name: 'Write a comment' })
+    ).toHaveAttribute('maxLength', String(COMMENT_TEXT_MAX_LENGTH));
   });
 
   it('reports typing, submit and cancel', async () => {

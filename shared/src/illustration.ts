@@ -2,6 +2,9 @@ export interface PublicIllustration {
   id: number;
   position: number;
   caption: string | null;
+  // Null for rows stored before migration 0004: they have no size.
+  width: number | null;
+  height: number | null;
   updatedAt: Date;
 }
 export const ILLUSTRATIONS_PER_CHAPTER_MAX = 20;

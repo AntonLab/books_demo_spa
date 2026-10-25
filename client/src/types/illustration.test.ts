@@ -5,6 +5,8 @@ it('points at the image route by id alone, so a caption save keeps the URL', () 
     id: 5,
     position: 1,
     caption: null,
+    width: null,
+    height: null,
     updatedAt: '2026-10-17T10:00:00.000Z',
   };
   const saved = {

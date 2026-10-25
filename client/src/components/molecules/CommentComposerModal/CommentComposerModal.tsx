@@ -1,5 +1,6 @@
 import { useRef, type FC } from 'react';
 import { Alert, Input, Modal, type GetRef } from 'antd';
+import { COMMENT_TEXT_MAX_LENGTH } from 'shared';
 import { Comment } from '@/components/molecules/Comment/Comment';
 import { useRestoreFocus } from '@/hooks/useRestoreFocus';
 import type { CommentWithAuthor } from '@/types/api';
@@ -87,6 +88,7 @@ export const CommentComposerModal: FC<CommentComposerModalProps> = ({
         rows={4}
         value={value}
         aria-label={label}
+        maxLength={COMMENT_TEXT_MAX_LENGTH}
         onChange={(event) => onChange(event.target.value)}
       />
     </Modal>
