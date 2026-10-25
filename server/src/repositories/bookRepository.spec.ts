@@ -597,7 +597,7 @@ describe('bookRepository against real MySQL', { skip }, () => {
     });
 
     let moved = false;
-    Book.addHook('afterFind', 'moveAfterPeek', async (found, options) => {
+    Book.addHook('afterFind', 'moveAfterPeek', async (_found, options) => {
       if (moved || options.transaction) return;
       moved = true;
       await Book.update(
