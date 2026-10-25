@@ -5,6 +5,7 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { editorAccount } from '@/test/editFixtures';
 import { seedSession } from '@/test/session';
+import { tomorrowIso } from '@/test/dates';
 import type { RootState } from '@/store';
 import { formatDate, formatDateTime } from '@/format/date';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
@@ -36,7 +37,7 @@ const page = (items: ReturnType<typeof chapterNamed>[]) => ({
 });
 
 const OUT = '2026-09-02T00:00:00.000Z';
-const SOON = new Date(Date.now() + 86_400_000).toISOString();
+const SOON = tomorrowIso();
 const one = chapterNamed(1, 'One', OUT);
 const two = chapterNamed(2, 'Two', OUT);
 const three = chapterNamed(3, 'Three', OUT);

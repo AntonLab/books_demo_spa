@@ -11,6 +11,7 @@ import { ChapterPage } from './ChapterPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
 import { seedSession } from '@/test/session';
+import { tomorrowIso } from '@/test/dates';
 import * as booksApi from '@/api/books';
 import * as chaptersApi from '@/api/chapters';
 import * as illustrationsApi from '@/api/illustrations';
@@ -461,7 +462,7 @@ describe('ChapterPage navigation around chapters not yet out', () => {
         { ...summary(20, 'Unwritten'), publishedAt: null },
         {
           ...summary(21, 'Coming'),
-          publishedAt: new Date(Date.now() + 86_400_000).toISOString(),
+          publishedAt: tomorrowIso(),
         },
         summary(11, 'Three'),
       ],
