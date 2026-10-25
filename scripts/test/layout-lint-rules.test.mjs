@@ -3,20 +3,27 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { lint } from '../layout-lint-rules.mjs';
 
-// Needs an installed Edge or Chrome (the script's own requirement); skipped
-// where neither exists, e.g. on CI.
+// Needs an installed Edge or Chrome (the script's own requirement). Skipped
+// where neither launches, with the launch error in the message; under CI the
+// suite fails instead, so a broken browser install cannot pass unnoticed.
 let browser;
+let launchError;
 before(async () => {
   for (const channel of ['msedge', 'chrome']) {
     try {
       browser = await chromium.launch({ channel });
       return;
-    } catch {
-      // try the next channel
+    } catch (error) {
+      launchError = error;
     }
   }
+  if (process.env.CI)
+    throw new Error('no browser launched', { cause: launchError });
 });
 after(() => browser?.close());
+
+const skipReason = () =>
+  `no Edge or Chrome launched: ${launchError?.message.split('\n')[0]}`;
 
 const strip = (cls) => `
   <div class="${cls}-wrap" style="overflow-x:hidden;width:266px">
@@ -38,13 +45,13 @@ const run = async (html) => {
 };
 
 test('a tab bar clipped by ant-tabs-nav-wrap is not reported', async (t) => {
-  if (!browser) return t.skip('no Edge or Chrome installed');
+  if (!browser) return t.skip(skipReason());
   const found = await run(strip('ant-tabs-nav'));
   assert.deepEqual(found.offscreen, []);
 });
 
 test('the same clipped strip outside ant-tabs-nav-wrap is still reported', async (t) => {
-  if (!browser) return t.skip('no Edge or Chrome installed');
+  if (!browser) return t.skip(skipReason());
   const found = await run(strip('other'));
   assert.ok(found.offscreen.length > 0);
 });

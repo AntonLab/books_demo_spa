@@ -7,7 +7,7 @@
 // Exit 1 when any page has a finding. A page the app redirects elsewhere only
 // warns, since the checked page is then not the requested one.
 import { chromium } from 'playwright-core';
-import { lint } from './layout-lint-rules.mjs';
+import { isRedirected, lint } from './layout-lint-rules.mjs';
 
 const argv = process.argv.slice(2);
 const opt = {
@@ -50,7 +50,7 @@ try {
     // No networkidle: the dev server keeps a socket open.
     await page.waitForTimeout(2000);
     const landed = new URL(page.url()).pathname;
-    if (landed !== `/${path}`)
+    if (isRedirected(path, landed))
       console.log(
         `warn ${entry}: requested /${path} but the app is at ${landed} (redirected for ${opt.user}?)`
       );
