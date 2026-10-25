@@ -4,7 +4,8 @@
  * locally and then conflicts, or fails CI on the merge ref.
  *
  *   npm run branch:check              exit 1 when behind or when the branch's
- *                                     PR is already merged, with the fix
+ *                                     PR is already merged and the branch
+ *                                     is still on origin, with the fix
  *   node scripts/branch-check.mjs --warn   print only when behind, always exit 0
  *
  * `--warn` is the SessionStart hook: silence costs no context, and a failed
@@ -69,7 +70,16 @@ if (!warnOnly && branch !== 'dev' && branch !== 'main') {
   } catch {
     // no gh, no network: skip the check
   }
-  if (merged)
+  // A merged PR's branch name is reusable once the remote branch is gone: the
+  // next push creates it anew and a new PR can open.
+  let onRemote = false;
+  try {
+    git('ls-remote', '--exit-code', '--heads', 'origin', branch);
+    onRemote = true;
+  } catch {
+    // absent, or no network: do not warn
+  }
+  if (merged && onRemote)
     report(
       `branch-check: PR #${merged} of ${branch} is already merged. A new commit here will not reach dev: branch from ${base} and open a new PR.`
     );

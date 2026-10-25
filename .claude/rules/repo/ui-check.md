@@ -23,6 +23,8 @@ cost grows with every call: 32% of workers in PR #251). Before the dispatch, con
 seed never produces left one item UNVERIFIED in 3.73M tokens), and tell it to
 run each breakpoint pass in one `browser_run_code_unsafe` call: that run took
 21 calls and 1.20M, against about 90 calls and 3.73M without it. Skip items a
-jsdom test or `npm run layout-lint` already settles. Save each run's
+jsdom test or `npm run layout-lint` already settles. `layout-lint` is a
+controller or `ui-checker` step, never a plan task: an implementer has neither
+the `DEMO_PASSWORD` nor the page paths. Save each run's
 returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md` under a
 `## <sha>` heading; `/swarm:ship` builds the test plan from it.
