@@ -13,6 +13,8 @@ const row = (id: number, position: number, caption: string | null) => ({
   id,
   position,
   caption,
+  width: null,
+  height: null,
   updatedAt: '2026-10-17T10:00:00.000Z',
 });
 const srcs = (container: HTMLElement) =>

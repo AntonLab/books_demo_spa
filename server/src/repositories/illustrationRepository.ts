@@ -146,7 +146,13 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
           { where, transaction }
         );
         const row = await Illustration.create(
-          { chapterId, position: (last ?? 0) + 1, caption: null },
+          {
+            chapterId,
+            position: (last ?? 0) + 1,
+            caption: null,
+            width: image.width,
+            height: image.height,
+          },
           { transaction }
         );
         await IllustrationImage.create(

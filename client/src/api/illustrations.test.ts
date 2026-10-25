@@ -49,6 +49,8 @@ describe('illustrations api', () => {
       id: 5,
       position: 1,
       caption: null,
+      width: null,
+      height: null,
       updatedAt: '2026-10-17T00:00:00.000Z',
     };
     const fetchMock = mockFetch(row, 201);
@@ -69,6 +71,8 @@ describe('illustrations api', () => {
       id: 5,
       position: 1,
       caption: null,
+      width: null,
+      height: null,
       updatedAt: 'x',
     });
     await updateIllustrationCaption(5, null);

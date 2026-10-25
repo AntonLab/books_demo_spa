@@ -46,6 +46,7 @@ const APPLIED_MIGRATIONS = [
   '0001-baseline.ts',
   '0002-illustrations.ts',
   '0003-xor-checks.ts',
+  '0004-illustration-dimensions.ts',
 ];
 
 const SERVER_DIR = path.resolve(import.meta.dirname, '../../..');

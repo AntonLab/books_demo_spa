@@ -797,10 +797,15 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
     );
     assert.deepEqual(Object.keys(own.body.items[0] ?? {}).sort(), [
       'caption',
+      'height',
       'id',
       'position',
       'updatedAt',
+      'width',
     ]);
+    // A row stored before the columns existed has no size.
+    assert.equal(own.body.items[0]?.width, null);
+    assert.equal(own.body.items[0]?.height, null);
     const image = await imageOf(first.id, author.browser);
     assert.equal(image.status, 200);
     assert.equal(image.headers.get('content-type'), 'image/webp');
@@ -924,9 +929,13 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       id: number;
       position: number;
       caption: string | null;
+      width: number | null;
+      height: number | null;
     };
     assert.equal(row.position, 1);
     assert.equal(row.caption, null);
+    assert.equal(row.width, 1600);
+    assert.equal(row.height, 400);
     const meta = await sharp(
       Buffer.from(await (await imageOf(row.id)).arrayBuffer())
     ).metadata();
@@ -938,14 +947,50 @@ describe('the full stack from HTTP to MySQL', { skip }, () => {
       chapter.id,
       await picture(40, 30)
     );
+    const smallRow = (await small.json()) as {
+      id: number;
+      width: number | null;
+      height: number | null;
+    };
     const smallMeta = await sharp(
-      Buffer.from(
-        await (
-          await imageOf(((await small.json()) as { id: number }).id)
-        ).arrayBuffer()
-      )
+      Buffer.from(await (await imageOf(smallRow.id)).arrayBuffer())
     ).metadata();
     assert.equal(smallMeta.width, 40);
+    assert.equal(smallRow.width, 40);
+    assert.equal(smallRow.height, 30);
+
+    type Listed = { items: { id: number; width: number; height: number }[] };
+    const sizeOfFirst = async () =>
+      (
+        await author.browser.send<Listed>(
+          'GET',
+          `/chapters/${chapter.id}/illustrations`
+        )
+      ).body.items.find((item) => item.id === row.id);
+    assert.deepEqual(
+      {
+        width: (await sizeOfFirst())?.width,
+        height: (await sizeOfFirst())?.height,
+      },
+      { width: 1600, height: 400 }
+    );
+    const patched = await author.browser.send(
+      'PATCH',
+      `/illustrations/${row.id}`,
+      {
+        caption: 'Wide',
+      }
+    );
+    assert.equal(patched.status, 200);
+    const reordered = await author.browser.send(
+      'PUT',
+      `/chapters/${chapter.id}/illustration-order`,
+      { illustrationIds: [smallRow.id, row.id] }
+    );
+    assert.equal(reordered.status, 200);
+    const kept = await sizeOfFirst();
+    assert.equal(kept?.width, 1600);
+    assert.equal(kept?.height, 400);
 
     const after = await author.browser.send<PublicChapter>(
       'GET',

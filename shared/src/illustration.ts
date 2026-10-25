@@ -2,6 +2,9 @@ export interface PublicIllustration {
   id: number;
   position: number;
   caption: string | null;
+  // Null for a picture stored before its size was recorded.
+  width: number | null;
+  height: number | null;
   updatedAt: Date;
 }
 export const ILLUSTRATIONS_PER_CHAPTER_MAX = 20;
