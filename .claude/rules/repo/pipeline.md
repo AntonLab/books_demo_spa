@@ -46,7 +46,8 @@ per-call values.
   ledger line and a review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
   task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
-  review costs about 0.08M tokens, and skipping it let defects through. Do not run
+  review costs about 0.08M tokens, and skipping it let defects through. A fix
+  round for review or audit findings gets the scoped re-review instead. Do not run
   `superpowers:executing-plans` inline: the Opus session pays about as much as
   all the implementers together and compacts more often.
 - **Light mode** is for a spec that touches no `client/src` (or only tests and
@@ -72,14 +73,15 @@ per-call values.
   the subset if it ran one). Never write that line yourself: a past run
   claimed typecheck and lint that never ran. `guard-shell` refuses an
   unbounded package-wide gate in the main session; one piped through
-  `| tail` passes, but it is not a `gates green` line. Before the final
+  `| tail` passes, but it is not a `gates green` line. Ask `gate-runner`
+  whether the MySQL suites ran after a `SKIP_MYSQL=1` run. Before the final
   `gate-runner` the controller runs `git fetch` and `npm run branch:check`;
   if the branch is behind, rebase first, then run the gates.
 - **A PR body reports only checks that have finished**, with their result:
   a past PR body listed a plan-check run before it ran. Write a pending check as pending, never as its expected result; update the
   body once it finishes.
-- **A diff that touches `client/src` gets a `ui-checker` run** after the
-  changed-files audit's fixes and before `finishing-a-development-branch`;
+- **A diff that touches `client/src` gets a `ui-checker` run** (unless the
+  approved spec skips it) after the changed-files audit's fixes and before `finishing-a-development-branch`;
   Read `.claude/rules/repo/ui-check.md` for the checklist rules.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
@@ -104,10 +106,12 @@ per-call values.
   single fix dispatch, which runs too many turns in one context.
 - **After the final scoped re-review, audit the changed files** with one
   `repo-auditor` (sonnet): yardstick "comments and duplication", scope the
-  output of `git diff --name-only origin/dev...HEAD`. Reviews judge
+  output of `git diff --name-only origin/dev...HEAD` (in a queue run the
+  branch holds other issues: use this issue's commits only). Reviews judge
   correctness, so wordy comments and copied logic pass them. Fix every
   finding the same way as final-review findings (`sdd-implementer` groups,
-  one scoped re-review), then rerun `gate-runner` if code changed. A `dup`
+  one scoped re-review), then rerun `gate-runner` if code changed (a
+  comment-only fix needs no rerun). A `dup`
   whose owner copy lies outside the diff is fixed only inside the diff; any
   other out-of-diff finding goes to the follow-ups file.
 - **Pass `model` on every dispatch:** `sdd-implementer` haiku when the brief
@@ -135,7 +139,8 @@ per-call values.
   database needs a rebuild, ask the user to type it; the Skill call is refused.
 - **The controller creates the worktree before Task 1 with
   `npm run worktree -- <name> <branch>`**: fresh `origin/dev`, the
-  `.env.local` files an agent may not copy, and an install. Name the worktree
+  `.env.local` files an agent may not copy (a deny rule refuses even
+  `ls server/.env.local`: do not probe it), and an install. Name the worktree
   after the spec's `<topic>`. Once the PR merges,
   `npm run worktree -- --remove <name>` deletes it with its branch,
   `.playwright-mcp`, the `docs/superpowers` spec, code map, follow-ups and
