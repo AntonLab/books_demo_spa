@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   Route,
@@ -26,6 +26,7 @@ import * as genresApi from '@/api/genres';
 import * as libraryApi from '@/api/library';
 import * as seriesApi from '@/api/series';
 import * as authorsApi from '@/api/authors';
+import * as authApi from '@/api/auth';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -41,7 +42,9 @@ jest.mock('@/api/genres');
 jest.mock('@/api/library');
 jest.mock('@/api/series');
 jest.mock('@/api/authors');
+jest.mock('@/api/auth');
 
+const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
@@ -179,6 +182,7 @@ const noLists = { items: [], total: 0, current: 1, pageSize: 10 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedAuth.me.mockResolvedValue(null as never);
   jest.mocked(authorsApi).searchAuthors.mockResolvedValue([]);
   mockedReadingLists.listReadingLists.mockResolvedValue(noLists);
   mockedBooks.getBook.mockResolvedValue(book);
@@ -968,6 +972,28 @@ describe('BookPage Edit button', () => {
       expect(container.querySelector('.ant-skeleton')).not.toBeNull()
     );
     expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
+  });
+
+  it('keeps ?edit=1 while the session is still loading', async () => {
+    // Not seeded: the session query stays pending.
+    mockedAuth.me.mockReturnValue(new Promise(() => {}));
+    renderWithProviders(
+      <>
+        <BookPage />
+        <SearchProbe />
+      </>,
+      {
+        route: '/books/1?edit=1',
+        path: '/books/:id',
+        queryClient: createTestQueryClient(),
+      }
+    );
+
+    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    // Let a (wrongly) fired drop navigate before reading the URL.
+    await act(async () => {});
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('sets the param on Edit and removes it on close, keeping other params', async () => {

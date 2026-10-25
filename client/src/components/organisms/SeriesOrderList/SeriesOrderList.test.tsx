@@ -230,6 +230,24 @@ describe('SeriesOrderList', () => {
     expect(screen.getByRole('combobox', { name: 'Add a book' })).toBeDisabled();
   });
 
+  it('disables the picker when exactly 100 own books are all in series and none wait past the page', async () => {
+    const books = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      title: `Book ${i + 1}`,
+      seriesId: 9,
+    })) as unknown as PublicBook[];
+    mockedBooks.listBooks.mockResolvedValue({
+      items: books,
+      total: 100,
+      current: 1,
+      pageSize: 100,
+    });
+    renderList();
+
+    expect(await screen.findByText('No books to add')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Add a book' })).toBeDisabled();
+  });
+
   it('keeps the picker enabled when the first 100 own books are all in series and a free one follows', async () => {
     const books = Array.from({ length: 101 }, (_, i) => ({
       id: i + 1,
