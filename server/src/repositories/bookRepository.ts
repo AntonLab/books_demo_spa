@@ -599,6 +599,7 @@ export function createSequelizeBookRepository(): BookRepository {
         offset: (query.current - 1) * query.pageSize,
         order,
       });
+      // The window count is a MySQL BIGINT, which can arrive as a string.
       let total = Number(rows[0]?.get('total') ?? 0);
       let current = query.current;
       if (rows.length === 0 && query.current > 1) {

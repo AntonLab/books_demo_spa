@@ -38,8 +38,8 @@ code alone does not explain.
 - `GET /api/books` pages by `current` / `pageSize` (1–`PAGE_SIZE_MAX`,
   default 20), not `limit` / `offset`, and answers `PagedResponse`
   (`{ items, total, current, pageSize }`). The page query returns the total,
-  with a separate count only for a page past the end, which it
-  serves the last non-empty page, page 1 when nothing matches, and says so in
+  with a separate count only for a page past the end. Past the end it serves
+  the last non-empty page, page 1 when nothing matches, and says so in
   `current`. Every other paged list keeps `limit` / `offset` and
   `ListResponse`; a short list served whole (Genres, authors, a series'
   books) answers `ItemsResponse`, checked with `satisfies` at `res.json`.
