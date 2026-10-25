@@ -230,6 +230,43 @@ describe('SeriesOrderList', () => {
     expect(screen.getByRole('combobox', { name: 'Add a book' })).toBeDisabled();
   });
 
+  it('keeps the picker enabled when the first 100 own books are all in series and a free one follows', async () => {
+    const books = Array.from({ length: 101 }, (_, i) => ({
+      id: i + 1,
+      title: `Book ${i + 1}`,
+      seriesId: i < 100 ? 9 : null,
+    })) as unknown as PublicBook[];
+    mockedBooks.listBooks.mockImplementation(
+      async ({ q, pageSize = 20 } = {}) => {
+        const matches = q ? books.filter((b) => b.title.includes(q)) : books;
+        return {
+          items: matches.slice(0, pageSize),
+          total: matches.length,
+          current: 1,
+          pageSize,
+        };
+      }
+    );
+    mockedBooks.updateBook.mockResolvedValue({} as never);
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await waitFor(() =>
+      expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 3, pageSize: 100 })
+      )
+    );
+    expect(screen.queryByText('No books to add')).toBeNull();
+    expect(picker).toBeEnabled();
+
+    await userEvent.type(picker, 'Book 101');
+    await waitPastDebounce();
+    await userEvent.click(await screen.findByText('Book 101'));
+    await waitFor(() =>
+      expect(mockedBooks.updateBook).toHaveBeenCalledWith(101, { seriesId: 7 })
+    );
+  });
+
   it('takes a book out of the series only once that is confirmed', async () => {
     mockedSeries.listSeriesBooks.mockResolvedValue(
       listing([bookNamed(1, 'A Tale of Dragons')])

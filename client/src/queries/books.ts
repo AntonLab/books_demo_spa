@@ -108,7 +108,12 @@ export const useOwnBooksWithoutSeries = (
   return useQuery({
     queryKey: queryKeys.books(params),
     queryFn: () => listBooks(params),
-    select: (page) => page.items.filter((book) => book.seriesId === null),
+    // `more` is true when the server holds books past this page, which `select`
+    // cannot see: an empty `books` then does not mean nothing is left to add.
+    select: (page) => ({
+      books: page.items.filter((book) => book.seriesId === null),
+      more: page.total > page.items.length,
+    }),
     enabled,
   });
 };

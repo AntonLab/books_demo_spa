@@ -28,13 +28,15 @@ export const AddBookToSeries: FC<AddBookToSeriesProps> = ({
   const candidates = useOwnBooksWithoutSeries(session.id, debounced, true);
   const add = useAddBookToSeries(seriesId);
   const searching = pending || candidates.isFetching;
-  // Only an empty search proves there is nothing to add: a term with no match
+  // Only an empty search over a complete page proves there is nothing to add:
+  // a term with no match, or a page of series-bound books with more behind it,
   // must leave the picker usable.
   const nothingToAdd =
     term === '' &&
     !pending &&
     candidates.isSuccess &&
-    candidates.data.length === 0;
+    candidates.data.books.length === 0 &&
+    !candidates.data.more;
 
   return (
     <>
@@ -59,10 +61,12 @@ export const AddBookToSeries: FC<AddBookToSeriesProps> = ({
           onSearch={(value) => setTerm(value.slice(0, SEARCH_TEXT_MAX_LENGTH))}
           notFoundContent={searching ? null : 'No books found'}
           style={{ minWidth: 240 }}
-          options={(pending ? [] : (candidates.data ?? [])).map((book) => ({
-            value: book.id,
-            label: book.title,
-          }))}
+          options={(pending ? [] : (candidates.data?.books ?? [])).map(
+            (book) => ({
+              value: book.id,
+              label: book.title,
+            })
+          )}
           // Controlled and always empty: after a pick the Select returns to
           // its placeholder while the list refetches.
           value={null}
