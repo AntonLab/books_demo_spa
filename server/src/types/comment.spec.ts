@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { COMMENT_TEXT_MAX_LENGTH } from 'shared';
 import {
-  COMMENT_TEXT_MAX_LENGTH,
   createCommentSchema,
   listCommentsQuerySchema,
   updateCommentSchema,
@@ -46,6 +46,15 @@ test('createCommentSchema rejects an empty text', () => {
     createCommentSchema.safeParse({ bookId: 1, text: '' }).success,
     false
   );
+});
+
+test('createCommentSchema accepts text at the limit', () => {
+  const result = createCommentSchema.safeParse({
+    bookId: 1,
+    text: 'x'.repeat(COMMENT_TEXT_MAX_LENGTH),
+  });
+
+  assert.equal(result.success, true);
 });
 
 test('createCommentSchema rejects text past the limit', () => {
