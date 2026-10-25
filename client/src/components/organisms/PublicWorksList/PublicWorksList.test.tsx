@@ -4,8 +4,14 @@ import { useLocation } from 'react-router';
 import { PublicWorksList } from './PublicWorksList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import * as booksApi from '@/api/books';
+import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+  switchGridToList,
+} from '@/test/layoutSwitch';
 import { publicBook, publicSeries } from '@/test/works';
 
 jest.mock('@/api/books');
@@ -164,6 +170,25 @@ describe('PublicWorksList', () => {
     expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
   });
 
+  it('switches Books from tiles to a list from the switch, on a non-empty list', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book(1, 'Alpha')],
+      total: 1,
+      current: 1,
+      pageSize: 20,
+    });
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="books" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    const link = await screen.findByRole('link', { name: 'Alpha' });
+    expect(screen.queryByText('D.')).toBeNull();
+
+    await switchGridToList(store, link);
+
+    expect(screen.getAllByText('D.').length).toBeGreaterThan(0);
+  });
+
   it('has the layout switch on Books, next to the Sort order, and keeps it on an empty list', async () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
@@ -178,6 +203,23 @@ describe('PublicWorksList', () => {
     expect(
       screen.getByRole('group', { name: 'Results layout' })
     ).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch while the books load', async () => {
+    mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
+    renderWithProviders(<PublicWorksList kind="books" userId={7} />, {
+      route: '/accounts/7',
+    });
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedBooks.listBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="books" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    await expectSwitchOnError(store);
   });
 
   it('keeps Series as a list with no switch even when the layout is grid', async () => {

@@ -5,8 +5,13 @@ import { useLocation } from 'react-router';
 import { SearchPage } from './SearchPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { genreItem, publicGenre } from '@/test/genres';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+} from '@/test/layoutSwitch';
 import { publicBook } from '@/test/works';
 import * as booksApi from '@/api/books';
+import { ApiError } from '@/api/client';
 import * as genresApi from '@/api/genres';
 import type { PublicBook } from '@/types/book';
 import type { PagedResponse } from 'shared';
@@ -129,6 +134,18 @@ describe('SearchPage', () => {
     return expect(
       screen.findByRole('heading', { name: 'Search results · Searching…' })
     ).resolves.toBeInTheDocument();
+  });
+
+  it('keeps the layout switch while the books load', async () => {
+    mockedBooks.listBooks.mockImplementation(() => new Promise(() => {}));
+    renderPage('/search?q=dragon');
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedBooks.listBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderPage('/search?q=dragon');
+    await expectSwitchOnError(store);
   });
 
   it('says so when nothing matches', async () => {

@@ -1,6 +1,12 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation, useNavigationType } from 'react-router';
+import {
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+} from 'react-router';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -20,6 +26,7 @@ import * as genresApi from '@/api/genres';
 import * as libraryApi from '@/api/library';
 import * as seriesApi from '@/api/series';
 import * as authorsApi from '@/api/authors';
+import * as authApi from '@/api/auth';
 import type { BookDetail } from '@/types/book';
 import type { ChapterSummary } from '@/types/chapter';
 import type { RootState } from '@/store';
@@ -35,7 +42,9 @@ jest.mock('@/api/genres');
 jest.mock('@/api/library');
 jest.mock('@/api/series');
 jest.mock('@/api/authors');
+jest.mock('@/api/auth');
 
+const mockedAuth = jest.mocked(authApi);
 const mockedBooks = jest.mocked(booksApi);
 const mockedChapters = jest.mocked(chaptersApi);
 const mockedComments = jest.mocked(commentsApi);
@@ -101,19 +110,30 @@ const reader: PublicUser = {
 
 const SearchProbe = () => <p data-testid="search">{useLocation().search}</p>;
 
+const NavTypeProbe = () => <p data-testid="navtype">{useNavigationType()}</p>;
+
+const BackProbe = () => {
+  const navigate = useNavigate();
+  return <button onClick={() => void navigate(-1)}>Go back</button>;
+};
+
 const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
   id = '1',
-  search = ''
+  search = '',
+  seedViewer = true
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) seedSession(queryClient, session);
+  // No viewer is a resolved Guest, so only the book is ever unknown.
+  if (seedViewer) seedSession(queryClient, session ?? null);
 
   return renderWithProviders(
     <>
       <BookPage />
       <SearchProbe />
+      <NavTypeProbe />
+      <BackProbe />
     </>,
     {
       route: `/books/${id}${search}`,
@@ -163,6 +183,7 @@ const noLists = { items: [], total: 0, current: 1, pageSize: 10 };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockedAuth.me.mockResolvedValue(null as never);
   jest.mocked(authorsApi).searchAuthors.mockResolvedValue([]);
   mockedReadingLists.listReadingLists.mockResolvedValue(noLists);
   mockedBooks.getBook.mockResolvedValue(book);
@@ -912,6 +933,7 @@ describe('BookPage Edit button', () => {
     expect(
       within(await screen.findByRole('dialog')).getByText('Edit book')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
   });
 
   it.each(['?edit=0', '?edit=', '?edit=true'])('ignores %s', async (search) => {
@@ -921,14 +943,47 @@ describe('BookPage Edit button', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('ignores ?edit=1 for a reader who may not edit, and for a Guest', async () => {
-    const { unmount } = renderPage(reader, undefined, '1', '?edit=1');
-    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
-    expect(screen.queryByRole('dialog')).toBeNull();
-    unmount();
+  it.each([
+    ['a reader who may not edit', reader],
+    ['a Guest', undefined],
+  ])(
+    'drops ?edit=1 from the URL for %s and opens no modal',
+    async (_name, viewer) => {
+      renderPage(viewer, undefined, '1', '?x=1&edit=1');
 
-    renderPage(undefined, undefined, '1', '?edit=1');
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      await waitFor(() =>
+        expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/)
+      );
+      expect(screen.getByTestId('navtype')).toHaveTextContent('REPLACE');
+      expect(screen.queryByRole('dialog')).toBeNull();
+    }
+  );
+
+  it('keeps ?edit=1 while the book is still loading', async () => {
+    mockedBooks.getBook.mockReturnValue(new Promise(() => {}));
+    const { container } = renderPage(
+      { ...reader, id: 4, role: 'author' },
+      undefined,
+      '1',
+      '?edit=1'
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector('.ant-skeleton')).not.toBeNull()
+    );
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
+  });
+
+  it('keeps ?edit=1 while the session is still loading', async () => {
+    // Not seeded: the session query stays pending.
+    mockedAuth.me.mockReturnValue(new Promise(() => {}));
+    renderPage(undefined, undefined, '1', '?edit=1', false);
+
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+    // Let a (wrongly) fired drop navigate before reading the URL.
+    await act(async () => {});
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -944,6 +999,33 @@ describe('BookPage Edit button', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/);
+  });
+
+  it('closes the modal on Back after Edit opened it, leaving the page', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
+  });
+
+  it('does not reopen the modal on Back after it was closed', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Close',
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
   });
 
   it('offers a Moderator the same Edit button, and a plain reader none', async () => {

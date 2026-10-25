@@ -4,6 +4,10 @@ import { useLocation } from 'react-router';
 import type { ReadingStatus } from 'shared';
 import { LibraryPanel } from './LibraryPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+} from '@/test/layoutSwitch';
 import { seededClient } from '@/test/session';
 import { publicBook } from '@/test/works';
 import * as libraryApi from '@/api/library';
@@ -85,6 +89,26 @@ describe('LibraryPanel', () => {
     expect(
       screen.getByRole('button', { name: 'Remove Dragons from Library' })
     ).toBeInTheDocument();
+  });
+
+  it('puts Remove below the tile in grid and beside it in list', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading')])
+    );
+    const { store } = renderPanel();
+    const link = await titleLink('Dragons');
+    setLayout(store, 'grid');
+    const remove = screen.getByRole('button', {
+      name: 'Remove Dragons from Library',
+    });
+    const removeFollowsLink = () =>
+      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(removeFollowsLink()).toBeTruthy();
+    expect(remove.parentElement).toHaveClass('ant-flex-vertical');
+
+    setLayout(store, 'list');
+    expect(remove.parentElement).not.toHaveClass('ant-flex-vertical');
+    expect(removeFollowsLink()).toBeTruthy();
   });
 
   it('shows the full-width list with descriptions in list layout', async () => {
@@ -270,5 +294,17 @@ describe('LibraryPanel', () => {
     mockedLibrary.listLibrary.mockRejectedValue(new ApiError(500, 'boom'));
     renderPanel();
     expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
+
+  it('keeps the layout switch while the books load', async () => {
+    mockedLibrary.listLibrary.mockReturnValue(new Promise(() => {}));
+    renderPanel();
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedLibrary.listLibrary.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderPanel();
+    await expectSwitchOnError(store);
   });
 });

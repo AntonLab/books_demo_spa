@@ -37,8 +37,9 @@ code alone does not explain.
   `seriesTitle` are looked up as id lists first, like `userId`.
 - `GET /api/books` pages by `current` / `pageSize` (1–`PAGE_SIZE_MAX`,
   default 20), not `limit` / `offset`, and answers `PagedResponse`
-  (`{ items, total, current, pageSize }`). It counts first: past the end it
-  serves the last non-empty page, page 1 when nothing matches, and says so in
+  (`{ items, total, current, pageSize }`). The page query returns the total,
+  with a separate count only for a page past the end. Past the end it serves
+  the last non-empty page, page 1 when nothing matches, and says so in
   `current`. Every other paged list keeps `limit` / `offset` and
   `ListResponse`; a short list served whole (Genres, authors, a series'
   books) answers `ItemsResponse`, checked with `satisfies` at `res.json`.

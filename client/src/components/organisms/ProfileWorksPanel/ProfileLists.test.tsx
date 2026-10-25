@@ -6,11 +6,17 @@ import { ProfileBooksList } from './ProfileBooksList';
 import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+  switchGridToList,
+} from '@/test/layoutSwitch';
 import { seedSession } from '@/test/session';
 import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
 import * as booksApi from '@/api/books';
+import { ApiError } from '@/api/client';
 import * as favoritesApi from '@/api/favorites';
 import * as genresApi from '@/api/genres';
 import * as seriesApi from '@/api/series';
@@ -132,6 +138,20 @@ describe('ProfileBooksList in My works', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the layout switch while the books load', async () => {
+    mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
+    renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />);
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the books fail to load', async () => {
+    mockedBooks.listBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderAs(
+      <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
+    );
+    await expectSwitchOnError(store);
+  });
+
   it('lists the viewer’s books, Drafts included, and wires Edit', async () => {
     const onEdit = jest.fn();
     renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={onEdit} />);
@@ -141,11 +161,12 @@ describe('ProfileBooksList in My works', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 3, current: 1, pageSize: 20 })
     );
-    await clickWorkMenuItem('Out Now', 'Edit');
-    expect(onEdit).toHaveBeenCalledWith(2);
+    await openWorkMenu('Out Now');
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith(2);
   });
 
   it('hides the Author field of the form, and keeps the other books fields', async () => {
@@ -226,6 +247,35 @@ describe('ProfileBooksList in Favorites', () => {
     );
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
+
+  it('has the layout switch on a non-empty list, and a pick changes the Device preference', async () => {
+    mockedBooks.listFavoritedBooks.mockResolvedValue(
+      page([book(2, 'Out Now', 'complete', 41)]) as Awaited<
+        ReturnType<typeof booksApi.listFavoritedBooks>
+      >
+    );
+    const { store } = renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    const link = await screen.findByRole('link', { name: 'Out Now' });
+    await switchGridToList(store, link);
+  });
+
+  it('keeps the layout switch while the favorites load', async () => {
+    mockedBooks.listFavoritedBooks.mockReturnValue(new Promise(() => {}));
+    renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the favorites fail to load', async () => {
+    mockedBooks.listFavoritedBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    await expectSwitchOnError(store);
+  });
 });
 
 describe('ProfileSeriesList', () => {
@@ -255,11 +305,12 @@ describe('ProfileSeriesList', () => {
       await screen.findByRole('link', { name: 'The Scale Cycle' })
     ).toHaveAttribute('href', '/series/12');
     expect(screen.getByText('1 book')).toBeInTheDocument();
-    await clickWorkMenuItem('The Scale Cycle', 'Edit');
-    expect(onEdit).toHaveBeenCalledWith(12);
+    await openWorkMenu('The Scale Cycle');
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith(12);
     expect(screen.getByLabelText('Tag')).toBeInTheDocument();
     for (const label of ['Author', 'Status'])
       expect(screen.queryByLabelText(label)).toBeNull();

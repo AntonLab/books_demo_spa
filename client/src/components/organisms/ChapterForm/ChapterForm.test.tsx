@@ -5,6 +5,7 @@ import { CHAPTER_TEXT_MAX_LENGTH } from 'shared';
 import { ChapterForm } from './ChapterForm';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { formatDateTime } from '@/format/date';
+import { tomorrowIso } from '@/test/dates';
 
 const filled = { title: 'Chapter One', text: 'It was a dark night.' };
 
@@ -217,7 +218,7 @@ describe('ChapterForm', () => {
   });
 
   it('names the moment a scheduled chapter will go out', () => {
-    const scheduled = new Date(Date.now() + 86_400_000).toISOString();
+    const scheduled = tomorrowIso();
     renderWithProviders(
       <ChapterForm
         initialValues={filled}

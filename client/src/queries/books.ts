@@ -90,13 +90,30 @@ export const useBooksInSeries = (seriesId: number) => {
   });
 };
 
-// The viewer's own books in no series: what the Edit series Books tab can file. The server filters by author only; `select` drops books already in a series.
-// ponytail: one page at the server's cap, as useBooksInSeries.
-export const useOwnBooksWithoutSeries = (userId: number, enabled: boolean) => {
+// The viewer's own books in no series: what the Edit series Books tab can file.
+// The server filters by author and searches `q` (title or description), so a
+// book past the first 100 is reachable by title; `select` drops books already
+// in a series.
+// ponytail: a search shows at most one page (the server's cap) of matches.
+export const useOwnBooksWithoutSeries = (
+  userId: number,
+  q: string,
+  enabled: boolean
+) => {
+  const params: ListBooksParams = {
+    userId,
+    pageSize: PAGE_SIZE_MAX,
+    q: q.trim() === '' ? undefined : q.trim(),
+  };
   return useQuery({
-    queryKey: queryKeys.books({ userId, pageSize: PAGE_SIZE_MAX }),
-    queryFn: () => listBooks({ userId, pageSize: PAGE_SIZE_MAX }),
-    select: (page) => page.items.filter((book) => book.seriesId === null),
+    queryKey: queryKeys.books(params),
+    queryFn: () => listBooks(params),
+    // `more` is true when the server holds books past this page, which `select`
+    // cannot see: an empty `books` then does not mean nothing is left to add.
+    select: (page) => ({
+      books: page.items.filter((book) => book.seriesId === null),
+      more: page.total > page.items.length,
+    }),
     enabled,
   });
 };
