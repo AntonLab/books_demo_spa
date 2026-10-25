@@ -6,6 +6,11 @@ import { ProfileBooksList } from './ProfileBooksList';
 import { ProfileSeriesList } from './ProfileSeriesList';
 import { renderWithProviders } from '@/test/renderWithProviders';
 import { createTestQueryClient } from '@/test/queryClient';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+  switchGridToList,
+} from '@/test/layoutSwitch';
 import { seedSession } from '@/test/session';
 import { clickWorkMenuItem, openWorkMenu } from '@/test/workMenu';
 import { publicBook, publicSeries } from '@/test/works';
@@ -136,12 +141,7 @@ describe('ProfileBooksList in My works', () => {
   it('keeps the layout switch while the books load', async () => {
     mockedBooks.listBooks.mockReturnValue(new Promise(() => {}));
     renderAs(<ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />);
-    expect(
-      await screen.findByRole('status', { name: 'Loading books' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
+    await expectSwitchWhileLoading();
   });
 
   it('keeps the layout switch when the books fail to load', async () => {
@@ -149,14 +149,7 @@ describe('ProfileBooksList in My works', () => {
     const { store } = renderAs(
       <ProfileBooksList scope="mine" viewerId={3} onEdit={jest.fn()} />
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'List' }));
-
-    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    await expectSwitchOnError(store);
   });
 
   it('lists the viewer’s books, Drafts included, and wires Edit', async () => {
@@ -265,12 +258,7 @@ describe('ProfileBooksList in Favorites', () => {
       <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
     );
     const link = await screen.findByRole('link', { name: 'Out Now' });
-    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
-
-    await userEvent.click(screen.getByRole('button', { name: 'List' }));
-
-    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
-    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    await switchGridToList(store, link);
   });
 });
 

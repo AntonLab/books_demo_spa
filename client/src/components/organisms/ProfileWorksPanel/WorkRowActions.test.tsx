@@ -185,6 +185,7 @@ it('does not let one row block another row from removing its favorite', async ()
 
   await clickWorkMenuItem(book.title, 'Remove from favorites');
   await openWorkMenu(series.title);
+  // Closed menus stay in the DOM (zeroRuntime); pick the one not hidden.
   const menu = (await screen.findAllByRole('menu')).find(
     (m) =>
       !m.closest('.ant-dropdown')?.classList.contains('ant-dropdown-hidden')

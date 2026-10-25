@@ -4,6 +4,10 @@ import { useLocation } from 'react-router';
 import type { ReadingStatus } from 'shared';
 import { LibraryPanel } from './LibraryPanel';
 import { renderWithProviders } from '@/test/renderWithProviders';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+} from '@/test/layoutSwitch';
 import { seededClient } from '@/test/session';
 import { publicBook } from '@/test/works';
 import * as libraryApi from '@/api/library';
@@ -97,16 +101,14 @@ describe('LibraryPanel', () => {
     const remove = screen.getByRole('button', {
       name: 'Remove Dragons from Library',
     });
-    expect(
-      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    const removeFollowsLink = () =>
+      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(removeFollowsLink()).toBeTruthy();
     expect(remove.parentElement).toHaveClass('ant-flex-vertical');
 
     setLayout(store, 'list');
     expect(remove.parentElement).not.toHaveClass('ant-flex-vertical');
-    expect(
-      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+    expect(removeFollowsLink()).toBeTruthy();
   });
 
   it('shows the full-width list with descriptions in list layout', async () => {
@@ -297,24 +299,12 @@ describe('LibraryPanel', () => {
   it('keeps the layout switch while the books load', async () => {
     mockedLibrary.listLibrary.mockReturnValue(new Promise(() => {}));
     renderPanel();
-    expect(
-      await screen.findByRole('status', { name: 'Loading books' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
+    await expectSwitchWhileLoading();
   });
 
   it('keeps the layout switch when the books fail to load', async () => {
     mockedLibrary.listLibrary.mockRejectedValue(new ApiError(500, 'boom'));
     const { store } = renderPanel();
-    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'List' }));
-
-    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    await expectSwitchOnError(store);
   });
 });

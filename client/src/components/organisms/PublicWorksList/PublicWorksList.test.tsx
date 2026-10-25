@@ -7,6 +7,11 @@ import * as booksApi from '@/api/books';
 import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
 import { devicePreferences } from '@/store/devicePreferencesSlice';
+import {
+  expectSwitchOnError,
+  expectSwitchWhileLoading,
+  switchGridToList,
+} from '@/test/layoutSwitch';
 import { publicBook, publicSeries } from '@/test/works';
 
 jest.mock('@/api/books');
@@ -177,13 +182,10 @@ describe('PublicWorksList', () => {
       { route: '/accounts/7' }
     );
     const link = await screen.findByRole('link', { name: 'Alpha' });
-    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
     expect(screen.queryByText('D.')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    await switchGridToList(store, link);
 
-    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
-    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
     expect(screen.getAllByText('D.').length).toBeGreaterThan(0);
   });
 
@@ -208,12 +210,7 @@ describe('PublicWorksList', () => {
     renderWithProviders(<PublicWorksList kind="books" userId={7} />, {
       route: '/accounts/7',
     });
-    expect(
-      await screen.findByRole('status', { name: 'Loading books' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
+    await expectSwitchWhileLoading();
   });
 
   it('keeps the layout switch when the books fail to load', async () => {
@@ -222,14 +219,7 @@ describe('PublicWorksList', () => {
       <PublicWorksList kind="books" userId={7} />,
       { route: '/accounts/7' }
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('boom');
-    expect(
-      screen.getByRole('group', { name: 'Results layout' })
-    ).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'List' }));
-
-    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    await expectSwitchOnError(store);
   });
 
   it('keeps Series as a list with no switch even when the layout is grid', async () => {
