@@ -164,10 +164,20 @@ export function createSequelizeIllustrationRepository(): IllustrationRepository 
     },
 
     async updateCaption(id, caption) {
-      const row = await Illustration.findByPk(id);
-      if (!row) return null;
-      await row.update({ caption });
-      return toPublicIllustration(row);
+      return sequelizeOf(Illustration).transaction(async (transaction) => {
+        // Locked so a delete between the read and the write cannot leave us
+        // answering a row that is gone.
+        const locked = await Illustration.findByPk(id, {
+          attributes: ['id'],
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!locked) return null;
+
+        await Illustration.update({ caption }, { where: { id }, transaction });
+        const row = await Illustration.findByPk(id, { transaction });
+        return row ? toPublicIllustration(row) : null;
+      });
     },
 
     async reorder(chapterId, illustrationIds) {
