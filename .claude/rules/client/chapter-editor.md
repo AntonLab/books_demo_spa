@@ -29,9 +29,8 @@ paths:
   `chapterStateOf`, not what the checkbox would make it.
 - `onSaved` runs after the `saved` dispatch and never on a 409.
 - A mask click, Escape or the close icon closes only the Chapter modal,
-  silently, and keeps its Unsaved text. It has no `usePageGuard` and no
-  `DiscardGuardModal`.
-- Escape and the close icon reach only the top modal, because it is a sibling
-  of the Book modal's `DiscardGuardModal`, not a child of it.
+  silently, and keeps its Unsaved text. It has no `usePageGuard`. Escape and
+  the close icon reach only the top modal, because it is a sibling of the Book
+  modal's `DiscardGuardModal`, not a child of it.
 - A place that is gone (404) or no longer editable shows `UnsavedTextNotice`
   in the modal; only Discard removes the text.
