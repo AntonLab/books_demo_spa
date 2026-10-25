@@ -260,6 +260,22 @@ describe('ProfileBooksList in Favorites', () => {
     const link = await screen.findByRole('link', { name: 'Out Now' });
     await switchGridToList(store, link);
   });
+
+  it('keeps the layout switch while the favorites load', async () => {
+    mockedBooks.listFavoritedBooks.mockReturnValue(new Promise(() => {}));
+    renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    await expectSwitchWhileLoading();
+  });
+
+  it('keeps the layout switch when the favorites fail to load', async () => {
+    mockedBooks.listFavoritedBooks.mockRejectedValue(new ApiError(500, 'boom'));
+    const { store } = renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    await expectSwitchOnError(store);
+  });
 });
 
 describe('ProfileSeriesList', () => {

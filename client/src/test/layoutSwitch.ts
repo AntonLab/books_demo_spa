@@ -1,6 +1,6 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { AppStore } from '../store';
+import type { AppStore } from '@/store';
 
 const expectSwitchPresent = () =>
   expect(
