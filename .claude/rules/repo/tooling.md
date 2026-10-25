@@ -110,7 +110,8 @@ the newest version, so it needs no update when the plugin does.
 `playwright-core`. It drives the installed Edge or Chrome at 375px against a
 running dev server and fails on an element outside the viewport or a word
 broken mid-line; it needs `LAYOUT_LINT_PASSWORD` (the seed's `DEMO_PASSWORD`)
-and has no unit test, because it needs a browser.
+and keeps its in-page rules in `layout-lint-rules.mjs`, tested in a real
+browser (skipped where no Edge or Chrome exists).
 `plan-check.mjs` tells a test block from implementation by a `test`/`it`/
 `describe`/`expect` call; a plan whose tests use another runner's names needs
 the pattern widened, not the 15-line limit. It also caps a task at

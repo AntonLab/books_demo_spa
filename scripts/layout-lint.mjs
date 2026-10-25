@@ -4,8 +4,10 @@
 //     [--channel msedge|chrome] [--width 375] <path>[|<tab text>] ...
 // A path is relative to the base ("books/17", no leading slash: Git Bash turns
 // "/x" into a Windows path). "|Reading lists" clicks that text after loading.
-// Exit 1 when any page has a finding.
+// Exit 1 when any page has a finding. A page the app redirects elsewhere only
+// warns, since the checked page is then not the requested one.
 import { chromium } from 'playwright-core';
+import { lint } from './layout-lint-rules.mjs';
 
 const argv = process.argv.slice(2);
 const opt = {
@@ -28,66 +30,6 @@ if (!password || pages.length === 0) {
   process.exit(2);
 }
 
-// Runs in the page. Two rules: R1 a visible element lies outside the viewport
-// (scrollable containers and SVG are skipped); R2 a word of 6+ characters spans
-// several lines (line-clamp and ellipsis text are skipped).
-const lint = () => {
-  const W = window.innerWidth;
-  const found = {
-    overflowX: document.documentElement.scrollWidth - W,
-    offscreen: [],
-    midWord: [],
-  };
-  const inScroller = (el) => {
-    for (let p = el.parentElement; p; p = p.parentElement) {
-      const o = getComputedStyle(p).overflowX;
-      if ((o === 'auto' || o === 'scroll') && p.scrollWidth > p.clientWidth)
-        return true;
-    }
-    return false;
-  };
-  const name = (el) =>
-    `${el.tagName.toLowerCase()}[${(el.textContent ?? '').trim().slice(0, 24)}]`;
-  for (const el of document.querySelectorAll('body *')) {
-    const r = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    if (
-      !r.width ||
-      !r.height ||
-      cs.visibility === 'hidden' ||
-      cs.display === 'none'
-    )
-      continue;
-    if (el.closest('svg') || inScroller(el)) continue;
-    if (r.left < -1 || r.right > W + 1) {
-      found.offscreen.push(
-        `${name(el)} left=${Math.round(r.left)} right=${Math.round(r.right)}`
-      );
-    }
-  }
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-  for (let n; (n = walker.nextNode());) {
-    const el = n.parentElement;
-    if (!el || ['SCRIPT', 'STYLE'].includes(el.tagName)) continue;
-    const cs = getComputedStyle(el);
-    if (cs.webkitLineClamp !== 'none' || cs.textOverflow === 'ellipsis')
-      continue;
-    for (const m of n.data.matchAll(/\S{6,}/g)) {
-      const range = document.createRange();
-      range.setStart(n, m.index);
-      range.setEnd(n, m.index + m[0].length);
-      const rows = new Set(
-        [...range.getClientRects()].map((x) => Math.round(x.top))
-      );
-      if (rows.size > 1 && el.getBoundingClientRect().width)
-        found.midWord.push(`${m[0]} in ${name(el)}`);
-    }
-  }
-  found.offscreen = found.offscreen.slice(0, 6);
-  found.midWord = found.midWord.slice(0, 6);
-  return found;
-};
-
 const browser = await chromium.launch({ channel: opt.channel });
 let failed = false;
 try {
@@ -107,6 +49,11 @@ try {
     await page.goto(`${opt.base}/${path}`);
     // No networkidle: the dev server keeps a socket open.
     await page.waitForTimeout(2000);
+    const landed = new URL(page.url()).pathname;
+    if (landed !== `/${path}`)
+      console.log(
+        `warn ${entry}: requested /${path} but the app is at ${landed} (redirected for ${opt.user}?)`
+      );
     if (tab) {
       await page.getByText(tab).first().click();
       await page.waitForTimeout(1500);
