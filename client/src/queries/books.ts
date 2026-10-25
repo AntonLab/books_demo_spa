@@ -91,9 +91,9 @@ export const useBooksInSeries = (seriesId: number) => {
 };
 
 // The viewer's own books in no series: what the Edit series Books tab can file.
-// The server filters by author and searches by `q` (title or description), so a
-// Book past the first 100 is reachable by typing its title; `select` drops
-// books already in a series.
+// The server filters by author and searches `q` (title or description), so a
+// book past the first 100 is reachable by title; `select` drops books already
+// in a series.
 // ponytail: a search shows at most one page (the server's cap) of matches.
 export const useOwnBooksWithoutSeries = (
   userId: number,

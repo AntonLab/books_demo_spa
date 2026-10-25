@@ -68,18 +68,19 @@ const renderList = (
     />
   );
 
-const ownBooks = Array.from({ length: 101 }, (_, i) => ({
-  id: i + 1,
-  title: `Book ${i + 1}`,
-  seriesId: null,
-})) as unknown as PublicBook[];
+const makeBooks = (n: number, seriesOf: (i: number) => number | null) =>
+  Array.from({ length: n }, (_, i) => ({
+    id: i + 1,
+    title: `Book ${i + 1}`,
+    seriesId: seriesOf(i),
+  })) as unknown as PublicBook[];
 
-const serveOwnBooks = () =>
+const serveBooks = (books: PublicBook[]) =>
   mockedBooks.listBooks.mockImplementation(
     async ({ q, pageSize = 20 } = {}) => {
       const matches = q
-        ? ownBooks.filter((book) => book.title.includes(q))
-        : ownBooks;
+        ? books.filter((book) => book.title.includes(q))
+        : books;
       return {
         items: matches.slice(0, pageSize),
         total: matches.length,
@@ -88,6 +89,10 @@ const serveOwnBooks = () =>
       };
     }
   );
+
+const ownBooks = makeBooks(101, () => null);
+
+const serveOwnBooks = () => serveBooks(ownBooks);
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -231,11 +236,7 @@ describe('SeriesOrderList', () => {
   });
 
   it('disables the picker when exactly 100 own books are all in series and none wait past the page', async () => {
-    const books = Array.from({ length: 100 }, (_, i) => ({
-      id: i + 1,
-      title: `Book ${i + 1}`,
-      seriesId: 9,
-    })) as unknown as PublicBook[];
+    const books = makeBooks(100, () => 9);
     mockedBooks.listBooks.mockResolvedValue({
       items: books,
       total: 100,
@@ -249,22 +250,7 @@ describe('SeriesOrderList', () => {
   });
 
   it('keeps the picker enabled when the first 100 own books are all in series and a free one follows', async () => {
-    const books = Array.from({ length: 101 }, (_, i) => ({
-      id: i + 1,
-      title: `Book ${i + 1}`,
-      seriesId: i < 100 ? 9 : null,
-    })) as unknown as PublicBook[];
-    mockedBooks.listBooks.mockImplementation(
-      async ({ q, pageSize = 20 } = {}) => {
-        const matches = q ? books.filter((b) => b.title.includes(q)) : books;
-        return {
-          items: matches.slice(0, pageSize),
-          total: matches.length,
-          current: 1,
-          pageSize,
-        };
-      }
-    );
+    serveBooks(makeBooks(101, (i) => (i < 100 ? 9 : null)));
     mockedBooks.updateBook.mockResolvedValue({} as never);
     renderList();
 

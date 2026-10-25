@@ -121,11 +121,12 @@ const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
   id = '1',
-  search = ''
+  search = '',
+  seedViewer = true
 ) => {
   const queryClient = createTestQueryClient();
   // No viewer is a resolved Guest, so only the book is ever unknown.
-  seedSession(queryClient, session ?? null);
+  if (seedViewer) seedSession(queryClient, session ?? null);
 
   return renderWithProviders(
     <>
@@ -977,17 +978,7 @@ describe('BookPage Edit button', () => {
   it('keeps ?edit=1 while the session is still loading', async () => {
     // Not seeded: the session query stays pending.
     mockedAuth.me.mockReturnValue(new Promise(() => {}));
-    renderWithProviders(
-      <>
-        <BookPage />
-        <SearchProbe />
-      </>,
-      {
-        route: '/books/1?edit=1',
-        path: '/books/:id',
-        queryClient: createTestQueryClient(),
-      }
-    );
+    renderPage(undefined, undefined, '1', '?edit=1', false);
 
     await screen.findByRole('heading', { name: 'A Tale of Dragons' });
     // Let a (wrongly) fired drop navigate before reading the URL.
