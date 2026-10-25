@@ -38,9 +38,9 @@ per-call values.
   concern: fix it as the audit bullet below says. Re-read an accepted fix from
   the diff, not the report: a report line can say done for a change not made.
 - **The main session edits no source file while a plan runs**, and it fixes
-  nothing through `cavecrew-builder` or another ad-hoc agent. Exception: a
-  rebase conflict that touches only imports or comments the main session
-  resolves itself; any logic goes to `sdd-implementer` through a brief.
+  nothing through `cavecrew-builder` or another ad-hoc agent. Exception: the
+  main session resolves a rebase conflict that touches only imports or
+  comments; any logic goes to `sdd-implementer` through a brief.
   Otherwise every change goes through an `sdd-implementer` brief, so it gets a
   ledger line and a review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
@@ -66,12 +66,12 @@ per-call values.
   push. A blocked push or `gh pr create`: stop and ask the user.
 - **Run the gates through `gate-runner` before the final review**, in every
   mode, and quote its last line in the dispatch (`gates green at <sha>`, with
-  the subset if it ran one). Before the final `gate-runner` the controller
-  runs `git fetch` and `npm run branch:check`; if the branch is behind, rebase
-  first, then run the gates. Never write that line yourself: a past run
+  the subset if it ran one). Never write that line yourself: a past run
   claimed typecheck and lint that never ran. `guard-shell` refuses an
   unbounded package-wide gate in the main session; one piped through
-  `| tail` passes, but it is not a `gates green` line.
+  `| tail` passes, but it is not a `gates green` line. Before the final
+  `gate-runner` the controller runs `git fetch` and `npm run branch:check`;
+  if the branch is behind, rebase first, then run the gates.
 - **A PR body reports only checks that have finished**, with their result.
   Write a pending check as pending, never as its expected result; update the
   body once it finishes.
