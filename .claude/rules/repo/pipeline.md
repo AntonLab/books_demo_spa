@@ -39,9 +39,11 @@ per-call values.
   concern: fix it as the audit bullet below says. Re-read an accepted fix from
   the diff, not the report: a report line can say done for a change not made.
 - **The main session edits no source file while a plan runs**, and it fixes
-  nothing through `cavecrew-builder` or another ad-hoc agent. Every change
-  goes through an `sdd-implementer` brief, so it gets a ledger line and a
-  review.
+  nothing through `cavecrew-builder` or another ad-hoc agent. Exception: the
+  main session resolves a rebase conflict that touches only imports or
+  comments; any logic goes to `sdd-implementer` through a brief.
+  Otherwise every change goes through an `sdd-implementer` brief, so it gets a
+  ledger line and a review.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
   task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
   review costs about 0.08M tokens, and skipping it let defects through. Do not run
@@ -70,24 +72,15 @@ per-call values.
   the subset if it ran one). Never write that line yourself: a past run
   claimed typecheck and lint that never ran. `guard-shell` refuses an
   unbounded package-wide gate in the main session; one piped through
-  `| tail` passes, but it is not a `gates green` line.
-- **A PR body reports only checks that have finished**, with their result: a
-  past PR body listed a plan-check run before it ran. Write a pending check
-  as pending, never as its expected result; update the body once it finishes.
+  `| tail` passes, but it is not a `gates green` line. Before the final
+  `gate-runner` the controller runs `git fetch` and `npm run branch:check`;
+  if the branch is behind, rebase first, then run the gates.
+- **A PR body reports only checks that have finished**, with their result:
+  a past PR body listed a plan-check run before it ran. Write a pending check as pending, never as its expected result; update the
+  body once it finishes.
 - **A diff that touches `client/src` gets a `ui-checker` run** after the
-  changed-files audit's fixes and before `finishing-a-development-branch`, because it finds
-  defects every review passed: a numbered checklist of at most 8 items from
-  the spec's user-visible behavior, the worktree as working directory. It
-  serves the worktree on ports 3100/4100, never the user's server on 3000. Its
-  FAIL items are fixed like final-review findings: the fix brief quotes the
-  FAIL line with its measured values, and the implementer's report says why
-  the change moves them. Build each item from what the seeded data can reach:
-  roles are `user`, `author`, `admin` and `superadmin` (check `USER_ROLES` in
-  `shared/`). Fix all FAIL items first, then send one recheck run with only
-  those items. Skip it in a follow-up round that changes no rendered output
-  (its cost grows with every call: 32% of workers in PR #251). Save each
-  run's returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md`
-  under a `## <sha>` heading; `/swarm:ship` builds the test plan from it.
+  changed-files audit's fixes and before `finishing-a-development-branch`;
+  Read `.claude/rules/repo/ui-check.md` for the checklist rules.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`, since

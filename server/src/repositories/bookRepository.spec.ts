@@ -585,6 +585,43 @@ describe('bookRepository against real MySQL', { skip }, () => {
     assert.equal((await repository.findCoAuthorIds(created.id))?.length, 1);
   });
 
+  // update peeks seriesId unlocked, then locks and re-reads the book. A move
+  // in between (here: the afterFind hook, on the unlocked peek only) is a 409.
+  test('updating a book that moved to another series since the peek is a state conflict', async () => {
+    const created = await repository.create({
+      userId: ownerId,
+      seriesId: null,
+      title: 'Before',
+      description: 'Solo',
+      tags: [],
+    });
+
+    let moved = false;
+    Book.addHook('afterFind', 'moveAfterPeek', async (_found, options) => {
+      if (moved || options.transaction) return;
+      moved = true;
+      await Book.update(
+        { seriesId },
+        { where: { id: created.id }, hooks: false }
+      );
+    });
+    try {
+      await assert.rejects(
+        repository.update(created.id, { title: 'After' }),
+        (error: unknown) =>
+          error instanceof StateConflictError &&
+          error.message === 'The book was moved to another series; try again'
+      );
+    } finally {
+      Book.removeHook('afterFind', 'moveAfterPeek');
+    }
+
+    assert.equal(moved, true);
+    const row = await Book.findByPk(created.id);
+    assert.equal(row?.title, 'Before');
+    assert.equal(row?.seriesId, seriesId);
+  });
+
   test('crediting a co-author while the work is deleted never fails unmapped', async () => {
     const coAuthorId = (await User.create({ ...coAuthor, role: 'author' })).id;
     const created = await repository.create({
