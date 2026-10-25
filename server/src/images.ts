@@ -54,14 +54,15 @@ export function processAvatarImage(buffer: Buffer): Promise<Buffer> {
   return reencode(buffer, { width: 256, height: 256, fit: 'cover' });
 }
 
-// An Illustration: fitted inside a square box, never cropped or enlarged.
 export interface ProcessedIllustration {
   data: Buffer;
   width: number;
   height: number;
 }
 
-// The size is read back from the stored bytes, so it is what the browser decodes.
+// An Illustration: fitted inside a square box, never cropped or enlarged.
+// Returns the re-encoded bytes with their stored size, read back from those
+// bytes so it is what the browser decodes.
 export async function processIllustrationImage(
   buffer: Buffer
 ): Promise<ProcessedIllustration> {
@@ -71,13 +72,7 @@ export async function processIllustrationImage(
     fit: 'inside',
     withoutEnlargement: true,
   });
-  let size: { width?: number; height?: number };
-  try {
-    size = await sharp(data).metadata();
-  } catch {
-    throw new BadRequestError('Not a valid image');
-  }
-  const { width, height } = size;
+  const { width, height } = await (await decode(data)).metadata();
   if (!width || !height) throw new BadRequestError('Not a valid image');
   return { data, width, height };
 }

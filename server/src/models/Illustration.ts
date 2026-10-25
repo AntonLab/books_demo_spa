@@ -23,7 +23,6 @@ export class Illustration extends Model<
   // 1-based and gapped after a delete, like chapters.position.
   declare position: number;
   declare caption: string | null;
-  // Null for a row stored before the columns existed.
   declare width: CreationOptional<number | null>;
   declare height: CreationOptional<number | null>;
   declare createdAt: CreationOptional<Date>;
