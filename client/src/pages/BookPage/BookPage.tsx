@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { FC } from 'react';
 import {
   CommentOutlined,
@@ -52,6 +53,13 @@ export const BookPage: FC = () => {
   ) : (
     <GoneRedirect message={BOOK_GONE} />
   );
+};
+
+// A child, since the early returns in BookView leave no room for a hook that
+// needs `mayEdit`.
+const DropEditParam: FC<{ onDrop: () => void }> = ({ onDrop }) => {
+  useEffect(onDrop, [onDrop]);
+  return null;
 };
 
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
@@ -251,6 +259,9 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         ]}
       />
 
+      {editing && !mayEdit && session !== undefined && (
+        <DropEditParam onDrop={() => setEditing(false)} />
+      )}
       {editing && mayEdit && (
         <BookEditDetailsModal
           bookId={bookId}

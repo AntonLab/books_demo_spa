@@ -101,6 +101,8 @@ const reader: PublicUser = {
 
 const SearchProbe = () => <p data-testid="search">{useLocation().search}</p>;
 
+const NavTypeProbe = () => <p data-testid="navtype">{useNavigationType()}</p>;
+
 const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
@@ -108,12 +110,14 @@ const renderPage = (
   search = ''
 ) => {
   const queryClient = createTestQueryClient();
-  if (session) seedSession(queryClient, session);
+  // No viewer is a resolved Guest, so only the book is ever unknown.
+  seedSession(queryClient, session ?? null);
 
   return renderWithProviders(
     <>
       <BookPage />
       <SearchProbe />
+      <NavTypeProbe />
     </>,
     {
       route: `/books/${id}${search}`,
@@ -912,6 +916,7 @@ describe('BookPage Edit button', () => {
     expect(
       within(await screen.findByRole('dialog')).getByText('Edit book')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
   });
 
   it.each(['?edit=0', '?edit=', '?edit=true'])('ignores %s', async (search) => {
@@ -921,15 +926,36 @@ describe('BookPage Edit button', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('ignores ?edit=1 for a reader who may not edit, and for a Guest', async () => {
-    const { unmount } = renderPage(reader, undefined, '1', '?edit=1');
-    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
-    expect(screen.queryByRole('dialog')).toBeNull();
-    unmount();
+  it.each([
+    ['a reader who may not edit', reader],
+    ['a Guest', undefined],
+  ])(
+    'drops ?edit=1 from the URL for %s and opens no modal',
+    async (_name, viewer) => {
+      renderPage(viewer, undefined, '1', '?x=1&edit=1');
 
-    renderPage(undefined, undefined, '1', '?edit=1');
-    await screen.findByRole('heading', { name: 'A Tale of Dragons' });
-    expect(screen.queryByRole('dialog')).toBeNull();
+      await screen.findByRole('heading', { name: 'A Tale of Dragons' });
+      await waitFor(() =>
+        expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/)
+      );
+      expect(screen.getByTestId('navtype')).toHaveTextContent('REPLACE');
+      expect(screen.queryByRole('dialog')).toBeNull();
+    }
+  );
+
+  it('keeps ?edit=1 while the book is still loading', async () => {
+    mockedBooks.getBook.mockReturnValue(new Promise(() => {}));
+    const { container } = renderPage(
+      { ...reader, id: 4, role: 'author' },
+      undefined,
+      '1',
+      '?edit=1'
+    );
+
+    await waitFor(() =>
+      expect(container.querySelector('.ant-skeleton')).not.toBeNull()
+    );
+    expect(screen.getByTestId('search')).toHaveTextContent('?edit=1');
   });
 
   it('sets the param on Edit and removes it on close, keeping other params', async () => {
