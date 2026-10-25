@@ -5,11 +5,14 @@ import { renderWithProviders } from '@/test/renderWithProviders';
 import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
+import * as booksApi from '@/api/books';
 import type { PublicUser, SeriesBookSummary } from '@/types/api';
 
 jest.mock('@/api/series');
+jest.mock('@/api/books');
 
 const mockedSeries = jest.mocked(seriesApi);
+const mockedBooks = jest.mocked(booksApi);
 
 const ann = {
   id: 3,
@@ -66,6 +69,12 @@ const renderList = (
 beforeEach(() => {
   jest.resetAllMocks();
   mockedSeries.listSeriesBooks.mockResolvedValue(listing([]));
+  mockedBooks.listBooks.mockResolvedValue({
+    items: [],
+    total: 0,
+    current: 1,
+    pageSize: 20,
+  });
 });
 
 describe('SeriesOrderList', () => {
@@ -120,6 +129,21 @@ describe('SeriesOrderList', () => {
     renderList({ mayEdit: false });
 
     expect(mockedSeries.listSeriesBooks).not.toHaveBeenCalled();
+  });
+
+  it('offers the Add a book picker to an editor', async () => {
+    renderList({ mayEdit: true });
+
+    expect(
+      await screen.findByRole('combobox', { name: 'Add a book' })
+    ).toBeInTheDocument();
+  });
+
+  it('offers no Add a book picker to a viewer who may not edit', () => {
+    renderList({ mayEdit: false });
+
+    expect(screen.queryByRole('combobox', { name: 'Add a book' })).toBeNull();
+    expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
 
   it('takes a book out of the series only once that is confirmed', async () => {
