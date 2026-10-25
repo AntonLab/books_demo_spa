@@ -6,7 +6,9 @@ import { layOutSortableRows, moveWithKeyboard } from '@/test/sortable';
 import { ApiError } from '@/api/client';
 import * as seriesApi from '@/api/series';
 import * as booksApi from '@/api/books';
+import { waitPastDebounce } from '@/test/waitPastDebounce';
 import type { PublicUser, SeriesBookSummary } from '@/types/api';
+import type { PublicBook } from '@/types/book';
 
 jest.mock('@/api/series');
 jest.mock('@/api/books');
@@ -64,6 +66,27 @@ const renderList = (
       session={sessionOf('author')}
       {...overrides}
     />
+  );
+
+const ownBooks = Array.from({ length: 101 }, (_, i) => ({
+  id: i + 1,
+  title: `Book ${i + 1}`,
+  seriesId: null,
+})) as unknown as PublicBook[];
+
+const serveOwnBooks = () =>
+  mockedBooks.listBooks.mockImplementation(
+    async ({ q, pageSize = 20 } = {}) => {
+      const matches = q
+        ? ownBooks.filter((book) => book.title.includes(q))
+        : ownBooks;
+      return {
+        items: matches.slice(0, pageSize),
+        total: matches.length,
+        current: 1,
+        pageSize,
+      };
+    }
   );
 
 beforeEach(() => {
@@ -144,6 +167,67 @@ describe('SeriesOrderList', () => {
 
     expect(screen.queryByRole('combobox', { name: 'Add a book' })).toBeNull();
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
+  });
+
+  it('reaches the 101st own book by searching its title', async () => {
+    serveOwnBooks();
+    mockedBooks.updateBook.mockResolvedValue({} as never);
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await userEvent.type(picker, 'Book 101');
+    await waitPastDebounce();
+    await userEvent.click(await screen.findByText('Book 101'));
+
+    await waitFor(() =>
+      expect(mockedBooks.updateBook).toHaveBeenCalledWith(101, { seriesId: 7 })
+    );
+    expect(mockedBooks.listBooks).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 3, q: 'Book 101', pageSize: 100 })
+    );
+  });
+
+  it('asks for the unfiltered page when the search is blank', async () => {
+    serveOwnBooks();
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await userEvent.type(picker, '   ');
+    await waitPastDebounce();
+
+    const calls = mockedBooks.listBooks.mock.calls.map(([params]) => params);
+    expect(calls.every((params) => params?.q === undefined)).toBe(true);
+  });
+
+  it('cuts a search term at SEARCH_TEXT_MAX_LENGTH (200)', async () => {
+    serveOwnBooks();
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await userEvent.type(picker, 'a'.repeat(201));
+    await waitPastDebounce();
+
+    const qs = mockedBooks.listBooks.mock.calls.map(([params]) => params?.q);
+    expect(qs[qs.length - 1]).toHaveLength(200);
+  });
+
+  it('says so when no book matches, and keeps the picker enabled', async () => {
+    serveOwnBooks();
+    renderList();
+
+    const picker = await screen.findByRole('combobox', { name: 'Add a book' });
+    await userEvent.type(picker, 'zzz');
+    await waitPastDebounce();
+
+    expect(await screen.findByText('No books found')).toBeInTheDocument();
+    expect(picker).toBeEnabled();
+  });
+
+  it('disables the picker with "No books to add" when there are no candidates at all', async () => {
+    renderList(); // default mock: empty page
+
+    expect(await screen.findByText('No books to add')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Add a book' })).toBeDisabled();
   });
 
   it('takes a book out of the series only once that is confirmed', async () => {

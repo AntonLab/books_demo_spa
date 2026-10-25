@@ -90,12 +90,24 @@ export const useBooksInSeries = (seriesId: number) => {
   });
 };
 
-// The viewer's own books in no series: what the Edit series Books tab can file. The server filters by author only; `select` drops books already in a series.
-// ponytail: one page at the server's cap, as useBooksInSeries.
-export const useOwnBooksWithoutSeries = (userId: number, enabled: boolean) => {
+// The viewer's own books in no series: what the Edit series Books tab can file.
+// The server filters by author and searches by `q` (title or description), so a
+// Book past the first 100 is reachable by typing its title; `select` drops
+// books already in a series.
+// ponytail: a search shows at most one page (the server's cap) of matches.
+export const useOwnBooksWithoutSeries = (
+  userId: number,
+  q: string,
+  enabled: boolean
+) => {
+  const params: ListBooksParams = {
+    userId,
+    pageSize: PAGE_SIZE_MAX,
+    q: q.trim() === '' ? undefined : q.trim(),
+  };
   return useQuery({
-    queryKey: queryKeys.books({ userId, pageSize: PAGE_SIZE_MAX }),
-    queryFn: () => listBooks({ userId, pageSize: PAGE_SIZE_MAX }),
+    queryKey: queryKeys.books(params),
+    queryFn: () => listBooks(params),
     select: (page) => page.items.filter((book) => book.seriesId === null),
     enabled,
   });
