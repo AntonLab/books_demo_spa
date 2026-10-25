@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BookRowActions, SeriesRowActions } from './WorkRowActions';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -125,6 +125,9 @@ describe.each(kinds)('$noun row actions in My works', (kind) => {
       await screen.findByRole('button', { name: 'Cancel' })
     );
 
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull()
+    );
     expect(kind.remove).not.toHaveBeenCalled();
   });
 
@@ -182,11 +185,13 @@ it('does not let one row block another row from removing its favorite', async ()
 
   await clickWorkMenuItem(book.title, 'Remove from favorites');
   await openWorkMenu(series.title);
-  // The first, closed menu stays in the DOM (zeroRuntime); the open one is last.
-  const items = await screen.findAllByRole('menuitem', {
-    name: 'Remove from favorites',
-  });
-  await userEvent.click(items[items.length - 1]!);
+  const menu = (await screen.findAllByRole('menu')).find(
+    (m) =>
+      !m.closest('.ant-dropdown')?.classList.contains('ant-dropdown-hidden')
+  )!;
+  await userEvent.click(
+    within(menu).getByRole('menuitem', { name: 'Remove from favorites' })
+  );
 
   expect(mockedFavorites.deleteFavorite).toHaveBeenCalledTimes(2);
   expect(mockedFavorites.deleteFavorite).toHaveBeenCalledWith(41);

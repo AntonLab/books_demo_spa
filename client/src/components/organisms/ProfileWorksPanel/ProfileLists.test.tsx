@@ -168,11 +168,12 @@ describe('ProfileBooksList in My works', () => {
     expect(mockedBooks.listBooks).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 3, current: 1, pageSize: 20 })
     );
-    await clickWorkMenuItem('Out Now', 'Edit');
-    expect(onEdit).toHaveBeenCalledWith(2);
+    await openWorkMenu('Out Now');
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith(2);
   });
 
   it('hides the Author field of the form, and keeps the other books fields', async () => {
@@ -300,11 +301,12 @@ describe('ProfileSeriesList', () => {
       await screen.findByRole('link', { name: 'The Scale Cycle' })
     ).toHaveAttribute('href', '/series/12');
     expect(screen.getByText('1 book')).toBeInTheDocument();
-    await clickWorkMenuItem('The Scale Cycle', 'Edit');
-    expect(onEdit).toHaveBeenCalledWith(12);
+    await openWorkMenu('The Scale Cycle');
     expect(
       screen.getByRole('menuitem', { name: 'Delete' })
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    expect(onEdit).toHaveBeenCalledWith(12);
     expect(screen.getByLabelText('Tag')).toBeInTheDocument();
     for (const label of ['Author', 'Status'])
       expect(screen.queryByLabelText(label)).toBeNull();
