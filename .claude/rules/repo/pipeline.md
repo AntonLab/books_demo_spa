@@ -29,7 +29,8 @@ per-call values.
   `cavecrew-investigator` before it: they map the same code twice. Plans carry
   contracts and tests, not implementation bodies; `node scripts/plan-check.mjs
 <plan>` enforces it, and fails a task over 180 lines.
-- **Every plan goes through plan-writer.** The main session never writes one.
+- **Every plan goes through plan-writer.** The main session never writes one:
+  it costs several times the plan-writer's tokens for a plan of the same size.
 - **A `DONE_WITH_CONCERNS` from any agent:** take a recommendation that stays
   inside the spec, add `accepted without user: <concern> -> <choice>` to the
   follow-ups file, and go on; the user reviews those lines with the other
@@ -46,7 +47,8 @@ per-call values.
 - **Every plan runs `superpowers:subagent-driven-development`**, and every
   task, a two-line fix brief included, gets an `sdd-task-reviewer`: a task
   review costs about 0.08M tokens, and skipping it let defects through. Do not run
-  `superpowers:executing-plans` inline.
+  `superpowers:executing-plans` inline: the Opus session pays about as much as
+  all the implementers together and compacts more often.
 - **Light mode** is for a spec that touches no `client/src` and names at most
   three files to change. Skip `code-mapper`; plan-writer reads those files
   itself. When the plan has one task, skip `sdd-final-reviewer`: the task
@@ -55,7 +57,8 @@ per-call values.
   comes back with more than two tasks leaves light mode for the final review.
 - **Prefer one spec per main session.** After the PR for a spec is opened,
   suggest `/clear` before the next spec: a long context compacts repeatedly and
-  costs more. Continuing is fine when the next spec is small and related. A
+  costs more. Continuing is fine when the next spec is small and related. The
+  spec, code map, plan, ledger and follow-ups files carry the state. A
   PostToolUse hook prints a reminder after `gh pr create`.
 - **One PR per spec** (or per two or three small related specs, or per
   `/swarm:queue` run of up to 5 issues with one commit group per issue): a
@@ -72,23 +75,12 @@ per-call values.
   `| tail` passes, but it is not a `gates green` line. Before the final
   `gate-runner` the controller runs `git fetch` and `npm run branch:check`;
   if the branch is behind, rebase first, then run the gates.
-- **A PR body reports only checks that have finished**, with their result.
-  Write a pending check as pending, never as its expected result; update the
+- **A PR body reports only checks that have finished**, with their result:
+  a past PR body listed a plan-check run before it ran. Write a pending check as pending, never as its expected result; update the
   body once it finishes.
 - **A diff that touches `client/src` gets a `ui-checker` run** after the
-  changed-files audit's fixes and before `finishing-a-development-branch`, because it finds
-  defects every review passed: a numbered checklist of at most 8 items from
-  the spec's user-visible behavior, the worktree as working directory. It
-  serves the worktree on ports 3100/4100, never the user's server on 3000. Its
-  FAIL items are fixed like final-review findings: the fix brief quotes the
-  FAIL line with its measured values, and the implementer's report says why
-  the change moves them. Build each item from what the seeded data can reach:
-  roles are `user`, `author`, `admin` and `superadmin` (check `USER_ROLES` in
-  `shared/`). Fix all FAIL items first, then send one recheck run with only
-  those items. Skip it in a follow-up round that changes no rendered output
-  (its cost grows with every call: 32% of workers in PR #251). Save each
-  run's returned list with `Write` to `.superpowers/sdd/<topic>/ui-check.md`
-  under a `## <sha>` heading; `/swarm:ship` builds the test plan from it.
+  changed-files audit's fixes and before `finishing-a-development-branch`;
+  Read `.claude/rules/repo/ui-check.md` for the checklist rules.
 - **Follow-ups live in a file, not in the chat.** Each deferred finding,
   out-of-scope observation or unresolved item goes, the moment it appears, into
   `docs/superpowers/specs/YYYY-MM-DD-<topic>-followups.md` with `Edit`, since
@@ -127,7 +119,8 @@ per-call values.
   it burned the weekly limit mid-plan.
 - **Token check:** `npm run tokens -- <session-id> [from-ISO] [to-ISO]` prints
   totals per subagent role and the main session's compactions for a session
-  window. Give its numbers to `superpowers:diagnosing-superpowers`.
+  window. Give its numbers to `superpowers:diagnosing-superpowers` instead of
+  rebuilding the tally.
 - **Never pause between tasks.** Stop only on `BLOCKED`, `NEEDS_CONTEXT`, a
   concern the `DONE_WITH_CONCERNS` rule sends to the user, or the end of the
   plan. After `/compact`, re-read the plan's ledger under `.superpowers/sdd/`
