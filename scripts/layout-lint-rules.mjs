@@ -1,13 +1,13 @@
-// Runs in the page, so it must stay self-contained (page.evaluate serializes it).
-// Two rules: R1 a visible element lies outside the viewport (scrollable
-// containers and SVG are skipped); R2 a word of 6+ characters spans several
-// lines (line-clamp and ellipsis text are skipped).
-// True when the app ended on another path than requested; ?query, #hash and a
-// trailing "/" do not count.
+// Runs in Node: true when the app ended on another path than requested;
+// ?query, #hash and a trailing "/" do not count.
 export const isRedirected = (path, landed) =>
   landed.replace(/\/$/, '') !==
   `/${path.replace(/[?#].*$/, '')}`.replace(/\/$/, '');
 
+// Runs in the page, so it must stay self-contained (page.evaluate serializes it).
+// Two rules: R1 a visible element lies outside the viewport (scrollable
+// containers and SVG are skipped); R2 a word of 6+ characters spans several
+// lines (line-clamp and ellipsis text are skipped).
 export const lint = () => {
   const W = window.innerWidth;
   const found = {
