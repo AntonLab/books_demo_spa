@@ -79,6 +79,14 @@ test('a missing git exits non-zero naming git, not a TypeError', (t) => {
   assert.doesNotMatch(result.stderr, /TypeError/);
 });
 
+test('a tracked brief does not match its own tokens', (t) => {
+  const repo = sandbox(t, '`deadName`\n');
+  spawnSync('git', ['add', 'brief.md'], { cwd: repo });
+  const result = run(repo);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /deadName hits=0/);
+});
+
 test('no argument exits 2 with usage', (t) => {
   const repo = sandbox(t, '');
   const result = spawnSync(process.execPath, ['scripts/brief-check.mjs'], {
