@@ -56,6 +56,37 @@ test('a path of a tracked file counts as one hit', (t) => {
   assert.match(result.stdout, /src\/code\.ts hits=1/);
 });
 
+test('an untracked file named in the brief reports hits=0', (t) => {
+  const repo = sandbox(t, '`src/untracked.ts`\n');
+  writeFileSync(join(repo, 'src', 'untracked.ts'), 'export const x = 1;\n');
+  const result = run(repo);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /src\/untracked\.ts hits=0/);
+});
+
+test('a missing git exits non-zero naming git, not a TypeError', (t) => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/brief-check.mjs', 'brief.md'],
+    {
+      cwd: sandbox(t, '`liveName`\n'),
+      encoding: 'utf8',
+      env: { ...process.env, PATH: '', Path: '' },
+    }
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /git/);
+  assert.doesNotMatch(result.stderr, /TypeError/);
+});
+
+test('a tracked brief does not match its own tokens', (t) => {
+  const repo = sandbox(t, '`deadName`\n');
+  spawnSync('git', ['add', 'brief.md'], { cwd: repo });
+  const result = run(repo);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /deadName hits=0/);
+});
+
 test('no argument exits 2 with usage', (t) => {
   const repo = sandbox(t, '');
   const result = spawnSync(process.execPath, ['scripts/brief-check.mjs'], {
