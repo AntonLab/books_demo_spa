@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { lint } from '../layout-lint-rules.mjs';
 
-// Needs an installed Edge or Chrome (the script's own requirement). Skipped
-// where neither launches, with the launch error in the message; under CI the
-// suite fails instead, so a broken browser install cannot pass unnoticed.
+// Needs an installed Edge or Chrome. Skipped where none launches; under CI it
+// fails, so a broken install cannot pass unnoticed.
 let browser;
 let launchError;
 before(async () => {
