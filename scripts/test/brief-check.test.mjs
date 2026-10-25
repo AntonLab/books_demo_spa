@@ -64,6 +64,21 @@ test('an untracked file named in the brief reports hits=0', (t) => {
   assert.match(result.stdout, /src\/untracked\.ts hits=0/);
 });
 
+test('a missing git exits non-zero naming git, not a TypeError', (t) => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/brief-check.mjs', 'brief.md'],
+    {
+      cwd: sandbox(t, '`liveName`\n'),
+      encoding: 'utf8',
+      env: { ...process.env, PATH: '', Path: '' },
+    }
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /git/);
+  assert.doesNotMatch(result.stderr, /TypeError/);
+});
+
 test('no argument exits 2 with usage', (t) => {
   const repo = sandbox(t, '');
   const result = spawnSync(process.execPath, ['scripts/brief-check.mjs'], {

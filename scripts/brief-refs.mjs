@@ -12,12 +12,13 @@ import { extractTokens } from './doc-refs.mjs';
 const FILE_NAME = /\.(ts|tsx|mjs|md|json)$/;
 
 const git = (root, args) => {
-  const { status, stdout, stderr } = spawnSync('git', args, {
+  const { status, stdout, stderr, error } = spawnSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   });
-  if (status > 1) throw new Error(`git ${args[0]} failed: ${stderr}`);
+  if (status !== 0 && status !== 1)
+    throw new Error(`git ${args[0]} failed: ${error?.message ?? stderr}`);
   return stdout;
 };
 
