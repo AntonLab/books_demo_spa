@@ -3,7 +3,8 @@
  * every feature starts from and every PR targets. Work on a stale base passes
  * locally and then conflicts, or fails CI on the merge ref.
  *
- *   npm run branch:check              exit 1 when behind, with the fix
+ *   npm run branch:check              exit 1 when behind or when the branch's
+ *                                     PR is already merged, with the fix
  *   node scripts/branch-check.mjs --warn   print only when behind, always exit 0
  *
  * `--warn` is the SessionStart hook: silence costs no context, and a failed
@@ -41,6 +42,37 @@ try {
 } catch {
   if (warnOnly) process.exit(0);
   report(`branch-check: ${base} not found.`);
+}
+
+// A commit pushed to a branch whose PR already merged never reaches `dev`.
+// Skipped for `--warn` (the SessionStart hook must not wait on the network)
+// and when `gh` is missing or offline.
+if (!warnOnly && branch !== 'dev' && branch !== 'main') {
+  let merged = '';
+  try {
+    merged = execFileSync(
+      'gh',
+      [
+        'pr',
+        'list',
+        '--head',
+        branch,
+        '--state',
+        'merged',
+        '--json',
+        'number',
+        '--jq',
+        '.[0].number',
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 15000 }
+    ).trim();
+  } catch {
+    // no gh, no network: skip the check
+  }
+  if (merged)
+    report(
+      `branch-check: PR #${merged} of ${branch} is already merged. A new commit here will not reach dev: branch from ${base} and open a new PR.`
+    );
 }
 
 if (behind === 0) {
