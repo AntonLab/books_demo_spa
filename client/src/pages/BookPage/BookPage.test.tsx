@@ -1,6 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes, useLocation, useNavigationType } from 'react-router';
+import {
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+} from 'react-router';
 import { EMPTY_LIBRARY_COUNTS } from 'shared';
 import { BookPage } from './BookPage';
 import { renderWithProviders } from '@/test/renderWithProviders';
@@ -103,6 +109,11 @@ const SearchProbe = () => <p data-testid="search">{useLocation().search}</p>;
 
 const NavTypeProbe = () => <p data-testid="navtype">{useNavigationType()}</p>;
 
+const BackProbe = () => {
+  const navigate = useNavigate();
+  return <button onClick={() => void navigate(-1)}>Go back</button>;
+};
+
 const renderPage = (
   session?: PublicUser,
   preloadedState?: Partial<RootState>,
@@ -118,6 +129,7 @@ const renderPage = (
       <BookPage />
       <SearchProbe />
       <NavTypeProbe />
+      <BackProbe />
     </>,
     {
       route: `/books/${id}${search}`,
@@ -970,6 +982,33 @@ describe('BookPage Edit button', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.getByTestId('search')).toHaveTextContent(/^\?x=1$/);
+  });
+
+  it('closes the modal on Back after Edit opened it, leaving the page', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await screen.findByRole('dialog');
+    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
+  });
+
+  it('does not reopen the modal on Back after it was closed', async () => {
+    renderPage({ ...reader, id: 4, role: 'author' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Close',
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Go back' }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('search')).toHaveTextContent(/^$/);
   });
 
   it('offers a Moderator the same Edit button, and a plain reader none', async () => {

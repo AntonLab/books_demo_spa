@@ -107,6 +107,7 @@ Routing and the App shell: `routing.md`.
   The Edit modal's open state is the `?edit=1` param on `/books/:id` (for a viewer
   without `mayEdit` it is removed with `replace` once the page has loaded, and
   kept while the book or viewer loads); the profile works list's book Edit links there.
+  Opening pushes an entry, so Back closes it; closing replaces.
 - `usePageClamp` redirects a page past the end, with `replace`, to the last
   page of the true `total`. A books page past the end is served as the last
   non-empty page and a series page comes back empty, both with the true

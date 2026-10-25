@@ -65,7 +65,8 @@ const DropEditParam: FC<{ onDrop: () => void }> = ({ onDrop }) => {
 const BookView: FC<{ bookId: number }> = ({ bookId }) => {
   const { token } = theme.useToken();
   const navigate = useNavigate();
-  // `?edit=1` lets a link open the Edit modal.
+  // `?edit=1` lets a link open the Edit modal. Edit pushes an entry so Back
+  // closes it; closing and the non-editor strip replace.
   const [searchParams, setSearchParams] = useSearchParams();
   const editing = searchParams.get(EDIT_PARAM) === EDIT_PARAM_OPEN;
   const setEditing = (open: boolean) =>
@@ -76,7 +77,7 @@ const BookView: FC<{ bookId: number }> = ({ bookId }) => {
         else next.delete(EDIT_PARAM);
         return next;
       },
-      { replace: true }
+      { replace: !open }
     );
 
   const { data: session } = useSession();
