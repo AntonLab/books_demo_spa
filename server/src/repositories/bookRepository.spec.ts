@@ -975,9 +975,11 @@ describe('bookRepository against real MySQL', { skip }, () => {
   test('a page in range costs one books query, and no item carries the window total', async () => {
     await seedRings();
     const bookSelects: string[] = [];
-    const hook = (_options: unknown, query: { sql?: string }) => {
-      if (/^SELECT .* FROM `books` AS `Book`/s.test(query.sql ?? '')) {
-        bookSelects.push(query.sql ?? '');
+    // AbstractQuery's typings omit `sql`, hence the cast.
+    const hook = (_options: unknown, query: object) => {
+      const { sql = '' } = query as { sql?: string };
+      if (/^SELECT .* FROM `books` AS `Book`/s.test(sql)) {
+        bookSelects.push(sql);
       }
     };
     // afterQuery: Sequelize 6 sets `query.sql` only inside `query.run`.
