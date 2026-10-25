@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FC } from 'react';
 import {
   CommentOutlined,
@@ -57,8 +57,14 @@ export const BookPage: FC = () => {
 
 // A child, since the early returns in BookView leave no room for a hook that
 // needs `mayEdit`.
+// The caller's `onDrop` is a new function every render; the ref keeps the
+// latest one so the effect runs once on mount, not on every render.
 const DropEditParam: FC<{ onDrop: () => void }> = ({ onDrop }) => {
-  useEffect(onDrop, [onDrop]);
+  const latest = useRef(onDrop);
+  useEffect(() => {
+    latest.current = onDrop;
+  });
+  useEffect(() => latest.current(), []);
   return null;
 };
 
