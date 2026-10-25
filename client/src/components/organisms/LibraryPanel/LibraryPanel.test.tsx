@@ -87,6 +87,28 @@ describe('LibraryPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('puts Remove below the tile in grid and beside it in list', async () => {
+    mockedLibrary.listLibrary.mockResolvedValue(
+      page([entry(1, 'Dragons', 'reading')])
+    );
+    const { store } = renderPanel();
+    const link = await titleLink('Dragons');
+    setLayout(store, 'grid');
+    const remove = screen.getByRole('button', {
+      name: 'Remove Dragons from Library',
+    });
+    expect(
+      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(remove.parentElement).toHaveClass('ant-flex-vertical');
+
+    setLayout(store, 'list');
+    expect(remove.parentElement).not.toHaveClass('ant-flex-vertical');
+    expect(
+      link.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('shows the full-width list with descriptions in list layout', async () => {
     mockedLibrary.listLibrary.mockResolvedValue(
       page([entry(1, 'Dragons', 'reading')])

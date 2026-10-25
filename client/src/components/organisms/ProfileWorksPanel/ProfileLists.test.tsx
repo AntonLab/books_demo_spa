@@ -226,6 +226,24 @@ describe('ProfileBooksList in Favorites', () => {
     );
     expect(mockedBooks.listBooks).not.toHaveBeenCalled();
   });
+
+  it('has the layout switch on a non-empty list, and a pick changes the Device preference', async () => {
+    mockedBooks.listFavoritedBooks.mockResolvedValue(
+      page([book(2, 'Out Now', 'complete', 41)]) as Awaited<
+        ReturnType<typeof booksApi.listFavoritedBooks>
+      >
+    );
+    const { store } = renderAs(
+      <ProfileBooksList scope="favorites" viewerId={3} onEdit={jest.fn()} />
+    );
+    const link = await screen.findByRole('link', { name: 'Out Now' });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
+
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+  });
 });
 
 describe('ProfileSeriesList', () => {

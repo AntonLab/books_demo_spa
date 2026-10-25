@@ -164,6 +164,28 @@ describe('PublicWorksList', () => {
     expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
   });
 
+  it('switches Books from tiles to a list from the switch, on a non-empty list', async () => {
+    mockedBooks.listBooks.mockResolvedValue({
+      items: [book(1, 'Alpha')],
+      total: 1,
+      current: 1,
+      pageSize: 20,
+    });
+    const { store } = renderWithProviders(
+      <PublicWorksList kind="books" userId={7} />,
+      { route: '/accounts/7' }
+    );
+    const link = await screen.findByRole('link', { name: 'Alpha' });
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-xs-12');
+    expect(screen.queryByText('D.')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+
+    expect(store.getState().devicePreferences.resultsLayout).toBe('list');
+    expect(link.closest('.ant-col')).toHaveClass('ant-col-24');
+    expect(screen.getAllByText('D.').length).toBeGreaterThan(0);
+  });
+
   it('has the layout switch on Books, next to the Sort order, and keeps it on an empty list', async () => {
     mockedBooks.listBooks.mockResolvedValue({
       items: [],
