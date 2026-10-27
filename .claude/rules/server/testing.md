@@ -51,7 +51,7 @@ Each answers a question the others cannot:
   or a missing database passes it silently.
 - `node:test` runs spec files in parallel processes, and two suites calling
   `sync({ force: true })` on one schema drop each other's tables. So each suite
-  has its own schema, named `TEST_DB_NAME` (default `books_demo_spa_test`) plus
+  has its own schema, named `TEST_DB_NAME` (default `books_spa_test`) plus
   `_<suite>`. `posttest` (`db/dropTestDatabases.testkit.ts`) drops everything
   under that prefix after a green run; a red run leaves the rows for
   inspection. A schema named any other way stays on disk forever.

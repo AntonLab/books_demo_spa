@@ -9,7 +9,7 @@ test('applies defaults for host, port, database, env and app port', () => {
 
   assert.equal(config.db.host, '127.0.0.1');
   assert.equal(config.db.port, 3306);
-  assert.equal(config.db.database, 'books_demo_spa');
+  assert.equal(config.db.database, 'books_spa');
   assert.equal(config.env, 'development');
   assert.equal(config.port, 4000);
 });

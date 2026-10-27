@@ -1,4 +1,4 @@
-# Server — books_demo_spa
+# Server — books_spa
 
 Express 5 + Sequelize 6 / MySQL API, run as native TypeScript on Node >= 24.
 
@@ -73,7 +73,7 @@ refuses to start on a malformed value. The traps:
   Production must set it; see README.
 - `DB_USER` / `DB_PASSWORD` have no default, so the server never starts against
   an unintended database.
-- The test suite alone reads `TEST_DB_NAME` (default `books_demo_spa_test`) and
+- The test suite alone reads `TEST_DB_NAME` (default `books_spa_test`) and
   `SKIP_MYSQL` (see `testing.md`).
 
 ## Runtime

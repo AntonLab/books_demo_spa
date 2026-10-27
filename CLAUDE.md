@@ -1,4 +1,4 @@
-# Claude Code — books_demo_spa
+# Claude Code — books_spa
 
 Three npm workspaces under one root `package.json`: a webpack-bundled React
 (TypeScript) frontend, an Express + Sequelize backend, and the API types both
@@ -105,7 +105,7 @@ reviewers read it; implementers do not, so a rule there costs no context.
 
 ## Agent skills
 
-- **Issues**: GitHub issues on `AntonLab/books_demo_spa` through `gh`. See
+- **Issues**: GitHub issues on `AntonLab/books_spa` through `gh`. See
   `docs/agents/issue-tracker.md`.
 - **Triage labels**: five canonical roles, label equal to name. See
   `docs/agents/triage-labels.md`.

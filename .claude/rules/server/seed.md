@@ -58,7 +58,7 @@ answering "User Four" reads as a test run, not a demo). Personas are in
 - The delete and every insert share one transaction; a failure leaves the
   previous demo intact.
 - Guards (`seedGuards.ts`): `NODE_ENV=production` is refused regardless of
-  flags; a `DB_NAME` other than `books_demo_spa` gets a loud warning.
+  flags; a `DB_NAME` other than `books_spa` gets a loud warning.
 
 ## Tests
 

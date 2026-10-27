@@ -14,7 +14,7 @@ interface QueryGeneratorLike {
 }
 
 const createTableSql = (() => {
-  const sequelize = new Sequelize('books_demo_spa', 'user', 'pass', {
+  const sequelize = new Sequelize('books_spa', 'user', 'pass', {
     dialect: 'mysql',
     logging: false,
   });

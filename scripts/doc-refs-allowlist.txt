@@ -32,7 +32,7 @@ repositories/<name>Repository.fake.testkit.ts
 /books/:id/chapters/:chapterId/edit
 
 # Repositories on GitHub, outside this tree.
-AntonLab/books_demo_spa
+AntonLab/books_spa
 AntonLab/custom-agents-swarm
 
 # Properties, columns and methods (Type.member, table.column) whose parent is a real

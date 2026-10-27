@@ -9,7 +9,7 @@ const envSchema = z.object({
   PORT: port.default(4000),
   DB_HOST: z.string().min(1).default('127.0.0.1'),
   DB_PORT: port.default(3306),
-  DB_NAME: z.string().min(1).default('books_demo_spa'),
+  DB_NAME: z.string().min(1).default('books_spa'),
   // No defaults for the credentials on purpose: a root/root fallback would let
   // the server start against an unintended database, and the mistake would
   // surface later as confusing data instead of immediately as a config error.

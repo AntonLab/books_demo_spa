@@ -7,7 +7,7 @@
 // clears them away.
 //
 // The suites are found by name rather than from a list: every one of them
-// derives its schema from `TEST_DB_NAME ?? 'books_demo_spa_test'`, so that
+// derives its schema from `TEST_DB_NAME ?? 'books_spa_test'`, so that
 // prefix is the whole test namespace, and a suite added later is cleaned up
 // without anyone remembering to add it here.
 

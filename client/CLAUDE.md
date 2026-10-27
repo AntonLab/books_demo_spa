@@ -1,4 +1,4 @@
-# Client — books_demo_spa
+# Client — books_spa
 
 React 19 + TypeScript SPA bundled with webpack 5. Server state lives in
 TanStack Query (`src/queries/`). Client state that outlives the component
