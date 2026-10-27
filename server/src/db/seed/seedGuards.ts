@@ -8,7 +8,7 @@ import type { AppConfig } from '../config.ts';
 
 // The schema this seed is written for. Any other name needs --force, which is
 // the same flag that authorises the delete — one gesture, two guards.
-export const DEMO_DATABASE = 'books_demo_spa';
+export const DEMO_DATABASE = 'books_spa';
 
 export function assertSafeTarget(config: AppConfig, force: boolean): void {
   // Unconditional: no flag makes wiping a production database this script's

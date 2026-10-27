@@ -6,7 +6,7 @@
 
 import { parseConfig, type DbConfig } from './config.ts';
 
-export const TEST_DB_BASE = process.env.TEST_DB_NAME ?? 'books_demo_spa_test';
+export const TEST_DB_BASE = process.env.TEST_DB_NAME ?? 'books_spa_test';
 
 export function testDbName(suffix: string): string {
   return `${TEST_DB_BASE}_${suffix}`;

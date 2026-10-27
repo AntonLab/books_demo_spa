@@ -1,7 +1,7 @@
-# books_demo_spa
+# books_spa
 
-[![CI](https://github.com/AntonLab/books_demo_spa/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonLab/books_demo_spa/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml/badge.svg)](https://github.com/AntonLab/books_demo_spa/actions/workflows/codeql.yml)
+[![CI](https://github.com/AntonLab/books_spa/actions/workflows/ci.yml/badge.svg)](https://github.com/AntonLab/books_spa/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/AntonLab/books_spa/actions/workflows/codeql.yml/badge.svg)](https://github.com/AntonLab/books_spa/actions/workflows/codeql.yml)
 
 A demo single-page application for browsing books: a React 19 + TypeScript
 frontend and an Express 5 + Sequelize/MySQL API, kept in one repository as three
@@ -48,7 +48,7 @@ The client dev server proxies `/api` to `http://localhost:4000`, so the browser
 only ever talks to one origin in development.
 
 On start-up (outside `NODE_ENV=production`) the server creates the
-`books_demo_spa` schema if it is missing and syncs the Sequelize models, so a
+`books_spa` schema if it is missing and syncs the Sequelize models, so a
 clean MySQL install needs no manual migration step.
 
 ## Environment
@@ -62,7 +62,7 @@ broken server.
 | `NODE_ENV`                    | `development`              | `development` \| `test` \| `production`; also picks the argon2 cost (`test` is deliberately weak) and gates the cookie's `secure` flag                                                                                        |
 | `PORT`                        | `4000`                     | The API's port                                                                                                                                                                                                                |
 | `DB_HOST` / `DB_PORT`         | `127.0.0.1` / `3306`       |                                                                                                                                                                                                                               |
-| `DB_NAME`                     | `books_demo_spa`           |                                                                                                                                                                                                                               |
+| `DB_NAME`                     | `books_spa`                |                                                                                                                                                                                                                               |
 | `DB_USER` / `DB_PASSWORD`     | _(none)_                   | Required — no default, on purpose. An empty password is accepted, a missing one is not.                                                                                                                                       |
 | `APP_BASE_URL`                | `http://localhost:3000`    | Client origin: builds emailed links and is the CSRF trusted origin                                                                                                                                                            |
 | `TRUST_PROXY`                 | `0` (none in production)   | Reverse-proxy hops to trust for the client address (`X-Forwarded-For`); `0` trusts none. The sign-in limits key on `req.ip`, so set it behind a proxy. Production must set it explicitly (`0` is valid); boot fails otherwise |

@@ -21,7 +21,7 @@ interface QueryGeneratorLike {
 // Built once: initModels declares the associations, and Sequelize rejects a
 // second association under the same alias.
 const createTableSql = (() => {
-  const sequelize = new Sequelize('books_demo_spa', 'user', 'pass', {
+  const sequelize = new Sequelize('books_spa', 'user', 'pass', {
     dialect: 'mysql',
     logging: false,
   });
